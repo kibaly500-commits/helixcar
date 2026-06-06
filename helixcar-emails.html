@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HelixCar — Aperçu des emails</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--y:#F5C518;--bk:#0D0D0D;--nv:#0A1628;--bl:#2556A8;--wh:#FAFAF7;--gr:#8A8A8A;--gl:#F0EFE9;--gn:#22C55E;--rd:#EF4444;--or:#F97316;--t:.25s ease}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'DM Sans',sans-serif;background:var(--gl);min-height:100vh}
+.hdr{background:var(--nv);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem}
+.lb{width:26px;height:26px;background:var(--y);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:var(--bk)}
+.tabs{display:flex;gap:0;background:rgba(255,255,255,.08);border-radius:10px;padding:4px}
+.tab{padding:8px 18px;border-radius:7px;cursor:pointer;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.6);transition:all var(--t);border:none;background:transparent}
+.tab.active{background:var(--y);color:var(--bk)}
+.main{max-width:700px;margin:0 auto;padding:24px 16px}
+.section-label{font-family:'Syne',sans-serif;font-weight:700;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gr);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.section-label::before{content:'';display:block;width:16px;height:2px;background:var(--y)}
+.email-card{background:var(--wh);border-radius:14px;overflow:hidden;margin-bottom:20px;box-shadow:0 2px 16px rgba(0,0,0,.08)}
+.email-chrome{background:#F0F0F0;padding:10px 16px;border-bottom:1px solid #DDD;display:flex;align-items:center;gap:8px}
+.chrome-dot{width:10px;height:10px;border-radius:50%}
+.email-meta{background:#FAFAFA;padding:14px 20px;border-bottom:1px solid #EEE;font-size:.82rem;color:#555}
+.email-meta strong{color:var(--bk)}
+.email-body{padding:0}
+/* Email HTML styles */
+.em{font-family:'DM Sans',sans-serif;background:#fff;color:#1a1a1a;line-height:1.6}
+.em-header{background:var(--nv);padding:28px 32px;text-align:center}
+.em-logo{display:inline-flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff}
+.em-logo-badge{width:32px;height:32px;background:var(--y);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:var(--bk)}
+.em-content{padding:28px 32px}
+.em-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;margin-bottom:8px;color:var(--bk)}
+.em-subtitle{font-size:.88rem;color:#555;margin-bottom:24px}
+.em-box{background:var(--gl);border-radius:10px;padding:18px;margin-bottom:16px}
+.em-box h4{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:12px;color:var(--bk)}
+.em-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.84rem}
+.em-row:last-child{border-bottom:none}
+.em-row span:first-child{color:var(--gr)}
+.em-row span:last-child{font-weight:600}
+.em-alert{border-radius:8px;padding:12px 16px;font-size:.83rem;margin-bottom:14px;line-height:1.6}
+.em-alert-warning{background:rgba(239,68,68,.06);border-left:3px solid var(--rd);color:#C2410C}
+.em-alert-success{background:rgba(34,197,94,.06);border-left:3px solid var(--gn);color:#16A34A}
+.em-alert-info{background:rgba(37,86,168,.06);border-left:3px solid var(--bl);color:var(--bl)}
+.em-btn{display:inline-block;background:var(--y);color:var(--bk);padding:12px 28px;border-radius:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;text-decoration:none;margin:8px 4px}
+.em-footer{background:var(--nv);padding:20px 32px;text-align:center;font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.7}
+.penalty-box{background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;padding:16px;margin-bottom:14px}
+.penalty-box h4{color:var(--rd);font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:8px}
+.penalty-box p{font-size:.83rem;color:#555;line-height:1.6}
+/* UI */
+.email-group{margin-bottom:32px}
+[id^="group-"]{display:none}
+[id^="group-"].active{display:block}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:100px;font-size:.72rem;font-weight:700}
+.badge-conv{background:rgba(34,197,94,.12);color:var(--gn)}
+.badge-client{background:rgba(37,86,168,.1);color:var(--bl)}
+.card-nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.cnav-btn{padding:8px 16px;border-radius:8px;border:1.5px solid #ddd;background:#fff;cursor:pointer;font-size:.82rem;font-weight:600;color:#555;transition:all var(--t)}
+.cnav-btn.active{border-color:var(--y);background:rgba(245,197,24,.1);color:var(--bk)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="logo"><div class="lb">HC</div>HelixCar — Aperçu emails</div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchRole('conv', this)">🚗 Convoyeur</button>
+    <button class="tab" onclick="switchRole('client', this)">👤 Client</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ══ CONVOYEUR ══ -->
+  <div id="group-conv" class="active">
+    <div class="section-label">Emails reçus par le convoyeur</div>
+    <div class="card-nav">
+      <button class="cnav-btn active" onclick="showEmail('conv', 'inscription', this)">📧 Inscription</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'validation', this)">✅ Validation compte</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'mission', this)">🚗 Fiche mission</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'penalite', this)">⚠️ Pénalité</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'rappel', this)">🔔 Rappel missions</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'challenge', this)">🏆 Récompense challenge</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'retard', this)">⏰ Signalement retard</button>
+      <button class="cnav-btn" onclick="showEmail('conv', 'scenario', this)" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#C2410C">⚠️ Scénario : Note chute</button>
+    </div>
+
+    <!-- Inscription convoyeur -->
+    <div class="email-card" id="email-conv-inscription">
+      <div class="email-chrome">
+        <div class="chrome-dot" style="background:#FF5F57"></div>
+        <div class="chrome-dot" style="background:#FFBD2E"></div>
+        <div class="chrome-dot" style="background:#28C840"></div>
+      </div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> HelixCar — Candidature reçue, étape suivante 🎬</div>
+      </div>
+      <div class="email-body">
+        <div class="em">
+          <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+          <div class="em-content">
+            <div class="em-title">Bonjour Antoine,</div>
+            <div class="em-subtitle">Votre candidature convoyeur a bien été reçue. Merci !</div>
+            <div class="em-alert em-alert-success">✅ Votre dossier est en cours d'examen par notre équipe. Vous recevrez une réponse sous 48h ouvrées.</div>
+            <div class="em-box">
+              <h4>📋 Récapitulatif de votre candidature</h4>
+              <div class="em-row"><span>Nom</span><span>Antoine Arcelin</span></div>
+              <div class="em-row"><span>Email</span><span>antoine.arcelin@email.com</span></div>
+              <div class="em-row"><span>Expérience</span><span>5 à 10 ans</span></div>
+              <div class="em-row"><span>Documents</span><span>✅ Pièce d'identité, Permis, RC Pro</span></div>
+              <div class="em-row"><span>Vidéo de présentation</span><span>✅ Reçue</span></div>
+              <div class="em-row"><span>Statut</span><span>⏳ En cours d'examen</span></div>
+            </div>
+            <p style="font-size:.85rem;color:#555;line-height:1.7;margin-bottom:16px">Notre équipe va examiner votre profil et revenir vers vous très prochainement. En attendant, si vous avez des questions, n'hésitez pas à nous contacter.</p>
+            
+          </div>
+          <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com<br>Vous recevez cet email car vous avez soumis une candidature sur helixcar.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Validation compte -->
+    <div class="email-card" id="email-conv-validation" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> ✅ Compte validé — Bienvenue chez HelixCar !</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">🎉 Antoine, votre compte est validé !</div>
+          <div class="em-subtitle">Bienvenue dans la famille HelixCar. Vous pouvez désormais accéder à votre espace convoyeur.</div>
+          <div class="em-alert em-alert-success">✅ Vous faites maintenant partie du programme <strong>Convoyeurs d'Excellence</strong> HelixCar.</div>
+          <div class="em-box">
+            <h4>🔑 Accès à votre espace</h4>
+            <div class="em-row"><span>Email</span><span>antoine.arcelin@email.com</span></div>
+            <div class="em-row"><span>Statut</span><span>✅ Convoyeur certifié HelixCar</span></div>
+            <div class="em-row"><span>Accès missions</span><span>✅ Activé</span></div>
+          </div>
+          <div class="em-box">
+            <h4>📋 Règles de tenue — à respecter lors de chaque mission</h4>
+            <div style="font-size:.82rem;color:#555;line-height:1.8">
+              Tenue professionnelle obligatoire
+              ✖️ Baskets, chaussures de sport et tenues décontractées <strong>interdits</strong>
+            </div>
+          </div>
+          <div class="em-box">
+            <h4>⚠️ Règles de conduite et responsabilités</h4>
+            <div style="font-size:.82rem;color:#555;line-height:1.8">
+              • Tout retard, absence injustifiée, infraction routière (flash radar, stationnement...) ou manquement aux règles pourra entraîner une retenue.<br>
+              • Les retenues sont déterminées selon la gravité du manquement.<br>
+              • En cas de faute grave ou répétée, l'accès à la plateforme pourra être suspendu ou retiré définitivement.
+            </div>
+          </div>
+          <div class="em-box">
+            <h4>🚫 Annulation de mission par le client</h4>
+            <div style="font-size:.82rem;color:#555;line-height:1.8">
+              • Annulation moins de 48h avant : <strong>50% de la mission vous est dû</strong><br>
+              • Annulation le jour J : <strong>100% de la mission vous est dû</strong>
+            </div>
+          </div>
+          <div class="em-box">
+            <h4>⛽ Carburant — obligation impérative</h4>
+            <div style="font-size:.82rem;color:#555;line-height:1.8">Le convoyeur doit livrer le véhicule avec le <strong>même niveau de carburant</strong> qu'à la prise en charge. Tout manquement à cette règle entraînera une retenue sur la rémunération correspondant au coût du carburant manquant.
+            </div>
+          </div>
+          <a href="#" class="em-btn">Accéder à mon espace →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+    <!-- Fiche mission -->
+    <div class="email-card" id="email-conv-mission" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> 🚗 Mission confirmée — Paris → Lyon · 29/05/2024</div>
+        <div style="margin-top:4px;font-size:.78rem;color:#888">📎 Pièces jointes : fiche_mission_HC-2024-0529.pdf · bon_de_commande.pdf</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">Mission confirmée ✅</div>
+          <div class="em-subtitle">Voici le récapitulatif complet de votre mission. Ce document vous est transmis dès votre acceptation — la fiche mission et la lettre de voiture sont en pièces jointes.</div>
+          <div class="em-box">
+            <h4>🚗 Détails de la mission</h4>
+            <div class="em-row"><span>Référence</span><span>HC-2024-0529</span></div>
+            <div class="em-row"><span>Trajet</span><span>Paris → Lyon</span></div>
+            <div class="em-row"><span>Distance</span><span>463 km</span></div>
+            <div class="em-row"><span>Date</span><span>29/05/2024</span></div>
+            <div class="em-row"><span>Heure de rendez-vous</span><span><strong>08h00</strong></span></div>
+            <div class="em-row"><span>Adresse départ</span><span>12 rue de la Paix, 75001 Paris</span></div>
+            <div class="em-row"><span>Adresse arrivée</span><span>8 avenue Berthelot, 69007 Lyon</span></div>
+          </div>
+          <div class="em-box">
+            <h4>🚙 Véhicule</h4>
+            <div class="em-row"><span>Marque / Modèle</span><span>BMW Série 3 320d</span></div>
+            <div class="em-row"><span>Immatriculation</span><span>AB-123-CD</span></div>
+            <div class="em-row"><span>Couleur</span><span>Noir métallisé</span></div>
+            <div class="em-row"><span>Type de transport</span><span>Standard</span></div>
+          </div>
+          <div class="em-box">
+            <h4>👤 Client</h4>
+            <div class="em-row"><span>Nom</span><span>Marc Dupont</span></div>
+            <div class="em-row"><span>Téléphone</span><span>06 11 22 33 44</span></div>
+          </div>
+          <div class="em-box">
+            <h4>💰 Rémunération</h4>
+            <div class="em-row"><span>Votre rémunération</span><span style="color:var(--gn);font-weight:700;font-size:1.05rem">200 €</span></div>
+          </div>
+          <div class="em-alert em-alert-warning">💡 <strong>Rappel important :</strong><br>
+👔 Tenue professionnelle obligatoire<br>
+⛽ Livrer le véhicule avec le même niveau de carburant qu'à la prise en charge<br>
+Tout manquement aux consignes de mission pourra entraîner une retenue.<br>
+Merci de veiller à respecter l'ensemble des règles HelixCar et d'anticiper vos trajets.</div>
+          <div class="em-alert em-alert-info">📸 L'état des lieux (photos + signature) se fait directement depuis l'application HelixCar, au départ et à l'arrivée.</div>
+          <div class="em-alert" style="background:rgba(245,197,24,.12);border:1.5px solid rgba(245,197,24,.4);border-radius:8px;padding:12px 14px;font-size:.83rem;color:#92400E;line-height:1.7;margin-bottom:12px">
+            ⚠️ <strong>Attention :</strong> Cette mission inclut une <strong>restitution</strong> à l'arrivée. Vous recevrez un code de restitution <strong>HC-2024-0529-RESTIT</strong> dès la livraison du véhicule. Conservez-le — il vous sera également renvoyé par email.
+          </div>
+          <div class="em-box" style="background:rgba(37,86,168,.06);border:1.5px solid rgba(37,86,168,.2)">
+            <h4 style="color:var(--bl)">🔑 Code de mission</h4>
+            <div style="font-size:1.4rem;font-family:monospace;font-weight:900;letter-spacing:.12em;color:var(--bk);text-align:center;padding:10px;background:#fff;border-radius:8px;border:2px dashed var(--bl);margin:8px 0">HC-2024-0529</div>
+            <p style="font-size:.8rem;color:#555;line-height:1.6;margin-top:6px">Ce code vous permet d'accéder à l'état des lieux sur l'application HelixCar. Conservez-le précieusement — il est requis au départ <strong>et</strong> à l'arrivée.</p>
+          </div>
+          <div class="em-box" style="background:rgba(239,68,68,.04);border:1.5px solid rgba(239,68,68,.2)">
+            <h4 style="color:var(--rd)">📄 Lettre de voiture — OBLIGATOIRE</h4>
+            <p style="font-size:.82rem;color:#555;line-height:1.6;margin-bottom:10px">Une lettre de voiture est jointe à cet email. Vous devez :</p>
+            <div style="font-size:.82rem;color:#555;line-height:1.9">
+              1️⃣ <strong>Imprimer</strong> la lettre de voiture avant la mission<br>
+              2️⃣ La <strong>remplir et la faire signer</strong> par le client au départ et à l'arrivée<br>
+              3️⃣ La <strong>scanner ou photographier</strong> immédiatement après la mission<br>
+              4️⃣ L'envoyer par email à <strong>helixcardoc@gmail.com</strong><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;Objet : <strong>HC-2024-0529 / DOCUMENT / Prénom Nom</strong>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a href="#" class="em-btn">Voir la fiche mission</a>
+            <a href="#" class="em-btn" style="background:var(--nv);color:#fff">Simuler le trajet</a>
+          </div>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com<br>En cas de problème : répondez à cet email ou appelez le service client.</div>
+      </div></div>
+    </div>
+
+    <!-- Pénalité convoyeur - template modulable -->
+    <div class="email-card" id="email-conv-penalite" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> ⚠️ HelixCar — Information importante · Mission HC-2024-0529</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:#7F1D1D"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title" style="color:var(--rd)">⚠️ Information importante</div>
+          <div class="em-subtitle">Suite à votre mission du 29/05/2024, nous vous informons d'une retenue appliquée sur votre rémunération.</div>
+          <div class="penalty-box">
+            <h4>📋 Détail</h4>
+            <div class="em-row"><span>Mission</span><span>HC-2024-0529 · Paris → Lyon</span></div>
+            <div class="em-row"><span>Date</span><span>29/05/2024</span></div>
+            <div class="em-row"><span>Motif</span><span>⬛ À compléter par l'admin</span></div>
+            <div class="em-row"><span>Retenue appliquée</span><span style="color:var(--rd);font-weight:700">⬛ Montant</span></div>
+          </div>
+          <p style="font-size:.84rem;color:#555;line-height:1.7;margin-bottom:16px">Si vous souhaitez contester cette décision, vous disposez de <strong>48h</strong> pour nous transmettre vos justificatifs.</p>
+          <div class="em-alert em-alert-info">💡 <strong>Rappel :</strong> Tout manquement aux consignes de mission pourra entraîner une retenue. Merci de veiller à respecter l'ensemble des règles HelixCar et d'anticiper vos trajets pour assurer le bon déroulement des missions.</div>
+          <a href="mailto:helixcarpro@gmail.com" class="em-btn">Contester cette décision →</a>
+          <p style="font-size:.75rem;color:#aaa;margin-top:12px">Ce motif est renseigné manuellement par l'équipe HelixCar selon le manquement constaté (retard, tenue, infraction routière, etc.)</p>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+    <!-- Rappel missions -->
+    <div class="email-card" id="email-conv-rappel" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> 🔔 3 nouvelles missions disponibles près de vous — 30/05/2024</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">3 missions disponibles aujourd'hui 🚗</div>
+          <div class="em-subtitle">Bonjour Antoine, voici les missions disponibles ce jour. Connectez-vous pour les accepter.</div>
+          <div class="em-box">
+            <h4>📍 Paris → Lyon · 463 km</h4>
+            <div class="em-row"><span>Date souhaitée</span><span>30/05/2024</span></div>
+            <div class="em-row"><span>Véhicule</span><span>BMW Série 3 · Standard</span></div>
+            <div class="em-row"><span>Votre rémunération</span><span style="color:var(--gn);font-weight:700">200 €</span></div>
+          </div>
+          <div class="em-box">
+            <h4>📍 Paris → Marseille · 775 km</h4>
+            <div class="em-row"><span>Date souhaitée</span><span>31/05/2024</span></div>
+            <div class="em-row"><span>Véhicule</span><span>Mercedes C220 · 💎 Luxe</span></div>
+            <div class="em-row"><span>Votre rémunération</span><span style="color:var(--gn);font-weight:700">335 €</span></div>
+          </div>
+          <div class="em-box">
+            <h4>📍 Lyon → Bordeaux · 558 km</h4>
+            <div class="em-row"><span>Date souhaitée</span><span>01/06/2024</span></div>
+            <div class="em-row"><span>Véhicule</span><span>Peugeot 308 · Standard</span></div>
+            <div class="em-row"><span>Votre rémunération</span><span style="color:var(--gn);font-weight:700">241 €</span></div>
+          </div>
+          <a href="#" class="em-btn">Voir toutes les missions →</a>
+          <p style="font-size:.78rem;color:#aaa;margin-top:16px">Vous recevez ce rappel quotidien car vous êtes convoyeur actif HelixCar.</p>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+    <!-- Retard convoyeur - message à client -->
+    <div class="email-card" id="email-conv-retard" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>Type :</strong> Email + SMS — à envoyer au client</div>
+        <div style="color:#888;font-size:.78rem;margin-top:2px">Ces templates sont à utiliser si l'heure de RDV est dépassée</div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button onclick="document.getElementById('retard-email-view').style.display='block';document.getElementById('retard-sms-view').style.display='none';this.style.background='var(--nv)';this.style.color='#fff';document.querySelectorAll('.retard-toggle')[1].style.background='';document.querySelectorAll('.retard-toggle')[1].style.color=''" class="retard-toggle" style="padding:5px 12px;border-radius:6px;border:1px solid #ddd;background:var(--nv);color:#fff;cursor:pointer;font-size:.78rem;font-weight:600">📧 Email</button>
+          <button onclick="document.getElementById('retard-sms-view').style.display='block';document.getElementById('retard-email-view').style.display='none';this.style.background='var(--nv)';this.style.color='#fff';document.querySelectorAll('.retard-toggle')[0].style.background='';document.querySelectorAll('.retard-toggle')[0].style.color=''" class="retard-toggle" style="padding:5px 12px;border-radius:6px;border:1px solid #ddd;cursor:pointer;font-size:.78rem;font-weight:600">📱 SMS</button>
+        </div>
+      </div>
+      <div id="retard-email-view">
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">⏰ Information sur votre mission</div>
+          <div class="em-subtitle">Bonjour Marc, nous vous contactons concernant votre mission HC-2024-0529.</div>
+          <div class="em-alert em-alert-warning">⏰ Votre convoyeur accuse un léger retard sur le trajet prévu. Nous nous en excusons sincèrement.</div>
+          <div class="em-box">
+            <h4>📋 Détails</h4>
+            <div class="em-row"><span>Mission</span><span>HC-2024-0529 · Paris → Lyon</span></div>
+            <div class="em-row"><span>Heure RDV prévue</span><span>08h00</span></div>
+            <div class="em-row"><span>Nouvelle heure estimée</span><span>08h45 — 09h00</span></div>
+            <div class="em-row"><span>Motif</span><span>Circulation dense sur l'itinéraire</span></div>
+          </div>
+          <p style="font-size:.84rem;color:#555;line-height:1.7;margin-bottom:16px">Notre convoyeur est en route et sera présent dans les meilleurs délais. Nous vous remercions de votre compréhension et restons disponibles pour toute question.</p>
+          <div class="em-alert em-alert-info">💬 Service client disponible 7j/7.</div>
+          <a href="mailto:helixcarpro@gmail.com" class="em-btn">Contacter le service client →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+      </div>
+      <div id="retard-sms-view" style="display:none">
+        <div style="padding:20px;background:#f5f5f0">
+          <div style="background:#DCF8C6;border-radius:12px 12px 12px 2px;padding:14px 16px;max-width:320px;font-size:.88rem;line-height:1.6;color:#1a1a1a;box-shadow:0 1px 3px rgba(0,0,0,.1)">
+            <strong>HelixCar :</strong> Bonjour Marc, votre convoyeur accuse un léger retard — arrivée prévue vers 08h45-09h00 au lieu de 08h00. Nous nous en excusons. Une question ? helixcarpro@gmail.com
+          </div>
+          <div style="font-size:.75rem;color:#888;margin-top:8px;text-align:left">SMS envoyé depuis le numéro HelixCar</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCÉNARIO COMPLET : Pénalité qui fait chuter la note -->
+    <div class="email-card" id="email-conv-scenario" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta" style="background:#FEF2F2;border-bottom:2px solid rgba(239,68,68,.2)">
+        <div style="font-size:.88rem;font-weight:700;color:#C2410C;margin-bottom:6px">⚠️ SCÉNARIO COMPLET — Convoyeur avec note qui chute</div>
+        <div style="font-size:.8rem;color:#555;line-height:1.6">
+          <strong>Antoine Arcelin</strong> — 3ᵉ pénalité reçue (2 retards + 1 radar) · Note : 9.2/20 → <strong>compte suspendu</strong><br>
+          Voici le mail qu'il reçoit + ce que tu vois dans ton espace admin.
+        </div>
+      </div>
+      <!-- Email de pénalité + suspension -->
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:#7F1D1D"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title" style="color:var(--rd)">⚠️ Information importante — Accès suspendu</div>
+          <div class="em-subtitle">Suite à votre mission du 31/05/2024, nous vous informons d'une retenue et d'une mesure temporaire.</div>
+
+          <div class="penalty-box">
+            <h4>📋 Détail de la retenue</h4>
+            <div class="em-row"><span>Mission</span><span>HC-2024-0531 · Marseille → Nice</span></div>
+            <div class="em-row"><span>Date</span><span>31/05/2024</span></div>
+            <div class="em-row"><span>Motif</span><span>Flash radar autoroute A8</span></div>
+            <div class="em-row"><span>Retenue</span><span style="color:var(--rd);font-weight:700">— À déterminer</span></div>
+          </div>
+
+          <div class="penalty-box" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4)">
+            <h4>🚫 Suspension temporaire de votre accès</h4>
+            <p style="font-size:.83rem;color:#555;line-height:1.6;margin-top:6px">Suite à <strong>3 manquements constatés</strong> en moins d'un mois, votre accès à la plateforme HelixCar est temporairement suspendu.</p>
+            <div class="em-row" style="margin-top:8px"><span>Manquement 1</span><span>12/05 · Retard (45 min) · HC-2024-0489</span></div>
+            <div class="em-row"><span>Manquement 2</span><span>22/05 · Retard (30 min) · HC-2024-0512</span></div>
+            <div class="em-row"><span>Manquement 3</span><span>31/05 · Flash radar A8 · HC-2024-0531</span></div>
+            <div class="em-row" style="border-top:1.5px solid rgba(239,68,68,.2);margin-top:6px"><span>Note actuelle</span><span style="color:var(--rd);font-weight:700">9.2 / 20</span></div>
+          </div>
+
+          <p style="font-size:.84rem;color:#555;line-height:1.7;margin-bottom:16px">Si vous souhaitez contester, vous disposez de <strong>48h</strong> pour nous envoyer vos justificatifs à helixcarpro@gmail.com.</p>
+          <div class="em-alert em-alert-info">💡 <strong>Rappel :</strong> Tout manquement aux consignes de mission pourra entraîner une retenue. Merci de veiller à respecter l'ensemble des règles HelixCar et d'anticiper vos trajets.</div>
+          <a href="mailto:helixcarpro@gmail.com" class="em-btn">Contester cette décision →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+
+      <!-- Ce que tu vois dans le dashboard admin -->
+      <div style="background:#0A1628;padding:16px 20px;border-top:2px solid rgba(245,197,24,.3)">
+        <div style="color:var(--y);font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:10px">🖥️ Ce que tu vois dans ton espace admin</div>
+        <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:12px;font-size:.82rem;color:rgba(255,255,255,.8);line-height:1.8">
+          <strong style="color:#fff">Onglet "Convoyeurs actifs" → Bouton "Voir" → Antoine Arcelin :</strong><br><br>
+          <span style="color:#FCA5A5">🔴 Note : 9.2/20 — COMPTE BLOQUÉ AUTOMATIQUEMENT</span><br>
+          📋 <strong>Historique des pénalités :</strong><br>
+          &nbsp;&nbsp;• 12/05 — Retard au rendez-vous (HC-2024-0489)<br>
+          &nbsp;&nbsp;• 22/05 — Retard au rendez-vous (HC-2024-0512)<br>
+          &nbsp;&nbsp;• 31/05 — Flash radar A8 (HC-2024-0531)<br>
+          &nbsp;&nbsp;<span style="color:var(--y)">⚠️ Seuil 3 pénalités atteint → Alerte rouge visible sur sa fiche</span><br><br>
+          <strong style="color:#fff">Bouton disponible :</strong><br>
+          🔓 <span style="color:#86EFAC">"Débloquer l'accès"</span> — si tu valides sa contestation<br>
+          ou laisser bloqué jusqu'à résolution du litige.
+        </div>
+        <div style="color:rgba(255,255,255,.5);font-size:.75rem;margin-top:10px">💡 Va dans Dashboard → Admin → Convoyeurs actifs → "Voir" sur Antoine Arcelin pour voir sa fiche en temps réel.</div>
+      </div>
+    </div>
+
+    <!-- Email récompense challenge mensuel -->
+    <div class="email-card" id="email-conv-challenge" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> antoine.arcelin@email.com</div>
+        <div><strong>Objet :</strong> 🏆 Félicitations — Vous êtes 1er du Challenge HelixCar de mai !</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:linear-gradient(135deg,#0A1628,#1A3A6B)">
+          <div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div>
+          <div style="text-align:center;margin-top:14px;font-size:1.8rem">🏆</div>
+        </div>
+        <div class="em-content">
+          <div class="em-title" style="color:var(--nv)">🥇 Antoine, vous êtes 1er ce mois-ci !</div>
+          <div class="em-subtitle">Félicitations pour votre performance en mai. Vous remportez le challenge mensuel HelixCar !</div>
+          <div class="em-box" style="background:rgba(245,197,24,.1);border:1.5px solid rgba(245,197,24,.3)">
+            <h4 style="color:#92400E">🏆 Votre récompense</h4>
+            <div class="em-row"><span>Classement</span><span style="font-weight:700;font-size:1.1rem">🥇 1er</span></div>
+            <div class="em-row"><span>Km parcourus en mai</span><span style="font-weight:700;color:var(--gn)">3 280 km</span></div>
+            <div class="em-row"><span>Missions réalisées</span><span style="font-weight:700">12 missions</span></div>
+            <div class="em-row"><span>Récompense</span><span style="font-weight:900;font-size:1.2rem;color:var(--nv)">150 €</span></div>
+            <div class="em-row"><span>Versement</span><span>Inclus dans votre prochaine facture</span></div>
+          </div>
+          <div class="em-alert em-alert-info">📋 Ce montant sera automatiquement inclus dans votre prochaine facture HelixCar. Aucune démarche supplémentaire nécessaire.</div>
+          <p style="font-size:.84rem;color:#555;line-height:1.7">Merci pour votre engagement et votre professionnalisme. Rendez-vous le mois prochain pour un nouveau challenge !</p>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <!-- ══ CLIENT ══ -->
+  <div id="group-client" style="display:none">
+    <div class="section-label">Emails reçus par le client</div>
+    <div class="card-nav">
+      <button class="cnav-btn active" onclick="showEmail('client', 'inscription', this)">📧 Inscription</button>
+      <button class="cnav-btn" onclick="showEmail('client', 'confirmation', this)">✅ Réservation confirmée</button>
+      <button class="cnav-btn" onclick="showEmail('client', 'depart', this)">🚦 Départ mission</button>
+      <button class="cnav-btn" onclick="showEmail('client', 'arrivee', this)">🏁 Arrivée véhicule</button>
+      <button class="cnav-btn" onclick="showEmail('client', 'penalite', this)">⚠️ Pénalité client</button>
+      <button class="cnav-btn" onclick="showEmail('client', 'fidelite', this)">🎁 Nouveau palier</button>
+    </div>
+
+    <!-- Inscription client -->
+    <div class="email-card" id="email-client-inscription">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> Bienvenue chez HelixCar, Marc ! 🚗</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">Bienvenue chez HelixCar, Marc !</div>
+          <div class="em-subtitle">Votre compte client a bien été créé. Vous pouvez dès maintenant commander votre premier convoyage.</div>
+          <div class="em-alert em-alert-success">✅ Compte activé — accès immédiat à tous nos services.</div>
+          <div class="em-box">
+            <h4>🎁 Votre programme fidélité</h4>
+            <p style="font-size:.83rem;color:#555;line-height:1.6">Chaque convoyage effectué avec HelixCar vous permet de cumuler des kilomètres et de débloquer des récompenses exclusives. Votre premier palier débute à 1 000 km parcourus.</p>
+          </div>
+          <div class="em-box">
+            <h4>💬 Service client réactif</h4>
+            <p style="font-size:.83rem;color:#555;line-height:1.6">Notre équipe est disponible 7j/7 et répond en moins de 2h à toutes vos demandes. N'hésitez pas à nous contacter à tout moment.</p>
+          </div>
+          <a href="#" class="em-btn">Commander mon premier convoyage →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com<br>Le convoyage professionnel, en France et partout en Europe.</div>
+      </div></div>
+    </div>
+
+    <!-- Réservation confirmée -->
+    <div class="email-card" id="email-client-confirmation" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> ✅ Réservation confirmée — Paris → Lyon · HC-2024-0529</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">Votre convoyage est confirmé ✅</div>
+          <div class="em-subtitle">Un convoyeur certifié HelixCar prendra en charge votre véhicule.</div>
+          <div class="em-box">
+            <h4>🚗 Votre mission</h4>
+            <div class="em-row"><span>Référence</span><span>HC-2024-0529</span></div>
+            <div class="em-row"><span>Adresse de départ</span><span>12 rue de Rivoli, 75001 Paris</span></div>
+            <div class="em-row"><span>Adresse d'arrivée</span><span>8 place Bellecour, 69002 Lyon</span></div>
+            <div class="em-row"><span>Distance estimée</span><span>463 km</span></div>
+            <div class="em-row"><span>Date</span><span>29/05/2024</span></div>
+            <div class="em-row"><span>Heure de rendez-vous</span><span><strong>08h00</strong></span></div>
+            <div class="em-row"><span>Véhicule</span><span>BMW 320d · AB-123-CD</span></div>
+            <div class="em-row"><span>Convoyeur</span><span>Antoine A.</span></div>
+            <div class="em-row"><span>Prix total</span><span>350 €</span></div>
+            <div class="em-row"><span>Total réglé</span><span style="font-weight:700">350 €</span></div>
+            <div class="em-row"><span>Statut paiement</span><span style="color:var(--gn);font-weight:700">💳 En attente de livraison</span></div>
+          </div>
+          <div class="em-alert em-alert-success">🔒 Votre paiement est sécurisé et simplement mis en attente jusqu'à la livraison de votre véhicule.</div>
+          <div class="em-alert em-alert-info">📱 Vous recevrez un SMS dès que votre convoyeur prend votre véhicule en charge et à son arrivée.</div>
+          <a href="#" class="em-btn">Suivre ma mission en temps réel →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+    <!-- Départ mission -->
+    <div class="email-card" id="email-client-depart" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> 🚦 Votre BMW vient de partir — Mission HC-2024-0529</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">🚦 Votre véhicule est en route !</div>
+          <div class="em-subtitle">L'état des lieux au départ a été effectué et signé. Votre BMW 320d est pris en charge.</div>
+          <div class="em-box">
+            <h4>📊 État des lieux au départ</h4>
+            <div class="em-row"><span>Kilométrage départ</span><span>48 250 km</span></div>
+            <div class="em-row"><span>État général</span><span>🟢 Excellent état</span></div>
+            <div class="em-row"><span>Dommages constatés</span><span>✅ Aucun</span></div>
+            <div class="em-row"><span>16 photos prises</span><span>✅ Archivées</span></div>
+            <div class="em-row"><span>Signature client</span><span>✅ Enregistrée</span></div>
+          </div>
+          <div class="em-box">
+            <h4>🚗 En route</h4>
+            <div class="em-row"><span>Convoyeur</span><span>Antoine Arcelin · 06 12 34 56 78</span></div>
+            <div class="em-row"><span>Départ</span><span>29/05/2024 · 08h15</span></div>
+            <div class="em-row"><span>Arrivée estimée</span><span>29/05/2024 · 14h30</span></div>
+          </div>
+          <a href="#" class="em-btn">Suivre en temps réel →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+
+    <!-- Arrivée -->
+    <div class="email-card" id="email-client-arrivee" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> 🏁 Votre BMW est arrivée à destination ! · HC-2024-0529</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:#064E3B"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">🏁 Votre véhicule est arrivé !</div>
+          <div class="em-subtitle">Mission terminée avec succès. Votre BMW 320d a été livrée à Lyon.</div>
+          <div class="em-alert em-alert-success">✅ Livraison effectuée le 29/05/2024 à 14h18 — dans les délais.</div>
+          <div class="em-box">
+            <h4>📊 État des lieux à l'arrivée</h4>
+            <div class="em-row"><span>Kilométrage arrivée</span><span>48 713 km (+463 km)</span></div>
+            <div class="em-row"><span>État général</span><span>🟢 Excellent état</span></div>
+            <div class="em-row"><span>Dommages constatés</span><span>✅ Aucun dommage</span></div>
+            <div class="em-row"><span>16 photos prises</span><span>✅ Archivées</span></div>
+          </div>
+          <div class="em-box">
+            <h4>🎁 +463 km sur votre programme fidélité</h4>
+            <div class="em-row"><span>Total km cumulés</span><span>1 743 km</span></div>
+            <div class="em-row"><span>Prochain palier</span><span>3 000 km (757 km restants)</span></div>
+          </div>
+          <div style="margin-bottom:16px">
+            <p style="font-size:.84rem;color:#555;margin-bottom:10px">Comment s'est passé votre expérience ? Évaluez votre convoyeur :</p>
+            <a href="#" class="em-btn">⭐ Évaluer Antoine A.</a>
+          </div>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com<br>Merci de votre confiance !</div>
+      </div></div>
+    </div>
+
+    <!-- Pénalité client - radar exemple -->
+    <div class="email-card" id="email-client-penalite" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> ⚠️ HelixCar — Information importante concernant votre mission HC-2024-0529</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:#7F1D1D"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title" style="color:var(--rd)">⚠️ Information importante</div>
+          <div class="em-subtitle">Nous avons été informés d'une infraction routière constatée lors du transport de votre véhicule.</div>
+          <div class="penalty-box">
+            <h4>📋 Détail de l'infraction</h4>
+            <div class="em-row"><span>Mission concernée</span><span>HC-2024-0529 · Paris → Lyon</span></div>
+            <div class="em-row"><span>Date</span><span>29/05/2024</span></div>
+            <div class="em-row"><span>Type d'infraction</span><span>Flash radar automatique</span></div>
+            <div class="em-row"><span>Lieu</span><span>A6 · Sens Sud · km 312</span></div>
+            <div class="em-row"><span>Véhicule</span><span>BMW 320d · AB-123-CD</span></div>
+          </div>
+          <div class="em-box">
+            <h4>📌 Prochaines étapes</h4>
+            <p style="font-size:.83rem;color:#555;line-height:1.7">L'avis de contravention vous parviendra directement à votre adresse ou via votre espace personnel. En tant que propriétaire du véhicule, vous êtes responsable de désigner le conducteur auprès des autorités compétentes.<br><br>HelixCar vous communiquera sur simple demande les informations nécessaires pour procéder à cette désignation (identité et coordonnées du convoyeur concerné).</p>
+          </div>
+          <div class="em-alert em-alert-info">Pour toute question concernant cette infraction, contactez notre service client à helixcarpro@gmail.com. Nous vous accompagnons dans les démarches.</div>
+          <a href="mailto:helixcarpro@gmail.com" class="em-btn">Contacter le service client →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com<br>Service client disponible 7j/7</div>
+      </div></div>
+    </div>
+
+    <!-- Nouveau palier fidélité -->
+    <div class="email-card" id="email-client-fidelite" style="display:none">
+      <div class="email-chrome"><div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div></div>
+      <div class="email-meta">
+        <div><strong>De :</strong> noreply@helixcar.com</div>
+        <div><strong>À :</strong> marc.dupont@email.com</div>
+        <div><strong>Objet :</strong> 🎁 Félicitations — ⭐ Bronze atteint ! Votre récompense vous attend</div>
+      </div>
+      <div class="email-body"><div class="em">
+        <div class="em-header" style="background:#78350F"><div class="em-logo"><span class="em-logo-badge">HC</span> HelixCar</div></div>
+        <div class="em-content">
+          <div class="em-title">🎉 ⭐ Bronze atteint — 1 000 km !</div>
+          <div class="em-subtitle">Félicitations Marc, vous venez de franchir le premier palier de votre programme fidélité HelixCar !</div>
+          <div class="em-box" style="background:rgba(245,197,24,.12);border:1.5px solid rgba(245,197,24,.4)">
+            <h4 style="color:#92400E">🎁 Votre récompense</h4>
+            <div class="em-row"><span>Réduction</span><span style="color:var(--gn);font-weight:700">— 10% sur votre prochain convoyage</span></div>
+            <div class="em-row"><span>Box surprise</span><span style="font-weight:700">Accessoires auto (valeur 10–15 €)</span></div>
+            <div class="em-row"><span>Code promo</span><span style="font-weight:700;color:var(--bl)">HELIX10</span></div>
+          </div>
+          <div class="em-box">
+            <h4>🗺️ Votre progression</h4>
+            <div class="em-row"><span>Km parcourus</span><span>1 043 km</span></div>
+            <div class="em-row"><span>Palier actuel</span><span>⭐ ⭐ Bronze</span></div>
+            <div class="em-row"><span>Prochain palier</span><span>3 000 km (1 457 km restants)</span></div>
+          </div>
+          <a href="#" class="em-btn">Utiliser ma récompense →</a>
+        </div>
+        <div class="em-footer">HelixCar SASU — helixcarpro@gmail.com</div>
+      </div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function switchRole(role, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('group-conv').style.display = role === 'conv' ? 'block' : 'none';
+  document.getElementById('group-client').style.display = role === 'client' ? 'block' : 'none';
+}
+
+function showEmail(role, type, btn) {
+  // Hide all emails for this role
+  document.querySelectorAll(`[id^="email-${role}-"]`).forEach(el => el.style.display = 'none');
+  document.getElementById(`email-${role}-${type}`).style.display = 'block';
+  // Update nav buttons
+  btn.parentElement.querySelectorAll('.cnav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

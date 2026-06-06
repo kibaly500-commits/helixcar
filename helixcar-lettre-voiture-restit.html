@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HelixCar — Lettre de Voiture — RESTITUTION</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #fff; color: #1a1a1a; font-size: 9.5px; line-height: 1.3; }
+
+@media print {
+  body { margin: 0; }
+  .no-print { display: none !important; }
+  .page { page-break-after: avoid; }
+}
+
+.page { max-width: 210mm; margin: 0 auto; padding: 8mm; min-height: auto; }
+
+/* HEADER */
+.doc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0A1628; padding-bottom: 7px; margin-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand-badge { width: 28px; height: 28px; background: #F5C518; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: #0A1628; }
+.brand-name { font-size: 15px; font-weight: 900; color: #0A1628; letter-spacing: .03em; }
+.brand-sub { font-size: 9px; color: #666; margin-top: 2px; }
+.doc-ref { text-align: right; }
+.doc-ref h1 { font-size: 14px; font-weight: 900; color: #0A1628; text-transform: uppercase; letter-spacing: .08em; }
+.doc-ref .code { font-size: 13px; font-family: monospace; font-weight: 900; color: #2556A8; background: #EFF6FF; padding: 3px 10px; border-radius: 4px; display: inline-block; margin-top: 4px; letter-spacing: .1em; }
+.doc-ref .date { font-size: 9px; color: #888; margin-top: 3px; }
+
+/* SECTIONS */
+.section { margin-bottom: 7px; }
+.section-title { background: #0A1628; color: #F5C518; font-size: 8px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; padding: 3px 7px; margin-bottom: 4px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.field { border: 1px solid #CCCCCC; border-radius: 3px; }
+.field-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #888; background: #F8F8F8; padding: 2px 6px; border-bottom: 1px solid #EEE; }
+.field-value { padding: 3px 5px; min-height: 18px; font-size: 9px; color: #1a1a1a; }
+.field-value.prefilled { font-weight: 700; color: #0A1628; }
+.field-value.writeable { color: #999; font-style: italic; }
+
+/* ÉTAT DU VÉHICULE */
+.etat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 5px; }
+.etat-box { border: 1.5px solid #DDD; border-radius: 4px; padding: 3px; text-align: center; }
+.etat-box.check { font-size: 16px; height: 22px; display: flex; align-items: center; justify-content: center; }
+.etat-label { font-size: 8px; text-transform: uppercase; font-weight: 700; color: #555; }
+
+/* DOMMAGES */
+.dommages-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+.dommages-table th { background: #F0F0F0; padding: 4px 6px; text-align: left; border: 1px solid #CCC; font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
+.dommages-table td { border: 1px solid #CCC; padding: 5px 6px; height: 20px; }
+.dommages-table td.zone-col { font-weight: 600; background: #FAFAFA; width: 25%; }
+
+/* CARBURANT */
+.carburant-bar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.fuel-label { font-size: 9px; font-weight: 700; color: #555; width: 50px; flex-shrink: 0; }
+.fuel-scale { display: flex; gap: 2px; flex: 1; }
+.fuel-mark { flex: 1; height: 16px; border: 1px solid #CCC; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 7px; font-weight: 700; color: #888; }
+.fuel-mark.e { background: #FEE2E2; color: #DC2626; }
+.fuel-mark.qtr { background: #FEF9C3; color: #92400E; }
+.fuel-mark.half { background: #FEF9C3; color: #92400E; }
+.fuel-mark.three-qtr { background: #DCFCE7; color: #166534; }
+.fuel-mark.full { background: #DCFCE7; color: #166534; }
+.fuel-circle { width: 18px; height: 18px; border: 2px solid #0A1628; border-radius: 50%; flex-shrink: 0; cursor: pointer; }
+
+/* SIGNATURES */
+.sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sig-box { border: 1.5px solid #CCC; border-radius: 4px; padding: 6px; }
+.sig-title { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #0A1628; margin-bottom: 3px; }
+.sig-name { font-size: 9px; color: #555; margin-bottom: 6px; }
+.sig-area { height: 36px; border: 1px dashed #CCC; border-radius: 3px; background: #FAFAFA; display: flex; align-items: center; justify-content: center; }
+.sig-area-text { font-size: 8px; color: #CCC; }
+.sig-date { font-size: 8px; color: #888; margin-top: 4px; display: flex; justify-content: space-between; }
+.sig-date span { font-weight: 600; color: #333; }
+
+/* OBSERVATIONS */
+.obs-box { border: 1px solid #CCC; border-radius: 3px; min-height: 28px; padding: 5px; font-size: 9px; color: #999; font-style: italic; }
+
+/* RÈGLES */
+.rules { background: #FFF8E1; border: 1px solid #F5C518; border-radius: 4px; padding: 5px 7px; }
+.rules-title { font-size: 9px; font-weight: 900; color: #92400E; margin-bottom: 4px; }
+.rules ul { padding-left: 12px; }
+.rules li { font-size: 8px; color: #7C5114; line-height: 1.6; }
+
+/* FOOTER */
+.doc-footer { border-top: 1px solid #EEE; padding-top: 6px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+.footer-text { font-size: 7.5px; color: #AAA; }
+.footer-code { font-family: monospace; font-size: 9px; font-weight: 700; color: #2556A8; }
+
+/* DIVIDER */
+.divider { border: none; border-top: 2px dashed #EEE; margin: 8px 0; }
+
+/* PRINT BUTTON */
+.no-print { text-align: center; padding: 16px; background: #F0F0F0; }
+.print-btn { background: #0A1628; color: #F5C518; border: none; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; margin-right: 8px; }
+.print-btn:hover { background: #1A3A6B; }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="print-btn" onclick="window.print()">🖨️ Imprimer / Sauvegarder PDF</button>
+  <span style="font-size:11px;color:#666">📋 <strong>2 exemplaires</strong> — Un pour le client, un à scanner et envoyer à <strong>helixcardoc@gmail.com</strong> — Objet : <strong>HC-2024-0529-RESTIT / DOCUMENT / Prénom Nom</strong></span>
+</div>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="doc-header">
+    <div class="brand">
+      <div class="brand-badge">HC</div>
+      <div>
+        <div class="brand-name">HelixCar</div>
+        <div class="brand-sub">helixcarpro@gmail.com · Service de convoyage professionnel</div>
+      </div>
+    </div>
+    <div class="doc-ref">
+      <h1>Lettre de Voiture — RESTITUTION</h1>
+      <div class="code" style="background:#FFF8E1;color:#92400E;border:1px solid #F5C518">HC-2024-0529-RESTIT</div>
+      <div class="date">Document généré le 29/05/2024</div>
+    </div>
+  </div>
+
+  <!-- MISSION -->
+  <div class="section">
+    <div class="section-title" style="background:#78350F">🔄 Informations de la restitution</div>
+    <div class="grid-3">
+      <div class="field">
+        <div class="field-label">Trajet</div>
+        <div class="field-value prefilled">Paris → Lyon</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Distance</div>
+        <div class="field-value prefilled">463 km</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Date & heure RDV</div>
+        <div class="field-value prefilled">29/05/2024 · 08h00</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Adresse de départ</div>
+        <div class="field-value prefilled">12 rue de la Paix, 75001 Paris</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Adresse d'arrivée</div>
+        <div class="field-value prefilled">8 av. Berthelot, 69007 Lyon</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Type de transport</div>
+        <div class="field-value prefilled">Standard</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VÉHICULE -->
+  <div class="section">
+    <div class="section-title">🔑 Informations du véhicule</div>
+    <div class="grid-3">
+      <div class="field">
+        <div class="field-label">Marque / Modèle</div>
+        <div class="field-value prefilled">BMW Série 3 320d</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Immatriculation</div>
+        <div class="field-value prefilled" style="font-size:13px;font-family:monospace;font-weight:900">AB-123-CD</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Couleur</div>
+        <div class="field-value prefilled">Noir métallisé</div>
+      </div>
+      <div class="field">
+        <div class="field-label">N° VIN / Châssis</div>
+        <div class="field-value writeable">Photo prise par le convoyeur</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Kilométrage à la prise (retour)</div>
+        <div class="field-value writeable" id="km-depart">_________ km</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Kilométrage à la restitution</div>
+        <div class="field-value writeable" id="km-arrivee">_________ km</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARBURANT -->
+  <div class="section">
+    <div class="section-title">⛽ Niveau de carburant</div>
+    <div class="carburant-bar">
+      <span class="fuel-label">Au départ :</span>
+      <div class="fuel-scale">
+        <div class="fuel-mark e">E<br>1/8</div>
+        <div class="fuel-mark qtr">1/4</div>
+        <div class="fuel-mark half">1/2</div>
+        <div class="fuel-mark three-qtr">3/4</div>
+        <div class="fuel-mark full">F<br>PLEIN</div>
+      </div>
+      <div class="fuel-circle" title="Cocher le niveau"></div>
+    </div>
+    <div class="carburant-bar">
+      <span class="fuel-label">À l'arrivée :</span>
+      <div class="fuel-scale">
+        <div class="fuel-mark e">E<br>1/8</div>
+        <div class="fuel-mark qtr">1/4</div>
+        <div class="fuel-mark half">1/2</div>
+        <div class="fuel-mark three-qtr">3/4</div>
+        <div class="fuel-mark full">F<br>PLEIN</div>
+      </div>
+      <div class="fuel-circle" title="Cocher le niveau"></div>
+    </div>
+    <div style="font-size:8px;color:#C2410C;margin-top:4px;font-style:italic">⚠️ Le véhicule doit être restitué avec le même niveau de carburant qu'à la prise en charge.</div>
+  </div>
+
+  <!-- ÉTAT GÉNÉRAL -->
+  <div class="section">
+    <div class="section-title">🔎 État général du véhicule au départ</div>
+    <div class="etat-grid">
+      <div class="etat-box">
+        <div class="etat-check">☐</div>
+        <div class="etat-label" style="color:#DC2626">Mauvais état</div>
+      </div>
+      <div class="etat-box">
+        <div class="etat-check">☐</div>
+        <div class="etat-label" style="color:#D97706">État correct</div>
+      </div>
+      <div class="etat-box">
+        <div class="etat-check">☐</div>
+        <div class="etat-label" style="color:#2563EB">Bon état</div>
+      </div>
+      <div class="etat-box">
+        <div class="etat-check">☐</div>
+        <div class="etat-label" style="color:#16A34A">Excellent état</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOMMAGES -->
+  <div class="section">
+    <div class="section-title">⚠️ Dommages constatés (cocher et décrire)</div>
+    <table class="dommages-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th>☐ Dommage ?</th>
+          <th>Type (rayure / bosse / impact / autre)</th>
+          <th>Localisation précise</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="zone-col">Pare-chocs avant</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Capot / Phares</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Côté gauche</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Côté droit</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Pare-brise / Vitres</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Toit</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Pare-chocs arrière</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Jantes / Pneus</td><td></td><td></td><td></td></tr>
+        <tr><td class="zone-col">Intérieur</td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- OBSERVATIONS -->
+  <div class="section">
+    <div class="section-title">📝 Observations</div>
+    <div class="obs-box">Précisez ici tout élément non conforme, remarque particulière ou réserve…</div>
+  </div>
+
+  <!-- RÈGLES RAPPEL -->
+  <div class="section rules">
+    <div class="rules-title">⚠️ Rappel des obligations du convoyeur</div>
+    <ul>
+      <li>Tenue professionnelle obligatoire</li>
+      <li>Livrer le véhicule avec le <strong>même niveau de carburant</strong> qu'à la prise en charge</li>
+      <li>Tout retard, infraction ou manquement aux règles pourra entraîner une retenue sur la rémunération</li>
+      <li>Ce document doit être signé au départ ET à l'arrivée</li>
+      <li>Établi en <strong>deux exemplaires</strong> : un remis au client, un scanné et envoyé à <strong>helixcardoc@gmail.com</strong> — Objet : <strong>HC-2024-0529-RESTIT / DOCUMENT / Prénom Nom</strong></li>
+    </ul>
+  </div>
+
+  <!-- ── TIRET SÉPARATEUR DÉPART / ARRIVÉE ── -->
+  <hr class="divider">
+  <div style="text-align:center;font-size:8.5px;color:#555;margin:-4px 0 8px;font-weight:700;letter-spacing:.06em">📋 Ce document doit être établi en <u>deux exemplaires</u> : un remis au client, un conservé par le convoyeur et renvoyé à HelixCar.</div>
+
+  <!-- SIGNATURES DÉPART -->
+  <div class="section">
+    <div class="section-title">✍️ Signatures — État des lieux au DÉPART</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-title">Convoyeur</div>
+        <div class="sig-name">Antoine Arcelin</div>
+        <div class="sig-area"><span class="sig-area-text">Signature</span></div>
+        <div class="sig-date">Date / Heure : <span>___/___/______ · ___h___</span></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Client (récupère son véhicule)</div>
+        <div class="sig-name">Marc Dupont</div>
+        <div class="sig-area"><span class="sig-area-text">Signature</span></div>
+        <div class="sig-date">Date / Heure : <span>___/___/______ · ___h___</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIGNATURES ARRIVÉE -->
+  <div class="section">
+    <div class="section-title">✍️ Signatures — État des lieux à l'ARRIVÉE</div>
+    <div class="grid-3">
+      <div class="field">
+        <div class="field-label">Kilométrage réel à l'arrivée</div>
+        <div class="field-value writeable">_________ km</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Heure d'arrivée réelle</div>
+        <div class="field-value writeable">___h___</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Dommages nouveaux constatés</div>
+        <div class="field-value writeable">☐ Oui &nbsp;&nbsp; ☐ Non</div>
+      </div>
+    </div>
+    <div style="height:6px"></div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-title">Convoyeur</div>
+        <div class="sig-name">Antoine Arcelin</div>
+        <div class="sig-area"><span class="sig-area-text">Signature</span></div>
+        <div class="sig-date">Date / Heure : <span>___/___/______ · ___h___</span></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-title">Client (confirme la restitution)</div>
+        <div class="sig-name">Marc Dupont</div>
+        <div class="sig-area"><span class="sig-area-text">Signature</span></div>
+        <div class="sig-date">Date / Heure : <span>___/___/______ · ___h___</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="doc-footer">
+    <div class="footer-text">HelixCar SASU — helixcarpro@gmail.com — Ce document a valeur contractuelle.</div>
+    <div class="footer-code">HC-2024-0529</div>
+  </div>
+
+</div>
+</body>
+</html>

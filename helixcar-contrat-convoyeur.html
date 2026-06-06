@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>HelixCar — Contrat Convoyeur</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--y:#F5C518;--nv:#0A1628;--bl:#2556A8;--wh:#FAFAF7;--gl:#F0EFE9;--gn:#22C55E;--rd:#EF4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--gl);color:#1a1a1a;line-height:1.6}
+@media print{.no-print{display:none!important}.page{padding:12mm}}
+.hdr{background:var(--nv);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem}
+.lb{width:26px;height:26px;background:var(--y);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:var(--nv)}
+.page{max-width:760px;margin:0 auto;padding:24px 16px 80px}
+.doc-header{background:var(--nv);border-radius:12px;padding:28px 32px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
+.doc-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:#fff}
+.doc-sub{font-size:.82rem;color:rgba(255,255,255,.55);margin-top:4px}
+.doc-ref{text-align:right}
+.doc-ref .code{font-family:monospace;font-weight:700;color:var(--y);font-size:.88rem;background:rgba(245,197,24,.15);padding:4px 10px;border-radius:5px}
+.doc-ref .date{font-size:.75rem;color:rgba(255,255,255,.4);margin-top:4px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.art-num{font-family:'Syne',sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--y);background:var(--nv);padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:8px}
+.art-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--nv);margin-bottom:10px}
+p{font-size:.88rem;color:#444;margin-bottom:8px}
+ul{padding-left:18px;margin-bottom:8px}
+li{font-size:.88rem;color:#444;margin-bottom:3px}
+.prestataire-box{background:rgba(37,86,168,.06);border:1.5px solid rgba(37,86,168,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.88rem}
+.prestataire-box strong{color:var(--nv)}
+.sig-section{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.sig-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:var(--nv);margin-bottom:6px}
+.check-group{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid #e0e0e0;font-size:.85rem;cursor:pointer;transition:all .2s}
+.check-item:has(input:checked){border-color:var(--gn);background:rgba(34,197,94,.04)}
+.check-item input{width:15px;height:15px;accent-color:var(--gn);flex-shrink:0;margin-top:2px}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px}
+.fg input,.fg select{width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s;background:#fff}
+.fg input:focus,.fg select:focus{border-color:var(--bl)}
+.sig-wrap{border:2px dashed #ccc;border-radius:8px;overflow:hidden;background:#fafafa;margin-bottom:6px}
+canvas{display:block;width:100%;height:110px;cursor:crosshair;touch-action:none}
+.sig-actions{display:flex;justify-content:space-between;padding:5px 10px;background:var(--gl);font-size:.72rem;color:#888}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 24px;border-radius:9px;cursor:pointer;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;transition:all .2s;width:100%}
+.btn-y{background:var(--y);color:var(--nv)}.btn-y:disabled{opacity:.4;cursor:not-allowed}
+.prog{height:4px;background:#e0e0e0;border-radius:2px;margin-bottom:20px;overflow:hidden}
+.prog-fill{height:100%;background:var(--y);border-radius:2px;transition:width .4s}
+.success{display:none;text-align:center;padding:40px 0}
+.sico{width:60px;height:60px;background:var(--gn);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;animation:pop .5s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.no-print-btn{background:var(--nv);color:var(--y);border:none;padding:8px 18px;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer}
+.parties-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+.partie-box{background:var(--gl);border-radius:8px;padding:12px 14px;font-size:.83rem}
+.partie-box .ptitle{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px}
+.partie-box .pval{font-weight:700;color:var(--nv)}
+.partie-box .psub{font-size:.78rem;color:#666;margin-top:2px}
+  @media (max-width: 600px) {
+    .page { padding: 16px 12px 60px; }
+    .doc-header { flex-direction: column; gap: 12px; padding: 20px; }
+    .doc-ref { text-align: left; }
+    .parties-grid { grid-template-columns: 1fr; }
+    .card { padding: 18px 14px; }
+    [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+    .check-item { font-size: .82rem; }
+    .btn { font-size: .85rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo"><div class="lb">HC</div>HelixCar — Contrat Convoyeur</div>
+  <div class="no-print">
+    <button class="no-print-btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
+  </div>
+</div>
+
+<div class="page">
+  <div id="contrat-view">
+
+    <div class="doc-header">
+      <div>
+        <div class="doc-title">📄 Contrat de Prestataire Convoyeur</div>
+        <div class="doc-sub">HelixCar SASU — Prestataire indépendant</div>
+      </div>
+      <div class="doc-ref">
+        <div class="code" id="contrat-ref">CTR-CONV-2024</div>
+        <div class="date" id="contrat-date"></div>
+      </div>
+    </div>
+
+    <!-- Parties -->
+    <div class="card">
+      <div class="art-title" style="margin-bottom:12px">Parties au contrat</div>
+      <div class="parties-grid">
+        <div class="partie-box">
+          <div class="ptitle">Donneur d'ordre</div>
+          <div class="pval">HelixCar SASU</div>
+          <div class="psub">Capital 10 000 € — RCS 900068685</div>
+        </div>
+        <div class="partie-box" id="presta-box">
+          <div class="ptitle">Prestataire</div>
+          <div class="pval" id="presta-name-display" style="color:#aaa;font-weight:400;font-style:italic">Renseignez vos informations ci-dessous</div>
+          <div class="psub" id="presta-siret-display"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Articles -->
+    <div class="card">
+      <div class="art-num">Article 1</div>
+      <div class="art-title">Statut</div>
+      <p>Le convoyeur, dénommé ci-après <strong id="presta-inline-1">« le Prestataire »</strong>, agit en qualité de prestataire indépendant.</p>
+      <p>Il n'existe aucun lien de subordination entre le convoyeur et HelixCar.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 2</div>
+      <div class="art-title">Mission</div>
+      <p><strong id="presta-inline-2">Le Prestataire</strong> s'engage à :</p>
+      <ul>
+        <li>Réaliser le convoyage confié dans les délais raisonnables</li>
+        <li>Respecter le véhicule confié</li>
+        <li>Respecter le code de la route en toute circonstance</li>
+        <li>Effectuer les états des lieux au départ et à l'arrivée via l'application HelixCar</li>
+        <li>Porter une tenue professionnelle conforme aux standards HelixCar</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 3</div>
+      <div class="art-title">Responsabilité</div>
+      <p><strong id="presta-inline-3">Le Prestataire</strong> est responsable de la conduite du véhicule pendant toute la durée de la mission. Il assume les conséquences de sa conduite dans le cadre de la loi et de ses assurances personnelles.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 4</div>
+      <div class="art-title">Véhicule</div>
+      <p><strong id="presta-inline-4">Le Prestataire</strong> s'engage à :</p>
+      <ul>
+        <li>Vérifier l'état du véhicule avant départ et documenter via état des lieux</li>
+        <li>Signaler toute anomalie immédiatement</li>
+        <li>Livrer le véhicule avec le même niveau de carburant qu'à la prise en charge</li>
+        <li>Respecter les consignes du client et de la plateforme</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 5</div>
+      <div class="art-title">Assurance</div>
+      <p><strong id="presta-inline-5">Le Prestataire</strong> doit être en possession d'une assurance valide couvrant la conduite de véhicules tiers dans le cadre de missions professionnelles.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 6</div>
+      <div class="art-title">Paiement</div>
+      <p>Le paiement est effectué par HelixCar après validation de la mission sous <strong>9 jours ouvrés</strong>. <strong id="presta-inline-6">Le Prestataire</strong> génère une facture depuis son espace avant paiement.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 7</div>
+      <div class="art-title">Non-sous-traitance</div>
+      <p><strong id="presta-inline-7">Le Prestataire</strong> ne peut pas sous-traiter la mission à un tiers sans accord préalable écrit de HelixCar.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 8</div>
+      <div class="art-title">Comportement</div>
+      <p><strong id="presta-inline-8">Le Prestataire</strong> s'engage à adopter un comportement professionnel et respectueux envers les clients et dans l'exercice de ses missions.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 9</div>
+      <div class="art-title">Rupture de mission</div>
+      <p>HelixCar peut annuler une mission ou suspendre l'accès à la plateforme en cas de :</p>
+      <ul>
+        <li>Non-respect des conditions du présent contrat</li>
+        <li>Comportement inapproprié ou signalements répétés</li>
+        <li>Impossibilité d'exécution non signalée</li>
+        <li>Accumulation de 3 pénalités ou plus</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 10</div>
+      <div class="art-title">Acceptation</div>
+      <p>Toute acceptation de mission vaut acceptation pleine et entière du présent contrat dans sa version en vigueur.</p>
+    </div>
+
+    <!-- SIGNATURE -->
+    <div class="sig-section">
+      <div class="sig-title">✍️ Informations du prestataire & signature</div>
+      <p style="font-size:.82rem;color:#666;margin-bottom:16px">Ces informations apparaîtront automatiquement dans le contrat. Complétez et signez pour valider.</p>
+      <div class="prog"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+
+      <div class="check-group">
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'ai lu et compris l'intégralité du contrat HelixCar</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> Je certifie agir en qualité de prestataire indépendant</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> Mon assurance RC Pro est valide et couvre la conduite de véhicules tiers</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'accepte les règles de tenue, d'état des lieux et de carburant HelixCar</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'accepte les modalités de paiement (9 jours ouvrés après validation)</label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg">
+          <label>Prénom et Nom *</label>
+          <input type="text" id="presta-name" placeholder="Ex : Antoine Arcelin" oninput="updateProg();updatePrestaDisplay()">
+        </div>
+        <div class="fg">
+          <label>Statut juridique *</label>
+          <select id="presta-statut" onchange="updateProg();updatePrestaDisplay()">
+            <option value="">Sélectionnez…</option>
+            <option value="Auto-entrepreneur">Auto-entrepreneur</option>
+            <option value="SASU">SASU</option>
+            <option value="EURL">EURL</option>
+            <option value="SAS">SAS</option>
+            <option value="SARL">SARL</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Nom de la société (si applicable)</label>
+          <input type="text" id="presta-societe" placeholder="Ex : Arcelin Transport" oninput="updatePrestaDisplay()">
+        </div>
+        <div class="fg">
+          <label>N° SIRET *</label>
+          <input type="text" id="presta-siret" placeholder="Ex : 900 068 685 00012" oninput="updateProg();updatePrestaDisplay()" maxlength="17">
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>Date *</label>
+          <input type="date" id="presta-date" oninput="updateProg()">
+        </div>
+      </div>
+
+      <div class="fg" style="margin-bottom:6px"><label>Signature *</label></div>
+      <div class="sig-wrap">
+        <canvas id="sig-canvas" width="720" height="110"></canvas>
+      </div>
+      <div class="sig-actions">
+        <span id="sig-status">Signez ici</span>
+        <button onclick="clearSig()" style="background:none;border:none;color:var(--rd);font-size:.78rem;cursor:pointer;font-weight:600">Effacer</button>
+      </div>
+      <div style="height:14px"></div>
+      <button class="btn btn-y" id="sign-btn" onclick="signContrat()" disabled>✍️ Signer et valider le contrat →</button>
+    </div>
+
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="success" id="success-screen">
+    <div class="sico">✅</div>
+    <h2 style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;margin-bottom:8px">Contrat signé !</h2>
+    <p style="color:#555;font-size:.88rem;line-height:1.7;margin-bottom:16px">Votre contrat a été signé électroniquement.<br><strong>Un email de confirmation vous a été envoyé avec une copie.</strong></p>
+    <div style="background:var(--gl);border-radius:10px;padding:14px;font-size:.82rem;text-align:left;color:#555;line-height:1.8;margin-bottom:16px">
+      👤 Prestataire : <strong id="recap-name"></strong><br>
+      🏢 Société / Statut : <strong id="recap-societe"></strong><br>
+      🔢 SIRET : <strong id="recap-siret"></strong><br>
+      📅 Date : <strong id="recap-date"></strong><br>
+      🔑 Référence : <strong id="recap-ref" style="font-family:monospace;color:var(--bl)"></strong>
+    </div>
+    <button class="btn btn-y" style="width:auto;padding:10px 24px" onclick="window.print()">🖨️ Télécharger le PDF</button>
+  </div>
+</div>
+
+<script>
+document.getElementById('contrat-date').textContent = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+document.getElementById('presta-date').value = new Date().toISOString().split('T')[0];
+
+const sc = document.getElementById('sig-canvas'), sx = sc.getContext('2d');
+sx.strokeStyle='#0A1628'; sx.lineWidth=2.5; sx.lineCap='round'; sx.lineJoin='round';
+let sd=false, hasSig=false;
+function gp(e){const r=sc.getBoundingClientRect(),w=sc.width/r.width,h=sc.height/r.height;return e.touches?{x:(e.touches[0].clientX-r.left)*w,y:(e.touches[0].clientY-r.top)*h}:{x:(e.clientX-r.left)*w,y:(e.clientY-r.top)*h};}
+sc.addEventListener('mousedown',e=>{sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)});
+sc.addEventListener('mousemove',e=>{if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();hasSig=true;document.getElementById('sig-status').textContent='✅ Signature enregistrée';updateProg();});
+sc.addEventListener('mouseup',()=>sd=false);
+sc.addEventListener('touchstart',e=>{e.preventDefault();sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)},{passive:false});
+sc.addEventListener('touchmove',e=>{e.preventDefault();if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();hasSig=true;updateProg();},{passive:false});
+sc.addEventListener('touchend',()=>sd=false);
+function clearSig(){sx.clearRect(0,0,sc.width,sc.height);hasSig=false;document.getElementById('sig-status').textContent='Signez ici';updateProg();}
+
+function updatePrestaDisplay(){
+  const name    = document.getElementById('presta-name').value.trim();
+  const statut  = document.getElementById('presta-statut').value;
+  const societe = document.getElementById('presta-societe').value.trim();
+  const siret   = document.getElementById('presta-siret').value.trim();
+
+  // Update encart parties
+  const displayName = societe ? `${societe} (${name})` : name || '— À compléter —';
+  document.getElementById('presta-name-display').textContent = displayName;
+  const sub = [statut, siret ? 'SIRET : ' + siret : ''].filter(Boolean).join(' — ');
+  document.getElementById('presta-siret-display').textContent = sub;
+
+  // Inject name into all inline references
+  const label = societe ? `${societe} (${name})` : name ? `${name}` : 'Le Prestataire';
+  for (let i=1; i<=8; i++) {
+    const el = document.getElementById('presta-inline-'+i);
+    if (el) el.textContent = i===1 ? `« ${label} »` : label;
+  }
+}
+
+function updateProg(){
+  const checks = [...document.querySelectorAll('.check-group input')];
+  const name   = document.getElementById('presta-name').value.trim().length > 2;
+  const statut = document.getElementById('presta-statut').value;
+  const siret  = document.getElementById('presta-siret').value.trim().length > 5;
+  const date   = document.getElementById('presta-date').value;
+  const done   = checks.filter(c=>c.checked).length + (name?1:0) + (statut?1:0) + (siret?1:0) + (date?1:0) + (hasSig?1:0);
+  const total  = checks.length + 5;
+  document.getElementById('prog-fill').style.width = Math.round(done/total*100)+'%';
+  document.getElementById('sign-btn').disabled = !(checks.every(c=>c.checked) && name && statut && siret && date && hasSig);
+}
+
+function signContrat(){
+  const name    = document.getElementById('presta-name').value.trim();
+  const statut  = document.getElementById('presta-statut').value;
+  const societe = document.getElementById('presta-societe').value.trim();
+  const siret   = document.getElementById('presta-siret').value.trim();
+  const date    = document.getElementById('presta-date').value;
+  const ref     = 'CTR-CONV-' + Date.now().toString().slice(-6);
+  document.getElementById('recap-name').textContent = name;
+  document.getElementById('recap-societe').textContent = (societe || name) + ' — ' + statut;
+  document.getElementById('recap-siret').textContent = siret;
+  document.getElementById('recap-date').textContent = new Date(date).toLocaleDateString('fr-FR');
+  document.getElementById('recap-ref').textContent = ref;
+  document.getElementById('contrat-view').style.display='none';
+  document.getElementById('success-screen').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

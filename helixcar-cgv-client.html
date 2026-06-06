@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>HelixCar — CGV Client</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--y:#F5C518;--nv:#0A1628;--bl:#2556A8;--wh:#FAFAF7;--gl:#F0EFE9;--gn:#22C55E;--rd:#EF4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--gl);color:#1a1a1a;line-height:1.6}
+@media print{.no-print{display:none!important}.page{padding:12mm}}
+.hdr{background:var(--nv);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem}
+.lb{width:26px;height:26px;background:var(--y);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;color:var(--nv)}
+.page{max-width:760px;margin:0 auto;padding:24px 16px 80px}
+.doc-header{background:var(--nv);border-radius:12px;padding:28px 32px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
+.doc-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:#fff}
+.doc-sub{font-size:.82rem;color:rgba(255,255,255,.55);margin-top:4px}
+.doc-ref{text-align:right}
+.doc-ref .code{font-family:monospace;font-weight:700;color:var(--y);font-size:.88rem;background:rgba(245,197,24,.15);padding:4px 10px;border-radius:5px}
+.doc-ref .date{font-size:.75rem;color:rgba(255,255,255,.4);margin-top:4px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.art-num{font-family:'Syne',sans-serif;font-weight:800;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--y);background:var(--nv);padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:8px}
+.art-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--nv);margin-bottom:10px}
+p{font-size:.88rem;color:#444;margin-bottom:8px}
+ul{padding-left:18px;margin-bottom:8px}
+li{font-size:.88rem;color:#444;margin-bottom:3px}
+.client-box{background:rgba(37,86,168,.06);border:1.5px solid rgba(37,86,168,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.88rem}
+.client-box strong{color:var(--nv)}
+.sig-section{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.sig-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:var(--nv);margin-bottom:6px}
+.check-group{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid #e0e0e0;font-size:.85rem;cursor:pointer;transition:all .2s}
+.check-item:has(input:checked){border-color:var(--gn);background:rgba(34,197,94,.04)}
+.check-item input{width:15px;height:15px;accent-color:var(--gn);flex-shrink:0;margin-top:2px}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px}
+.fg input{width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s}
+.fg input:focus{border-color:var(--bl)}
+.sig-wrap{border:2px dashed #ccc;border-radius:8px;overflow:hidden;background:#fafafa;margin-bottom:6px}
+canvas{display:block;width:100%;height:110px;cursor:crosshair;touch-action:none}
+.sig-actions{display:flex;justify-content:space-between;padding:5px 10px;background:var(--gl);font-size:.72rem;color:#888}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 24px;border-radius:9px;cursor:pointer;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;transition:all .2s;width:100%}
+.btn-y{background:var(--y);color:var(--nv)}.btn-y:disabled{opacity:.4;cursor:not-allowed}
+.prog{height:4px;background:#e0e0e0;border-radius:2px;margin-bottom:20px;overflow:hidden}
+.prog-fill{height:100%;background:var(--y);border-radius:2px;transition:width .4s}
+.success{display:none;text-align:center;padding:40px 0}
+.sico{width:60px;height:60px;background:var(--gn);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 14px;animation:pop .5s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.no-print-btn{background:var(--nv);color:var(--y);border:none;padding:8px 18px;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer}
+  @media (max-width: 600px) {
+    .page { padding: 16px 12px 60px; }
+    .doc-header { flex-direction: column; gap: 12px; padding: 20px; }
+    .doc-ref { text-align: left; }
+    .parties-grid { grid-template-columns: 1fr; }
+    .card { padding: 18px 14px; }
+    [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+    .check-item { font-size: .82rem; }
+    .btn { font-size: .85rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo"><div class="lb">HC</div>HelixCar — CGV Client</div>
+  <div class="no-print">
+    <button class="no-print-btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
+  </div>
+</div>
+
+<div class="page">
+  <div id="cgv-view">
+
+    <div class="doc-header">
+      <div>
+        <div class="doc-title">📄 Conditions Générales de Vente</div>
+        <div class="doc-sub">Client — HelixCar SASU</div>
+      </div>
+      <div class="doc-ref">
+        <div class="code" id="cgv-ref">CGV-CLIENT-2024</div>
+        <div class="date" id="cgv-date"></div>
+      </div>
+    </div>
+
+    <div class="client-box" id="client-filled" style="display:none">
+      📋 CGV établies pour : <strong id="client-name-display"></strong> — <span id="client-date-display"></span>
+    </div>
+
+    <!-- Articles -->
+    <div class="card">
+      <div class="art-num">Article 1</div>
+      <div class="art-title">Objet</div>
+      <p>HelixCar est une plateforme de mise en relation entre clients et chauffeurs indépendants pour des prestations de convoyage de véhicules en France et en Europe.</p>
+      <p>HelixCar n'est pas transporteur des véhicules mais organise et facilite la mise en relation.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 2</div>
+      <div class="art-title">Nature de la prestation</div>
+      <p>Le convoyage est réalisé par des chauffeurs indépendants sélectionnés par la plateforme.</p>
+      <p>Le client reconnaît que le transport est exécuté par un prestataire tiers indépendant.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 3</div>
+      <div class="art-title">Prix et paiement</div>
+      <p>Le prix est calculé automatiquement selon la distance et les paramètres du trajet.</p>
+      <p>Le paiement est effectué à la réservation via la plateforme.</p>
+      <p>Les fonds peuvent être conservés jusqu'à validation de la mission.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 4</div>
+      <div class="art-title">Délais</div>
+      <p>Les délais sont donnés à titre indicatif. Ils peuvent varier selon :</p>
+      <ul>
+        <li>Trafic et conditions météorologiques</li>
+        <li>Imprévus logistiques</li>
+        <li>Contraintes indépendantes de HelixCar</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 5</div>
+      <div class="art-title">État du véhicule</div>
+      <p>Le client garantit que :</p>
+      <ul>
+        <li>Le véhicule est en état de circuler</li>
+        <li>Le véhicule est assuré pour son usage</li>
+        <li>Les documents sont conformes à la réglementation</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 6</div>
+      <div class="art-title">Responsabilité</div>
+      <p>HelixCar agit en tant qu'intermédiaire. La responsabilité de la conduite du véhicule incombe exclusivement au chauffeur indépendant pendant la mission.</p>
+      <p>HelixCar ne peut être tenu responsable :</p>
+      <ul>
+        <li>Des dommages mécaniques</li>
+        <li>Des incidents de circulation</li>
+        <li>Des retards liés à des causes extérieures</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 7</div>
+      <div class="art-title">Assurance</div>
+      <p>Le client reconnaît que le véhicule doit être assuré pour le convoyage.</p>
+      <p>Le chauffeur peut disposer de garanties complémentaires selon la mission. HelixCar recommande une couverture adaptée.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 8</div>
+      <div class="art-title">Annulation</div>
+      <p>Toute annulation peut entraîner des frais selon l'avancement de la mission :</p>
+      <ul>
+        <li><strong>Avant départ :</strong> frais éventuels de gestion</li>
+        <li><strong>Après prise en charge :</strong> facturation partielle ou totale</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 9</div>
+      <div class="art-title">Validation de mission</div>
+      <p>La mission est considérée comme terminée à la remise du véhicule au point d'arrivée. Le paiement est alors validé et libéré.</p>
+    </div>
+
+    <div class="card">
+      <div class="art-num">Article 10</div>
+      <div class="art-title">Acceptation</div>
+      <p>La réservation implique l'acceptation pleine et entière des présentes conditions générales de vente.</p>
+    </div>
+
+    <!-- SIGNATURE -->
+    <div class="sig-section">
+      <div class="sig-title">✍️ Signature électronique</div>
+      <p style="font-size:.82rem;color:#666;margin-bottom:16px">Complétez vos informations et signez pour valider votre acceptation des CGV HelixCar.</p>
+      <div class="prog"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="check-group">
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'ai lu et compris l'intégralité des CGV HelixCar</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'ai pris connaissance des conditions relatives à l'état du véhicule (article 5)</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'accepte les conditions d'annulation et de paiement</label>
+        <label class="check-item"><input type="checkbox" onchange="updateProg()"> J'accepte que la mission soit réalisée par un chauffeur indépendant</label>
+      </div>
+      <div class="fg">
+        <label>Prénom et Nom *</label>
+        <input type="text" id="client-name" placeholder="Ex : Marc Dupont" oninput="updateProg();updateClientDisplay()">
+      </div>
+      <div class="fg">
+        <label>Date *</label>
+        <input type="date" id="client-date" oninput="updateProg();updateClientDisplay()">
+      </div>
+      <div class="fg" style="margin-bottom:6px"><label>Signature *</label></div>
+      <div class="sig-wrap">
+        <canvas id="sig-canvas" width="720" height="110"></canvas>
+      </div>
+      <div class="sig-actions">
+        <span id="sig-status">Signez ici</span>
+        <button onclick="clearSig()" style="background:none;border:none;color:var(--rd);font-size:.78rem;cursor:pointer;font-weight:600">Effacer</button>
+      </div>
+      <div style="height:14px"></div>
+      <button class="btn btn-y" id="sign-btn" onclick="signCGV()" disabled>✅ Accepter et signer les CGV →</button>
+    </div>
+
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="success" id="success-screen">
+    <div class="sico">✅</div>
+    <h2 style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;margin-bottom:8px">CGV acceptées !</h2>
+    <p style="color:#555;font-size:.88rem;line-height:1.7;margin-bottom:16px">Vos conditions générales ont été signées électroniquement.<br><strong>Un email de confirmation vous a été envoyé.</strong></p>
+    <div style="background:var(--gl);border-radius:10px;padding:14px;font-size:.82rem;text-align:left;color:#555;line-height:1.8;margin-bottom:16px">
+      👤 Signataire : <strong id="recap-name"></strong><br>
+      📅 Date : <strong id="recap-date"></strong><br>
+      🔑 Référence : <strong id="recap-ref" style="font-family:monospace;color:var(--bl)"></strong>
+    </div>
+    <button class="btn btn-y" style="width:auto;padding:10px 24px" onclick="window.print()">🖨️ Télécharger le PDF</button>
+  </div>
+</div>
+
+<script>
+// Init date
+document.getElementById('cgv-date').textContent = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+document.getElementById('client-date').value = new Date().toISOString().split('T')[0];
+
+// Signature canvas
+const sc = document.getElementById('sig-canvas'), sx = sc.getContext('2d');
+sx.strokeStyle='#0A1628'; sx.lineWidth=2.5; sx.lineCap='round'; sx.lineJoin='round';
+let sd=false, hasSig=false;
+function gp(e){const r=sc.getBoundingClientRect(),w=sc.width/r.width,h=sc.height/r.height;return e.touches?{x:(e.touches[0].clientX-r.left)*w,y:(e.touches[0].clientY-r.top)*h}:{x:(e.clientX-r.left)*w,y:(e.clientY-r.top)*h};}
+sc.addEventListener('mousedown',e=>{sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)});
+sc.addEventListener('mousemove',e=>{if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();hasSig=true;document.getElementById('sig-status').textContent='✅ Signature enregistrée';updateProg();});
+sc.addEventListener('mouseup',()=>sd=false);
+sc.addEventListener('touchstart',e=>{e.preventDefault();sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)},{passive:false});
+sc.addEventListener('touchmove',e=>{e.preventDefault();if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();hasSig=true;updateProg();},{passive:false});
+sc.addEventListener('touchend',()=>sd=false);
+function clearSig(){sx.clearRect(0,0,sc.width,sc.height);hasSig=false;document.getElementById('sig-status').textContent='Signez ici';updateProg();}
+
+function updateClientDisplay(){
+  const name = document.getElementById('client-name').value.trim();
+  const date = document.getElementById('client-date').value;
+  const box = document.getElementById('client-filled');
+  const info = document.getElementById('client-info-box');
+  if(name){
+    box.style.display='block';
+    document.getElementById('client-name-display').textContent = name;
+    document.getElementById('client-date-display').textContent = date ? new Date(date).toLocaleDateString('fr-FR') : '';
+  } else {
+    box.style.display='none';
+  }
+}
+
+function updateProg(){
+  const checks = [...document.querySelectorAll('.check-group input')];
+  const done = checks.filter(c=>c.checked).length + (document.getElementById('client-name').value.trim().length>2?1:0) + (document.getElementById('client-date').value?1:0) + (hasSig?1:0);
+  const total = checks.length + 3;
+  document.getElementById('prog-fill').style.width = Math.round(done/total*100)+'%';
+  document.getElementById('sign-btn').disabled = !(checks.every(c=>c.checked) && document.getElementById('client-name').value.trim().length>2 && document.getElementById('client-date').value && hasSig);
+}
+
+function signCGV(){
+  const name = document.getElementById('client-name').value.trim();
+  const date = document.getElementById('client-date').value;
+  const ref  = 'CGV-CLI-' + Date.now().toString().slice(-6);
+  document.getElementById('recap-name').textContent = name;
+  document.getElementById('recap-date').textContent = new Date(date).toLocaleDateString('fr-FR');
+  document.getElementById('recap-ref').textContent = ref;
+  document.getElementById('cgv-view').style.display='none';
+  document.getElementById('success-screen').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>
