@@ -884,71 +884,40 @@ tbody tr:last-child { border-bottom: none; }
         </div>
       </div>
 
-      <!-- ADMIN: Facturation -->
+<!-- ADMIN: Facturation -->
       <div class="page" id="page-admin-facturation">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-          <div class="stat-card yellow"><div class="stat-label">En attente validation</div><div class="stat-value">3</div><div class="stat-sub">Missions à valider sous 48h</div></div>
-          <div class="stat-card blue"><div class="stat-label">Factures à traiter</div><div class="stat-value">2</div><div class="stat-sub">Paiement sous 9 jours ouvrés</div></div>
-          <div class="stat-card"><div class="stat-label">Payé ce mois</div><div class="stat-value">1 850 €</div><div class="stat-sub">8 missions validées</div></div>
+          <div class="stat-card yellow"><div class="stat-label">Factures en attente</div><div class="stat-value" id="fc-admin-stat-attente">0</div><div class="stat-sub">À valider</div></div>
+          <div class="stat-card blue"><div class="stat-label">Factures à payer</div><div class="stat-value" id="fc-admin-stat-a-payer">0</div><div class="stat-sub">Paiement sous 9 jours ouvrés</div></div>
+          <div class="stat-card"><div class="stat-label">Payé ce mois</div><div class="stat-value" id="fc-admin-stat-paye">0 €</div><div class="stat-sub" id="fc-admin-stat-paye-sub">0 facture(s) payée(s)</div></div>
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">⏱️ Missions à valider (48h)</div><div class="card-sub">Vérifiez chaque mission avant de valider le paiement</div></div>
-          <div class="alert alert-info">Vous avez <strong>48h</strong> après la fin de chaque mission pour la valider. Passé ce délai, elle est validée automatiquement. Paiement sous <strong>9 jours ouvrés</strong> après validation.003cbr003e003cbr003e📬 Les documents (lettre de voiture, EDL) envoyés à 003cstrong003ehelixcardoc@gmail.com003c/strong003e avec le code mission en objet seront associés ici automatiquement une fois Supabase configuré.</div>
+          <div class="card-header"><div class="card-title">🧾 Factures en attente de validation</div><div class="card-sub">Générées par les convoyeurs, à vérifier avant paiement</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Mission</th><th>Convoyeur</th><th>Trajet</th><th>Date fin</th><th>Montant</th><th>EDL</th><th>Lettre VdV</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><strong>HC-2024-0529</strong></td><td>Antoine Arcelin</td><td>Paris → Lyon</td><td>29/05 14h18</td><td style="font-weight:700;color:var(--green)">200 €</td>
-                  <td><span class="badge badge-active">✅ Reçu</span></td>
-                  <td><span class="badge badge-active">✅ Reçu</span></td>
-                  <td>
-                    <button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" onclick="alert('✅ Mission HC-2024-0529 validée. Antoine Arcelin sera payé sous 9 jours ouvrés.')">✅ Valider</button>
-                    <button class="btn btn-sm btn-outline" onclick="alert('⚠️ Mission HC-2024-0529 mise en litige.')">⚠️ Litige</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td><strong>HC-2024-0530</strong></td><td>Jean Pellerin</td><td>Lyon → Bordeaux</td><td>30/05 16h42</td><td style="font-weight:700;color:var(--green)">241 €</td>
-                  <td><span class="badge badge-active">✅ Reçu</span></td>
-                  <td><span style="color:var(--red);font-size:.8rem;font-weight:600">⏳ En attente</span></td>
-                  <td>
-                    <button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" onclick="alert('✅ Validée.')">✅ Valider</button>
-                    <button class="btn btn-sm btn-outline">⚠️ Litige</button>
-                  </td>
-                </tr>
-              </tbody>
+              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Date émission</th><th>Action</th></tr></thead>
+              <tbody id="fc-admin-attente"><tr><td colspan="6" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
             </table>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">🧾 Factures convoyeurs</div><div class="card-sub">Les convoyeurs génèrent leurs factures depuis leur espace</div></div>
+          <div class="card-header"><div class="card-title">💰 Factures validées — à payer</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Date émission</th><th>Statut</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><strong style="font-family:monospace">FAC-2024-0041</strong></td>
-                  <td>Antoine Arcelin</td>
-                  <td>HC-0527 · HC-0528 · HC-0529</td>
-                  <td style="font-weight:700;color:var(--green)">600 €</td>
-                  <td>30/05/2024</td>
-                  <td><span class="badge" style="background:rgba(245,197,24,.2);color:#92400E">💰 À payer</span></td>
-                  <td>
-                    <button class="btn btn-sm btn-dark" onclick="alert('Paiement de 600 € à Antoine Arcelin déclenché — virement sous 9 jours ouvrés.')">💸 Payer</button>
-                  </td>
-                </tr>
-                <tr>
-                  <td><strong style="font-family:monospace">FAC-2024-0040</strong></td>
-                  <td>Jean Pellerin</td>
-                  <td>HC-0524 · HC-0530</td>
-                  <td style="font-weight:700;color:var(--green)">441 €</td>
-                  <td>28/05/2024</td>
-                  <td><span class="badge badge-active">✅ Payée</span></td>
-                  <td><button class="btn btn-sm btn-outline">Voir</button></td>
-                </tr>
-              </tbody>
+              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Validée le</th><th>Paiement prévu</th><th>Action</th></tr></thead>
+              <tbody id="fc-admin-a-payer"><tr><td colspan="7" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Historique des factures payées</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Payée le</th></tr></thead>
+              <tbody id="fc-admin-payees"><tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1376,27 +1345,20 @@ tbody tr:last-child { border-bottom: none; }
 
       <!-- CONVOYEUR: Facturation -->
       <div class="page" id="page-convoyeur-facturation">
-        <div class="alert alert-info">💡 Regroupez plusieurs missions validées en une seule facture. Paiement sous <strong>9 jours ouvrés</strong> après validation.</div>
+        <div class="alert alert-info">💡 Regroupez plusieurs missions terminées en une seule facture. Paiement sous <strong>9 jours ouvrés</strong> après validation par HelixCar.</div>
         <div class="card">
-          <div class="card-header"><div class="card-title">✅ Missions validées — prêtes à facturer</div></div>
-          <div style="padding:4px 0">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee"><div><strong>HC-2024-0527</strong> · Paris → Marseille<br><span style="font-size:.78rem;color:#888">Validée le 26/05</span></div><div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--green)">300 €</strong><input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--green)"></div></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee"><div><strong>HC-2024-0528</strong> · Lyon → Bordeaux<br><span style="font-size:.78rem;color:#888">Validée le 28/05</span></div><div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--green)">300 €</strong><input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--green)"></div></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0"><div><strong>HC-2024-0529</strong> · Paris → Lyon<br><span style="font-size:.78rem;color:#888">Validée le 29/05</span></div><div style="display:flex;align-items:center;gap:10px"><strong style="color:var(--green)">200 €</strong><input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--green)"></div></div>
-          </div>
+          <div class="card-header"><div class="card-title">✅ Missions terminées — prêtes à facturer</div></div>
+          <div id="fc-conv-missions-list" style="padding:4px 0"><p style="color:#888;font-size:.85rem">Chargement…</p></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:2px solid #eee">
-            <div style="font-weight:700">Total : <span style="color:var(--green);font-size:1.1rem">800 €</span></div>
-            <button class="btn btn-primary" onclick="alert('✅ Facture FAC-2024-0042 générée pour 800 €.\nEnvoyée à HelixCar — paiement sous 9 jours ouvrés.')">🧾 Générer la facture</button>
+            <div style="font-weight:700">Total : <span style="color:var(--green);font-size:1.1rem" id="fc-conv-total">0 €</span></div>
+            <button class="btn btn-primary" id="fc-conv-generer-btn" onclick="genererFactureConvoyeur()" disabled>🧾 Générer la facture</button>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Historique des factures</div></div>
           <div class="table-wrap"><table>
             <thead><tr><th>N° Facture</th><th>Missions</th><th>Total</th><th>Date</th><th>Statut</th></tr></thead>
-            <tbody>
-              <tr><td><strong>FAC-2024-0041</strong></td><td>HC-0524, HC-0525, HC-0526</td><td style="color:var(--green);font-weight:700">900 €</td><td>22/05</td><td><span class="badge badge-active">✅ Payée</span></td></tr>
-              <tr><td><strong>FAC-2024-0038</strong></td><td>HC-0520, HC-0521</td><td style="color:var(--green);font-weight:700">500 €</td><td>14/05</td><td><span class="badge badge-active">✅ Payée</span></td></tr>
-            </tbody>
+            <tbody id="fc-conv-historique"><tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
           </table></div>
         </div>
       </div>
@@ -2115,6 +2077,8 @@ function showPage(id) {
   if (id === 'convoyeur-dashboard') { loadDashboardMissionsPreview(); }
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
+  if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
+  if (id === 'admin-facturation') { loadFacturationAdmin(); }
 }
 
 // ── MODALS ─────────────────────────────────────────────────
@@ -2860,6 +2824,238 @@ function loadHistoriqueConvoyeur() {
     .catch(function(e) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
     });
+}
+
+// ── FACTURATION ──────────────────────────────────────────────
+function ajouterJoursOuvres(dateDepart, nbJours) {
+  const d = new Date(dateDepart);
+  let ajoutes = 0;
+  while (ajoutes < nbJours) {
+    d.setDate(d.getDate() + 1);
+    const jour = d.getDay(); // 0 = dimanche, 6 = samedi
+    if (jour !== 0 && jour !== 6) ajoutes++;
+  }
+  return d;
+}
+
+const FACTURE_STATUT_BADGE = {
+  en_attente: '<span class="badge badge-pending">⏳ En attente</span>',
+  validee:    '<span class="badge" style="background:rgba(245,197,24,.2);color:#92400E">💰 À payer</span>',
+  payee:      '<span class="badge badge-active">✅ Payée</span>'
+};
+
+// --- Côté convoyeur ---
+function loadFacturationConvoyeur() {
+  const conv = window._currentConvoyeur;
+  const listEl = document.getElementById('fc-conv-missions-list');
+  const histEl = document.getElementById('fc-conv-historique');
+  if (!conv || !listEl || !histEl) return;
+  listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Chargement…</p>';
+  histEl.innerHTML = '<tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr>';
+
+  Promise.all([
+    sbFetch('missions?convoyeur_id=eq.' + conv.id + '&statut=eq.terminee&order=date_livraison.desc'),
+    sbFetch('factures_convoyeur?convoyeur_id=eq.' + conv.id + '&order=date_generation.desc')
+  ]).then(function(results) {
+    const missionsTerminees = results[0] || [];
+    const factures = results[1] || [];
+
+    // Missions déjà incluses dans une facture (peu importe le statut de la facture)
+    const missionsDejaFacturees = new Set();
+    factures.forEach(function(f) { (f.mission_ids || []).forEach(function(id) { missionsDejaFacturees.add(id); }); });
+    const missionsAFacturer = missionsTerminees.filter(function(m) { return !missionsDejaFacturees.has(m.id); });
+
+    if (missionsAFacturer.length === 0) {
+      listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Aucune mission terminée à facturer pour le moment.</p>';
+    } else {
+      listEl.innerHTML = missionsAFacturer.map(function(m) {
+        const dateTxt = m.date_livraison ? new Date(m.date_livraison).toLocaleDateString('fr-FR') : '—';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee">'
+          + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
+          + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + '</span></div>'
+          + '<div style="display:flex;align-items:center;gap:10px">'
+          + '<strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong>'
+          + '<input type="checkbox" class="fc-conv-check" data-mission-id="' + m.id + '" data-montant="' + (m.prix_ttc || 0) + '" checked onchange="recalculerTotalFactureConvoyeur()" style="width:16px;height:16px;accent-color:var(--green)">'
+          + '</div></div>';
+      }).join('');
+    }
+    recalculerTotalFactureConvoyeur();
+
+    if (factures.length === 0) {
+      histEl.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:14px">Aucune facture générée pour le moment</td></tr>';
+    } else {
+      histEl.innerHTML = factures.map(function(f) {
+        const missionsTxt = (f.mission_ids || []).length + ' mission(s)';
+        const dateTxt = f.date_generation ? new Date(f.date_generation).toLocaleDateString('fr-FR') : '—';
+        const badge = FACTURE_STATUT_BADGE[f.statut] || f.statut;
+        return '<tr><td><strong>' + escapeHtml(f.reference) + '</strong></td><td>' + missionsTxt + '</td>'
+          + '<td style="color:var(--green);font-weight:700">' + f.montant_total + ' €</td>'
+          + '<td>' + dateTxt + '</td><td>' + badge + '</td></tr>';
+      }).join('');
+    }
+  }).catch(function(e) {
+    listEl.innerHTML = '<p style="color:var(--red);font-size:.85rem">Erreur de chargement — vérifiez la console</p>';
+    console.error('Erreur loadFacturationConvoyeur:', e);
+  });
+}
+
+function recalculerTotalFactureConvoyeur() {
+  const checks = document.querySelectorAll('.fc-conv-check:checked');
+  let total = 0;
+  checks.forEach(function(c) { total += parseFloat(c.getAttribute('data-montant')) || 0; });
+  const totalEl = document.getElementById('fc-conv-total');
+  const btn = document.getElementById('fc-conv-generer-btn');
+  if (totalEl) totalEl.textContent = total.toLocaleString('fr-FR') + ' €';
+  if (btn) btn.disabled = checks.length === 0;
+}
+
+function genererFactureConvoyeur() {
+  const conv = window._currentConvoyeur;
+  if (!conv) { alert('Session convoyeur introuvable — reconnecte-toi.'); return; }
+  const checks = document.querySelectorAll('.fc-conv-check:checked');
+  if (checks.length === 0) return;
+  const missionIds = [];
+  let total = 0;
+  checks.forEach(function(c) {
+    missionIds.push(c.getAttribute('data-mission-id'));
+    total += parseFloat(c.getAttribute('data-montant')) || 0;
+  });
+  if (!confirm('Générer une facture de ' + total.toLocaleString('fr-FR') + ' € pour ' + missionIds.length + ' mission(s) ?')) return;
+
+  const reference = 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
+  const btn = document.getElementById('fc-conv-generer-btn');
+  btn.disabled = true; btn.textContent = 'Génération…';
+
+  sbFetch('factures_convoyeur', {
+    method: 'POST',
+    headers: { 'Prefer': 'return=minimal' },
+    body: JSON.stringify({
+      reference: reference,
+      convoyeur_id: conv.id,
+      mission_ids: missionIds,
+      montant_total: total,
+      statut: 'en_attente'
+    })
+  }).then(function() {
+    alert('✅ Facture ' + reference + ' générée pour ' + total.toLocaleString('fr-FR') + ' €.\nEnvoyée à HelixCar pour validation.');
+    btn.textContent = '🧾 Générer la facture';
+    loadFacturationConvoyeur();
+  }).catch(function(e) {
+    alert('❌ Erreur lors de la génération de la facture (voir la console).');
+    console.error('Erreur genererFactureConvoyeur:', e);
+    btn.disabled = false; btn.textContent = '🧾 Générer la facture';
+  });
+}
+
+// --- Côté admin ---
+function loadFacturationAdmin() {
+  const attenteEl = document.getElementById('fc-admin-attente');
+  const aPayerEl = document.getElementById('fc-admin-a-payer');
+  const payeesEl = document.getElementById('fc-admin-payees');
+  if (!attenteEl) return;
+  attenteEl.innerHTML = '<tr><td colspan="6" style="color:#888;font-size:.85rem">Chargement…</td></tr>';
+
+  Promise.all([
+    sbFetch('factures_convoyeur?order=date_generation.desc'),
+    sbFetch('convoyeurs?select=id,prenom,nom'),
+    sbFetch('missions?select=id,reference')
+  ]).then(function(results) {
+    const factures = results[0] || [];
+    const convoyeurs = {};
+    (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
+    const missionsRef = {};
+    (results[2] || []).forEach(function(m) { missionsRef[m.id] = m.reference; });
+
+    function missionsTxt(f) {
+      return (f.mission_ids || []).map(function(id) { return missionsRef[id] || id; }).join(' · ');
+    }
+
+    const enAttente = factures.filter(function(f) { return f.statut === 'en_attente'; });
+    const validees = factures.filter(function(f) { return f.statut === 'validee'; });
+    const payees = factures.filter(function(f) { return f.statut === 'payee'; });
+
+    document.getElementById('fc-admin-stat-attente').textContent = enAttente.length;
+    document.getElementById('fc-admin-stat-a-payer').textContent = validees.length;
+    const moisActuel = new Date().getMonth();
+    const payeesCeMois = payees.filter(function(f) { return f.date_paiement && new Date(f.date_paiement).getMonth() === moisActuel; });
+    const totalPayeCeMois = payeesCeMois.reduce(function(s, f) { return s + (f.montant_total || 0); }, 0);
+    document.getElementById('fc-admin-stat-paye').textContent = totalPayeCeMois.toLocaleString('fr-FR') + ' €';
+    document.getElementById('fc-admin-stat-paye-sub').textContent = payeesCeMois.length + ' facture(s) payée(s)';
+
+    attenteEl.innerHTML = enAttente.length === 0
+      ? '<tr><td colspan="6" style="text-align:center;color:#888;padding:14px">Aucune facture en attente</td></tr>'
+      : enAttente.map(function(f) {
+          const dateTxt = f.date_generation ? new Date(f.date_generation).toLocaleDateString('fr-FR') : '—';
+          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+            + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
+            + '<td>' + missionsTxt(f) + '</td>'
+            + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
+            + '<td>' + dateTxt + '</td>'
+            + '<td><button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" onclick="accepterFactureConvoyeur(\'' + f.id + '\')">✅ Accepter</button></td></tr>';
+        }).join('');
+
+    aPayerEl.innerHTML = validees.length === 0
+      ? '<tr><td colspan="7" style="text-align:center;color:#888;padding:14px">Aucune facture à payer</td></tr>'
+      : validees.map(function(f) {
+          const dateValTxt = f.date_validation ? new Date(f.date_validation).toLocaleDateString('fr-FR') : '—';
+          const datePaieTxt = f.date_paiement_prevue ? new Date(f.date_paiement_prevue).toLocaleDateString('fr-FR') : '—';
+          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+            + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
+            + '<td>' + missionsTxt(f) + '</td>'
+            + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
+            + '<td>' + dateValTxt + '</td>'
+            + '<td>' + datePaieTxt + '</td>'
+            + '<td><button class="btn btn-sm btn-dark" onclick="marquerFacturePayee(\'' + f.id + '\')">💸 Marquer payée</button></td></tr>';
+        }).join('');
+
+    payeesEl.innerHTML = payees.length === 0
+      ? '<tr><td colspan="5" style="text-align:center;color:#888;padding:14px">Aucune facture payée pour le moment</td></tr>'
+      : payees.map(function(f) {
+          const datePaieTxt = f.date_paiement ? new Date(f.date_paiement).toLocaleDateString('fr-FR') : '—';
+          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+            + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
+            + '<td>' + missionsTxt(f) + '</td>'
+            + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
+            + '<td>' + datePaieTxt + '</td></tr>';
+        }).join('');
+  }).catch(function(e) {
+    attenteEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:14px">Erreur de chargement — vérifiez la console</td></tr>';
+    console.error('Erreur loadFacturationAdmin:', e);
+  });
+}
+
+function accepterFactureConvoyeur(factureId) {
+  if (!confirm('Accepter cette facture ? Le paiement sera dû sous 9 jours ouvrés.')) return;
+  const maintenant = new Date();
+  const datePaiementPrevue = ajouterJoursOuvres(maintenant, 9);
+  sbFetch('factures_convoyeur?id=eq.' + factureId, {
+    method: 'PATCH',
+    headers: { 'Prefer': 'return=minimal' },
+    body: JSON.stringify({
+      statut: 'validee',
+      date_validation: maintenant.toISOString(),
+      date_paiement_prevue: datePaiementPrevue.toISOString()
+    })
+  }).then(function() {
+    loadFacturationAdmin();
+  }).catch(function(e) {
+    alert('❌ Erreur lors de la validation (voir la console).');
+    console.error('Erreur accepterFactureConvoyeur:', e);
+  });
+}
+
+function marquerFacturePayee(factureId) {
+  if (!confirm('Confirmer que cette facture a bien été payée ?')) return;
+  sbFetch('factures_convoyeur?id=eq.' + factureId, {
+    method: 'PATCH',
+    headers: { 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ statut: 'payee', date_paiement: new Date().toISOString() })
+  }).then(function() {
+    loadFacturationAdmin();
+  }).catch(function(e) {
+    alert('❌ Erreur lors du marquage payée (voir la console).');
+    console.error('Erreur marquerFacturePayee:', e);
+  });
 }
 
 // ── MISSION DETAIL ─────────────────────────────────────────
