@@ -1220,6 +1220,16 @@ tbody tr:last-child { border-bottom: none; }
             <div id="archivage-log-recontacts" style="background:#F8F8F6;border:1px solid #eee;border-radius:8px;padding:12px 14px;font-size:.8rem;font-family:monospace;max-height:220px;overflow-y:auto;color:#333;margin-top:12px"></div>
           </div>
         </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">🧾 Factures convoyeurs</div><div class="card-sub">Une fiche par facture (référence, missions, montant, statut, dates), classées automatiquement Année/Mois — pratique pour la compta</div></div>
+          </div>
+          <div style="padding:16px">
+            <button class="btn btn-primary" id="btn-archiver-factures" onclick="lancerArchivageFactures()">📁 Télécharger les factures</button>
+            <div id="archivage-log-factures" style="background:#F8F8F6;border:1px solid #eee;border-radius:8px;padding:12px 14px;font-size:.8rem;font-family:monospace;max-height:220px;overflow-y:auto;color:#333;margin-top:12px"></div>
+          </div>
+        </div>
       </div>
 
       <!-- CLIENT: Notation après mission -->
@@ -2502,13 +2512,14 @@ async function lancerSynchronisation() {
   let succesSync = false;
 
   try {
-    ecrireLogArchive(logId, '🔎 Lecture des convoyeurs, clients, missions, recontacts…');
-    const [actifs, tousLesClients, missions, convoyeurs, recontacts] = await Promise.all([
+    ecrireLogArchive(logId, '🔎 Lecture des convoyeurs, clients, missions, recontacts, factures…');
+    const [actifs, tousLesClients, missions, convoyeurs, recontacts, factures] = await Promise.all([
       sbFetchToutePage('convoyeurs?statut=eq.actif&order=nom.asc'),
       sbFetchToutePage('clients?order=created_at.asc'),
       sbFetchToutePage('missions?select=id,reference,client_id,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url'),
       sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
-      sbFetchToutePage('recontacts?order=created_at.desc')
+      sbFetchToutePage('recontacts?order=created_at.desc'),
+      sbFetchToutePage('factures_convoyeur?order=date_generation.desc')
     ]);
     const convoyeurParId = {};
     (convoyeurs || []).forEach(function(c) { convoyeurParId[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
@@ -2607,6 +2618,15 @@ async function lancerSynchronisation() {
       const nomPersonne = nomDossierSain(((r.prenom || '') + ' ' + (r.nom || '')).trim() || ('demande-' + r.id));
       const dateCourte = r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : 'date-inconnue';
       descripteurs.push({ cle: 'fiche-recontact:' + r.id, chemin: 'Demandes de recontact/' + nomPersonne + ' - ' + dateCourte + '/fiche-recontact.txt', valeur: texteFicheRecontact(r), estUrl: false });
+    });
+
+    // 4) Factures convoyeurs, classées Année/Mois (d'après la date de génération)
+    const missionRefParId = {};
+    (missions || []).forEach(function(m) { missionRefParId[m.id] = m.reference; });
+    (factures || []).forEach(function(f) {
+      const nomConvoyeur = convoyeurParId[f.convoyeur_id] || 'Convoyeur inconnu';
+      const chemin = 'Factures/' + dossierAnneeMois(f.date_generation) + '/' + nomDossierSain(f.reference || ('facture-' + f.id)) + '.txt';
+      descripteurs.push({ cle: 'facture:' + f.id, chemin: chemin, valeur: texteFicheFacture(f, nomConvoyeur, missionRefParId), estUrl: false });
     });
 
     // ── PHASE 1 : tri rapide (aucun réseau) — juste "déjà connu ?" pour chaque élément.
@@ -3231,6 +3251,97 @@ async function lancerArchivageRecontacts() {
     succes = true;
   } catch (e) {
     console.error('Erreur archivage recontacts:', e);
+    ecrireLogArchive(logId, '❌ Erreur : ' + e.message);
+  } finally {
+    btn.disabled = false;
+    if (succes) {
+      btn.textContent = '✅ Terminé !';
+      setTimeout(function() { btn.textContent = texteInitialBtn; }, 2500);
+    } else {
+      btn.textContent = texteInitialBtn;
+    }
+  }
+}
+
+const MOIS_FR = ['01 - Janvier', '02 - Février', '03 - Mars', '04 - Avril', '05 - Mai', '06 - Juin', '07 - Juillet', '08 - Août', '09 - Septembre', '10 - Octobre', '11 - Novembre', '12 - Décembre'];
+
+function dossierAnneeMois(dateIso) {
+  const d = dateIso ? new Date(dateIso) : null;
+  if (!d || isNaN(d.getTime())) return 'Date inconnue';
+  return d.getFullYear() + '/' + MOIS_FR[d.getMonth()];
+}
+
+function texteFicheFacture(f, nomConvoyeur, missionsRef) {
+  const missionsTxt = (f.mission_ids || []).map(function(id) { return missionsRef[id] || id; }).join(', ') || '—';
+  const statutLisible = { en_attente: 'En attente de validation', validee: 'Validée, en attente de paiement', payee: 'Payée' }[f.statut] || f.statut || '—';
+  const lignes = [
+    'FACTURE — ' + (f.reference || '—'),
+    '='.repeat(50),
+    'Convoyeur : ' + (nomConvoyeur || '—'),
+    'Montant total : ' + (f.montant_total != null ? f.montant_total + ' €' : '—'),
+    'Statut : ' + statutLisible,
+    '',
+    'MISSIONS INCLUSES',
+    missionsTxt,
+    '',
+    'DATES',
+    'Génération : ' + (f.date_generation ? new Date(f.date_generation).toLocaleString('fr-FR') : '—'),
+    'Validation : ' + (f.date_validation ? new Date(f.date_validation).toLocaleString('fr-FR') : '—'),
+    'Paiement prévu : ' + (f.date_paiement_prevue ? new Date(f.date_paiement_prevue).toLocaleDateString('fr-FR') : '—'),
+    'Paiement effectué : ' + (f.date_paiement ? new Date(f.date_paiement).toLocaleString('fr-FR') : '—')
+  ];
+  return lignes.join('\n');
+}
+
+async function lancerArchivageFactures() {
+  const btn = document.getElementById('btn-archiver-factures');
+  if (!btn || btn.disabled) return;
+  if (typeof JSZip === 'undefined') { alert('❌ La librairie JSZip ne s\'est pas chargée (vérifie ta connexion) — réessaie.'); return; }
+
+  const texteInitialBtn = '📁 Télécharger les factures';
+  let succes = false;
+  const logId = 'archivage-log-factures';
+  const logEl = document.getElementById(logId);
+  if (logEl) logEl.innerHTML = '';
+  btn.disabled = true;
+  btn.textContent = '⏳ Préparation…';
+  ecrireLogArchive(logId, '🔎 Lecture des factures…');
+
+  try {
+    const [factures, convoyeurs, missions] = await Promise.all([
+      sbFetchToutePage('factures_convoyeur?order=date_generation.desc'),
+      sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
+      sbFetchToutePage('missions?select=id,reference')
+    ]);
+    if (!factures || factures.length === 0) {
+      ecrireLogArchive(logId, '✅ Aucune facture pour le moment.');
+      return;
+    }
+    const convoyeurParId = {};
+    (convoyeurs || []).forEach(function(c) { convoyeurParId[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
+    const missionRefParId = {};
+    (missions || []).forEach(function(m) { missionRefParId[m.id] = m.reference; });
+
+    ecrireLogArchive(logId, factures.length + ' facture(s) trouvée(s).');
+
+    const zip = new JSZip();
+    factures.forEach(function(f) {
+      const nomConvoyeur = convoyeurParId[f.convoyeur_id] || 'Convoyeur inconnu';
+      const dossier = dossierAnneeMois(f.date_generation) + '/' + nomDossierSain(f.reference || ('facture-' + f.id));
+      zip.file(dossier + '.txt', texteFicheFacture(f, nomConvoyeur, missionRefParId));
+    });
+
+    ecrireLogArchive(logId, '🗜️ Compression du ZIP…');
+    btn.textContent = '⏳ Compression…';
+    const contenuZip = await zip.generateAsync({ type: 'blob' });
+    const nomZip = 'helixcar-factures-' + new Date().toISOString().slice(0, 10) + '.zip';
+    telechargerBlobZip(contenuZip, nomZip);
+    ecrireLogArchive(logId, '✅ ZIP téléchargé : ' + nomZip + ' (' + factures.length + ' facture(s)).');
+
+    factures.forEach(function(f) { marquerSynchronise('facture:' + f.id); });
+    succes = true;
+  } catch (e) {
+    console.error('Erreur archivage factures:', e);
     ecrireLogArchive(logId, '❌ Erreur : ' + e.message);
   } finally {
     btn.disabled = false;
