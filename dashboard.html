@@ -557,6 +557,9 @@ tbody tr:last-child { border-bottom: none; }
         <input type="password" id="login-pw" placeholder="••••••••" style="padding-right:40px" onkeydown="if(event.key==='Enter')doLogin()">
         <button type="button" onclick="togglePw('login-pw', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;line-height:1;color:#888">👁️</button>
       </div>
+      <div style="text-align:right;margin-top:6px">
+        <a href="#" onclick="ouvrirMotDePasseOublie(event)" style="font-size:.78rem;color:var(--blue-mid);text-decoration:none">Mot de passe oublié ?</a>
+      </div>
     </div>
 
     <div id="login-alert" style="display:none" class="alert alert-warning">
@@ -2010,8 +2013,16 @@ async function doLogin() {
   }
 }
 
-async function finaliserSessionConvoyeur(email, alertEl) {
-  const rows = await sbFetch('convoyeurs?email=eq.' + encodeURIComponent(email) + '&order=created_at.desc&limit=1');
+async function finaliserSessionConvoyeur(email, alertEl, authUserId) {
+  let rows = null;
+  if (authUserId) {
+    rows = await sbFetch('convoyeurs?auth_user_id=eq.' + encodeURIComponent(authUserId) + '&limit=1');
+  }
+  if (!rows || rows.length === 0) {
+    // Repli par email : uniquement pour les comptes créés avant la liaison directe.
+    // Peut être ambigu si plusieurs fiches partagent le même email (ex. tests).
+    rows = await sbFetch('convoyeurs?email=eq.' + encodeURIComponent(email) + '&order=created_at.desc&limit=1');
+  }
   const conv = (rows || [])[0];
   if (!conv) {
     if (alertEl) { alertEl.textContent = '⚠️ Aucun dossier convoyeur trouvé pour cet email.'; alertEl.style.display = 'flex'; }
@@ -2047,7 +2058,7 @@ async function doLoginConvoyeur(email, pw, alertEl) {
       if (alertEl) { alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); alertEl.style.display = 'flex'; }
       return;
     }
-    await finaliserSessionConvoyeur(email, alertEl);
+    await finaliserSessionConvoyeur(email, alertEl, data.user ? data.user.id : null);
   } catch (e) {
     if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
     console.error(e);
@@ -2159,6 +2170,41 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+async function ouvrirMotDePasseOublie(e) {
+  if (e) e.preventDefault();
+  const email = prompt('Entre ton adresse email pour recevoir un lien de réinitialisation :');
+  if (!email || !email.trim()) return;
+  if (!sbAuth) { alert('❌ Erreur technique (Supabase non initialisé).'); return; }
+  try {
+    const { error } = await sbAuth.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html'
+    });
+    if (error) { alert('❌ ' + error.message); return; }
+    alert('📬 Si un compte existe avec cet email, un lien de réinitialisation vient d\'être envoyé (pense à vérifier les spams).');
+  } catch (e2) {
+    console.error('Erreur réinitialisation mot de passe:', e2);
+    alert('❌ Erreur lors de l\'envoi (voir la console).');
+  }
+}
+
+// Déclenché quand la personne arrive via le lien "mot de passe oublié" reçu par email.
+if (sbAuth) {
+  sbAuth.auth.onAuthStateChange(function(event, session) {
+    if (event === 'PASSWORD_RECOVERY') {
+      const nouveauMdp = prompt('Choisis ton nouveau mot de passe (8 caractères minimum) :');
+      if (!nouveauMdp) return;
+      if (nouveauMdp.length < 8) {
+        alert('❌ Le mot de passe doit contenir au moins 8 caractères. Réutilise le lien reçu par email pour réessayer.');
+        return;
+      }
+      sbAuth.auth.updateUser({ password: nouveauMdp }).then(function(res) {
+        if (res.error) { alert('❌ ' + res.error.message); }
+        else { alert('✅ Mot de passe mis à jour ! Tu es maintenant connecté sur ton espace.'); }
+      });
+    }
+  });
+}
 
 function sbFetch(path, options) {
   options = options || {};
@@ -2493,16 +2539,20 @@ async function lancerSynchronisation() {
       const baseClient = 'Clients/' + nomClient + '/';
 
       groupe.forEach(function(c, k) {
+        const nomReelDossier = nomDossierSain(((c.prenom || '') + ' ' + (c.nom || '')).trim() || ('client-' + c.id));
         const cheminFiche = groupe.length === 1
           ? baseClient + 'fiche-client.txt'
-          : baseClient + 'Demande ' + (k + 1) + ' - ' + (c.created_at ? new Date(c.created_at).toISOString().slice(0, 10) : 'date-inconnue') + '/fiche-client.txt';
+          : baseClient + 'Demande ' + (k + 1) + ' - ' + nomReelDossier + ' - ' + (c.created_at ? new Date(c.created_at).toISOString().slice(0, 10) : 'date-inconnue') + '/fiche-client.txt';
         descripteurs.push({
           cle: 'fiche-client:' + c.id, chemin: cheminFiche, valeur: texteFicheClient(c), estUrl: false,
           clientInfo: {
             nomClient: nomClient,
+            nomReel: ((c.prenom || '') + ' ' + (c.nom || '')).trim() || nomClient,
             trajet: (c.ville_depart || '?') + ' → ' + (c.ville_arrivee || '?'),
             dateAffichee: c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : 'date inconnue',
-            statut: c.statut || '?'
+            statut: c.statut || '?',
+            email: c.email || '—',
+            telephone: c.telephone || '—'
           }
         });
       });
@@ -2589,7 +2639,7 @@ async function lancerSynchronisation() {
           compteDuMorceau++;
           if (d.clientInfo) {
             const ci = d.clientInfo;
-            indexLignesDuMorceau.push(ci.nomClient + '  |  ' + ci.trajet + '  |  demande du ' + ci.dateAffichee + '  |  statut : ' + ci.statut + '  →  dossier "Clients/' + ci.nomClient + '/"');
+            indexLignesDuMorceau.push(ci.nomReel + '  |  ' + ci.trajet + '  |  demande du ' + ci.dateAffichee + '  |  statut : ' + ci.statut + '  |  ' + ci.email + '  |  ' + ci.telephone + '  →  dossier "Clients/' + ci.nomClient + '/"');
           }
         };
       }), 16, function(fait, total) {
@@ -3024,7 +3074,8 @@ async function lancerArchivageClients() {
       groupe.forEach(function(c) {
         const dateAffichee = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : 'date inconnue';
         const trajet = (c.ville_depart || '?') + ' → ' + (c.ville_arrivee || '?');
-        indexLignes.push(nomClient + '  |  ' + trajet + '  |  demande du ' + dateAffichee + '  |  statut : ' + (c.statut || '?') + '  →  dossier "' + nomClient + '/"');
+        const nomReel = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || nomClient;
+        indexLignes.push(nomReel + '  |  ' + trajet + '  |  demande du ' + dateAffichee + '  |  statut : ' + (c.statut || '?') + '  |  ' + (c.email || '—') + '  |  ' + (c.telephone || '—') + '  →  dossier "' + nomClient + '/"');
       });
 
       if (groupe.length === 1) {
@@ -3033,7 +3084,8 @@ async function lancerArchivageClients() {
       } else {
         groupe.forEach(function(c, idx) {
           const dateCourte = c.created_at ? new Date(c.created_at).toISOString().slice(0, 10) : 'date-inconnue';
-          zip.file(baseClient + 'Demande ' + (idx + 1) + ' - ' + dateCourte + '/fiche-client.txt', texteFicheClient(c));
+          const nomReelDossier = nomDossierSain(((c.prenom || '') + ' ' + (c.nom || '')).trim() || ('client-' + c.id));
+          zip.file(baseClient + 'Demande ' + (idx + 1) + ' - ' + nomReelDossier + ' - ' + dateCourte + '/fiche-client.txt', texteFicheClient(c));
           clesTelechargees.push('fiche-client:' + c.id);
         });
       }
@@ -3181,7 +3233,7 @@ async function lancerArchivageRecontacts() {
     if (!sbAuth) return;
     const { data: { session } } = await sbAuth.auth.getSession();
     if (session && session.user && session.user.email) {
-      await finaliserSessionConvoyeur(session.user.email, null);
+      await finaliserSessionConvoyeur(session.user.email, null, session.user.id);
     }
   } catch (e) { console.error('Auto-login convoyeur : erreur', e); }
 })();
