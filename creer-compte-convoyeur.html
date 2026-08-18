@@ -51,7 +51,7 @@
 <div class="box">
   <div class="logo"><div class="logo-badge">HC</div> HelixCar</div>
   <h2>Créer mon compte convoyeur</h2>
-  <p class="sub">Ton dossier est validé ! Choisis un mot de passe pour accéder à ton espace convoyeur et voir les missions disponibles.</p>
+  <p class="sub" id="cc-sub">Ton dossier est validé ! Choisis un mot de passe pour accéder à ton espace convoyeur et voir les missions disponibles.</p>
 
   <div id="form-zone">
     <div class="form-group">
@@ -181,6 +181,7 @@ async function creerCompte() {
 
     document.getElementById('cc-error').style.display = 'none';
     document.getElementById('form-zone').style.display = 'none';
+    document.getElementById('cc-sub').style.display = 'none';
     var successEl = document.getElementById('cc-success');
     var needsConfirm = !result.data.session; // pas de session = confirmation email requise
     successEl.innerHTML = needsConfirm
