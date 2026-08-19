@@ -1388,13 +1388,13 @@ tbody tr:last-child { border-bottom: none; }
       <!-- CONVOYEUR: Dashboard -->
       <div class="page" id="page-convoyeur-dashboard">
         <div class="stats-row">
-          <div class="stat-card yellow"><div class="stat-label">Missions disponibles</div><div class="stat-value">5</div><div class="stat-sub">Nouvelles aujourd'hui</div></div>
-          <div class="stat-card green"><div class="stat-label">Missions ce mois</div><div class="stat-value">8</div></div>
-          <div class="stat-card blue"><div class="stat-label">Km parcourus</div><div class="stat-value">3 840</div></div>
-          <div class="stat-card orange"><div class="stat-label">Gains ce mois (€)</div><div class="stat-value">744</div></div>
+          <div class="stat-card yellow"><div class="stat-label">Missions disponibles</div><div class="stat-value" id="conv-stat-dispo">—</div><div class="stat-sub" id="conv-stat-dispo-sub"></div></div>
+          <div class="stat-card green"><div class="stat-label">Missions ce mois</div><div class="stat-value" id="conv-stat-mois">—</div></div>
+          <div class="stat-card blue"><div class="stat-label">Km parcourus</div><div class="stat-value" id="conv-stat-km">—</div></div>
+          <div class="stat-card orange"><div class="stat-label">Gains ce mois (€)</div><div class="stat-value" id="conv-stat-gains">—</div></div>
         </div>
 
-        <div class="alert alert-success"><span>🏆 Challenge mensuel : vous êtes actuellement <strong>2ème</strong> du classement ! Continuez pour décrocher la 1ère place et 150 €.</span></div>
+        <div class="alert alert-info" id="conv-challenge-note"><span>🏆 Challenge mensuel & récompenses : pas encore connecté à de vraies données — à venir.</span></div>
 
         <div class="card">
           <div class="card-header">
@@ -1511,11 +1511,11 @@ tbody tr:last-child { border-bottom: none; }
       <!-- CONVOYEUR: Historique -->
       <div class="page" id="page-convoyeur-historique">
         <div class="historique-stats">
-          <div class="hstat"><div class="hstat-val">4 800 €</div><div class="hstat-label">CA Total HT</div></div>
-          <div class="hstat"><div class="hstat-val">11 280 km</div><div class="hstat-label">Total Km</div></div>
-          <div class="hstat"><div class="hstat-val">470 km</div><div class="hstat-label">Km moyen</div></div>
-          <div class="hstat"><div class="hstat-val">200 €</div><div class="hstat-label">Moyenne course</div></div>
-          <div class="hstat"><div class="hstat-val">24</div><div class="hstat-label">VH transportés</div></div>
+          <div class="hstat"><div class="hstat-val" id="hist-stat-ca">—</div><div class="hstat-label">CA Total</div></div>
+          <div class="hstat"><div class="hstat-val" id="hist-stat-km">—</div><div class="hstat-label">Total Km</div></div>
+          <div class="hstat"><div class="hstat-val" id="hist-stat-kmmoy">—</div><div class="hstat-label">Km moyen</div></div>
+          <div class="hstat"><div class="hstat-val" id="hist-stat-moycourse">—</div><div class="hstat-label">Moyenne course</div></div>
+          <div class="hstat"><div class="hstat-val" id="hist-stat-vh">—</div><div class="hstat-label">VH transportés</div></div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Mes missions (acceptées, en cours, terminées)</div><div class="card-sub" id="conv-historique-sub"></div></div>
@@ -2020,6 +2020,7 @@ async function doLogin() {
       return;
     }
     currentRole = user.role;
+    try { localStorage.setItem('helixcar_demo_email', email); } catch (e) {}
     initApp(user);
   } catch(e) {
     alert('Erreur connexion : ' + e.message);
@@ -2057,6 +2058,8 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
   window._currentConvoyeur = conv;
   currentRole = 'convoyeur';
   remplirProfilConvoyeur(conv);
+  if (PAGE_TITLES['convoyeur-dashboard']) PAGE_TITLES['convoyeur-dashboard'][1] = 'Bienvenue ' + (conv.prenom || '');
+  remplirStatsAccueilConvoyeur(conv);
   initApp({
     role: 'convoyeur',
     name: (conv.prenom || '') + ' ' + (conv.nom || ''),
@@ -2077,6 +2080,28 @@ function remplirProfilConvoyeur(conv) {
   for (const id in champs) {
     const el = document.getElementById(id);
     if (el) el.value = champs[id];
+  }
+}
+
+async function remplirStatsAccueilConvoyeur(conv) {
+  const setStat = function(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; };
+  try {
+    const disponibles = await sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&select=id,created_at');
+    setStat('conv-stat-dispo', String((disponibles || []).length));
+    const debutAujourdhui = new Date(); debutAujourdhui.setHours(0, 0, 0, 0);
+    const nouvellesAujourdhui = (disponibles || []).filter(function(m) { return m.created_at && new Date(m.created_at) >= debutAujourdhui; }).length;
+    const subEl = document.getElementById('conv-stat-dispo-sub');
+    if (subEl) subEl.textContent = nouvellesAujourdhui > 0 ? nouvellesAujourdhui + ' nouvelle(s) aujourd\'hui' : '';
+
+    const debutMois = new Date(); debutMois.setDate(1); debutMois.setHours(0, 0, 0, 0);
+    const missionsConvoyeur = await sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&select=id,prix_ttc,date_prise_en_charge');
+    const missionsCeMois = (missionsConvoyeur || []).filter(function(m) { return m.date_prise_en_charge && new Date(m.date_prise_en_charge) >= debutMois; });
+    setStat('conv-stat-mois', String(missionsCeMois.length));
+    const gainsCeMois = missionsCeMois.reduce(function(s, m) { return s + (m.prix_ttc || 0); }, 0);
+    setStat('conv-stat-gains', gainsCeMois.toLocaleString('fr-FR'));
+    setStat('conv-stat-km', (conv.km_total || 0).toLocaleString('fr-FR'));
+  } catch (e) {
+    console.error('Erreur stats accueil convoyeur:', e);
   }
 }
 
@@ -2137,6 +2162,7 @@ function buildNav(role) {
 function doLogout() {
   if (window._currentConvoyeur && sbAuth) { sbAuth.auth.signOut(); }
   window._currentConvoyeur = null;
+  try { localStorage.removeItem('helixcar_demo_email'); } catch (e) {}
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-email').value = '';
@@ -2201,6 +2227,17 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+// Restaure la session admin/client démo si elle existe (persistance au rechargement).
+(function restaurerSessionDemo() {
+  try {
+    const emailSauve = localStorage.getItem('helixcar_demo_email');
+    if (emailSauve && USERS[emailSauve]) {
+      currentRole = USERS[emailSauve].role;
+      initApp(USERS[emailSauve]);
+    }
+  } catch (e) { console.error('Erreur restauration session démo:', e); }
+})();
 
 async function ouvrirMotDePasseOublie(e) {
   if (e) e.preventDefault();
@@ -4162,6 +4199,17 @@ function loadHistoriqueConvoyeur() {
     .then(function(rows) {
       const sub = document.getElementById('conv-historique-sub');
       if (sub) sub.textContent = (rows || []).length + ' mission(s)';
+
+      const nb = (rows || []).length;
+      const caTotal = (rows || []).reduce(function(s, m) { return s + (m.prix_ttc || 0); }, 0);
+      const kmTotal = (rows || []).reduce(function(s, m) { return s + (m.distance_km || 0); }, 0);
+      const setStat = function(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; };
+      setStat('hist-stat-ca', caTotal.toLocaleString('fr-FR') + ' €');
+      setStat('hist-stat-km', kmTotal.toLocaleString('fr-FR') + ' km');
+      setStat('hist-stat-kmmoy', (nb > 0 ? Math.round(kmTotal / nb) : 0).toLocaleString('fr-FR') + ' km');
+      setStat('hist-stat-moycourse', (nb > 0 ? Math.round(caTotal / nb) : 0).toLocaleString('fr-FR') + ' €');
+      setStat('hist-stat-vh', String(nb));
+
       if (!rows || rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune mission acceptée pour le moment</td></tr>';
         return;
