@@ -2148,9 +2148,6 @@ body.scroll-verrouille { overflow: hidden; }
     <h3 id="dossier-name">Dossier convoyeur</h3>
     <p>Vérifiez les informations avant de valider ou refuser.</p>
     <div id="dossier-content"></div>
-    <div style="background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.3);border-radius:8px;padding:12px;margin-top:12px;font-size:.82rem;color:#555;line-height:1.6">
-      🎥 <strong>Vidéo de présentation :</strong> une vidéo de présentation enregistrée par le convoyeur lors de sa candidature. Elle sera visible ici une fois que tu auras connecté Supabase (stockage de fichiers). En attendant, elle est stockée et accessible directement dans ton espace Supabase Storage.
-    </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
       <div class="form-group" id="block-reason-group" style="display:none">
         <label>Motif du blocage</label>
@@ -2171,6 +2168,20 @@ body.scroll-verrouille { overflow: hidden; }
         <button class="btn btn-red" id="dossier-btn-block" onclick="toggleBlockConvoyeur()">🚫 Bloquer l'accès</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- LECTEUR VIDÉO SÉCURISÉ — la source est une URL SIGNÉE TEMPORAIRE,
+     obtenue après contrôle d'autorisation, et effacée à la fermeture.
+     Aucune URL n'est conservée dans le DOM au-delà de la lecture. -->
+<div class="modal-overlay" id="modal-video-candidature">
+  <div class="modal" style="position:relative;max-width:760px">
+    <button class="modal-close" onclick="fermerVideoCandidature()">✕</button>
+    <h3 id="video-candidature-titre">Vidéo de présentation</h3>
+    <div id="video-candidature-etat" style="font-size:.85rem;color:#888;margin-bottom:12px">Préparation de la lecture sécurisée…</div>
+    <video id="video-candidature-lecteur" controls playsinline preload="metadata"
+           style="display:none;width:100%;max-height:62vh;border-radius:10px;background:#000"></video>
+    <div id="video-candidature-meta" style="font-size:.8rem;color:#888;margin-top:10px"></div>
   </div>
 </div>
 
@@ -4213,9 +4224,136 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
+    <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
   `;
   openModal('dossier');
 }
+
+// ── VIDÉO DE CANDIDATURE — LECTURE SÉCURISÉE ────────────────
+// La base ne contient QUE le chemin de stockage : aucune URL publique
+// n'existe. La lecture passe par une URL signée temporaire créée à la
+// demande, uniquement pour un administrateur authentifié (les
+// politiques du bucket privé refusent la signature à quiconque d'autre).
+
+// La vidéo n'est attendue que pour le convoyage et le renfort : un
+// candidat « nettoyage seul » n'a pas de vidéo manquante, il n'en a
+// simplement pas besoin.
+function _videoAttenduePourActivites(activites) {
+  var a = normaliserActivites(activites);
+  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1;
+}
+
+function _celluleVideoCandidature(c) {
+  if (c && c.video_chemin) {
+    var meta = [];
+    if (c.video_duree_secondes) meta.push(Math.round(c.video_duree_secondes) + ' s');
+    if (c.video_taille_octets) meta.push((c.video_taille_octets / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo');
+    return '<button class="btn btn-sm btn-outline" onclick="ouvrirVideoCandidature(\'' + escapeHtml(String(c.id)) + '\')">' +
+           '🎥 Voir la vidéo</button>' +
+           (meta.length ? '<span style="margin-left:8px;color:#888;font-size:.78rem">' + escapeHtml(meta.join(' · ')) + '</span>' : '');
+  }
+  if (!_videoAttenduePourActivites(c && c.activites)) {
+    return '<span class="badge badge-pending">Non requise</span>';
+  }
+  return '<span class="badge badge-pending">⏳ Manquante</span>';
+}
+
+// URL signée en cours : conservée le temps de la lecture seulement.
+var _urlVideoSignee = null;
+
+async function ouvrirVideoCandidature(id) {
+  var c = (window._candidaturesData || {})[id] || (window._convoyeursActifsData || {})[id];
+  var lecteur = document.getElementById('video-candidature-lecteur');
+  var etat = document.getElementById('video-candidature-etat');
+  var meta = document.getElementById('video-candidature-meta');
+  var titre = document.getElementById('video-candidature-titre');
+  if (!lecteur || !etat) return;
+
+  lecteur.style.display = 'none';
+  meta.textContent = '';
+  etat.style.display = 'block';
+  etat.style.color = '#888';
+  etat.textContent = 'Préparation de la lecture sécurisée…';
+  if (titre) {
+    titre.textContent = 'Vidéo de présentation — ' + ((c && ((c.prenom || '') + ' ' + (c.nom || '')).trim()) || 'candidature');
+  }
+  openModal('video-candidature');
+
+  if (!c || !c.video_chemin) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Vidéo indisponible : aucune vidéo n\'est associée à cette candidature.';
+    return;
+  }
+  if (typeof sbAuth === 'undefined' || !sbAuth || !sbAuth.storage) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Lecture impossible : session administrateur requise.';
+    return;
+  }
+
+  try {
+    // 300 s : le temps de regarder, pas davantage.
+    var res = await sbAuth.storage.from('candidatures-videos').createSignedUrl(c.video_chemin, 300);
+    if (res && res.error) {
+      var m = String((res.error && res.error.message) || '').toLowerCase();
+      etat.style.color = 'var(--red)';
+      etat.textContent = /not found|does not exist|introuvable/.test(m)
+        ? 'Vidéo indisponible : le fichier est introuvable dans le stockage.'
+        : 'Erreur : lecture non autorisée ou service indisponible.';
+      console.error('createSignedUrl:', res.error);
+      return;
+    }
+    var url = res && res.data && (res.data.signedUrl || res.data.signedURL);
+    if (!url) {
+      etat.style.color = 'var(--red)';
+      etat.textContent = 'Erreur : aucune URL de lecture n\'a pu être obtenue.';
+      return;
+    }
+    _urlVideoSignee = url;
+    lecteur.src = url;
+    lecteur.style.display = 'block';
+    etat.style.display = 'none';
+    if (c.video_duree_secondes || c.video_taille_octets) {
+      meta.textContent = [
+        c.video_duree_secondes ? Math.round(c.video_duree_secondes) + ' s' : '',
+        c.video_taille_octets ? (c.video_taille_octets / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo' : '',
+        c.video_mime || ''
+      ].filter(Boolean).join(' · ');
+    }
+    lecteur.onerror = function () {
+      lecteur.style.display = 'none';
+      etat.style.display = 'block';
+      etat.style.color = 'var(--red)';
+      etat.textContent = 'Erreur de lecture : le fichier n\'a pas pu être lu.';
+    };
+  } catch (e) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Erreur : lecture non autorisée ou service indisponible.';
+    console.error('ouvrirVideoCandidature:', e);
+  }
+}
+
+// Fermeture : le lecteur est vidé ET l'URL signée oubliée. Elle n'est
+// jamais conservée dans le DOM ni dans une variable après la lecture.
+function fermerVideoCandidature() {
+  var lecteur = document.getElementById('video-candidature-lecteur');
+  if (lecteur) {
+    try { lecteur.pause(); } catch (e) {}
+    lecteur.onerror = null;
+    lecteur.removeAttribute('src');
+    try { lecteur.load(); } catch (e) {}
+    lecteur.style.display = 'none';
+  }
+  var meta = document.getElementById('video-candidature-meta');
+  if (meta) meta.textContent = '';
+  _urlVideoSignee = null;
+  closeModal('video-candidature');
+}
+
+// Un clic sur le fond doit nettoyer exactement comme le bouton Fermer.
+document.addEventListener('DOMContentLoaded', function () {
+  var ov = document.getElementById('modal-video-candidature');
+  if (ov) ov.addEventListener('click', function (e) { if (e.target === ov) fermerVideoCandidature(); });
+});
 
 // ── CONVOYEURS ACTIFS (Supabase) ─────────────────────────────
 function loadConvoyeursActifs() {

@@ -4124,6 +4124,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 #modal-convoyeur .hc-doc-btn-action { flex:0 0 auto; font-size:.76rem; font-weight:600; color:var(--accent); text-decoration:underline; }
 #modal-convoyeur .hc-doc-btn-plus { flex:0 0 auto; color:var(--accent); font-weight:700; }
 
+/* Vidéo de présentation — reprend strictement le langage visuel des
+   zones documents ci-dessus : même bordure, même rayon, même accent. */
+#modal-convoyeur .hc-video-btn {
+  flex:1 1 auto; min-height:48px; padding:12px 16px;
+  border:1px solid rgba(23,28,33,.13); border-radius:11px;
+  background:#fff; color:#171C21; font-size:.86rem; font-weight:500;
+  cursor:pointer; text-align:center; font-family:var(--font-body);
+}
+#modal-convoyeur .hc-video-btn:hover { border-color:rgba(158,63,70,.34); }
+#modal-convoyeur .hc-video-btn--mini { flex:0 0 auto; min-height:38px; padding:8px 15px; font-size:.79rem; font-weight:600; }
+#modal-convoyeur .hc-video-btn--danger { color:#8a3a3a; }
+#modal-convoyeur .hc-video-btn:disabled { opacity:.5; cursor:not-allowed; }
+#modal-convoyeur .hc-video-msg--ok { color:#247443; }
+#modal-convoyeur .hc-video-msg--err { color:#B3261E; }
+#modal-convoyeur .hc-video-msg--info { color:#7A7F84; }
+
 /* HelixCar — Premium V2. Couche strictement visuelle du formulaire Devenir client. */
 #modal-convoyeur {
   --accent: #9E3F46;
@@ -7270,6 +7286,40 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           </div>
         </div>
 
+        <!-- VIDÉO DE PRÉSENTATION — affichée uniquement quand une activité
+             la rend réellement nécessaire. La durée maximale annoncée
+             s'adapte aux activités choisies ; aucune explication interne
+             sur le nombre de vidéos n'est montrée au candidat. -->
+        <div class="modal-form-group" id="conv-video-group" style="display:none">
+          <label>Vidéo de présentation</label>
+          <div style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
+            Présentez-vous brièvement en vidéo : <b><span id="conv-video-duree-txt">1 minute maximum</span></b>. Formats acceptés : MP4, MOV ou WebM.
+          </div>
+
+          <div class="hc-doc-zone" id="conv-zone-video">
+            <input type="file" id="conv-video-capture" accept="video/mp4,video/quicktime,video/webm" capture="user" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+            <input type="file" id="conv-video-fichier" accept="video/mp4,video/quicktime,video/webm" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+
+            <div id="conv-video-choix" style="display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" class="hc-video-btn" id="conv-video-btn-capture" onclick="convOuvrirSelecteurVideo('capture')">Enregistrer une vidéo</button>
+              <button type="button" class="hc-video-btn" id="conv-video-btn-fichier" onclick="convOuvrirSelecteurVideo('fichier')">Choisir un fichier</button>
+            </div>
+
+            <div id="conv-video-etat" style="display:none;background:#fff;border:1px solid rgba(21,27,33,.10);border-radius:12px;padding:14px 16px">
+              <div id="conv-video-nom" style="font-size:.86rem;font-weight:600;color:var(--ink);word-break:break-all"></div>
+              <div id="conv-video-meta" style="font-size:.78rem;color:#7A7F84;margin-top:3px"></div>
+              <div id="conv-video-piste" style="display:none;height:6px;border-radius:99px;background:#EDEDEA;margin-top:10px;overflow:hidden">
+                <div id="conv-video-barre" style="height:100%;width:0%;background:var(--accent);transition:width .18s ease"></div>
+              </div>
+              <div id="conv-video-message" style="display:none;font-size:.8rem;margin-top:9px;line-height:1.5"></div>
+              <div id="conv-video-actions" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+                <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirSelecteurVideo('fichier')">Remplacer</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger" onclick="convSupprimerVideo()">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="form-step" data-step="4">
@@ -7542,6 +7592,10 @@ function resetFormSteps(type) {
       var el = document.getElementById('conv-act-' + v);
       if (el) el.checked = false;
     });
+    // La vidéo est une variable JS persistante : la remise à zéro du
+    // formulaire doit la vider réellement, sans quoi elle survivrait à
+    // une candidature et contaminerait la suivante.
+    if (typeof _reinitialiserVideoPartenaire === 'function') _reinitialiserVideoPartenaire();
     if (typeof onChoixActivitesPartenaire === 'function') onChoixActivitesPartenaire();
   }
   _renderFormStep(type);
@@ -7631,6 +7685,9 @@ function _renderFormStep(type) {
   if (type === 'convoyeur' && n === _dernierePasType('convoyeur') && typeof construireRecapConvoyeur === 'function') {
     construireRecapConvoyeur();
   }
+  // L'état du bouton Continuer de l'étape 3 partenaire dépend de la
+  // vidéo : recalculé à chaque rendu, jamais laissé périmé.
+  if (type === 'convoyeur' && typeof _convVideoMajBouton === 'function') _convVideoMajBouton();
 }
 
 // La question "Êtes-vous prêt à lancer le convoyage ?" a été supprimée :
@@ -10619,6 +10676,14 @@ function construireRecapConvoyeur() {
   var docs = _recapLigne('Pièce d\'identité', _recapNomFichier('conv-doc-identite') || 'Non ajouté') +
              _recapLigne('Permis de conduire', _recapNomFichier('conv-doc-permis') || 'Non ajouté') +
              _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || 'Non ajouté');
+  // La ligne vidéo n'apparaît que si une activité la rend nécessaire :
+  // un candidat « nettoyage seul » ne doit jamais la voir.
+  if (typeof _convVideoRequise === 'function' && _convVideoRequise()) {
+    docs += _recapLigne('Vidéo de présentation',
+      (_convVideo && _convVideoUtilisable())
+        ? (_convVideo.nom + (_convVideo.duree ? ' (' + _convFormaterDuree(_convVideo.duree) + ')' : ''))
+        : 'Non ajoutée');
+  }
   html += _recapBlocConvoyeur('Profil & documents', profil + docs, 3);
 
   zone.innerHTML = '<div class="recap-cadre">' + html + '</div>';
@@ -12917,6 +12982,336 @@ function _fichierPresent(inputId) {
 function _docsPartenaireManquants() {
   return DOCS_PARTENAIRE.filter(function (d) { return !_fichierPresent(d.input); });
 }
+
+// ══════════════════════════════════════════════════════════════
+// VIDÉO DE PRÉSENTATION DE LA CANDIDATURE
+// ══════════════════════════════════════════════════════════════
+// Une candidature ne porte qu'UNE vidéo. L'exigence et la durée
+// maximale se déduisent des activités reellement selectionnees :
+//   nettoyage seul                -> aucune video
+//   convoyage (sans renfort)      -> obligatoire, 60 s
+//   des que renfort est coche     -> obligatoire, 120 s
+// Cette regle interne n'est JAMAIS expliquee au candidat : il ne voit
+// qu'une seule zone et la duree maximale qui s'applique a lui.
+//
+// Le fichier est valide des sa selection (format, taille, duree) puis
+// envoye au moment de la soumission, exactement comme les 3 documents
+// deja en place : aucun octet n'est envoye pour une candidature qui ne
+// sera jamais soumise.
+
+var CONV_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/webm'];
+var CONV_VIDEO_TAILLE_MAX = 50 * 1024 * 1024;   // doit rester <= file_size_limit du bucket
+var CONV_VIDEO_EXT_MIME = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+
+// SOURCE DE VERITE : l'objet ci-dessous, jamais l'input file (un input
+// ne peut pas etre reaffecte de facon fiable et perd sa valeur au
+// re-rendu). { fichier, nom, taille, mime, duree }
+var _convVideo = null;
+// vide | verification | prete | invalide | envoi | envoyee | erreur
+var _convVideoEtat = 'vide';
+var _convVideoMsg = '';
+var _convVideoChemin = null;   // chemin de stockage apres envoi reussi
+
+function _reinitialiserVideoPartenaire() {
+  _convVideo = null;
+  _convVideoEtat = 'vide';
+  _convVideoMsg = '';
+  _convVideoChemin = null;
+}
+
+function _convVideoRequise() {
+  var a = _activitesPartenaire();
+  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1;
+}
+// Duree maximale REELLE pour les activites en cours. 0 = aucune video.
+function _convVideoDureeMax() {
+  var a = _activitesPartenaire();
+  if (a.indexOf('renfort') !== -1) return 120;
+  if (a.indexOf('convoyage') !== -1) return 60;
+  return 0;
+}
+function _convVideoDureeMaxTexte() {
+  return (_convVideoDureeMax() === 120) ? '2 minutes maximum' : '1 minute maximum';
+}
+function _convFormaterDuree(s) {
+  if (typeof s !== 'number' || !isFinite(s)) return '';
+  var m = Math.floor(s / 60), r = Math.round(s % 60);
+  if (r === 60) { m += 1; r = 0; }
+  return m > 0 ? (m + ' min ' + (r < 10 ? '0' : '') + r + ' s') : (r + ' s');
+}
+function _convFormaterTaille(o) {
+  if (!o) return '';
+  var mo = o / (1024 * 1024);
+  return (mo >= 1) ? (mo.toFixed(1).replace('.', ',') + ' Mo') : (Math.round(o / 1024) + ' Ko');
+}
+
+// Type reellement exploitable. Certains navigateurs renvoient un type
+// vide pour un .mov : on retombe alors sur l'extension, sans jamais
+// accepter un format hors liste.
+function _convMimeVideo(fichier) {
+  var t = String((fichier && fichier.type) || '').toLowerCase();
+  if (CONV_VIDEO_MIMES.indexOf(t) !== -1) return t;
+  var m = /\.(mp4|mov|webm)$/i.exec((fichier && fichier.name) || '');
+  return m ? CONV_VIDEO_EXT_MIME[m[1].toLowerCase()] : '';
+}
+function _convExtensionVideo(mime) {
+  if (mime === 'video/quicktime') return '.mov';
+  if (mime === 'video/webm') return '.webm';
+  return '.mp4';
+}
+
+// Lecture de la duree par le navigateur lui-meme. Un fichier que le
+// navigateur ne sait pas decoder ne renvoie aucune duree : il est alors
+// refuse, plutot que d'etre accepte sans controle.
+function _convLireDureeVideo(fichier) {
+  return new Promise(function (resolve) {
+    var url, video, termine = false;
+    function fin(d) {
+      if (termine) return;
+      termine = true;
+      try { if (video) { video.removeAttribute('src'); video.load(); } } catch (e) {}
+      try { if (url) URL.revokeObjectURL(url); } catch (e) {}
+      resolve(d);
+    }
+    try {
+      url = URL.createObjectURL(fichier);
+      video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.onloadedmetadata = function () {
+        var d = video.duration;
+        if (typeof d === 'number' && isFinite(d) && d > 0) { fin(d); return; }
+        // CAS REEL FREQUENT : une video issue d'un enregistrement direct
+        // (notamment WebM produit par un telephone) ne porte pas sa duree
+        // dans son en-tete ; le navigateur annonce alors Infinity. Sans
+        // ce rattrapage, une video parfaitement valide serait refusee.
+        // On force le navigateur a se placer en fin de media : il calcule
+        // alors la duree reelle, puis on revient au debut.
+        try {
+          video.ontimeupdate = function () {
+            video.ontimeupdate = null;
+            var d2 = video.duration;
+            try { video.currentTime = 0; } catch (e) {}
+            fin((typeof d2 === 'number' && isFinite(d2) && d2 > 0) ? d2 : null);
+          };
+          video.currentTime = 1e101;
+        } catch (e) { fin(null); }
+      };
+      video.onerror = function () { fin(null); };
+      setTimeout(function () { fin(null); }, 20000);
+      video.src = url;
+    } catch (e) { fin(null); }
+  });
+}
+
+function convOuvrirSelecteurVideo(mode) {
+  var id = (mode === 'capture') ? 'conv-video-capture' : 'conv-video-fichier';
+  var el = document.getElementById(id);
+  if (el) { el.value = ''; el.click(); }   // value vide : re-choisir le meme fichier declenche bien change
+}
+
+// Selection (ou remplacement) d'une video : tout est verifie AVANT de
+// considerer le fichier comme utilisable.
+function convOnVideoChoisie(input) {
+  var f = input && input.files && input.files[0];
+  if (!f) return;
+
+  _convVideoChemin = null;
+  var mime = _convMimeVideo(f);
+  if (!mime) {
+    _convVideo = null;
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Format non pris en charge. Choisissez un fichier MP4, MOV ou WebM.';
+    convMajAffichageVideo();
+    return;
+  }
+  if (f.size > CONV_VIDEO_TAILLE_MAX) {
+    _convVideo = null;
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Fichier trop volumineux (' + _convFormaterTaille(f.size) + '). Maximum : '
+      + _convFormaterTaille(CONV_VIDEO_TAILLE_MAX) + '.';
+    convMajAffichageVideo();
+    return;
+  }
+
+  _convVideo = { fichier: f, nom: f.name, taille: f.size, mime: mime, duree: null };
+  _convVideoEtat = 'verification';
+  _convVideoMsg = 'Vérification de la vidéo…';
+  convMajAffichageVideo();
+
+  _convLireDureeVideo(f).then(function (duree) {
+    // Une autre selection a pu intervenir entre-temps.
+    if (!_convVideo || _convVideo.fichier !== f) return;
+    if (duree === null) {
+      _convVideo = null;
+      _convVideoEtat = 'invalide';
+      _convVideoMsg = 'Vidéo illisible : sa durée n\'a pas pu être vérifiée. Réenregistrez-la ou choisissez un autre fichier.';
+      convMajAffichageVideo();
+      return;
+    }
+    _convVideo.duree = duree;
+    _convVideoAppliquerRegleDuree();
+    convMajAffichageVideo();
+  });
+}
+
+// Applique la regle de duree en vigueur POUR LES ACTIVITES ACTUELLES.
+// Rejouee a chaque changement d'activite : retirer le renfort en
+// gardant le convoyage fait repasser une video de plus d'une minute a
+// l'etat "a remplacer".
+function _convVideoAppliquerRegleDuree() {
+  if (!_convVideo || _convVideo.duree === null) return;
+  var max = _convVideoDureeMax();
+  if (max && _convVideo.duree > max + 0.5) {   // demi-seconde de tolerance d'arrondi
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Vidéo trop longue (' + _convFormaterDuree(_convVideo.duree) + '). '
+      + 'La durée maximale est de ' + _convVideoDureeMaxTexte().replace(' maximum', '') + '. Remplacez-la.';
+    return;
+  }
+  if (_convVideoEtat !== 'envoyee') {
+    _convVideoEtat = 'prete';
+    _convVideoMsg = 'Vidéo prête à être envoyée.';
+  }
+}
+
+function convSupprimerVideo() {
+  _reinitialiserVideoPartenaire();
+  ['conv-video-capture', 'conv-video-fichier'].forEach(function (id) {
+    var e = document.getElementById(id);
+    if (e) e.value = '';
+  });
+  _clearGroupError('conv-zone-video');
+  convMajAffichageVideo();
+}
+
+// Une video n'est utilisable que si elle est prete ou deja envoyee.
+function _convVideoUtilisable() {
+  return !!_convVideo && (_convVideoEtat === 'prete' || _convVideoEtat === 'envoyee');
+}
+// Condition UNIQUE de progression : soit la video n'est pas exigee,
+// soit elle est reellement utilisable.
+function _convVideoOk() {
+  return !_convVideoRequise() || _convVideoUtilisable();
+}
+
+function convMajAffichageVideo() {
+  var groupe = document.getElementById('conv-video-group');
+  if (!groupe) return;
+  var requise = _convVideoRequise();
+  groupe.style.display = requise ? 'block' : 'none';
+
+  var txtDuree = document.getElementById('conv-video-duree-txt');
+  if (txtDuree) txtDuree.textContent = _convVideoDureeMaxTexte();
+
+  var choix = document.getElementById('conv-video-choix');
+  var etat = document.getElementById('conv-video-etat');
+  var aFichier = !!_convVideo;
+  if (choix) choix.style.display = aFichier ? 'none' : 'flex';
+  if (etat) etat.style.display = aFichier ? 'block' : 'none';
+
+  if (aFichier) {
+    var nom = document.getElementById('conv-video-nom');
+    if (nom) nom.textContent = _convVideo.nom;
+    var meta = document.getElementById('conv-video-meta');
+    if (meta) {
+      meta.textContent = [_convFormaterTaille(_convVideo.taille), _convFormaterDuree(_convVideo.duree)]
+        .filter(Boolean).join(' · ');
+    }
+  }
+
+  var msg = document.getElementById('conv-video-message');
+  if (msg) {
+    msg.textContent = _convVideoMsg || '';
+    msg.style.display = _convVideoMsg ? 'block' : 'none';
+    msg.className = '';
+    if (_convVideoEtat === 'invalide' || _convVideoEtat === 'erreur') msg.classList.add('hc-video-msg--err');
+    else if (_convVideoEtat === 'prete' || _convVideoEtat === 'envoyee') msg.classList.add('hc-video-msg--ok');
+    else msg.classList.add('hc-video-msg--info');
+  }
+
+  var piste = document.getElementById('conv-video-piste');
+  if (piste) piste.style.display = (_convVideoEtat === 'envoi') ? 'block' : 'none';
+
+  // Pendant l'envoi, plus aucune action destructrice n'est possible.
+  var enEnvoi = (_convVideoEtat === 'envoi');
+  var actions = document.getElementById('conv-video-actions');
+  if (actions) {
+    Array.prototype.forEach.call(actions.querySelectorAll('button'), function (b) { b.disabled = enEnvoi; });
+  }
+  if (_convVideoEtat !== 'invalide') _clearGroupError('conv-zone-video');
+
+  _convVideoMajBouton();
+}
+
+function convMajProgressionVideo(pct) {
+  var barre = document.getElementById('conv-video-barre');
+  if (barre) barre.style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+
+// Le bouton Continuer de l'etape 3 refletee en permanence l'etat reel.
+// Les autres etapes du parcours partenaire ne sont pas touchees.
+function _convVideoMajBouton() {
+  var btn = document.getElementById('conv-step-next-btn');
+  if (!btn) return;
+  if (_formStepState.convoyeur !== 3) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    return;
+  }
+  var bloque = !_convVideoOk();
+  btn.disabled = bloque;
+  btn.style.opacity = bloque ? '.5' : '';
+  btn.style.cursor = bloque ? 'not-allowed' : '';
+}
+
+// Envoi vers le bucket PRIVE. Aucune URL publique n'est construite :
+// seul le chemin est conserve, et la lecture passera par une URL
+// signee temporaire generee cote Dashboard apres controle d'acces.
+function uploadVideoCandidature() {
+  return new Promise(function (resolve) {
+    if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
+    var chemin = 'candidatures/' + _convIdentifiantAleatoire() + _convExtensionVideo(_convVideo.mime);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', SUPABASE_URL + '/storage/v1/object/candidatures-videos/' + chemin, true);
+    xhr.setRequestHeader('apikey', SUPABASE_KEY);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+    xhr.setRequestHeader('Content-Type', _convVideo.mime);
+    xhr.setRequestHeader('x-upsert', 'false');   // jamais d'ecrasement d'un objet existant
+    xhr.timeout = 300000;
+    xhr.upload.onprogress = function (e) {
+      if (e.lengthComputable) convMajProgressionVideo(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true, chemin: chemin });
+      else resolve({ erreur: 'Envoi refusé (code ' + xhr.status + ').' });
+    };
+    xhr.onerror = function () { resolve({ erreur: 'Connexion interrompue pendant l\'envoi de la vidéo.' }); };
+    xhr.ontimeout = function () { resolve({ erreur: 'L\'envoi de la vidéo a expiré.' }); };
+    xhr.onabort = function () { resolve({ erreur: 'Envoi de la vidéo interrompu.' }); };
+    try { xhr.send(_convVideo.fichier); }
+    catch (e) { resolve({ erreur: 'Envoi de la vidéo impossible.' }); }
+  });
+}
+
+function _convIdentifiantAleatoire() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    if (window.crypto && window.crypto.getRandomValues) {
+      var t = new Uint8Array(16);
+      window.crypto.getRandomValues(t);
+      return Array.prototype.map.call(t, function (o) { return ('0' + o.toString(16)).slice(-2); }).join('');
+    }
+  } catch (e) {}
+  return String(Date.now()) + Math.random().toString(36).slice(2, 10);
+}
+
+// Les deux entrees (enregistrement et fichier existant) alimentent la
+// MEME logique : un seul chemin de validation, une seule video.
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el && (el.id === 'conv-video-capture' || el.id === 'conv-video-fichier')) convOnVideoChoisie(el);
+}, true);
 // Efface l'erreur d'une zone dès qu'un fichier y est déposé : pas
 // d'erreur fantôme sur une zone désormais remplie.
 document.addEventListener('change', function (e) {
@@ -12953,6 +13348,12 @@ function onChoixActivitesPartenaire() {
   // bloquer la progression (pas de validation invisible).
   if (!conv && typeof _clearFieldError === 'function') _clearFieldError('conv-experience');
   if (typeof _clearGroupError === 'function') _clearGroupError('conv-activites-group');
+  // L'exigence de vidéo ET sa durée maximale dépendent des activités :
+  // elles sont donc réévaluées à CHAQUE changement. Retirer le renfort
+  // en gardant le convoyage fait repasser une vidéo de plus d'une
+  // minute à l'état « à remplacer », sans la supprimer en silence.
+  if (typeof _convVideoAppliquerRegleDuree === 'function') _convVideoAppliquerRegleDuree();
+  if (typeof convMajAffichageVideo === 'function') convMajAffichageVideo();
 }
 
 // Point 5-6 (V57) — validation par étape du formulaire convoyeur,
@@ -13005,6 +13406,20 @@ function _validateConvStep(n) {
     // validation ne doit s'y appliquer (pas de blocage invisible).
     if (_partenaireAvecConvoyage()) {
       mark(_checkSelect('conv-experience', true), 'conv-experience');
+    }
+    // Vidéo de présentation : exigée uniquement quand une activité la
+    // rend réellement nécessaire. Le message reste factuel — il ne
+    // révèle jamais la règle interne du nombre de vidéos.
+    if (_convVideoRequise() && !_convVideoUtilisable()) {
+      ok = false;
+      if (typeof _showGroupError === 'function') {
+        _showGroupError('conv-zone-video', _convVideoMsg && _convVideoEtat === 'invalide'
+          ? _convVideoMsg
+          : 'Ajoutez votre vidéo de présentation (' + _convVideoDureeMaxTexte() + ').');
+      }
+      if (!firstInvalid) firstInvalid = document.getElementById('conv-zone-video');
+    } else if (typeof _clearGroupError === 'function') {
+      _clearGroupError('conv-zone-video');
     }
   }
   if (firstInvalid) { try { firstInvalid.focus(); firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
@@ -15345,6 +15760,23 @@ async function submitConvoyeurForm() {
     return;
   }
 
+  // GARDE-FOU FINAL VIDÉO — même principe que pour les 3 documents :
+  // vérifié AVANT tout envoi, pour qu'une soumission directe ou
+  // détournée ne puisse jamais enregistrer une candidature sans la
+  // vidéo pourtant exigée par ses activités.
+  if (_convVideoRequise() && !_convVideoUtilisable()) {
+    _formStepState.convoyeur = 3;
+    _renderFormStep('convoyeur');
+    if (typeof _showGroupError === 'function') {
+      _showGroupError('conv-zone-video', _convVideoMsg && _convVideoEtat === 'invalide'
+        ? _convVideoMsg
+        : 'Ajoutez votre vidéo de présentation (' + _convVideoDureeMaxTexte() + ').');
+    }
+    var zoneV = document.getElementById('conv-zone-video');
+    if (zoneV) { try { zoneV.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+    return;
+  }
+
   // Indiquer le chargement
   var btn = document.querySelector('#modal-convoyeur-form button.btn-primary');
   var btnTxt = btn ? btn.textContent : '';
@@ -15373,6 +15805,48 @@ async function submitConvoyeurForm() {
     );
     return;
   }
+
+  // ── VIDÉO : envoi vers le bucket PRIVÉ ──
+  // Comme pour les documents, un échec d'envoi interrompt la
+  // soumission : aucune candidature n'est enregistrée avec une vidéo
+  // exigée mais absente. Seul le CHEMIN est conservé, jamais une URL.
+  var video_chemin = null, video_mime = null, video_taille = null, video_duree = null, video_envoyee_le = null;
+  if (_convVideoRequise() && _convVideo) {
+    _convVideoEtat = 'envoi';
+    _convVideoMsg = 'Envoi de la vidéo en cours…';
+    convMajProgressionVideo(0);
+    convMajAffichageVideo();
+
+    var rVideo = await uploadVideoCandidature();
+
+    if (!rVideo || rVideo.erreur) {
+      _convVideoEtat = 'erreur';
+      _convVideoMsg = (rVideo && rVideo.erreur) ? rVideo.erreur : "L'envoi de la vidéo a échoué.";
+      convMajAffichageVideo();
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      _formStepState.convoyeur = 3;
+      _renderFormStep('convoyeur');
+      var zoneErr = document.getElementById('conv-zone-video');
+      if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+      alert(
+        "L'envoi de votre vidéo a échoué.\n\n" +
+        "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion, puis réessayez."
+      );
+      return;
+    }
+
+    _convVideoChemin  = rVideo.chemin;
+    _convVideoEtat    = 'envoyee';
+    _convVideoMsg     = 'Vidéo envoyée.';
+    convMajProgressionVideo(100);
+    convMajAffichageVideo();
+
+    video_chemin     = rVideo.chemin;
+    video_mime       = _convVideo.mime;
+    video_taille     = _convVideo.taille;
+    video_duree      = (typeof _convVideo.duree === 'number') ? Math.round(_convVideo.duree * 100) / 100 : null;
+    video_envoyee_le = new Date().toISOString();
+  }
   // Point 4 (V58) — le RIB n'est plus demandé à la candidature (sera
   // redemandé plus tard, une fois le convoyeur accepté). La colonne
   // rib_iban est conservée côté DB pour cet usage futur — envoyée ici
@@ -15391,6 +15865,13 @@ async function submitConvoyeurForm() {
     permis_url: permis_url,
     rc_pro_url: rc_pro_url,
     rib_iban: rib_iban,
+    // Vidéo : uniquement le chemin de stockage et les métadonnées
+    // utiles. Jamais d'URL publique permanente.
+    video_chemin: video_chemin,
+    video_mime: video_mime,
+    video_taille_octets: video_taille,
+    video_duree_secondes: video_duree,
+    video_envoyee_le: video_envoyee_le,
     statut: 'en_attente'
   }).then(function(r) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
