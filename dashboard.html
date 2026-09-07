@@ -5728,8 +5728,109 @@ var LIBELLES_SERVICE = {
   convoyage:          'Convoyage',
   stockage:           'Stockage',
   convoyage_stockage: 'Convoyage + stockage',
-  nettoyage:          'Nettoyage automobile professionnel'
+  nettoyage:          'Nettoyage automobile professionnel',
+  professionnel:      'Trouver un professionnel automobile'
 };
+
+// ── TROUVER UN PROFESSIONNEL AUTOMOBILE ─────────────────────
+// Mêmes principes que le nettoyage : toutes les données métier vivent
+// dans la colonne JSONB clients.professionnel_details, écrite par liste
+// blanche côté site. Aucune donnée n'est déduite ni inventée ici.
+var PRO_LIB_CATEGORIE = {
+  technicien: 'Technicien automobile',
+  renfort:    'Renfort automobile sur site'
+};
+var PRO_LIB_SPECIALITE = {
+  mecanique: 'Mécanique', carrosserie: 'Carrosserie', diagnostic: 'Diagnostic',
+  autre: 'Autre spécialité', conseil: 'Client à conseiller'
+};
+var PRO_LIB_MISSION = {
+  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  autre: 'Autre mission', conseil: 'Client à conseiller'
+};
+// Gabarits véhicules — identiques à TYPES_VEHICULE dans index.html.
+var PRO_LIB_TYPE_VEHICULE = {
+  citadine: 'Citadine', berline: 'Berline', break: 'Break',
+  suv: 'SUV / Crossover', monospace: 'Monospace',
+  'utilitaire-leger': 'Utilitaire léger / camionnette', fourgon: 'Fourgon',
+  'grand-fourgon': 'Grand fourgon / utilitaire jusqu’à 20 m³',
+  'autre-vl': 'Autre véhicule léger'
+};
+
+// Horaire réellement porté par une demande de nettoyage : heure précise,
+// créneau, ou disponibilité flexible. Jamais une valeur reconstituée.
+function _nettHoraireTexte(nd) {
+  if (!nd) return '';
+  if (nd.dispo_type === 'precise') return nd.heure_precise || '';
+  if (nd.dispo_type === 'creneau') return [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
+  if (nd.dispo_type === 'flexible') return 'Flexible';
+  return '';
+}
+function _nettAdresseTexte(nd) {
+  if (!nd) return '';
+  return [nd.adresse_rue, [nd.adresse_cp, nd.adresse_ville].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+}
+
+function _estDemandeProfessionnel(c) { return _typeServiceDemande(c) === 'professionnel'; }
+// Tolère un JSONB rendu en objet OU en chaîne selon le client REST.
+function _proDetails(c) {
+  var d = c && c.professionnel_details;
+  if (!d) return null;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { return null; } }
+  return (d && typeof d === 'object') ? d : null;
+}
+// Métier réellement choisi — jamais un métier imposé à un client qui a
+// demandé à être conseillé.
+function _proLibelleMetier(d) {
+  if (!d) return '';
+  if (d.conseil) return 'Client à conseiller';
+  if (d.categorie === 'technicien') return PRO_LIB_SPECIALITE[d.specialite] || d.specialite || '';
+  if (d.categorie === 'renfort') return PRO_LIB_MISSION[d.mission] || d.mission || '';
+  return '';
+}
+// CONTACT SUR PLACE — libellé unique, identique au formulaire, au
+// récapitulatif client et au PDF. Retourne '' si la donnée n'a pas été
+// réellement résolue : aucun contact partiel n'est affiché.
+function _contactSurPlaceTexte(cs) {
+  if (!cs || typeof cs !== 'object') return '';
+  if (!cs.nom || !cs.telephone) return '';
+  return cs.nom + ' — ' + cs.telephone;
+}
+// Durée en jours réellement portée par la demande (bornes incluses).
+function _proDureeTexte(d) {
+  if (!d || !d.duree_jours) return '';
+  return d.duree_jours + (d.duree_jours > 1 ? ' jours' : ' jour');
+}
+function _proPeriodeTexte(d) {
+  if (!d || !d.date_debut) return '';
+  var deb = _dvDate(d.date_debut);
+  if (!d.date_fin || d.date_fin === d.date_debut) return 'Le ' + deb;
+  return 'Du ' + deb + ' au ' + _dvDate(d.date_fin);
+}
+function _proHorairesTexte(d) {
+  if (!d) return '';
+  return [d.heure_debut, d.heure_fin].filter(Boolean).join(' – ');
+}
+function _proAdresseTexte(d) {
+  if (!d) return '';
+  return [d.adresse_rue, [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+}
+// Prestation formulée à partir de ce que le client a RÉELLEMENT demandé.
+function _proPrestationTexte(d) {
+  if (!d) return '';
+  var n = d.nombre_professionnels;
+  if (d.categorie === 'technicien') {
+    if (!n || n === 1) return 'Mise à disposition d\'un technicien automobile';
+    return 'Mise à disposition de ' + n + ' techniciens automobiles';
+  }
+  if (d.categorie === 'renfort') {
+    if (!n || n === 1) return 'Mise à disposition d\'un renfort automobile sur site';
+    return 'Mise à disposition de ' + n + ' renforts automobiles sur site';
+  }
+  return '';
+}
 
 // ── LOT 3 (V74) — NETTOYAGE AUTOMOBILE PROFESSIONNEL ─────────
 // Toutes les données métier vivent dans la colonne JSONB
@@ -6350,6 +6451,9 @@ function ouvrirFicheDemande(clientId) {
     if (nd.adresse_cp || nd.adresse_ville) {
       org += L('Ville', [nd.adresse_cp, nd.adresse_ville].filter(Boolean).join(' '));
     }
+    // Libellé unique, identique au formulaire, au récapitulatif client
+    // et au devis PDF.
+    org += L('Contact sur place', _contactSurPlaceTexte(nd.contact_sur_place));
     // Clés d'avant V75 : affichées uniquement si la demande les porte.
     if (nd.acces_eau) org += L('Accès à l\'eau (demande antérieure)', NETT_LIB_OUINON[nd.acces_eau] || nd.acces_eau);
     if (nd.acces_electricite) org += L('Prise électrique (demande antérieure)', NETT_LIB_OUINON[nd.acces_electricite] || nd.acces_electricite);
@@ -6371,6 +6475,103 @@ function ouvrirFicheDemande(clientId) {
     var titreN = document.getElementById('fiche-demande-titre');
     if (titreN) titreN.textContent = 'Demande nettoyage — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
     if (corpsN) corpsN.innerHTML = html;
+    openModal('fiche-demande');
+    return;
+  }
+
+  // ── FICHE DÉDIÉE — TROUVER UN PROFESSIONNEL AUTOMOBILE ─────
+  // Rendu totalement séparé, sur le modèle exact de la fiche Nettoyage :
+  // aucune ligne de trajet, prise en charge, livraison, restitution ou
+  // stockage n'est produite ici, et aucun champ sans rapport avec le
+  // service n'est affiché. Toutes les valeurs client passent par
+  // escapeHtml().
+  if (_estDemandeProfessionnel(c)) {
+    var pd = _proDetails(c) || {};
+    var estTech = (pd.categorie === 'technicien');
+    var LP = function (label, valeur) {
+      if (valeur === null || valeur === undefined || valeur === '') return '';
+      return '<div class="detail-row"><span class="detail-label">' + escapeHtml(label) +
+             '</span><span class="detail-val">' + escapeHtml(String(valeur)) + '</span></div>';
+    };
+    var SP = function (titre, contenu) {
+      if (!contenu) return '';
+      return '<div style="margin-bottom:16px"><div style="font-weight:700;font-size:.78rem;' +
+             'text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:6px">' +
+             escapeHtml(titre) + '</div>' + contenu + '</div>';
+    };
+
+    html += '<div class="badge badge-active" style="margin-bottom:14px">TROUVER UN PROFESSIONNEL AUTOMOBILE</div>';
+
+    html += SP('Client',
+      LP('Nom', ((c.prenom || '') + ' ' + (c.nom || '')).trim()) +
+      LP('Société', c.societe) + LP('SIRET', c.siret) +
+      LP('Email', c.email) + LP('Téléphone', c.telephone) +
+      LP('N° client', c.numero_client));
+
+    // PRESTATION DEMANDÉE + type de partenaire réellement nécessaire.
+    html += SP('Prestation demandée',
+      LP('Besoin', PRO_LIB_CATEGORIE[pd.categorie] || pd.categorie) +
+      LP(estTech ? 'Spécialité' : 'Mission', _proLibelleMetier(pd)) +
+      LP('Précision', pd.precision) +
+      LP('Professionnels', pd.nombre_professionnels) +
+      LP('Prestation', _proPrestationTexte(pd)) +
+      LP('Type de partenaire nécessaire',
+        estTech ? 'Partenaire technicien automobile'
+                : 'Partenaire renfort automobile sur site'));
+
+    // Véhicules — uniquement pour le technicien, et uniquement ce qui a
+    // réellement été saisi (ni immatriculation, ni VIN, ni restitution).
+    if (estTech && (pd.vehicules || []).length) {
+      var vhPro = LP('Nombre de véhicules', pd.nombre_vehicules);
+      pd.vehicules.forEach(function (v, i) {
+        vhPro += LP('Véhicule ' + (i + 1),
+          [PRO_LIB_TYPE_VEHICULE[v.type_vehicule] || v.type_vehicule, v.marque_modele]
+            .filter(Boolean).join(' — '));
+      });
+      html += SP(pd.vehicules.length > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', vhPro);
+    }
+
+    html += SP("Lieu d'intervention",
+      LP('Adresse', pd.adresse_rue) +
+      LP('Ville', [pd.adresse_cp, pd.adresse_ville].filter(Boolean).join(' ')) +
+      LP('Contact sur place', _contactSurPlaceTexte(pd.contact_sur_place)));
+
+    html += SP('Période et horaires',
+      LP('Période', _proPeriodeTexte(pd)) +
+      LP('Durée', _proDureeTexte(pd)) +
+      LP('Horaires', _proHorairesTexte(pd)));
+
+    html += SP(estTech ? 'Mission' : 'Type de mission',
+      LP('Description', pd.description) +
+      LP('Informations complémentaires', pd.informations_complementaires));
+
+    // INFORMATIONS MANQUANTES — calculées à partir de ce que la demande
+    // porte réellement, jamais d'une liste fixe.
+    var manquantsPro = [];
+    if (!pd.categorie) manquantsPro.push('Besoin');
+    if (!pd.conseil && !pd.specialite && !pd.mission) manquantsPro.push(estTech ? 'Spécialité' : 'Mission');
+    if (pd.conseil) manquantsPro.push('Métier et nombre de professionnels à définir avec le client');
+    if (!pd.adresse_rue || !pd.adresse_ville) manquantsPro.push("Adresse d'intervention");
+    if (!_contactSurPlaceTexte(pd.contact_sur_place)) manquantsPro.push('Contact sur place');
+    if (!pd.date_debut || !pd.date_fin) manquantsPro.push('Période');
+    if (!pd.heure_debut || !pd.heure_fin) manquantsPro.push('Horaires');
+    if (!pd.description) manquantsPro.push('Description de la mission');
+    html += SP('Informations manquantes',
+      manquantsPro.length ? LP('À compléter', manquantsPro.join(' · '))
+                          : LP('Statut', 'Aucune information manquante'));
+
+    html += SP('Suivi',
+      LP('Statut de la prestation', c.statut) +
+      LP('Reçue le', _dvDateHeure ? _dvDateHeure(c.created_at) : c.created_at));
+
+    html += '<div style="margin-top:14px;text-align:right">' +
+      '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
+      'Marquer comme non lue</button></div>';
+
+    var corpsP = document.getElementById('fiche-demande-corps');
+    var titreP = document.getElementById('fiche-demande-titre');
+    if (titreP) titreP.textContent = 'Demande professionnel — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
+    if (corpsP) corpsP.innerHTML = html;
     openModal('fiche-demande');
     return;
   }
@@ -7409,6 +7610,162 @@ function _construirePdfDevis(c, d) {
   // source exacte pour ce cas.
   var _nbVehiculesTrajet = c.nb_vehicules || (c._vehicules ? c._vehicules.length : 0) || 1;
   var _estMultiIndividuelTrajet = (_nbVehiculesTrajet >= 2 && c.trajet_commun !== true);
+
+  // ══ SERVICES SUR SITE — Nettoyage / Trouver un professionnel ══
+  // Ces deux services n'ont ni trajet, ni prise en charge, ni livraison,
+  // ni restitution, ni fiche véhicule en base : les sections Stockage /
+  // Trajet / Véhicules ci-dessous ne produisent donc déjà rien pour eux
+  // (leurs propres conditions sont fausses). On n'ajoute ici que leurs
+  // blocs métier, avec EXACTEMENT les mêmes primitives que le reste du
+  // devis (titre rouge, carte grise, bandeau d'indicateurs, puces) :
+  // aucun second modèle de devis n'est créé, aucune couleur ni
+  // typographie nouvelle.
+
+  // Ligne « Libellé : valeur » — la valeur est posée JUSTE APRÈS le
+  // libellé, à partir de sa largeur réellement mesurée : petit
+  // espacement, jamais une grande colonne vide.
+  function ligneLV(label, valeur, x, yy, dess) {
+    if (dess) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
+      doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
+      var l = String(label) + ' :';
+      T(l, x, yy);
+      var w = doc.getTextWidth(l);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
+      doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+      T(String(valeur), x + w + 2.6, yy);
+    }
+  }
+
+  // Carte de lignes « libellé : valeur ». Une ligne par donnée
+  // RÉELLEMENT présente ; la carte entière disparaît si tout est vide.
+  function carteLignes(titre, lignes) {
+    var utiles = (lignes || []).filter(function (l) {
+      return l && l[1] !== null && l[1] !== undefined && String(l[1]) !== '';
+    });
+    if (!utiles.length) return;
+    sectionAvecBloc(titre, function (dess) {
+      var y0 = y, cur = y0 + 7.4;
+      utiles.forEach(function (l) {
+        ligneLV(l[0], l[1], xG, cur, dess);
+        cur += 6.5;
+      });
+      return (cur - y0) - 6.5 + 7.4;
+    });
+  }
+
+  // Carte de texte libre : le texte du client, et rien d'autre.
+  function carteTexte(titre, texte) {
+    if (!texte) return;
+    sectionAvecBloc(titre, function (dess) {
+      var y0 = y, cur = y0 + 7.4;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.8);
+      var lignes = doc.splitTextToSize(String(texte), LARGEUR - 14);
+      if (dess) {
+        doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+        lignes.forEach(function (lg, i) { T(lg, xG, cur + i * 4.7); });
+      }
+      cur += (lignes.length - 1) * 4.7;
+      return (cur - y0) + 7.0;
+    });
+  }
+
+  // Bandeau d'indicateurs — même rendu que la rangée d'indicateurs du
+  // bloc Stockage : colonnes de largeur égale, libellé au-dessus de sa
+  // valeur. Mesuré AVANT dessin, jamais supposé.
+  function bandeauIndicateurs(items) {
+    var utiles = (items || []).filter(function (it) {
+      return it && it[1] !== null && it[1] !== undefined && String(it[1]) !== '';
+    });
+    if (!utiles.length) return;
+    var n = utiles.length, w = (LARGEUR - 12) / n;
+    var nlLabel = 1, nlVal = 1;
+    utiles.forEach(function (it, i) {
+      nlLabel = Math.max(nlLabel, etiquetteAdaptativeLisible(it[0], xG + i * w, 0, w, 10.4, 9.2, false));
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.2);
+      nlVal = Math.max(nlVal, doc.splitTextToSize(String(it[1]), w - 3).slice(0, 2).length);
+    });
+    var h = 6.5 + (nlLabel - 1) * 3.6 + 5.0 + nlVal * 4.4 + 2.5;
+    if (y + h > BAS_PAGE) { doc.addPage(); y = M; }
+    var y0 = y;
+    doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
+    doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'F');
+    doc.setDrawColor(GRIS_FILET[0], GRIS_FILET[1], GRIS_FILET[2]); doc.setLineWidth(0.15);
+    doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'S');
+    var curLabel = y0 + 6.5;
+    utiles.forEach(function (it, i) {
+      etiquetteAdaptativeLisible(it[0], xG + i * w, curLabel, w, 10.4, 9.2, true);
+    });
+    var yVal = curLabel + (nlLabel - 1) * 3.6 + 5.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.2);
+    doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+    utiles.forEach(function (it, i) {
+      doc.splitTextToSize(String(it[1]), w - 3).slice(0, 2).forEach(function (lg, k) {
+        T(lg, xG + i * w, yVal + k * 4.4);
+      });
+    });
+    y = y0 + h;
+  }
+
+  if (_estDemandeNettoyage(c)) {
+    var ndPdf = _nettDetails(c) || {};
+    y += ESPACE_AVANT_TITRE_GLOBAL;
+    sectionTitre('Nettoyage automobile');
+    bandeauIndicateurs([
+      ['Véhicules', ndPdf.nombre_vehicules_approx || ''],
+      ['Formule', NETT_LIB_TYPE[ndPdf.type_nettoyage] || ''],
+      ['Date', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Horaire', _nettHoraireTexte(ndPdf)]
+    ]);
+    carteLignes("Lieu d'intervention", [
+      ['Adresse', _nettAdresseTexte(ndPdf)],
+      ['Contact sur place', _contactSurPlaceTexte(ndPdf.contact_sur_place)]
+    ]);
+    carteLignes('Véhicules à nettoyer',
+      (ndPdf.repartition_categories || []).filter(function (r) { return r && r.quantite > 0; })
+        .map(function (r) {
+          var lib = NETT_LIB_CAT[r.categorie] || r.categorie;
+          if (r.precision) lib += ' (' + r.precision + ')';
+          return [lib, r.quantite + (r.quantite > 1 ? ' véhicules' : ' véhicule')];
+        }));
+  }
+
+  if (_estDemandeProfessionnel(c)) {
+    var pdPdf = _proDetails(c) || {};
+    var estTechPdf = (pdPdf.categorie === 'technicien');
+    y += ESPACE_AVANT_TITRE_GLOBAL;
+    sectionTitre('Trouver un professionnel automobile');
+    bandeauIndicateurs(estTechPdf ? [
+      ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
+      ['Spécialité', _proLibelleMetier(pdPdf)],
+      ['Véhicules', pdPdf.nombre_vehicules || ''],
+      ['Professionnels', pdPdf.nombre_professionnels || '']
+    ] : [
+      ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
+      ['Mission', _proLibelleMetier(pdPdf)],
+      ['Professionnels', pdPdf.nombre_professionnels || ''],
+      ['Durée', _proDureeTexte(pdPdf)]
+    ]);
+    carteLignes(estTechPdf ? 'Intervention' : 'Mission sur site', [
+      ['Lieu', _proAdresseTexte(pdPdf)],
+      ['Contact sur place', _contactSurPlaceTexte(pdPdf.contact_sur_place)],
+      ['Période', _proPeriodeTexte(pdPdf)],
+      ['Horaires', _proHorairesTexte(pdPdf)],
+      ['Précision', pdPdf.precision || ''],
+      [estTechPdf ? 'Mission' : 'Type de mission', pdPdf.description || '']
+    ]);
+    if (estTechPdf && (pdPdf.vehicules || []).length) {
+      carteLignes(pdPdf.vehicules.length > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule',
+        pdPdf.vehicules.map(function (v, i) {
+          return ['Véhicule ' + (i + 1),
+            [PRO_LIB_TYPE_VEHICULE[v.type_vehicule] || v.type_vehicule, v.marque_modele]
+              .filter(Boolean).join(' — ')];
+        }));
+    }
+    // Uniquement le texte libre du client ; bloc entièrement absent s'il
+    // est vide.
+    carteTexte('Informations complémentaires', pdPdf.informations_complementaires);
+  }
 
   // ══ STOCKAGE — mêmes codes graphiques que les autres blocs ══
   if (_aStockage(c)) {
@@ -8536,7 +8893,16 @@ function _construirePdfDevis(c, d) {
   // Chaque prestation réellement assurée apparaît. Le convoyage vers le
   // stockage disparaissait auparavant du devis.
   var prestations = [];
-  if (_aStockage(c)) {
+  // Services sur site : la prestation est celle que le client a
+  // RÉELLEMENT demandée — jamais une formulation ajoutée d'office.
+  if (_estDemandeNettoyage(c)) {
+    var _ndPrest = _nettDetails(c) || {};
+    var _libNettPrest = NETT_LIB_TYPE[_ndPrest.type_nettoyage];
+    if (_libNettPrest) prestations.push(_libNettPrest);
+  } else if (_estDemandeProfessionnel(c)) {
+    var _pdPrest = _proPrestationTexte(_proDetails(c));
+    if (_pdPrest) prestations.push(_pdPrest);
+  } else if (_aStockage(c)) {
     if (_operationDossier(c, 'pc')) prestations.push('Convoyage vers le stockage');
     prestations.push('Stockage automobile');
     if (_operationDossier(c, 'liv')) prestations.push('Livraison après stockage');
