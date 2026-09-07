@@ -24,6 +24,10 @@ done
 
 # Sécurité serveur (TypeScript, sans réseau)
 node --experimental-strip-types t_video_securite.mjs
+
+# Vérification réelle des politiques RLS (PostgreSQL 16 local, jamais Supabase).
+# Requiert les binaires postgresql-16 et les droits root pour « su postgres ».
+bash t_rls.sh
 ```
 
 Voir aussi **`RECETTE-VIDEO.md`** : recette manuelle MP4/MOV sur
@@ -45,6 +49,7 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_brouillon.js` | Effacer / OK des rubriques, brouillon écrit puis restauré après F5 |
 | `t_video.js` | Vidéo partenaire : exigence et durée selon les activités, formats, taille, durée réelle, remplacement, suppression, envoi et erreurs réseau |
 | `t_video_admin.js` | Dashboard : fiche unique, états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
+| `t_rls.sh` | **Politiques RLS exécutées pour de vrai** sur un PostgreSQL 16 local jetable : compatibilité de la phase préparatoire avec l'ancien Dashboard, effet du durcissement, partenaire bloqué (fiche visible, zéro mission, auto-déblocage impossible, décisions conservées), déblocage administrateur, idempotence de la chaîne complète |
 | `t_decisions.js` | **Décisions par activité et blocage partenaire** : indépendance des activités, six transitions, confirmation explicite et annulation sans écriture, historique complet, persistance après F5, blocage réellement enregistré, refus d'autorisation, invalidation d'une session ouverte, zéro e-mail |
 | `t_video_securite.mjs` | **Sécurité** : exécute le vrai code de la fonction serveur `candidature-video` contre un double Supabase (jeton, chemin imposé par le serveur, cloisonnement A/B, contrôles format/taille/durée, usage unique, orphelins) |
 
@@ -71,12 +76,21 @@ Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
   Playwright (succès, refus serveur, coupure) : aucun octet ne part
   réellement vers Supabase.
 - `t_decisions.js` exécute le **vrai code du Dashboard** contre un double
-  Supabase en mémoire qui **simule** les refus RLS selon le rôle. Il prouve
-  donc que l'interface réagit correctement à un refus serveur et n'écrit
-  jamais ce qu'elle n'a pas le droit d'écrire — il ne prouve **pas** que les
-  politiques du fichier `05_blocage_partenaire.sql` sont actives : celles-ci
-  n'ont pas été exécutées. La vérification correspondante figure dans
-  `migrations/README.md` et doit être faite après application.
+  Supabase en mémoire qui **simule** les refus RLS selon le rôle : il prouve
+  que l'interface réagit correctement à un refus serveur et n'écrit jamais ce
+  qu'elle n'a pas le droit d'écrire. La **preuve côté base** est apportée
+  séparément par `t_rls.sh`, qui applique les vrais fichiers de `migrations/`
+  sur un PostgreSQL 16 local et observe le comportement effectif.
+- `t_rls.sh` reconstitue l'environnement Supabase (rôles `anon` /
+  `authenticated`, `auth.uid()`) et un schéma **approximé** : seules les
+  colonnes dont dépendent les migrations sont reproduites
+  (`tests/pg/00_socle_supabase.sql`). Les **politiques testées sont les
+  vraies** — les fichiers de `migrations/` sont appliqués sans modification —
+  mais un écart entre ce socle et le schéma réel de production reste possible.
+  Les contrôles de `migrations/README.md` restent donc à passer sur Supabase
+  après application.
+- `t_rls.sh` a besoin des binaires PostgreSQL 16 et des droits root
+  (`su postgres`). Il ne se connecte **jamais** à Supabase.
 - Les tests n'écrivent jamais dans Supabase : ils s'arrêtent au payload
   construit côté navigateur. Aucune donnée réelle n'est touchée.
 - Les données de test sont préfixées `TEST-QA` et utilisent des adresses en

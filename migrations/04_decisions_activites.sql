@@ -47,6 +47,43 @@ create table if not exists public.convoyeur_decisions_historique (
 create index if not exists convoyeur_decisions_hist_convoyeur_idx
   on public.convoyeur_decisions_historique (convoyeur_id, modifie_le desc);
 
+-- CONTRAINTE DÉCOUVERTE À L'EXÉCUTION (PostgreSQL 16 réel, cf.
+-- tests/t_rls.sh) : le Dashboard écrit une décision avec un UPSERT
+-- (insert ... on conflict do update). Or les triggers BEFORE INSERT
+-- s'exécutent AVANT la détection du conflit : une seule décision
+-- produisait DEUX lignes d'historique, dont une mensongère
+-- (« NULL -> oui », prétendant qu'aucune décision n'existait avant).
+--
+-- La trace est donc écrite par un trigger AFTER : sur un upsert qui
+-- bascule en update, AFTER INSERT ne se déclenche pas, et seule la
+-- vraie transition est enregistrée.
+
+-- 1. AVANT : renseigne les colonnes de la ligne elle-même.
+create or replace function public.horodater_decision_convoyeur()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if tg_op = 'UPDATE' and new.decision is not distinct from old.decision then
+    return new;   -- aucune décision réellement changée : rien à horodater
+  end if;
+  new.updated_at := now();
+  if new.decision <> 'en_attente' then
+    new.decide_le  := now();
+    new.decide_par := auth.uid();
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_tracer_decision_convoyeur on public.convoyeur_decisions;
+drop trigger if exists trg_horodater_decision_convoyeur on public.convoyeur_decisions;
+create trigger trg_horodater_decision_convoyeur
+  before insert or update on public.convoyeur_decisions
+  for each row execute function public.horodater_decision_convoyeur();
+
+-- 2. APRÈS : écrit l'historique, une fois la ligne réellement persistée.
 create or replace function public.tracer_decision_convoyeur()
 returns trigger
 language plpgsql
@@ -55,22 +92,14 @@ set search_path = public, pg_temp
 as $$
 begin
   if tg_op = 'UPDATE' and new.decision is not distinct from old.decision then
-    return new;   -- aucune décision réellement changée : rien à tracer
+    return null;  -- aucune décision réellement changée : rien à tracer
   end if;
 
   -- Amorçage : la création d'une ligne « en attente » n'est pas une
-  -- décision prise par un administrateur. Elle est donc horodatée mais
-  -- n'entre pas dans l'historique, qui ne doit contenir que de vraies
-  -- décisions.
+  -- décision prise par un administrateur. Elle n'entre donc pas dans
+  -- l'historique, qui ne doit contenir que de vraies décisions.
   if tg_op = 'INSERT' and new.decision = 'en_attente' then
-    new.updated_at := now();
-    return new;
-  end if;
-
-  new.updated_at := now();
-  if new.decision <> 'en_attente' then
-    new.decide_le  := now();
-    new.decide_par := auth.uid();
+    return null;
   end if;
 
   insert into public.convoyeur_decisions_historique
@@ -80,13 +109,25 @@ begin
      case when tg_op = 'UPDATE' then old.decision else null end,
      new.decision, auth.uid());
 
-  return new;
+  return null;
 end $$;
 
-drop trigger if exists trg_tracer_decision_convoyeur on public.convoyeur_decisions;
-create trigger trg_tracer_decision_convoyeur
-  before insert or update on public.convoyeur_decisions
+drop trigger if exists trg_tracer_decision_apres on public.convoyeur_decisions;
+create trigger trg_tracer_decision_apres
+  after insert or update on public.convoyeur_decisions
   for each row execute function public.tracer_decision_convoyeur();
+
+-- ------------------------------------------------------------
+-- Privilèges de table
+-- ------------------------------------------------------------
+-- Supabase configure normalement des privilèges par défaut sur le
+-- schéma public, mais ils dépendent de la configuration du projet. On
+-- les pose donc explicitement : sans eux, PostgREST renverrait
+-- « permission denied for table convoyeur_decisions » AVANT même que
+-- la RLS ne s'applique, et la fiche partenaire resterait vide.
+-- La RLS ci-dessous reste le seul filtre sur les LIGNES.
+grant select, insert, update on public.convoyeur_decisions            to authenticated;
+grant select                 on public.convoyeur_decisions_historique to authenticated;
 
 -- ------------------------------------------------------------
 -- RLS

@@ -4,50 +4,164 @@
 > application manuelle par HelixCar, dans le SQL Editor Supabase.
 > Aucun secret ne figure dans ce dossier.
 
+## ⚠️ Déploiement en TROIS phases — lire avant toute exécution
+
+Le durcissement RLS **ne peut pas** être compatible avec la version du
+Dashboard actuellement en ligne. Le déploiement est donc scindé, et
+l'ordre ci-dessous est **impératif**.
+
+| Phase | Action | Compatible ancien Dashboard |
+|---|---|---|
+| **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
+| **B** | Déploiement de la nouvelle `dashboard.html` | — |
+| **C** | `90_durcissement_rls_partenaires.sql` | ❌ **non** — exige la phase B |
+
+### Pourquoi la phase C ne peut pas venir plus tôt
+
+L'ancien Dashboard envoie la clé `anon` sur **tous** ses appels REST :
+`auth.uid()` y vaut `null`, donc `est_admin()` est faux et aucune
+politique ne peut être satisfaite. Mesuré sur un PostgreSQL 16 local en
+appliquant réellement ces fichiers (`tests/t_rls.sh`) :
+
+| Opération de l'ancien Dashboard | Résultat après un durcissement prématuré |
+|---|---|
+| Lecture des candidatures / missions | **0 ligne, en HTTP 200** — l'écran se vide **sans aucune erreur** |
+| `PATCH` (valider une candidature) | **`UPDATE 0`** — accepté, **ne modifie rien**, succès mensonger |
+| `DELETE` (supprimer une candidature) | 204 avec **0 ligne supprimée** |
+| `POST` (créer une mission) | rejet `42501` — la seule erreur réellement visible |
+
+La lecture vide et l'écriture silencieuse sont les deux dangers : elles
+ne déclenchent aucune alerte.
+
+La nouvelle `dashboard.html` corrige la cause — `sbFetch()` transmet le
+JWT de la session ouverte — ce qui rend la phase C sans effet visible
+pour les administrateurs.
+
+### Ce que la phase A ne fait PAS
+
+Le fichier `05` est volontairement **additif** : aucune activation de
+RLS, aucune politique, et **pas** le garde-fou sur les colonnes
+sensibles. Ce garde-fou lève une exception dès que `est_admin()` est
+faux : installé en phase A, il ferait **échouer la validation et le
+refus des candidatures** depuis l'ancien Dashboard. Il vit donc dans
+`90`.
+
 ## Ordre d'application
 
 Appliquer **dans l'ordre des préfixes**, un fichier à la fois, en
 vérifiant qu'il se termine sans erreur avant de passer au suivant.
 
-| Ordre | Fichier | Objet | Requis pour |
+| Ordre | Phase | Fichier | Objet |
 |---|---|---|---|
-| 1 | `00_helpers.sql` | `est_admin()`, `est_proprietaire_convoyeur()` | tous les autres |
-| 2 | `01_professionnel_details.sql` | `clients.professionnel_details` + index | service « Trouver un professionnel » |
-| 3 | `02_contact_sur_place.sql` | garde-fous + vue de lecture | contact sur place |
-| 4 | `03_videos_candidature.sql` | métadonnées vidéo + bucket privé + policies Storage | vidéos partenaires |
-| 5 | `04_decisions_activites.sql` | décisions par activité + historique | décisions multi-activités |
-| 6 | `05_blocage_partenaire.sql` | blocage réel + RLS `convoyeurs` | blocage partenaire |
-| 7 | `06_informations_manquantes.sql` | `clients.auth_user_id` + informations à compléter | espace client |
+| 1 | A | `00_helpers.sql` | `est_admin()`, `est_proprietaire_convoyeur()` |
+| 2 | A | `01_professionnel_details.sql` | `clients.professionnel_details` + index |
+| 3 | A | `02_contact_sur_place.sql` | garde-fous + vue de lecture |
+| 4 | A | `03_videos_candidature.sql` | métadonnées vidéo + bucket privé + policies Storage |
+| 5 | A | `04_decisions_activites.sql` | décisions par activité + historique |
+| 6 | A | `05_blocage_partenaire.sql` | colonnes de blocage, trace, `partenaire_actif()`, **rattachement des comptes historiques** |
+| 7 | A | `06_informations_manquantes.sql` | `clients.auth_user_id` + informations à compléter |
+| — | **B** | **déploiement de `dashboard.html`** | `sbFetch()` transmet le JWT |
+| 8 | C | `90_durcissement_rls_partenaires.sql` | garde-fou + RLS `convoyeurs` et `missions` + politiques |
 
-Toutes les instructions sont **idempotentes** (`IF NOT EXISTS`,
-`CREATE OR REPLACE`, `DROP POLICY IF EXISTS`) : les rejouer ne duplique
-rien.
+Toutes les instructions sont **idempotentes** : la chaîne complète a été
+appliquée **deux fois de suite** sur PostgreSQL 16 sans erreur, sans
+politique en double, sans trigger en double et sans ligne d'historique
+inventée (`tests/t_rls.sh`, section F).
 
-## Ce qui est indispensable *maintenant*
+## Vérifications AVANT / APRÈS chaque phase
 
-Seul **`01_professionnel_details.sql`** est nécessaire au code livré dans
-cette Pull Request : sans lui, l'enregistrement d'une demande
-« Trouver un professionnel automobile » échouera (colonne absente).
-`02` est fortement recommandé dans la foulée (garde-fous du contact sur
-place, déjà écrit par le formulaire).
+### Avant la phase A
+```sql
+-- Doit renvoyer au moins 1 : sans administrateur reconnaissable,
+-- la phase C fermerait le Dashboard à tout le monde.
+select count(*) from public.admins where actif is true and auth_user_id is not null;
+```
 
-`03_videos_candidature.sql` est requis par la **vidéo de candidature**
-(livrée), et `04` + `05` par les **décisions par activité et le blocage
-partenaire** (livrés). Sans `04`, la fiche partenaire affichera les
-activités mais aucune décision ne pourra être enregistrée. Sans `05`, le
-bouton Bloquer/Débloquer écrira `bloque` sans qu'aucune politique
-serveur ne l'applique : le blocage resterait **déclaratif**.
+### Après la phase A — bloquant pour la suite
+```sql
+-- 1. Doit renvoyer 0. Chaque ligne restante est un partenaire ACTIF qui
+--    serait EXCLU de son espace par la phase C (voir ci-dessous).
+select id, email, statut from public.convoyeurs
+ where auth_user_id is null and statut = 'actif';
 
-Seul `06_informations_manquantes.sql` prépare la suite : son interface
-utilisateur (espace client, informations à compléter) n'est **pas**
-livrée dans cette Pull Request.
+-- 2. Doublons d'e-mail non rattachables automatiquement : à traiter à la main.
+select lower(email) as email, count(*) from public.convoyeurs
+ where auth_user_id is null group by 1 having count(*) > 1;
 
-> **Prérequis applicatif de `05`.** Ces politiques reposent sur
-> `auth.uid()`. Le Dashboard envoyait auparavant la clé `anon` sur *tous*
-> ses appels REST : `auth.uid()` valait `null` et l'activation de la RLS
-> aurait **vidé le Dashboard**. C'est corrigé dans `dashboard.html`
-> (`sbFetch()` transmet désormais le JWT de la session ouverte). Vérifier
-> que cette version est bien déployée **avant** d'appliquer `05`.
+-- 3. L'ancien Dashboard doit continuer de fonctionner normalement :
+--    listes remplies, validation d'une candidature effective.
+```
+
+> **Pourquoi le point 1 est bloquant.** La connexion partenaire cherche
+> la fiche par `auth_user_id`, puis retombe sur un **repli par e-mail**
+> pour les comptes anciens. La politique de la phase C autorise le
+> propriétaire sur `auth_user_id = auth.uid()` : une fiche dont
+> `auth_user_id` est `NULL` devient invisible **pour son propre
+> titulaire**, et le repli par e-mail ne renvoie plus rien — le
+> partenaire lit « Aucun dossier convoyeur trouvé ». La phase A
+> rattache automatiquement les cas **non ambigus** ; les autres doivent
+> être traités à la main avant la phase C.
+
+### Avant la phase C
+1. La nouvelle `dashboard.html` est **effectivement servie** (vider le
+   cache, recharger) et un administrateur s'y est connecté avec succès.
+2. Le contrôle « après phase A » renvoie bien 0.
+
+### Après la phase C
+Depuis la session d'un **partenaire de test bloqué** :
+```sql
+-- 1 ligne : un partenaire bloqué garde SA fiche, et elle seule.
+--    Choix assumé : la masquer ferait échouer la connexion sur
+--    « aucun dossier trouvé », un message trompeur. C'est cette ligne
+--    que le contrôle d'accès relit pour afficher la suspension.
+select id, bloque from public.convoyeurs;
+
+select * from public.convoyeur_decisions;   -- 0 ligne (réservé aux admins)
+select * from public.missions;              -- 0 ligne : l'effet réel du blocage
+
+-- Doit échouer ou ne modifier aucune ligne — jamais réussir.
+update public.convoyeurs set bloque = false where auth_user_id = auth.uid();
+```
+Puis, depuis un compte **administrateur** : le partenaire bloqué reste
+visible, son déblocage rétablit l'accès aux missions, et **aucune
+décision par activité n'est modifiée** — une activité refusée ou en
+attente le reste.
+
+## Retour arrière
+
+### Revenir sur la phase C
+```sql
+alter table public.missions   disable row level security;
+alter table public.convoyeurs disable row level security;
+drop trigger if exists trg_garde_colonnes_sensibles_convoyeur on public.convoyeurs;
+```
+> ⚠️ Cela **rouvre** les données partenaires à la clé `anon`, c'est-à-dire
+> l'état antérieur à ce lot. À n'utiliser qu'en dépannage immédiat. La
+> bonne réponse reste de vérifier que la nouvelle `dashboard.html` est
+> bien celle qui est servie.
+
+### Revenir sur la phase A
+```sql
+drop trigger  if exists trg_tracer_blocage_convoyeur on public.convoyeurs;
+drop function if exists public.tracer_blocage_convoyeur();
+
+-- Annuler le rattachement des comptes historiques (état exact restauré) :
+update public.convoyeurs c
+   set auth_user_id = s.auth_user_id_avant
+  from public.convoyeurs_rattachement_sauvegarde s
+ where c.id = s.convoyeur_id;
+```
+> Ne **pas** supprimer les colonnes `bloque*` : la connexion partenaire
+> lit `bloque`. Les laisser en place est sans effet tant que la phase C
+> n'est pas appliquée.
+
+### Fenêtre d'exposition à connaître
+Entre les phases A et C, `convoyeurs` reste **sans RLS**, exactement
+comme aujourd'hui : la phase A n'ouvre rien de plus, mais ne referme
+rien non plus. La colonne `bloque_motif` créée en phase A serait donc
+lisible avec la clé `anon` tant que la phase C n'est pas passée. En
+conséquence : **enchaîner B et C dans la même fenêtre de maintenance**,
+et **ne bloquer aucun partenaire avant la phase C**.
 
 ## Réglages manuels Supabase (hors SQL)
 
@@ -77,34 +191,6 @@ livrée dans cette Pull Request.
    demandes existantes à un compte est laissé volontairement non exécuté
    (requête fournie en commentaire dans `06`) — un rapprochement par
    e-mail peut exposer la demande d'un tiers en cas d'adresse réutilisée.
-
-## Vérifications recommandées après application
-
-Après `05_blocage_partenaire.sql`, contrôler que le blocage est **réel**
-et pas seulement visuel, depuis la session d'un partenaire de test bloqué :
-
-```sql
--- 1 ligne : un partenaire bloqué garde SA fiche, et elle seule.
---    Choix assumé : la masquer ferait échouer la connexion sur
---    « aucun dossier trouvé », un message trompeur. C'est précisément
---    cette ligne que le contrôle d'accès relit pour afficher le message
---    neutre de suspension puis fermer la session.
-select id, bloque from convoyeurs;
-
--- 0 ligne : les décisions sont réservées aux administrateurs.
-select * from convoyeur_decisions;
-
--- 0 ligne : c'est ICI que le blocage produit son effet réel.
-select * from missions;
-
--- doit échouer : insufficient_privilege — jamais réussir.
-update convoyeurs set bloque = false where auth_user_id = auth.uid();
-```
-
-Le contrôle doit rester vrai après déconnexion / reconnexion et par
-navigation directe. Vérifier ensuite qu'un **déblocage** depuis un compte
-administrateur rétablit l'accès aux missions **sans** modifier aucune
-décision : une activité refusée ou en attente doit le rester.
 
 ## Stripe
 

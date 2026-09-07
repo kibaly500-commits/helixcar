@@ -1,14 +1,37 @@
 -- ============================================================
--- HelixCar — 05 : blocage persistant d'un partenaire
+-- HelixCar — 05 : blocage partenaire — PHASE PRÉPARATOIRE
 -- ============================================================
 -- Dépend de : 00_helpers.sql
 --
--- POINT CENTRAL : le blocage doit être RÉEL, pas un bouton ni un
--- masque visuel. Il est donc porté par la base ET appliqué par les
--- politiques RLS : un partenaire bloqué ne lit plus ses propres
--- données protégées, quel que soit le JavaScript exécuté dans son
--- navigateur, après déconnexion/reconnexion ou navigation directe.
+-- ⚠️ CE FICHIER EST VOLONTAIREMENT ADDITIF ET SANS RLS.
+--
+-- Il peut être appliqué en production ALORS QUE L'ANCIEN DASHBOARD EST
+-- ENCORE EN LIGNE, sans rien vider et sans rien casser : il n'active
+-- aucune Row Level Security, ne crée aucune politique, et n'installe
+-- aucun garde-fou susceptible de refuser une écriture existante.
+--
+-- Le durcissement — activation de la RLS et politiques — vit dans un
+-- fichier séparé, `90_durcissement_rls_partenaires.sql`, à appliquer
+-- APRÈS le déploiement de la nouvelle interface. Voir README.md,
+-- section « Déploiement en trois phases ».
+--
+-- POURQUOI CETTE SÉPARATION (mesuré, pas supposé) : l'ancien Dashboard
+-- envoie la clé `anon` sur TOUS ses appels REST. `auth.uid()` y vaut
+-- donc null. Activer la RLS pendant qu'il est en ligne produit :
+--   * lectures  -> 0 ligne, en HTTP 200 : le Dashboard se vide SANS
+--                  afficher la moindre erreur ;
+--   * UPDATE    -> « UPDATE 0 » : l'écriture est acceptée et ne modifie
+--                  RIEN. L'interface annonce un succès mensonger ;
+--   * INSERT    -> rejet 42501, seule erreur réellement visible.
+-- Ces trois comportements ont été observés sur un PostgreSQL 16 local
+-- en appliquant ces fichiers (cf. tests/t_rls.sh).
 
+-- ------------------------------------------------------------
+-- 1. Colonnes de blocage (additif pur)
+-- ------------------------------------------------------------
+-- `bloque` est la source de vérité DÉJÀ utilisée par le contrôle
+-- d'accès existant (finaliserSessionConvoyeur la lit pour refuser la
+-- connexion). On ne crée donc aucun second champ concurrent.
 alter table public.convoyeurs
   add column if not exists bloque       boolean not null default false,
   add column if not exists bloque_le    timestamptz,
@@ -16,15 +39,19 @@ alter table public.convoyeurs
   add column if not exists bloque_motif text;
 
 comment on column public.convoyeurs.bloque is
-  'Blocage réel du partenaire. Appliqué par les politiques RLS, jamais '
-  'par le seul affichage : un partenaire bloqué perd l''accès à ses '
-  'données protégées côté serveur.';
+  'Blocage réel du partenaire. Appliqué par les politiques RLS de '
+  '90_durcissement_rls_partenaires.sql, jamais par le seul affichage.';
 
 create index if not exists convoyeurs_bloque_idx
   on public.convoyeurs (bloque) where bloque;
 
--- Horodatage et auteur du blocage renseignés automatiquement : impossible
--- d'avoir un blocage sans trace.
+-- ------------------------------------------------------------
+-- 2. Trace automatique du blocage
+-- ------------------------------------------------------------
+-- Compatible ancien Dashboard : ce trigger ne se déclenche que si
+-- `bloque` change réellement de valeur. Les écritures existantes
+-- (validation d'une candidature, mise à jour d'un profil) le traversent
+-- sans effet et sans erreur.
 create or replace function public.tracer_blocage_convoyeur()
 returns trigger
 language plpgsql
@@ -53,9 +80,10 @@ create trigger trg_tracer_blocage_convoyeur
   for each row execute function public.tracer_blocage_convoyeur();
 
 -- ------------------------------------------------------------
--- Fonction d'accès : un partenaire actif est un partenaire NON bloqué.
--- Utilisable par toute politique protégeant une donnée partenaire.
+-- 3. Fonction d'accès : un partenaire actif est un partenaire NON bloqué
 -- ------------------------------------------------------------
+-- Créée dès maintenant, mais utilisée seulement par les politiques de
+-- la phase de durcissement. La déclarer ici n'a aucun effet visible.
 create or replace function public.partenaire_actif()
 returns boolean
 language sql
@@ -75,155 +103,84 @@ revoke all on function public.partenaire_actif() from public;
 grant execute on function public.partenaire_actif() to authenticated;
 
 -- ------------------------------------------------------------
--- RLS sur la table des candidatures
+-- 4. RATTACHEMENT DES COMPTES PARTENAIRES HISTORIQUES
 -- ------------------------------------------------------------
-alter table public.convoyeurs enable row level security;
+-- POINT DE BLOCAGE IDENTIFIÉ ET MESURÉ. La connexion partenaire
+-- cherche la fiche par `auth_user_id`, PUIS retombe sur un repli par
+-- e-mail pour les comptes créés avant la liaison directe. Or la
+-- politique de la phase de durcissement autorise le propriétaire sur
+-- `auth_user_id = auth.uid()` : une fiche dont `auth_user_id` est NULL
+-- devient invisible pour son propre titulaire, et le repli par e-mail
+-- ne renvoie plus rien. Résultat : « Aucun dossier convoyeur trouvé »
+-- et un partenaire légitime EXCLU de son espace.
+--
+-- On règle donc la donnée AVANT de durcir, et jamais par une politique
+-- permissive sur l'e-mail.
 
--- Un partenaire lit SA PROPRE fiche, bloqué ou non.
--- CHOIX ASSUMÉ : masquer aussi sa fiche ferait échouer la connexion sur
--- « aucun dossier trouvé » — un message trompeur. Le contrôle d'accès
--- existant (finaliserSessionConvoyeur) lit précisément `bloque` sur
--- cette ligne pour afficher un message neutre de suspension puis fermer
--- la session. Ce sont les DONNÉES PROTÉGÉES (missions) qui deviennent
--- inaccessibles, pas l'information « mon compte est suspendu ».
-drop policy if exists "convoyeurs : lecture par le proprietaire non bloque" on public.convoyeurs;
-drop policy if exists "convoyeurs : lecture par le proprietaire" on public.convoyeurs;
-create policy "convoyeurs : lecture par le proprietaire"
-  on public.convoyeurs for select to authenticated
-  using (auth_user_id = auth.uid());
+-- Sauvegarde préalable : permet un retour arrière exact (cf. README).
+create table if not exists public.convoyeurs_rattachement_sauvegarde (
+  convoyeur_id     uuid primary key,
+  auth_user_id_avant uuid,
+  rattache_le      timestamptz not null default now()
+);
 
--- Un administrateur actif voit tout, y compris les partenaires bloqués
--- (sans quoi il ne pourrait plus jamais les débloquer).
-drop policy if exists "convoyeurs : lecture admin" on public.convoyeurs;
-create policy "convoyeurs : lecture admin"
-  on public.convoyeurs for select to authenticated
-  using (public.est_admin());
+-- Aucun privilège n'est accordé sur cette table : elle ne sert qu'aux
+-- opérations d'administration effectuées depuis le SQL Editor.
 
--- Un partenaire met à jour SA candidature tant qu'il n'est pas bloqué.
--- Les colonnes de décision, de statut et de blocage restent hors de sa
--- portée : voir le trigger de garde ci-dessous.
-drop policy if exists "convoyeurs : mise a jour par le proprietaire non bloque" on public.convoyeurs;
-create policy "convoyeurs : mise a jour par le proprietaire non bloque"
-  on public.convoyeurs for update to authenticated
-  using (auth_user_id = auth.uid() and bloque is false)
-  with check (auth_user_id = auth.uid() and bloque is false);
-
-drop policy if exists "convoyeurs : mise a jour admin" on public.convoyeurs;
-create policy "convoyeurs : mise a jour admin"
-  on public.convoyeurs for update to authenticated
-  using (public.est_admin()) with check (public.est_admin());
-
--- Le dépôt d'une candidature reste ouvert (formulaire public, clé anon),
--- comportement actuel inchangé.
-drop policy if exists "convoyeurs : depot de candidature" on public.convoyeurs;
-create policy "convoyeurs : depot de candidature"
-  on public.convoyeurs for insert to anon, authenticated
-  with check (true);
-
--- GARDE-FOU : seul un administrateur peut modifier les colonnes
--- sensibles. Un partenaire qui tenterait de se débloquer lui-même ou de
--- changer son statut est rejeté côté serveur, quelle que soit la requête.
-create or replace function public.garde_colonnes_sensibles_convoyeur()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-begin
-  if public.est_admin() then
-    return new;
-  end if;
-  if new.bloque       is distinct from old.bloque
-     or new.bloque_le    is distinct from old.bloque_le
-     or new.bloque_par   is distinct from old.bloque_par
-     or new.bloque_motif is distinct from old.bloque_motif
-     or new.statut       is distinct from old.statut then
-    raise exception 'Modification réservée à un administrateur.'
-      using errcode = 'insufficient_privilege';
-  end if;
-  return new;
-end $$;
-
-drop trigger if exists trg_garde_colonnes_sensibles_convoyeur on public.convoyeurs;
-create trigger trg_garde_colonnes_sensibles_convoyeur
-  before update on public.convoyeurs
-  for each row execute function public.garde_colonnes_sensibles_convoyeur();
+-- Rattachement UNIQUEMENT des cas non ambigus : une seule fiche sans
+-- liaison pour cet e-mail, et un seul compte d'authentification.
+-- Les cas ambigus (doublons d'e-mail) sont volontairement laissés en
+-- l'état : les traiter automatiquement risquerait de donner à quelqu'un
+-- l'accès à la fiche d'un tiers.
+with candidats as (
+  select c.id as convoyeur_id, u.id as auth_user_id
+    from public.convoyeurs c
+    join auth.users u on lower(u.email) = lower(c.email)
+   where c.auth_user_id is null
+     and c.email is not null
+   group by c.id, u.id
+  having count(*) = 1
+), sans_ambiguite as (
+  select convoyeur_id, auth_user_id
+    from candidats
+   where auth_user_id in (
+     select auth_user_id from candidats group by auth_user_id having count(*) = 1
+   )
+     and convoyeur_id in (
+     select convoyeur_id from candidats group by convoyeur_id having count(*) = 1
+   )
+), trace as (
+  insert into public.convoyeurs_rattachement_sauvegarde (convoyeur_id, auth_user_id_avant)
+  select convoyeur_id, null from sans_ambiguite
+  on conflict (convoyeur_id) do nothing
+  returning convoyeur_id
+)
+update public.convoyeurs c
+   set auth_user_id = s.auth_user_id
+  from sans_ambiguite s
+ where c.id = s.convoyeur_id;
 
 -- ------------------------------------------------------------
--- DONNÉES PROTÉGÉES : LES MISSIONS
+-- 5. DIAGNOSTIC À LIRE AVANT DE PASSER À LA PHASE DE DURCISSEMENT
 -- ------------------------------------------------------------
--- C'est ICI que le blocage produit son effet réel. Un partenaire bloqué
--- garde sa fiche (pour voir qu'il est suspendu) mais ne lit ni ne
--- modifie plus aucune mission — quel que soit le JavaScript exécuté
--- dans son navigateur, en tapant l'URL de son espace, ou en appelant
--- directement l'API Supabase.
-alter table public.missions enable row level security;
-
--- Lecture : administrateur, ou partenaire ACTIF ET NON BLOQUÉ. Un
--- partenaire actif voit ses missions et celles encore non attribuées,
--- exactement comme aujourd'hui.
-drop policy if exists "missions : lecture admin" on public.missions;
-create policy "missions : lecture admin"
-  on public.missions for select to authenticated
-  using (public.est_admin());
-
-drop policy if exists "missions : lecture partenaire actif" on public.missions;
-create policy "missions : lecture partenaire actif"
-  on public.missions for select to authenticated
-  using (
-    public.partenaire_actif()
-    and (
-      convoyeur_id is null
-      or exists (
-        select 1 from public.convoyeurs c
-         where c.id = missions.convoyeur_id
-           and c.auth_user_id = auth.uid()
-      )
-    )
-  );
-
--- Écriture : un partenaire actif n'agit que sur SES missions (accepter,
--- avancer). Toute autre écriture reste réservée à l'administrateur.
-drop policy if exists "missions : mise a jour partenaire actif" on public.missions;
-create policy "missions : mise a jour partenaire actif"
-  on public.missions for update to authenticated
-  using (
-    public.partenaire_actif()
-    and (
-      convoyeur_id is null
-      or exists (
-        select 1 from public.convoyeurs c
-         where c.id = missions.convoyeur_id
-           and c.auth_user_id = auth.uid()
-      )
-    )
-  )
-  with check (public.partenaire_actif());
-
-drop policy if exists "missions : ecriture admin" on public.missions;
-create policy "missions : ecriture admin"
-  on public.missions for all to authenticated
-  using (public.est_admin()) with check (public.est_admin());
-
--- ------------------------------------------------------------
--- PRÉREQUIS CÔTÉ APPLICATION
--- ------------------------------------------------------------
--- Ces politiques reposent sur `auth.uid()`. Le Dashboard envoyait
--- jusqu'ici la clé anon sur TOUS ses appels REST : `auth.uid()` valait
--- null et aucune politique d'identité n'aurait fonctionné (le Dashboard
--- se serait vidé). Corrigé dans dashboard.html : sbFetch() transmet
--- désormais le JWT de la session ouverte quand il y en a une.
--- Vérifier ce point AVANT d'appliquer ce fichier.
-
--- ------------------------------------------------------------
--- VÉRIFICATION MANUELLE RECOMMANDÉE APRÈS APPLICATION
--- ------------------------------------------------------------
--- 1. Bloquer un partenaire de test, puis, depuis SA session :
---      select * from convoyeurs;              -> 0 ligne
---      select * from convoyeur_decisions;     -> 0 ligne
---    y compris après déconnexion / reconnexion.
--- 2. Depuis cette même session, tenter :
---      update convoyeurs set bloque = false where auth_user_id = auth.uid();
---    -> doit échouer (insufficient_privilege), jamais réussir.
--- 3. Débloquer depuis un compte administrateur et vérifier que l'accès
---    prévu est rétabli, et lui seul.
+-- Doit renvoyer 0. Toute ligne restante est un partenaire qui SERA
+-- exclu par le durcissement : le traiter à la main avant d'appliquer
+-- 90_durcissement_rls_partenaires.sql.
+--
+--   select c.id, c.email, c.statut
+--     from public.convoyeurs c
+--    where c.auth_user_id is null
+--      and c.statut = 'actif';
+--
+-- Doublons d'e-mail non rattachables automatiquement :
+--
+--   select lower(c.email) as email, count(*) as fiches
+--     from public.convoyeurs c
+--    where c.auth_user_id is null
+--    group by 1 having count(*) > 1;
+--
+-- Administrateurs reconnus par est_admin() — doit renvoyer au moins 1,
+-- sans quoi le durcissement fermerait le Dashboard à tout le monde :
+--
+--   select count(*) from public.admins where actif is true
+--      and auth_user_id is not null;
