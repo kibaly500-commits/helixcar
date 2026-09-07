@@ -248,38 +248,104 @@ async function etatVideo(page) {
   L.check('I5 : message factuel, sans règle interne',
     /vidéo de présentation/i.test(v3.err) && !/une seule|plusieurs activit/i.test(v3.err), v3.err);
 
-  // ── J. Envoi : succès, erreur réseau, interruption ──
-  // Le formulaire est hors ligne dans ce bac à sable : on intercepte
-  // l'appel de stockage pour éprouver réellement les trois issues.
+  // ── J. Envoi sécurisé : autorisation serveur -> URL signée -> confirmation ──
+  // Le navigateur n'a AUCUN droit d'écriture sur le bucket : il demande
+  // une autorisation, puis dépose sur l'URL signée que le serveur lui a
+  // renvoyée. On intercepte les deux points d'appel pour éprouver
+  // réellement l'enchaînement et ses échecs.
   await activites(page, ['convoyage']);
   await deposer(page, V30);
   await attendreEtat(page, ['prete'], 25000);
 
-  await page.route('**/storage/v1/object/candidatures-videos/**', route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"ok"}' }));
-  let envoi = await page.evaluate(async () => {
-    const r = await uploadVideoCandidature();
-    return r;
-  });
-  L.check('J1 : envoi réussi -> chemin de stockage retourné',
-    envoi.ok === true && /^candidatures\//.test(envoi.chemin), JSON.stringify(envoi));
-  L.check('J2 : extension du chemin conforme au format', /\.webm$/.test(envoi.chemin), envoi.chemin);
-  L.check('J3 : le chemin ne contient AUCUNE URL publique',
-    !/http|public/.test(envoi.chemin), envoi.chemin);
-  await page.unroute('**/storage/v1/object/candidatures-videos/**');
+  const CHEMIN_SERVEUR = 'candidatures/11111111-1111-4111-8111-111111111111/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.webm';
+  let appels = [];
+  async function armerInterceptions(page, opts) {
+    appels = [];
+    await page.route('**/functions/v1/candidature-video', async route => {
+      const corps = JSON.parse(route.request().postData() || '{}');
+      appels.push({ type: 'fonction', action: corps.action, corps: corps });
+      if (corps.action === 'autoriser') {
+        if (opts.autoriserKo) {
+          return route.fulfill({ status: 403, contentType: 'application/json',
+            body: JSON.stringify({ ok: false, code: 'FORBIDDEN', message: "Autorisation d'envoi inconnue ou déjà utilisée." }) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ ok: true, chemin: CHEMIN_SERVEUR, token: 'jeton-upload-signe', validite_secondes: 120 }) });
+      }
+      if (opts.confirmerKo) {
+        return route.fulfill({ status: 409, contentType: 'application/json',
+          body: JSON.stringify({ ok: false, code: 'ENVOI_INCOMPLET', message: "La vidéo n'a pas été reçue entièrement." }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    });
+    await page.route('**/storage/v1/object/upload/sign/**', async route => {
+      appels.push({ type: 'depot', url: route.request().url(), methode: route.request().method() });
+      if (opts.depotCoupe) return route.abort('failed');
+      if (opts.depotRefuse) return route.fulfill({ status: 403, contentType: 'application/json', body: '{}' });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"ok"}' });
+    });
+  }
+  async function desarmer(page) {
+    await page.unroute('**/functions/v1/candidature-video');
+    await page.unroute('**/storage/v1/object/upload/sign/**');
+  }
+  async function lancerEnvoi(page) {
+    return page.evaluate(async () => {
+      _convJetonEnvoi = 'f'.repeat(64);   // jeton généré à la soumission
+      return await uploadVideoCandidature();
+    });
+  }
 
-  await page.route('**/storage/v1/object/candidatures-videos/**', route =>
-    route.fulfill({ status: 403, contentType: 'application/json', body: '{"message":"refuse"}' }));
-  envoi = await page.evaluate(async () => await uploadVideoCandidature());
-  L.check('J4 : refus serveur -> erreur explicite, aucun chemin',
-    !!envoi.erreur && !envoi.chemin && /403/.test(envoi.erreur), JSON.stringify(envoi));
-  await page.unroute('**/storage/v1/object/candidatures-videos/**');
+  await armerInterceptions(page, {});
+  let envoi = await lancerEnvoi(page);
+  L.check('J1 : envoi réussi de bout en bout', envoi.ok === true, JSON.stringify(envoi));
+  const autorisation = appels.find(a => a.action === 'autoriser');
+  L.check('J2 : une autorisation est demandée au serveur AVANT tout dépôt',
+    !!autorisation && appels.indexOf(autorisation) === 0, JSON.stringify(appels.map(a => a.action || a.type)));
+  L.check('J3 : le navigateur ne propose AUCUN chemin de stockage',
+    autorisation && !autorisation.corps.chemin && !autorisation.corps.path && !autorisation.corps.name,
+    JSON.stringify(autorisation && Object.keys(autorisation.corps)));
+  L.check('J4 : le navigateur transmet le jeton, le format, la taille et la durée',
+    autorisation && autorisation.corps.jeton && autorisation.corps.mime === 'video/webm'
+    && autorisation.corps.taille_octets > 0 && autorisation.corps.duree_secondes > 0,
+    JSON.stringify(autorisation && autorisation.corps));
+  const depot = appels.find(a => a.type === 'depot');
+  L.check('J5 : le dépôt se fait sur l\'URL SIGNÉE, jamais en écriture directe',
+    !!depot && /\/object\/upload\/sign\/candidatures-videos\//.test(depot.url), depot && depot.url);
+  L.check('J6 : le dépôt utilise EXACTEMENT le chemin renvoyé par le serveur',
+    !!depot && depot.url.includes(CHEMIN_SERVEUR), depot && depot.url);
+  L.check('J7 : le dépôt porte le jeton d\'envoi signé', !!depot && /token=jeton-upload-signe/.test(depot.url));
+  L.check('J8 : une confirmation serveur clôt l\'envoi',
+    appels.some(a => a.action === 'confirmer'), JSON.stringify(appels.map(a => a.action || a.type)));
+  L.check('J9 : aucune clé Supabase dans l\'URL de dépôt',
+    !!depot && !/apikey|eyJ/.test(depot.url), depot && depot.url);
+  await desarmer(page);
 
-  await page.route('**/storage/v1/object/candidatures-videos/**', route => route.abort('failed'));
-  envoi = await page.evaluate(async () => await uploadVideoCandidature());
-  L.check('J5 : interruption réseau -> message dédié, aucun chemin',
-    !!envoi.erreur && !envoi.chemin && /interrompue/i.test(envoi.erreur), JSON.stringify(envoi));
-  await page.unroute('**/storage/v1/object/candidatures-videos/**');
+  await armerInterceptions(page, { autoriserKo: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J10 : autorisation refusée -> message serveur remonté, aucun dépôt',
+    !!envoi.erreur && /déjà utilisée|inconnue/i.test(envoi.erreur)
+    && !appels.some(a => a.type === 'depot'), JSON.stringify(envoi));
+  await desarmer(page);
+
+  await armerInterceptions(page, { depotCoupe: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J11 : coupure réseau pendant le dépôt -> erreur, aucune confirmation',
+    !!envoi.erreur && /interrompue/i.test(envoi.erreur)
+    && !appels.some(a => a.action === 'confirmer'), JSON.stringify(envoi));
+  await desarmer(page);
+
+  await armerInterceptions(page, { depotRefuse: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J12 : dépôt refusé (autorisation expirée) -> message explicite',
+    !!envoi.erreur && /expirée/i.test(envoi.erreur), JSON.stringify(envoi));
+  await desarmer(page);
+
+  await armerInterceptions(page, { confirmerKo: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J13 : confirmation refusée -> envoi considéré comme échoué',
+    !!envoi.erreur && /reçue entièrement/i.test(envoi.erreur), JSON.stringify(envoi));
+  await desarmer(page);
 
   // ── K. Aucune URL publique nulle part ──
   const fs = require('fs');

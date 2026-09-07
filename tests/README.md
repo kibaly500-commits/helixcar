@@ -18,10 +18,17 @@ Le chemin de Chromium est défini dans `lib.js` (constante `EXE`) ; adaptez-le
 
 ```bash
 cd tests
-for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon; do
+for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin; do
   echo "== $f"; node $f.js || echo "ÉCHEC $f"
 done
+
+# Sécurité serveur (TypeScript, sans réseau)
+node --experimental-strip-types t_video_securite.mjs
 ```
+
+Voir aussi **`RECETTE-VIDEO.md`** : recette manuelle MP4/MOV sur
+navigateur réel, et vérifications de sécurité à passer après
+déploiement (refus réels de Supabase, non exécutables ici).
 
 Chaque fichier sort en code 0 si tout passe, 1 sinon.
 
@@ -38,6 +45,7 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_brouillon.js` | Effacer / OK des rubriques, brouillon écrit puis restauré après F5 |
 | `t_video.js` | Vidéo partenaire : exigence et durée selon les activités, formats, taille, durée réelle, remplacement, suppression, envoi et erreurs réseau |
 | `t_video_admin.js` | Dashboard : fiche unique, états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
+| `t_video_securite.mjs` | **Sécurité** : exécute le vrai code de la fonction serveur `candidature-video` contre un double Supabase (jeton, chemin imposé par le serveur, cloisonnement A/B, contrôles format/taille/durée, usage unique, orphelins) |
 
 Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
 150 s) encodés par ffmpeg ; `generer.sh` les régénère.

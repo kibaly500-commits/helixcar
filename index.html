@@ -13265,32 +13265,114 @@ function _convVideoMajBouton() {
   btn.style.cursor = bloque ? 'not-allowed' : '';
 }
 
-// Envoi vers le bucket PRIVE. Aucune URL publique n'est construite :
-// seul le chemin est conserve, et la lecture passera par une URL
-// signee temporaire generee cote Dashboard apres controle d'acces.
-function uploadVideoCandidature() {
+// ── ENVOI SECURISE DE LA VIDEO ──────────────────────
+// Le navigateur n'ecrit JAMAIS librement dans le bucket : il ne
+// possede aucun droit d'ecriture dessus. Il demande une autorisation
+// a la fonction serveur `candidature-video`, qui est seule a detenir
+// la cle service_role, qui GENERE elle-meme le chemin de destination,
+// et qui revalide format, taille et duree. Le navigateur ne recoit
+// qu'une URL d'envoi signee, temporaire et liee a ce seul chemin.
+var URL_FONCTION_VIDEO = SUPABASE_URL + '/functions/v1/candidature-video';
+
+// Jeton d'envoi a usage unique. Le SECRET reste dans ce navigateur ;
+// la base ne recoit que son empreinte SHA-256.
+var _convJetonEnvoi = null;
+
+function _convGenererJetonEnvoi() {
+  var t = new Uint8Array(32);
+  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(t);
+  else for (var i = 0; i < t.length; i++) t[i] = Math.floor(Math.random() * 256);
+  return Array.prototype.map.call(t, function (o) { return ('0' + o.toString(16)).slice(-2); }).join('');
+}
+
+function _convEmpreinteJeton(jeton) {
+  // Meme empreinte que celle recalculee par la fonction serveur.
+  if (!window.crypto || !window.crypto.subtle) {
+    return Promise.reject(new Error('CRYPTO_INDISPONIBLE'));
+  }
+  return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(jeton))
+    .then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (o) {
+        return ('0' + o.toString(16)).slice(-2);
+      }).join('');
+    });
+}
+
+function _convAppelerFonctionVideo(action, corps) {
+  return fetch(URL_FONCTION_VIDEO, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+    body: JSON.stringify(Object.assign({ action: action }, corps || {}))
+  }).then(function (r) {
+    return r.text().then(function (txt) {
+      var d = {};
+      try { d = JSON.parse(txt); } catch (e) {}
+      if (!r.ok || !d.ok) {
+        return { erreur: d.message || ('Envoi refusé (code ' + r.status + ').') };
+      }
+      return d;
+    });
+  }).catch(function () {
+    return { erreur: 'Connexion interrompue pendant l\'envoi de la vidéo.' };
+  });
+}
+
+// Depot sur l'URL SIGNEE fournie par le serveur. Aucun chemin n'est
+// choisi ici : on renvoie exactement celui que le serveur a genere.
+function _convEnvoyerVersUrlSignee(chemin, token) {
   return new Promise(function (resolve) {
-    if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
-    var chemin = 'candidatures/' + _convIdentifiantAleatoire() + _convExtensionVideo(_convVideo.mime);
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', SUPABASE_URL + '/storage/v1/object/candidatures-videos/' + chemin, true);
-    xhr.setRequestHeader('apikey', SUPABASE_KEY);
-    xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+    xhr.open('PUT', SUPABASE_URL + '/storage/v1/object/upload/sign/candidatures-videos/'
+      + chemin + '?token=' + encodeURIComponent(token), true);
     xhr.setRequestHeader('Content-Type', _convVideo.mime);
-    xhr.setRequestHeader('x-upsert', 'false');   // jamais d'ecrasement d'un objet existant
     xhr.timeout = 300000;
     xhr.upload.onprogress = function (e) {
       if (e.lengthComputable) convMajProgressionVideo(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = function () {
-      if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true, chemin: chemin });
-      else resolve({ erreur: 'Envoi refusé (code ' + xhr.status + ').' });
+      if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true });
+      else if (xhr.status === 400 || xhr.status === 401 || xhr.status === 403) {
+        resolve({ erreur: 'Autorisation d\'envoi expirée. Réessayez.' });
+      } else resolve({ erreur: 'Envoi refusé (code ' + xhr.status + ').' });
     };
     xhr.onerror = function () { resolve({ erreur: 'Connexion interrompue pendant l\'envoi de la vidéo.' }); };
     xhr.ontimeout = function () { resolve({ erreur: 'L\'envoi de la vidéo a expiré.' }); };
     xhr.onabort = function () { resolve({ erreur: 'Envoi de la vidéo interrompu.' }); };
     try { xhr.send(_convVideo.fichier); }
     catch (e) { resolve({ erreur: 'Envoi de la vidéo impossible.' }); }
+  });
+}
+
+// Enchainement complet : autorisation -> depot -> confirmation.
+// Retourne { ok } ou { erreur }. Le chemin de stockage n'est jamais
+// decide ni transmis par le navigateur.
+function uploadVideoCandidature() {
+  return new Promise(function (resolve) {
+    if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
+    if (!_convJetonEnvoi) { resolve({ erreur: 'Autorisation d\'envoi absente.' }); return; }
+
+    _convAppelerFonctionVideo('autoriser', {
+      jeton: _convJetonEnvoi,
+      mime: _convVideo.mime,
+      taille_octets: _convVideo.taille,
+      duree_secondes: _convVideo.duree
+    }).then(function (autorisation) {
+      if (autorisation.erreur) { resolve({ erreur: autorisation.erreur }); return; }
+      if (!autorisation.chemin || !autorisation.token) {
+        resolve({ erreur: 'Autorisation d\'envoi incomplète.' }); return;
+      }
+      _convEnvoyerVersUrlSignee(autorisation.chemin, autorisation.token).then(function (depot) {
+        if (depot.erreur) { resolve({ erreur: depot.erreur }); return; }
+        // La confirmation est indispensable : c'est elle qui vérifie
+        // côté serveur que le fichier est réellement arrivé, supprime
+        // une éventuelle vidéo remplacée et consomme le jeton.
+        _convAppelerFonctionVideo('confirmer', { jeton: _convJetonEnvoi }).then(function (fin) {
+          if (fin.erreur) { resolve({ erreur: fin.erreur }); return; }
+          _convJetonEnvoi = null;   // usage unique, cote navigateur aussi
+          resolve({ ok: true, chemin: autorisation.chemin });
+        });
+      });
+    });
   });
 }
 
@@ -15806,47 +15888,6 @@ async function submitConvoyeurForm() {
     return;
   }
 
-  // ── VIDÉO : envoi vers le bucket PRIVÉ ──
-  // Comme pour les documents, un échec d'envoi interrompt la
-  // soumission : aucune candidature n'est enregistrée avec une vidéo
-  // exigée mais absente. Seul le CHEMIN est conservé, jamais une URL.
-  var video_chemin = null, video_mime = null, video_taille = null, video_duree = null, video_envoyee_le = null;
-  if (_convVideoRequise() && _convVideo) {
-    _convVideoEtat = 'envoi';
-    _convVideoMsg = 'Envoi de la vidéo en cours…';
-    convMajProgressionVideo(0);
-    convMajAffichageVideo();
-
-    var rVideo = await uploadVideoCandidature();
-
-    if (!rVideo || rVideo.erreur) {
-      _convVideoEtat = 'erreur';
-      _convVideoMsg = (rVideo && rVideo.erreur) ? rVideo.erreur : "L'envoi de la vidéo a échoué.";
-      convMajAffichageVideo();
-      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-      _formStepState.convoyeur = 3;
-      _renderFormStep('convoyeur');
-      var zoneErr = document.getElementById('conv-zone-video');
-      if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
-      alert(
-        "L'envoi de votre vidéo a échoué.\n\n" +
-        "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion, puis réessayez."
-      );
-      return;
-    }
-
-    _convVideoChemin  = rVideo.chemin;
-    _convVideoEtat    = 'envoyee';
-    _convVideoMsg     = 'Vidéo envoyée.';
-    convMajProgressionVideo(100);
-    convMajAffichageVideo();
-
-    video_chemin     = rVideo.chemin;
-    video_mime       = _convVideo.mime;
-    video_taille     = _convVideo.taille;
-    video_duree      = (typeof _convVideo.duree === 'number') ? Math.round(_convVideo.duree * 100) / 100 : null;
-    video_envoyee_le = new Date().toISOString();
-  }
   // Point 4 (V58) — le RIB n'est plus demandé à la candidature (sera
   // redemandé plus tard, une fois le convoyeur accepté). La colonne
   // rib_iban est conservée côté DB pour cet usage futur — envoyée ici
@@ -15854,7 +15895,7 @@ async function submitConvoyeurForm() {
   // déjà null dès qu'aucun fichier n'était sélectionné).
   var rib_iban   = null;
 
-  supabaseInsert('convoyeurs', {
+  var payloadCandidature = {
     prenom: prenom,
     nom: nom,
     email: email,
@@ -15865,20 +15906,75 @@ async function submitConvoyeurForm() {
     permis_url: permis_url,
     rc_pro_url: rc_pro_url,
     rib_iban: rib_iban,
-    // Vidéo : uniquement le chemin de stockage et les métadonnées
-    // utiles. Jamais d'URL publique permanente.
-    video_chemin: video_chemin,
-    video_mime: video_mime,
-    video_taille_octets: video_taille,
-    video_duree_secondes: video_duree,
-    video_envoyee_le: video_envoyee_le,
     statut: 'en_attente'
-  }).then(function(r) {
-    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    if (!r || r.error) {
-      alert('Erreur lors de envoi. ' + (r && r.error ? JSON.stringify(r.error) : 'Reessayez.'));
+  };
+
+  // ── VIDÉO : ORDRE IMPOSÉ PAR LA SÉCURITÉ ──
+  // Le navigateur n'a AUCUN droit d'écriture sur le bucket. Il doit
+  // obtenir une autorisation d'envoi du serveur, et cette autorisation
+  // est liée à une candidature qui existe déjà. La candidature est donc
+  // créée d'abord, avec le statut 'video_attendue' : elle n'est
+  // considérée reçue qu'une fois la vidéo réellement confirmée côté
+  // serveur. Aucune métadonnée vidéo n'est écrite par le navigateur —
+  // c'est la fonction serveur qui les renseigne.
+  var videoAEnvoyer = _convVideoRequise() && _convVideo;
+  if (videoAEnvoyer) {
+    _convJetonEnvoi = _convGenererJetonEnvoi();
+    var empreinteJeton = null;
+    try { empreinteJeton = await _convEmpreinteJeton(_convJetonEnvoi); }
+    catch (e) { empreinteJeton = null; }
+    if (!empreinteJeton) {
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      alert("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n\n"
+        + "Votre candidature n'a pas été enregistrée. Essayez depuis un navigateur à jour.");
       return;
     }
+    payloadCandidature.statut = 'video_attendue';
+    payloadCandidature.video_upload_jeton_hash = empreinteJeton;
+  }
+
+  var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
+  if (!rInsert || rInsert.error) {
+    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+    alert('Erreur lors de envoi. ' + (rInsert && rInsert.error ? JSON.stringify(rInsert.error) : 'Reessayez.'));
+    return;
+  }
+
+  if (videoAEnvoyer) {
+    _convVideoEtat = 'envoi';
+    _convVideoMsg = 'Envoi de la vidéo en cours…';
+    convMajProgressionVideo(0);
+    convMajAffichageVideo();
+
+    var rVideo = await uploadVideoCandidature();
+
+    if (!rVideo || rVideo.erreur) {
+      // La candidature reste au statut 'video_attendue' : elle n'est
+      // pas présentée comme reçue et la vidéo peut être renvoyée.
+      _convVideoEtat = 'erreur';
+      _convVideoMsg = (rVideo && rVideo.erreur) ? rVideo.erreur : "L'envoi de la vidéo a échoué.";
+      convMajAffichageVideo();
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      _formStepState.convoyeur = 3;
+      _renderFormStep('convoyeur');
+      var zoneErr = document.getElementById('conv-zone-video');
+      if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+      alert(
+        "L'envoi de votre vidéo a échoué.\n\n" +
+        "Votre candidature n'est pas finalisée. Vérifiez votre connexion, puis réessayez."
+      );
+      return;
+    }
+
+    _convVideoChemin = rVideo.chemin;
+    _convVideoEtat   = 'envoyee';
+    _convVideoMsg    = 'Vidéo envoyée.';
+    convMajProgressionVideo(100);
+    convMajAffichageVideo();
+  }
+
+  (function (r) {
+    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
     showSuccess('convoyeur');
 
       // Envoi email candidature recue via EmailJS
@@ -15902,7 +15998,7 @@ async function submitConvoyeurForm() {
           });
         }
       } catch(e) { console.error('EmailJS exception:', e); }
-  });
+  })(rInsert);
 }
 
 function submitParrainage() {

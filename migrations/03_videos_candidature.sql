@@ -102,23 +102,71 @@ on conflict (id) do update
 -- Convention de nommage : 'candidatures/<uuid aléatoire>.<ext>'.
 -- Le nom ne porte aucune donnée personnelle et n'est pas devinable.
 
--- DÉPÔT — ouvert au formulaire public (anon) comme à une session
--- authentifiée, mais STRICTEMENT limité au préfixe 'candidatures/' de
--- ce bucket. C'est une boîte de dépôt : écriture seule.
--- Aucune politique de lecture, de liste, de modification ou de
--- suppression n'est accordée à `anon` — un dépôt anonyme ne permet donc
--- jamais de relire ni de toucher le fichier d'autrui.
+-- DÉPÔT — AUCUNE écriture anonyme.
+-- CORRECTION DE SÉCURITÉ : une version précédente de ce fichier
+-- autorisait `anon` à insérer librement sous le préfixe
+-- 'candidatures/'. Un bucket privé empêche la LECTURE publique, mais
+-- cette politique laissait n'importe qui déposer un objet, choisir son
+-- chemin, et donc écrire dans le dossier d'une autre candidature.
+-- Elle est SUPPRIMÉE et n'est remplacée par aucune politique anonyme.
+--
+-- Une candidature est déposée sans compte : le dépôt passe donc
+-- EXCLUSIVEMENT par la fonction serveur `candidature-video`
+-- (supabase/functions/candidature-video), qui détient la clé
+-- service_role — jamais le navigateur. Cette fonction :
+--   1. identifie la candidature (jeton à usage unique, ou session
+--      authentifiée du propriétaire) ;
+--   2. revérifie côté serveur le format, la taille et la durée ;
+--   3. GÉNÈRE elle-même le chemin 'candidatures/<id>/<uuid>.<ext>' —
+--      le navigateur ne le choisit jamais ;
+--   4. délivre une URL d'envoi signée, temporaire et liée à CE chemin.
+-- Le navigateur ne peut donc écrire que là où le serveur l'a autorisé.
 drop policy if exists "candidature video : depot par le proprietaire" on storage.objects;
 drop policy if exists "candidature video : depot de candidature" on storage.objects;
-create policy "candidature video : depot de candidature"
-  on storage.objects for insert to anon, authenticated
+
+-- Dépôt direct réservé au propriétaire AUTHENTIFIÉ d'une candidature
+-- (remplacement depuis son espace, une fois son compte créé) et aux
+-- administrateurs. Le chemin doit appartenir au dossier de SA
+-- candidature : impossible d'écrire dans celui d'un autre.
+drop policy if exists "candidature video : depot par le proprietaire authentifie" on storage.objects;
+create policy "candidature video : depot par le proprietaire authentifie"
+  on storage.objects for insert to authenticated
   with check (
     bucket_id = 'candidatures-videos'
-    and name like 'candidatures/%'
+    and (
+      public.est_admin()
+      or exists (
+        select 1 from public.convoyeurs c
+         where c.auth_user_id = auth.uid()
+           and storage.objects.name like 'candidatures/' || c.id::text || '/%'
+      )
+    )
   );
+
+-- RATTACHEMENT VÉRIFIABLE — un objet appartient à la candidature dont
+-- l'identifiant figure dans son chemin : 'candidatures/<id>/<fichier>'.
+-- Ce lien est utilisé à l'identique par les trois politiques
+-- ci-dessous. Il reste vrai pendant un remplacement (le nouvel objet
+-- existe avant que convoyeurs.video_chemin ne soit mis à jour), ce
+-- qu'un rattachement par `video_chemin = name` seul ne permettait pas.
+create or replace function public.candidature_du_chemin_video(p_nom text)
+returns uuid
+language sql
+immutable
+as $$
+  select nullif((string_to_array(p_nom, '/'))[2], '')::uuid
+   where p_nom like 'candidatures/%/%';
+$$;
+
+comment on function public.candidature_du_chemin_video(text) is
+  'Identifiant de candidature porté par le chemin d''un objet vidéo. '
+  'Sert de lien vérifiable objet <-> candidature dans les politiques.';
 
 -- LECTURE — administrateurs actifs, et le candidat propriétaire une
 -- fois son compte créé et rattaché. Jamais en anonyme.
+-- C'est cette politique qui conditionne aussi la CRÉATION D'UNE URL
+-- SIGNÉE de lecture : sans droit de select sur l'objet, la signature
+-- est refusée par le service Storage.
 drop policy if exists "candidature video : lecture proprietaire ou admin" on storage.objects;
 create policy "candidature video : lecture proprietaire ou admin"
   on storage.objects for select to authenticated
@@ -128,7 +176,7 @@ create policy "candidature video : lecture proprietaire ou admin"
       public.est_admin()
       or exists (
         select 1 from public.convoyeurs c
-         where c.video_chemin = storage.objects.name
+         where c.id = public.candidature_du_chemin_video(storage.objects.name)
            and c.auth_user_id = auth.uid()
       )
     )
@@ -144,7 +192,7 @@ create policy "candidature video : remplacement par le proprietaire"
       public.est_admin()
       or exists (
         select 1 from public.convoyeurs c
-         where c.video_chemin = storage.objects.name
+         where c.id = public.candidature_du_chemin_video(storage.objects.name)
            and c.auth_user_id = auth.uid()
       )
     )
@@ -162,16 +210,39 @@ create policy "candidature video : suppression par le proprietaire"
       public.est_admin()
       or exists (
         select 1 from public.convoyeurs c
-         where c.video_chemin = storage.objects.name
+         where c.id = public.candidature_du_chemin_video(storage.objects.name)
            and c.auth_user_id = auth.uid()
       )
     )
   );
 
--- Retrouver rapidement la candidature portant un objet donné (utilisé
--- par les politiques ci-dessus à chaque lecture).
+-- Retrouver rapidement la candidature portant un objet donné.
 create index if not exists convoyeurs_video_chemin_idx
   on public.convoyeurs (video_chemin);
+
+-- ------------------------------------------------------------
+-- 3 bis. AUTORISATION D'ENVOI TEMPORAIRE
+-- ------------------------------------------------------------
+-- Une candidature déposée sans compte doit tout de même prouver, au
+-- moment de l'envoi, qu'elle est bien celle qui vient d'être créée par
+-- CE navigateur. Un jeton à usage unique est généré par le navigateur,
+-- puis enregistré ici UNIQUEMENT SOUS SA FORME HACHÉE (SHA-256) —
+-- même convention que le token de devis déjà en place : la base ne
+-- contient jamais le secret en clair.
+alter table public.convoyeurs
+  add column if not exists video_upload_jeton_hash text;
+
+comment on column public.convoyeurs.video_upload_jeton_hash is
+  'SHA-256 du jeton d''envoi vidéo à usage unique. Effacé dès que la '
+  'vidéo est confirmée. Jamais le secret en clair, jamais une URL.';
+
+create index if not exists convoyeurs_video_upload_jeton_idx
+  on public.convoyeurs (video_upload_jeton_hash)
+  where video_upload_jeton_hash is not null;
+
+-- La fenêtre d'utilisation du jeton n'est PAS une colonne modifiable
+-- par le client : elle est dérivée de created_at et vérifiée par la
+-- fonction serveur. Un navigateur ne peut donc pas se l'allonger.
 
 -- ------------------------------------------------------------
 -- 4. RÉGLAGES MANUELS À FAIRE DANS SUPABASE (hors SQL)

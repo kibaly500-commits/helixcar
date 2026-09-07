@@ -37,6 +37,19 @@ utilisateur n'est **pas** livrée dans cette Pull Request (voir la section
 
 ## Réglages manuels Supabase (hors SQL)
 
+0. **Déployer la fonction `candidature-video`** — *indispensable au
+   dépôt des vidéos.* Le navigateur n'a **aucun droit d'écriture** sur le
+   bucket : sans cette fonction, une candidature Convoyage ou Renfort ne
+   peut pas envoyer sa vidéo.
+
+   ```bash
+   supabase functions deploy candidature-video
+   ```
+
+   Elle utilise `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`, déjà
+   présentes dans l'environnement des Edge Functions. **Cette clé ne doit
+   jamais être placée ailleurs que là.**
+
 1. **Storage → `candidatures-videos`** : vérifier que le bucket apparaît
    bien comme **Private**. C'est le point de sécurité central des vidéos.
 2. **Aucune clé `service_role` côté navigateur.** La lecture d'une vidéo
