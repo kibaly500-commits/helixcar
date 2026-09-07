@@ -6446,7 +6446,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
       <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
-        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez compléter une demande de convoyage à tout moment depuis votre espace client.</div>
+        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
         <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
         <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
       </div>
@@ -7600,17 +7600,13 @@ function nettOnEligibiliteChange(sansRendu) {
   if (corps) corps.style.display = ok ? 'block' : 'none';
   if (orga) orga.style.display = (ok && _avecNettoyage()) ? 'block' : 'none';
 
-  // V77 - plus aucun grand rectangle. Le bouton Continuer n'est grise
-  // QUE pour un particulier ; un professionnel garde un bouton normal et
-  // recoit une petite erreur sous les cases s'il clique sans avoir
-  // confirme (cf. _validateNettoyageEtape2).
-  var btn = document.getElementById('client-step-next-btn');
-  if (btn && _avecNettoyage()) {
-    var bloque = !_nettEstProfessionnel();
-    btn.disabled = bloque;
-    btn.style.opacity = bloque ? '.5' : '';
-    btn.style.cursor = bloque ? 'not-allowed' : '';
-  }
+  // CORRECTIF - le bouton Continuer refletait uniquement le statut
+  // professionnel (V77), jamais les 2 confirmations, le total, la
+  // repartition ou la prestation : un professionnel pouvait voir le
+  // bouton actif alors qu'une autre condition manquait encore, ou
+  // inversement rester sur un etat perime apres une correction. Source
+  // UNIQUE desormais : _nettPeutContinuerEtape2(), via _nettMajBoutonContinuer().
+  _nettMajBoutonContinuer();
   if (_avecNettoyage() && !ok) {
     _etapeMax = Math.min(_etapeMax, 2);
     if (_formStepState.client > 2) _formStepState.client = 2;
@@ -7730,6 +7726,7 @@ function nettRendreRepartition() {
     if (ip) ip.value = '';
     _clearFieldError('nett-autre-precision');
   }
+  _nettMajBoutonContinuer();
 }
 
 // REGLE ANTI-DEPASSEMENT : une categorie ne peut jamais faire depasser le
@@ -7798,6 +7795,11 @@ function nettMajRepartition() {
     if (ip) ip.value = '';
     _clearFieldError('nett-autre-precision');
   }
+  // CORRECTIF - chaque ajustement de quantite (boutons +/-) ou de total
+  // peut faire varier la condition "repartition === total" : le bouton
+  // Continuer doit refleter ce nouvel etat immediatement, sans attendre
+  // un clic ailleurs dans la page.
+  _nettMajBoutonContinuer();
 }
 
 // Changement du total : ne modifie JAMAIS silencieusement une quantite
@@ -7813,7 +7815,18 @@ function nettOnTotalChange() {
   _clearFieldError('nett-nb-approx');
 }
 
-function nettOnTypeChange() { _clearGroupError('nett-type-group'); }
+// CORRECTIF - cette lecture du type de nettoyage choisi (radio nett-type)
+// etait appelee par _validateNettoyageEtape2()/_construireDetailsNettoyage()
+// sans jamais avoir ete definie : une ReferenceError silencieuse au clic
+// sur "Continuer" interrompait toute la validation de l'etape 2, ce qui
+// empechait la progression meme lorsque toutes les conditions etaient
+// reellement remplies. Meme convention que _typeServiceChoisi().
+function _nettTypeNettoyage() {
+  var el = document.querySelector('input[name="nett-type"]:checked');
+  return el ? el.value : '';
+}
+
+function nettOnTypeChange() { _clearGroupError('nett-type-group'); _nettMajBoutonContinuer(); }
 
 // Bouton Effacer : agit UNIQUEMENT sur la section "Quel nettoyage
 // souhaitez-vous ?". Ne touche ni aux coordonnees, ni au service choisi,
@@ -7822,6 +7835,38 @@ function nettEffacerTypeNettoyage() {
   var radios = document.querySelectorAll('input[name="nett-type"]');
   Array.prototype.forEach.call(radios, function (r) { r.checked = false; });
   _clearGroupError('nett-type-group');
+  _nettMajBoutonContinuer();
+}
+
+// CORRECTIF - source UNIQUE de verite pour activer "Continuer" a l'etape 2
+// du nettoyage : professionnel confirme, les 2 conditions d'intervention
+// cochees, un total de vehicules valide, une repartition par categorie qui
+// correspond EXACTEMENT a ce total, et une prestation selectionnee.
+// Reutilisee a la fois pour l'etat temps reel du bouton et par
+// _validateNettoyageEtape2() (garde-fou au clic), sans dupliquer la regle.
+function _nettPeutContinuerEtape2() {
+  if (!_nettEligibiliteOk()) return false;
+  var total = _nettTotalApprox();
+  if (total < 1) return false;
+  if (_nettTotalReparti() !== total) return false;
+  if (!_nettTypeNettoyage()) return false;
+  return true;
+}
+
+// CORRECTIF - recalcule l'etat (actif/grise) du bouton "Continuer" a
+// CHAQUE evenement pouvant faire varier une des 5 conditions ci-dessus
+// (statut professionnel, les 2 confirmations, le total, la repartition,
+// la prestation), et non plus seulement au moment du choix du service.
+// Ne touche au bouton que si le nettoyage est le service actif : les
+// parcours Convoyage/Stockage/Compte gardent leur propre logique,
+// inchangee.
+function _nettMajBoutonContinuer() {
+  var btn = document.getElementById('client-step-next-btn');
+  if (!btn || !_avecNettoyage()) return;
+  var bloque = !_nettPeutContinuerEtape2();
+  btn.disabled = bloque;
+  btn.style.opacity = bloque ? '.5' : '';
+  btn.style.cursor = bloque ? 'not-allowed' : '';
 }
 
 function nettOnLieuChange() {
@@ -8127,12 +8172,18 @@ function onChoixService() {
   // sans deuxieme variable de navigation.
   var btnNext = document.getElementById('client-step-next-btn');
   var msgSocle = document.getElementById('client-socle-msg');
-  var bloque = pro || (nett && !_nettEstProfessionnel());
+  // CORRECTIF - le nettoyage a maintenant sa propre source de verite
+  // (_nettMajBoutonContinuer(), qui verifie professionnel + 2 confirmations
+  // + total + repartition + prestation) : ce bloc ne gere plus que le
+  // socle "Trouver un professionnel automobile", toujours bloque tant
+  // qu'il n'est pas construit.
+  var bloque = pro;
   if (btnNext) {
     btnNext.disabled = bloque;
     btnNext.style.opacity = bloque ? '.5' : '';
     btnNext.style.cursor = bloque ? 'not-allowed' : '';
   }
+  if (nett) _nettMajBoutonContinuer();
   if (msgSocle) msgSocle.style.display = pro ? 'block' : 'none';
 
   // Lot 2 (V73) — CORRECTION : contournement par l'étapeur. Si le client
