@@ -62,7 +62,7 @@ insert into public.missions (id, convoyeur_id, reference, statut) values
   ('bbbbbbbb-0000-0000-0000-000000000002', null,'TEST-QA-M2','en_attente');" >/dev/null
 
 echo "── A. PHASE PRÉPARATOIRE : compatible avec l'ANCIEN dashboard ──"
-for f in 00_helpers 04_decisions_activites 05_blocage_partenaire; do
+for f in 00_helpers 04_decisions_activites 05_blocage_partenaire 06_informations_manquantes; do
   err=$(appliquer "migrations/$f.sql")
   check "A0 : migrations/$f.sql s'applique sans erreur" "" "$err"
 done
@@ -82,10 +82,28 @@ check "A6 : diagnostic — aucun partenaire actif sans compte lié" "0" \
 check "A7 : les tables de décisions sont fermées dès leur création" "0" \
   "$(sql "begin; select public.devenir_anon(); select count(*) from public.convoyeur_decisions; commit;" | tail -1)"
 
+# Demandes client : la colonne clients.auth_user_id est créée par la
+# migration 06, ce seed ne peut donc pas précéder la phase A.
+sql "insert into auth.users (id, email) values
+  ('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'),
+  ('66666666-6666-6666-6666-666666666666','clientB@helixcar.test');
+insert into public.clients (id, auth_user_id, numero_client, email, prenom, nom, telephone,
+                            type_service, statut, immatriculation, marque_modele,
+                            date_prise_en_charge, adresse_arrivee_rue, prix_interne) values
+  ('cccccccc-0000-0000-0000-00000000000A','55555555-5555-5555-5555-555555555555','TEST-QA-A1',
+   'clientA@helixcar.test','TEST-QA','ClientA','+33600000010','convoyage','nouveau',
+   'AA-123-AA','Peugeot 208','2026-10-01','12 rue de la Paix', 990.00),
+  ('cccccccc-0000-0000-0000-00000000000B','66666666-6666-6666-6666-666666666666','TEST-QA-B1',
+   'clientB@helixcar.test','TEST-QA','ClientB','+33600000011','nettoyage','nouveau',
+   null,null,null,null, 120.00);" >/dev/null
+
+
 echo
 echo "── B. DURCISSEMENT (après déploiement de la nouvelle interface) ──"
 err=$(appliquer migrations/90_durcissement_rls_partenaires.sql)
 check "B0 : migrations/90 s'applique sans erreur" "" "$err"
+err91=$(appliquer migrations/91_durcissement_rls_clients.sql)
+check "B0b : migrations/91 s'applique sans erreur" "" "$err91"
 check "B1 : la clé anon ne lit plus aucune candidature" "0" \
   "$(sql "begin; select public.devenir_anon(); select count(*) from public.convoyeurs; commit;" | tail -1)"
 check "B2 : la clé anon ne lit plus aucune mission" "0" \
@@ -168,6 +186,73 @@ check "E4 : une activité en attente le reste (aucune acceptation automatique)" 
   "$(sql "select decision from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and activite='nettoyage';")"
 check "E5 : aucune mission attribuée automatiquement" "0" \
   "$(sql "select count(*) from public.missions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and statut='proposee';")"
+
+echo
+echo "── G. ESPACE CLIENT : cloisonnement et informations ──"
+check "G1 : le client A ne lit AUCUNE ligne de public.clients (colonnes internes)" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select count(*) from public.clients; commit;" | tail -1)"
+check "G2 : le client A voit SA demande via la vue" "TEST-QA-A1" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select numero_client from public.v_mes_demandes; commit;" | tail -1)"
+check "G3 : le client A ne voit PAS la demande du client B" "1" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select count(*) from public.v_mes_demandes; commit;" | tail -1)"
+check "G4 : la vue n'expose AUCUNE colonne interne" "0" \
+  "$(sql "select count(*) from information_schema.columns where table_name='v_mes_demandes' and column_name in ('prix_interne','auth_user_id');")"
+check "G5 : informations requises calculées pour un convoyage" "6" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select count(*) from public.informations_demande('cccccccc-0000-0000-0000-00000000000A'); commit;" | tail -1)"
+check "G6 : une donnée déjà enregistrée n'est JAMAIS redemandée" "fournie" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select statut from public.informations_demande('cccccccc-0000-0000-0000-00000000000A') where cle='immatriculation'; commit;" | tail -1)"
+check "G7 : une donnée absente est marquée manquante" "attendue" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select statut from public.informations_demande('cccccccc-0000-0000-0000-00000000000A') where cle='contact_pc_nom'; commit;" | tail -1)"
+check "G8 : les rubriques diffèrent selon le service" "3" \
+  "$(sql "begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test'); select count(*) from public.informations_demande('cccccccc-0000-0000-0000-00000000000B'); commit;" | tail -1)"
+
+check "G9 : le client ne peut PAS modifier sa demande (prix, statut, devis)" "UPDATE 0" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); update public.clients set statut='validee', prix_interne=1 where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE|^ERROR' | head -1)"
+check "G10 : et sa demande reste intacte" "nouveau|990.00" \
+  "$(sql "select statut||'|'||prix_interne from public.clients where id='cccccccc-0000-0000-0000-00000000000A';")"
+check "G11 : le client ne peut PAS supprimer sa demande" "DELETE 0" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); delete from public.clients where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^DELETE|^ERROR' | head -1)"
+check "G12 : un dépôt anonyme ne permet PAS de relire la demande" "refuse" \
+  "$(sql "begin; select public.devenir_anon(); insert into public.clients (numero_client,email,type_service,statut) values ('TEST-QA-REPR','r@helixcar.test','convoyage','nouveau') returning id; commit;" | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
+
+echo
+echo "── H. RÉPONSE DU CLIENT ET VALIDATION ADMINISTRATEUR ──"
+check "H1 : le client A répond à ses rubriques manquantes" "2" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select public.repondre_informations_demande('cccccccc-0000-0000-0000-00000000000A', '{\"contact_pc_nom\":\"TEST-QA Dupont\",\"contact_pc_tel\":\"+33600000012\"}'::jsonb); commit;" | tail -1)"
+check "H2 : la réponse passe en transmise" "transmise" \
+  "$(sql "select statut from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom';")"
+check "H3 : le client NE PEUT PAS répondre pour la demande d'un autre" "insufficient" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select public.repondre_informations_demande('cccccccc-0000-0000-0000-00000000000B', '{\"contact_pc_nom\":\"PIRATE\"}'::jsonb); commit;" | grep -qiE 'non autorisée|insufficient' && echo insufficient || echo passe)"
+check "H4 : le client NE PEUT PAS valider lui-même" "reserve-admin" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); update public.demande_informations_manquantes set statut='validee' where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom'; commit;" | grep -qE 'réservée à un administrateur|row-level security' && echo reserve-admin || echo passe)"
+check "H4b : et sa rubrique reste NON validée" "transmise" \
+  "$(sql "select statut from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom';")"
+check "H5 : une rubrique NON REQUISE est ignorée" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select public.repondre_informations_demande('cccccccc-0000-0000-0000-00000000000A', '{\"prix_interne\":\"1\"}'::jsonb); commit;" | tail -1)"
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.demande_informations_manquantes set statut='validee'
+  where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom'; commit;" >/dev/null
+check "H6 : l'administrateur valide" "validee" \
+  "$(sql "select statut from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom';")"
+check "H7 : qui et quand sont tracés" "1" \
+  "$(sql "select count(*) from public.demande_informations_manquantes where cle='contact_pc_nom' and validee_le is not null and validee_par='11111111-1111-1111-1111-111111111111';")"
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.demande_informations_manquantes set statut='a_corriger', commentaire='Numéro incomplet'
+  where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_tel'; commit;" >/dev/null
+check "H8 : demande de correction avec motif" "Numéro incomplet" \
+  "$(sql "select commentaire from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_tel';")"
+check "H9 : nouvelle transmission après correction" "1" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select public.repondre_informations_demande('cccccccc-0000-0000-0000-00000000000A', '{\"contact_pc_tel\":\"+33600000099\"}'::jsonb); commit;" | tail -1)"
+check "H10 : l'information déjà VALIDÉE est conservée intacte" "validee" \
+  "$(sql "select statut from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle='contact_pc_nom';")"
+check "H11 : le motif de correction est effacé par la nouvelle réponse" "0" \
+  "$(sql "select count(*) from public.demande_informations_manquantes where cle='contact_pc_tel' and commentaire is not null;")"
+sql "update public.clients set type_service='stockage' where id='cccccccc-0000-0000-0000-00000000000A';" >/dev/null
+check "H12 : changer de service RECALCULE les rubriques" "3" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select count(*) from public.informations_demande('cccccccc-0000-0000-0000-00000000000A'); commit;" | tail -1)"
+sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); select public.repondre_informations_demande('cccccccc-0000-0000-0000-00000000000A', '{\"stockage_ville\":\"Lyon\"}'::jsonb); commit;" >/dev/null
+check "H13 : les valeurs conditionnelles obsolètes sont SUPPRIMÉES" "0" \
+  "$(sql "select count(*) from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle in ('contact_pc_nom','contact_pc_tel');")"
 
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"

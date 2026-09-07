@@ -6212,6 +6212,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
+      <div id="hc-bandeau-connecte"
+           style="display:none;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#065F46"></div>
+
       <div class="modal-form-group">
 
         <label>Téléphone <span class="field-required">*</span></label>
@@ -7365,6 +7368,38 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 <!-- V61 — MODALE CONNEXION (vitrine uniquement, aucune authentification réelle) -->
 
+<!-- ============================================================
+     COMPLÉTER MES INFORMATIONS
+     ============================================================
+     Ouvert depuis l'espace client (dashboard.html) par
+     index.html?completer=<id>. Volontairement hébergé ICI, avec le
+     formulaire : les rubriques réutilisent les mêmes classes et les
+     mêmes composants, donc le même design, sans en dupliquer aucun.
+     Seules les rubriques encore manquantes ou à corriger sont
+     affichées ; les informations déjà validées ne sont jamais
+     redemandées. -->
+<div class="modal-overlay" id="modal-completer">
+  <div class="modal" style="position:relative;max-width:560px">
+    <button type="button" class="modal-close" onclick="closeModal('completer')" aria-label="Fermer">&times;</button>
+    <h2>Compléter mes informations</h2>
+    <p id="completer-sous-titre">Ces éléments nous manquent pour organiser votre prestation.</p>
+
+    <div id="completer-message"
+         style="display:none;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem"></div>
+
+    <div id="completer-progression"
+         style="display:none;font-size:.8rem;color:#4B5563;margin-bottom:14px"></div>
+
+    <form id="modal-completer-form" onsubmit="event.preventDefault();return false">
+      <div id="completer-rubriques"></div>
+    </form>
+
+    <button type="button" id="completer-envoyer" class="btn btn-primary"
+            style="width:100%;justify-content:center;font-size:.92rem"
+            onclick="envoyerInformationsCompletees()">Enregistrer mes informations</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-connexion">
 
   <div class="modal">
@@ -8247,6 +8282,378 @@ function nettOnDispoChange() {
 // exactement celui que l'etape 1 est en train de creer, donc la meme
 // source de verite — jamais une copie parallele.
 var _hcProfilConnecte = null;
+
+// ============================================================
+// SESSION CLIENT — un seul moteur de formulaire, deux entrées
+// ============================================================
+// L'espace client (dashboard.html) n'embarque AUCUNE copie du
+// formulaire : « Faire une nouvelle demande » ouvre cette page-ci en
+// mode connecté. C'est la seule façon de garantir que les questions,
+// les règles conditionnelles, les compteurs, les accordéons, les
+// calendriers, les validations, le récapitulatif et le payload sont
+// EXACTEMENT les mêmes — puisque c'est le même code.
+//
+// Les deux pages partagent la même origine, donc la même session
+// Supabase (stockée par supabase-js) : il n'y a rien à transmettre
+// dans l'URL, et surtout aucune identité à faire confiance côté client.
+
+var _hcSessionClient = null;     // { userId, email } ou null
+
+function _hcNouvelIdentifiant() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+  } catch (e) {}
+  // Repli conforme UUID v4 pour les navigateurs sans randomUUID.
+  var oct = new Uint8Array(16);
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(oct);
+  } else {
+    for (var i = 0; i < 16; i++) oct[i] = Math.floor(Math.random() * 256);
+  }
+  oct[6] = (oct[6] & 0x0f) | 0x40;
+  oct[8] = (oct[8] & 0x3f) | 0x80;
+  var h = [];
+  for (var j = 0; j < 16; j++) h.push((oct[j] + 0x100).toString(16).slice(1));
+  return h.slice(0, 4).join('') + '-' + h.slice(4, 6).join('') + '-'
+       + h.slice(6, 8).join('') + '-' + h.slice(8, 10).join('') + '-'
+       + h.slice(10, 16).join('');
+}
+
+function _hcIdCompteConnecte() {
+  return (_hcSessionClient && _hcSessionClient.userId) || null;
+}
+
+// Lit la session réellement ouverte. Aucune donnée de profil n'est
+// jamais prise dans l'URL ou le localStorage applicatif : elles
+// viennent de la base, pour le compte que Supabase a authentifié.
+async function _hcChargerSessionClient() {
+  _hcSessionClient = null;
+  _hcProfilConnecte = null;
+  if (!_sb || !_sb.auth) return null;
+  var session = null;
+  try {
+    var res = await _sb.auth.getSession();
+    session = res && res.data && res.data.session;
+  } catch (e) { return null; }
+  if (!session || !session.user) return null;
+
+  _hcSessionClient = { userId: session.user.id, email: session.user.email || '' };
+
+  // Profil prérempli depuis la DERNIÈRE demande du compte. On lit la
+  // vue v_mes_demandes, jamais la table : elle ne projette que les
+  // colonnes destinées au client, sans aucune donnée interne.
+  try {
+    var r = await _sb.from('v_mes_demandes')
+      .select('prenom, nom, email, telephone, type_client, societe, siret, '
+            + 'source_acquisition, source_acquisition_detail')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    var ligne = r && r.data && r.data[0];
+    if (ligne) {
+      _hcProfilConnecte = {
+        prenom: ligne.prenom || '',
+        nom: ligne.nom || '',
+        email: ligne.email || _hcSessionClient.email,
+        telephone: ligne.telephone || '',
+        type_client: ligne.type_client || '',
+        societe: ligne.societe || '',
+        siret: ligne.siret || '',
+        source_acquisition: ligne.source_acquisition || '',
+        source_acquisition_detail: ligne.source_acquisition_detail || ''
+      };
+    } else {
+      _hcProfilConnecte = { prenom: '', nom: '', email: _hcSessionClient.email, telephone: '' };
+    }
+  } catch (e) {
+    _hcProfilConnecte = { prenom: '', nom: '', email: _hcSessionClient.email, telephone: '' };
+  }
+  return _hcSessionClient;
+}
+
+// Reporte le profil connecté dans les champs du formulaire et masque
+// ce qu'il ne faut plus redemander : création de compte, mot de passe,
+// et adresse e-mail déjà vérifiée.
+function _hcAppliquerModeConnecte() {
+  if (!_hcSessionClient) return;
+  var mettre = function (id, valeur) {
+    var el = document.getElementById(id);
+    if (el && valeur) el.value = valeur;
+  };
+  var pr = _hcProfilConnecte || {};
+  mettre('client-prenom', pr.prenom);
+  mettre('client-nom', pr.nom);
+  mettre('client-email', pr.email || _hcSessionClient.email);
+  mettre('client-tel', pr.telephone);
+
+  // Statut du demandeur (particulier / professionnel) et, le cas
+  // échéant, société et SIRET. Ce n'est PAS cosmétique : l'éligibilité
+  // du nettoyage professionnel en dépend directement. On déclenche le
+  // change pour que toute la logique conditionnelle existante
+  // (toggleClientType, nettSyncStatutPro…) s'exécute réellement.
+  if (pr.type_client) {
+    var selType = document.getElementById('client-type');
+    if (selType) {
+      selType.value = pr.type_client;
+      selType.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    mettre('client-societe', pr.societe);
+    mettre('client-siret', pr.siret);
+  }
+
+  // « Comment avez-vous connu HelixCar ? » concerne le COMPTE, pas
+  // chaque demande : on reprend la réponse déjà donnée.
+  if (pr.source_acquisition) {
+    var selSrc = document.getElementById('client-source');
+    if (selSrc) {
+      selSrc.value = pr.source_acquisition;
+      selSrc.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    mettre('client-source-detail', pr.source_acquisition_detail);
+  }
+
+  // Le mot de passe n'a plus lieu d'être : le compte existe déjà et la
+  // session est ouverte. On retire l'obligation pour que la validation
+  // existante ne bloque pas sur un champ devenu sans objet.
+  var mdp = document.getElementById('client-password');
+  if (mdp) {
+    mdp.required = false;
+    mdp.value = '';
+    var groupeMdp = mdp.closest ? mdp.closest('.modal-form-group') : null;
+    if (groupeMdp) groupeMdp.style.display = 'none';
+  }
+  var courriel = document.getElementById('client-email');
+  if (courriel) {
+    courriel.readOnly = true;
+    courriel.setAttribute('aria-readonly', 'true');
+    courriel.style.background = '#F3F4F6';
+  }
+  var banniere = document.getElementById('hc-bandeau-connecte');
+  if (banniere) {
+    banniere.style.display = 'block';
+    banniere.textContent = 'Vous êtes connecté'
+      + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
+      + '. Vos informations de compte sont déjà renseignées.';
+  }
+}
+
+// Entrée « Faire une nouvelle demande » depuis l'espace client :
+// index.html?nouvelle-demande=1 . On ouvre le parcours à la question
+// « Comment pouvons-nous vous accompagner ? ».
+async function _hcDemarrerDepuisEspaceClient() {
+  var params = new URLSearchParams(window.location.search || '');
+  if (params.get('nouvelle-demande') !== '1') return false;
+  await _hcChargerSessionClient();
+  if (!_hcSessionClient) {
+    // Pas de session : on ne prétend pas être connecté. Le parcours
+    // public normal reste accessible.
+    return false;
+  }
+  if (typeof openModal === 'function') openModal('client');
+  _hcAppliquerModeConnecte();
+  // L'étape 1 est l'identité et la création de compte : elle n'a plus
+  // lieu d'être pour un client déjà connecté. On ouvre le parcours sur
+  // « Comment pouvons-nous vous accompagner ? », qui est l'étape 2.
+  //
+  // SAUF si le statut du demandeur est inconnu : il conditionne de
+  // vraies règles métier (éligibilité du nettoyage professionnel). On
+  // ne l'invente pas — le client le renseigne une fois, à l'étape 1.
+  // Ce cas ne se produit que pour un compte sans aucune demande passée.
+  if (!(_hcProfilConnecte && _hcProfilConnecte.type_client)) {
+    if (typeof _renderFormStep === 'function') _renderFormStep('client');
+    return true;
+  }
+  _formStepState.client = 2;
+  if (typeof _etapeMax !== 'undefined') _etapeMax = Math.max(_etapeMax || 1, 2);
+  if (typeof _renderFormStep === 'function') _renderFormStep('client');
+  return true;
+}
+
+// ============================================================
+// COMPLÉTER MES INFORMATIONS
+// ============================================================
+// Le calcul de CE QUI MANQUE est fait par le serveur
+// (informations_demande) à partir des données réellement enregistrées :
+// le navigateur ne décide jamais de ce qui est requis, et ne peut donc
+// pas s'en dispenser. L'enregistrement passe par
+// repondre_informations_demande, qui revérifie la propriété de la
+// demande côté serveur.
+
+var _completerDemandeId = null;
+var _completerRubriques = [];
+var _completerEnvoiEnCours = false;
+
+function _completerAfficherMessage(texte, type) {
+  var el = document.getElementById('completer-message');
+  if (!el) return;
+  if (!texte) { el.style.display = 'none'; return; }
+  var vert = (type === 'ok');
+  el.style.display = 'block';
+  el.style.background = vert ? '#ECFDF5' : '#FEF2F2';
+  el.style.border = '1.5px solid ' + (vert ? '#6EE7B7' : '#FCA5A5');
+  el.style.color = vert ? '#065F46' : '#991B1B';
+  el.textContent = texte;
+}
+
+function _completerChampId(cle) { return 'completer-champ-' + cle; }
+
+// Rend UNIQUEMENT les rubriques encore manquantes ou à corriger, avec
+// les mêmes composants que le formulaire (.modal-form-group, label,
+// champ). Une rubrique validée n'apparaît jamais.
+function _completerRendre(lignes) {
+  var zone = document.getElementById('completer-rubriques');
+  var prog = document.getElementById('completer-progression');
+  if (!zone) return;
+  zone.innerHTML = '';
+
+  var total = lignes.length;
+  var fournies = lignes.filter(function (l) {
+    return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
+  }).length;
+  if (prog) {
+    prog.style.display = 'block';
+    prog.textContent = fournies + ' information' + (fournies > 1 ? 's' : '')
+      + ' sur ' + total + ' déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.';
+  }
+
+  var aCompleter = lignes.filter(function (l) {
+    return l.statut === 'attendue' || l.statut === 'a_corriger';
+  });
+  _completerRubriques = aCompleter;
+
+  if (!aCompleter.length) {
+    zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563">'
+      + 'Aucune information ne manque pour cette demande. Merci !</p>';
+    var b = document.getElementById('completer-envoyer');
+    if (b) b.style.display = 'none';
+    return;
+  }
+  var bouton = document.getElementById('completer-envoyer');
+  if (bouton) bouton.style.display = '';
+
+  aCompleter.forEach(function (l) {
+    var groupe = document.createElement('div');
+    groupe.className = 'modal-form-group';
+
+    var label = document.createElement('label');
+    label.textContent = l.libelle;
+    var etoile = document.createElement('span');
+    etoile.className = 'field-required';
+    etoile.textContent = '*';
+    label.appendChild(document.createTextNode(' '));
+    label.appendChild(etoile);
+    groupe.appendChild(label);
+
+    // Motif de correction : ce que l'administrateur demande de
+    // corriger. Aucun commentaire interne n'existe dans ce modèle, il
+    // ne peut donc pas en fuir.
+    if (l.statut === 'a_corriger' && l.commentaire) {
+      var motif = document.createElement('div');
+      motif.style.cssText = 'background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:2px;'
+        + 'padding:8px 10px;margin-bottom:8px;font-size:.78rem;color:#92400E';
+      motif.textContent = 'À corriger : ' + l.commentaire;
+      groupe.appendChild(motif);
+    }
+
+    var champ = document.createElement('input');
+    champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
+               : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
+    champ.id = _completerChampId(l.cle);
+    champ.value = l.valeur || '';
+    groupe.appendChild(champ);
+
+    zone.appendChild(groupe);
+  });
+}
+
+async function ouvrirCompleterInformations(demandeId) {
+  _completerDemandeId = demandeId;
+  _completerAfficherMessage('');
+  if (typeof openModal === 'function') openModal('completer');
+  var zone = document.getElementById('completer-rubriques');
+  if (zone) zone.innerHTML = '<p style="font-size:.85rem;color:#6B7280">Chargement…</p>';
+
+  await _hcChargerSessionClient();
+  if (!_hcSessionClient) {
+    _completerAfficherMessage('Votre session a expiré. Reconnectez-vous pour compléter vos informations.');
+    if (zone) zone.innerHTML = '';
+    return;
+  }
+  try {
+    var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
+    if (r && r.error) throw new Error(r.error.message);
+    _completerRendre((r && r.data) || []);
+  } catch (e) {
+    if (zone) zone.innerHTML = '';
+    _completerAfficherMessage('Impossible de charger vos informations pour le moment. Réessayez.');
+  }
+}
+
+async function envoyerInformationsCompletees() {
+  // Double clic : le second appel est ignoré tant que le premier n'a
+  // pas répondu. Rien n'est envoyé deux fois.
+  if (_completerEnvoiEnCours) return;
+  if (!_completerDemandeId) return;
+
+  var reponses = {};
+  var manquant = null;
+  _completerRubriques.forEach(function (l) {
+    var el = document.getElementById(_completerChampId(l.cle));
+    var v = el ? String(el.value || '').trim() : '';
+    if (!v) { if (!manquant) manquant = l.libelle; return; }
+    reponses[l.cle] = v;
+  });
+  if (manquant) {
+    _completerAfficherMessage('Renseignez « ' + manquant +' » avant d\'enregistrer.');
+    return;
+  }
+
+  _completerEnvoiEnCours = true;
+  var bouton = document.getElementById('completer-envoyer');
+  var libelleBouton = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
+  _completerAfficherMessage('');
+
+  try {
+    var r = await _sb.rpc('repondre_informations_demande', {
+      p_client_id: _completerDemandeId,
+      p_reponses: reponses
+    });
+    if (r && r.error) throw new Error(r.error.message);
+    _completerAfficherMessage('Vos informations ont bien été enregistrées.', 'ok');
+    // On relit l'état RÉEL depuis le serveur : après un F5 ou une
+    // reprise, l'écran montre toujours ce que la base contient.
+    var relu = await _sb.rpc('informations_demande', { p_client_id: _completerDemandeId });
+    if (relu && !relu.error) _completerRendre(relu.data || []);
+  } catch (e) {
+    // Coupure réseau ou refus : rien n'est perdu, les valeurs saisies
+    // restent à l'écran et l'envoi peut être relancé.
+    _completerAfficherMessage('L\'enregistrement n\'a pas abouti. Vos saisies sont conservées : réessayez.');
+  } finally {
+    _completerEnvoiEnCours = false;
+    if (bouton) { bouton.disabled = false; bouton.textContent = libelleBouton || 'Enregistrer mes informations'; }
+  }
+}
+
+// Entrée depuis l'espace client : index.html?completer=<id>
+async function _hcOuvrirCompletionDepuisUrl() {
+  var params = new URLSearchParams(window.location.search || '');
+  var id = params.get('completer');
+  if (!id) return false;
+  await ouvrirCompleterInformations(id);
+  return true;
+}
+
+// Branchement au chargement de la page. Volontairement non bloquant :
+// un échec ne doit jamais empêcher le site public de fonctionner.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    _hcDemarrerDepuisEspaceClient().catch(function () {});
+    _hcOuvrirCompletionDepuisUrl().catch(function () {});
+  } catch (e) {}
+});
+
 
 function _hcCompteIdentite() {
   if (_hcProfilConnecte && typeof _hcProfilConnecte === 'object') {
@@ -12079,8 +12486,20 @@ function _validateClientStep(n) {
     mark(_checkRequiredText('client-nom', null, true), 'client-nom');
     mark(_checkEmail('client-email', true), 'client-email');
     mark(_checkPhone('client-tel', true), 'client-tel');
-    mark(_checkPassword('client-password', true), 'client-password');
-    mark(_checkSelect('client-source', true), 'client-source');
+    // Le mot de passe sert UNIQUEMENT à créer le compte HelixCar. Pour
+    // un client déjà connecté, il n'y a pas de compte à créer : la règle
+    // n'a plus d'objet et n'est donc pas évaluée. Elle reste appliquée
+    // à l'identique pour tout dépôt public.
+    if (!_hcIdCompteConnecte()) {
+      mark(_checkPassword('client-password', true), 'client-password');
+    }
+    // Même raisonnement que le mot de passe : la question d'acquisition
+    // porte sur le compte et a déjà été posée. Elle est reprise du
+    // profil quand elle est connue, et n'est pas re-exigée d'un client
+    // connecté. Règle inchangée pour tout dépôt public.
+    if (!_hcIdCompteConnecte()) {
+      mark(_checkSelect('client-source', true), 'client-source');
+    }
     var srcEl = document.getElementById('client-source');
     if (srcEl && srcEl.value === 'autre') {
       mark(_checkRequiredText('client-source-detail', null, true), 'client-source-detail');
@@ -13844,15 +14263,35 @@ function generateParrainageCode(clientNum) {
 
 
 
-function submitClientForm() {
-  // Lot 2 (V72) — garde-fou socle (deuxième niveau de sécurité, en plus du
-  // bouton Continuer désactivé) : empêche toute soumission Nettoyage /
-  // Professionnel tant que les lots 3/4 n'ont pas construit ces parcours,
-  // même en cas d'appel direct de cette fonction contournant l'étapeur.
-  if (_avecProfessionnel()) {
-    alert("Ce parcours n'est pas encore disponible. Il sera bientôt activé par HelixCar.");
-    return;
+// Verrou de ré-entrée : une demande, un envoi. Sans lui, deux clics
+// rapprochés — ou deux appels avant le premier await — créaient DEUX
+// demandes distinctes, chacune avec sa propre référence HelixCar.
+var _envoiClientEnCours = false;
+
+async function submitClientForm() {
+  if (_envoiClientEnCours) return;
+  _envoiClientEnCours = true;
+  var _relacherEnvoiClient = function () { _envoiClientEnCours = false; };
+  // Le verrou est relâché dès que le parcours se termine, quel qu'en
+  // soit l'issue : succès, refus de validation, erreur réseau.
+  try {
+    return await _submitClientFormInterne();
+  } finally {
+    _relacherEnvoiClient();
   }
+}
+
+async function _submitClientFormInterne() {
+  // GARDE-FOU SOCLE V72 — RETIRÉ ICI.
+  // Il empêchait TOUTE soumission « Trouver un professionnel », alors
+  // que ce parcours a depuis été réellement construit : validation,
+  // récapitulatif et branche de payload (professionnel_details) sont en
+  // place, et la navigation avait déjà été débloquée — le message
+  // « parcours en préparation » (#client-socle-msg) est d'ailleurs
+  // masqué en permanence. Seule cette garde subsistait : elle rendait
+  // le service impossible à commander, y compris depuis l'espace
+  // client. La validation propre au parcours, elle, est CONSERVÉE
+  // telle quelle un peu plus bas.
   // V76 - VALIDATION FINALE COMPLETE DU NETTOYAGE.
   // La V75 ne revalidait que l'eligibilite. Insuffisant : depuis le
   // recapitulatif, le client peut revenir en arriere, effacer une
@@ -14221,11 +14660,57 @@ function submitClientForm() {
   }
 
 
+  // ── IDENTIFIANT GÉNÉRÉ ICI, ET NON RELU APRÈS COUP ──
+  // L'ancienne version insérait avec `Prefer: return=representation`
+  // puis RELISAIT la ligne pour récupérer son id (indispensable à
+  // l'enregistrement des véhicules). Sous RLS, un dépôt anonyme n'a
+  // aucun droit de lecture : cette relecture échoue avec
+  // « new row violates row-level security policy » et LA DEMANDE DU
+  // CLIENT SERAIT PERDUE (vérifié sur PostgreSQL 16, cf. tests/t_rls.sh).
+  // On fournit donc l'identifiant nous-mêmes : plus aucune relecture.
+  payload.id = _hcNouvelIdentifiant();
+
+  // Demande déposée depuis un compte connecté : elle lui est rattachée
+  // dès l'insertion. C'est ce lien que lisent l'espace client et les
+  // politiques RLS ; il n'est jamais deviné après coup par e-mail.
+  var _idCompteDepot = _hcIdCompteConnecte();
+  if (_idCompteDepot) payload.auth_user_id = _idCompteDepot;
+
+  // ── CRÉATION DU COMPTE HELIXCAR ──
+  // Le formulaire demandait déjà un mot de passe, mais il n'était
+  // envoyé nulle part : aucun compte n'était créé et la connexion à
+  // l'espace client était impossible. On crée donc réellement le compte
+  // Supabase Auth ici, et on relie la demande à ce compte.
+  //
+  // Un échec de création NE DOIT JAMAIS faire perdre la demande : si
+  // l'adresse est déjà utilisée (client de retour) ou si le service est
+  // indisponible, la demande est enregistrée sans rattachement. On ne
+  // rattache jamais une demande à un compte sur la seule foi d'une
+  // adresse e-mail : cela exposerait la demande d'un tiers.
+  if (!_idCompteDepot && _sb && _sb.auth && email_val) {
+    var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
+    if (mdpSaisi) {
+      try {
+        var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
+        var utilisateur = rCompte && rCompte.data && rCompte.data.user;
+        if (!rCompte.error && utilisateur && utilisateur.id) {
+          payload.auth_user_id = utilisateur.id;
+        }
+      } catch (e) {
+        console.warn('Création du compte impossible, la demande est conservée :', e);
+      }
+    }
+  }
+
   console.log('Payload complet:', payload);
 
   function inserer(tentativesRestantes) {
-    return supabaseInsertReturning('clients', payload)
-      .then(function (row) { return { ok: true, row: row }; })
+    return supabaseInsert('clients', payload)
+      .then(function (r) {
+        if (r && r.error) return { error: String(r.error) };
+        if (!r) return { error: 'Echec de connexion.' };
+        return { ok: true, row: { id: payload.id } };
+      })
       .catch(function (e) { return { error: String(e.message || e) }; })
       .then(function(r) {
       var collisionNumero = r && r.error && typeof r.error === 'string'
@@ -14530,13 +15015,39 @@ function hero2ChangeScenario(direction) {
 // Supabase Auth, ni session, ni Dashboard client). Cette modale
 // prépare uniquement l'interface visuelle demandée ; elle ne simule
 // aucune connexion réussie et ne crée aucune session.
-function submitConnexionForm() {
+async function submitConnexionForm() {
   event && event.preventDefault();
   var msg = document.getElementById('connexion-message');
-  if (msg) {
-    msg.style.display = 'block';
-    msg.textContent = "La connexion à l'espace client n'est pas encore disponible. Cette fonctionnalité arrive bientôt. En attendant, contactez-nous ou créez votre compte via « Devenir client ».";
+  var afficher = function (texte) {
+    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
+  };
+  var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
+  var mdp   = ((document.getElementById('connexion-password') || {}).value || '');
+  if (!email || !mdp) {
+    afficher('Renseignez votre adresse e-mail et votre mot de passe.');
+    return;
   }
+  if (!_sb || !_sb.auth) {
+    afficher('La connexion est momentanément indisponible. Réessayez dans quelques instants.');
+    return;
+  }
+  afficher('Connexion en cours…');
+  var res = null;
+  try {
+    res = await _sb.auth.signInWithPassword({ email: email, password: mdp });
+  } catch (e) {
+    afficher('La connexion a échoué. Vérifiez votre connexion internet et réessayez.');
+    return;
+  }
+  if (!res || res.error || !res.data || !res.data.session) {
+    // Message volontairement identique quelle que soit la cause : ne pas
+    // révéler si une adresse existe ou non.
+    afficher('Adresse e-mail ou mot de passe incorrect.');
+    return;
+  }
+  // La session est ouverte : l'espace client la retrouve tel quel,
+  // puisque les deux pages partagent la même origine.
+  window.location.href = 'dashboard.html';
 }
 
 

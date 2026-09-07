@@ -114,14 +114,25 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   // ── E. GARDE-FOUS DE PÉRIMÈTRE (analyse du diff réel) ──
   const { execSync } = require('child_process');
   const diff = execSync('git diff origin/main -- index.html dashboard.html', { cwd: '/home/user/helixcar', maxBuffer: 60 * 1024 * 1024 }).toString();
-  const ajouts = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+  const lignesAjoutees = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
+  const ajouts = lignesAjoutees.join('\n');
+  // Les garde-fous ci-dessous cherchent du CODE, pas des mots. Les
+  // commentaires qui attestent l'absence de Stripe contiennent
+  // forcément « Stripe » : les inclure ferait échouer le test sur sa
+  // propre documentation. On ne teste donc que les lignes de code.
+  const ajoutsCode = lignesAjoutees
+    .map(l => l.slice(1).trim())
+    .filter(l => l && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')
+                 && !l.startsWith('--') && !l.startsWith('<!--'))
+    .join('\n');
 
   L.check('E1 : aucun nouvel envoi EmailJS introduit',
     !/emailjs\.(send|sendForm)/i.test(ajouts), (ajouts.match(/emailjs\.[a-z]+/gi) || []).join(','));
   L.check('E2 : aucun code Stripe introduit',
-    !/stripe|checkout\.session|payment_intent/i.test(ajouts));
+    !/stripe|checkout\.session|payment_intent/i.test(ajoutsCode),
+    (ajoutsCode.match(/.*stripe.*/i) || []).slice(0, 2).join(' | '));
   L.check('E3 : aucun statut « payé » introduit',
-    !/statut\s*[:=]\s*['"]pay/i.test(ajouts) && !/\bpaye\b\s*[:=]\s*true/i.test(ajouts));
+    !/statut\s*[:=]\s*['"]pay/i.test(ajoutsCode) && !/\bpaye\b\s*[:=]\s*true/i.test(ajoutsCode));
   // Le mot apparaît dans des commentaires qui attestent que la clé
   // reste côté serveur. Ce qui doit être vérifié, c'est l'absence de
   // clé RÉELLE (JWT dont le rôle n'est pas « anon ») et l'absence de
@@ -139,8 +150,22 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     jwtsPrivilegies(ajouts).length === 0
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/index.html', 'utf8'))
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')));
+  // Une ligne qui apparaît « supprimée » dans le diff ne prouve rien :
+  // git ré-aligne les hunks dès qu'on modifie le voisinage, et une
+  // validation déplacée ou ré-indentée apparaît alors comme retirée.
+  // Ce qui compte est qu'elle EXISTE ENCORE dans le fichier livré. On
+  // vérifie donc chaque validation supposée supprimée contre le contenu
+  // réel des deux pages.
+  const sourceActuelle =
+    fs.readFileSync('/home/user/helixcar/index.html', 'utf8')
+    + fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const validationsRetirees = diff.split('\n')
+    .filter(l => l.startsWith('-') && !l.startsWith('---'))
+    .map(l => l.slice(1).trim())
+    .filter(l => /^(if \(!_check|_showFieldError|_showGroupError)/.test(l))
+    .filter(l => sourceActuelle.indexOf(l) === -1);
   L.check('E5 : aucune suppression de validation métier existante',
-    !/^-\s*(if \(!_check|_showFieldError|_showGroupError)/m.test(diff.split('\n').filter(l => l.startsWith('-')).join('\n')));
+    validationsRetirees.length === 0, validationsRetirees.slice(0, 3).join(' | '));
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: '/home/user/helixcar' }).toString().trim().split('\n');
   L.check('E6 : périmètre de fichiers maîtrisé',

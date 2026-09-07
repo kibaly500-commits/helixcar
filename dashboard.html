@@ -1970,6 +1970,25 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CLIENT: Dashboard -->
       <div class="page" id="page-client-dashboard">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Une nouvelle prestation ?</div>
+              <div style="font-size:.85rem;color:#555;margin-top:4px">
+                Convoyage, stockage, nettoyage ou recherche d'un professionnel automobile.
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="ouvrirNouvelleDemande()">Faire une nouvelle demande →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Mes demandes</div></div>
+          <div id="client-demandes-liste">
+            <div style="font-size:.85rem;color:#666">Chargement…</div>
+          </div>
+        </div>
+
         <div class="stats-row">
           <div class="stat-card yellow"><div class="stat-label">Missions effectuées</div><div class="stat-value">8</div></div>
           <div class="stat-card green"><div class="stat-label">Km parcourus</div><div class="stat-value">3 840</div></div>
@@ -2029,6 +2048,15 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- CLIENT: Fidélité -->
+      <div class="page" id="page-client-infos">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Demandes nécessitant des informations</div></div>
+          <div id="client-infos-liste">
+            <div style="font-size:.85rem;color:#666">Chargement…</div>
+          </div>
+        </div>
+      </div>
+
       <div class="page" id="page-client-fidelite">
         <div class="card">
           <div class="card-header"><div class="card-title">Votre progression</div></div>
@@ -2350,6 +2378,7 @@ body.scroll-verrouille { overflow: hidden; }
   <div class="modal" style="position:relative;max-width:720px;text-align:left;max-height:88vh;overflow-y:auto">
     <h3 id="fiche-demande-titre" style="margin-bottom:14px">Demande</h3>
     <div id="fiche-demande-corps"></div>
+    <div id="fiche-demande-infos"></div>
     <button class="btn btn-secondary btn-full" style="margin-top:16px" onclick="closeModal('fiche-demande')">Fermer</button>
   </div>
 </div>
@@ -2377,8 +2406,10 @@ const USERS = {
   // V50.5B.2 — le compte de démonstration admin a été retiré : l'admin
   // s'authentifie désormais réellement via sbAuth.auth.signInWithPassword
   // (cf. doLoginAdmin/finaliserSessionAdmin plus bas). Le rôle 'client'
-  // reste un mock local inchangé — sa migration vers une vraie
-  // authentification est une phase ultérieure, non traitée ici.
+  // s'authentifie lui aussi réellement depuis le chantier « espace
+  // client » (doLoginClient/finaliserSessionClient) : cette table ne
+  // sert plus à aucune connexion. Elle est conservée telle quelle pour
+  // ne rien casser d'autre qui la lirait.
   'convoyeur@helixcar.com': { pw: 'demo123', role: 'convoyeur', name: 'Antoine A.',  initials: 'A' },
   'client@helixcar.com':    { pw: 'demo123', role: 'client',    name: 'Marc D.',     initials: 'M' },
 };
@@ -2412,6 +2443,7 @@ const NAVS = {
   client: [
     { id: 'client-dashboard', icon: '📊', label: 'Tableau de bord' },
     { id: 'client-missions',  icon: '🚗', label: 'Mes missions' },
+    { id: 'client-infos',     icon: '📝', label: 'Informations à compléter' },
     { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badge: 1 },
     { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité' },
     { id: 'client-profil',    icon: '👤', label: 'Mon profil' },
@@ -2458,16 +2490,10 @@ async function doLogin() {
       return;
     }
 
-    // Client : identifiants de démo encore en place — migration vers une
-    // vraie authentification prévue dans une phase ultérieure distincte.
-    const user = USERS[email];
-    if (!user || user.pw !== pw) {
-      if (alertEl) alertEl.style.display = 'flex';
-      return;
-    }
-    currentRole = user.role;
-    try { localStorage.setItem('helixcar_demo_email', email); } catch (e) {}
-    initApp(user);
+    // Client : vraie session Supabase Auth, comme l'admin et le
+    // convoyeur. Le compte est créé par le formulaire public au moment
+    // où le client choisit son mot de passe.
+    await doLoginClient(email, pw, alertEl);
   } catch(e) {
     alert('Erreur connexion : ' + e.message);
   }
@@ -2596,6 +2622,380 @@ async function doLoginAdmin(email, pw, alertEl) {
   }
 }
 
+async function doLoginClient(email, pw, alertEl) {
+  const btn = document.querySelector('#login-screen .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
+  try {
+    const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
+    if (error) {
+      if (alertEl) {
+        alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.' : error.message);
+        alertEl.style.display = 'flex';
+      }
+      return;
+    }
+    await finaliserSessionClient(email, alertEl, data.user ? data.user.id : null);
+  } catch (e) {
+    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    console.error(e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
+  }
+}
+
+// Ouvre l'espace client sur une session RÉELLE. On lit la vue
+// v_mes_demandes (jamais la table clients) : elle filtre elle-même sur
+// auth.uid() et ne projette aucune donnée interne.
+async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec) {
+  if (signOutSiEchec === undefined) signOutSiEchec = true;
+  if (!authUserId) return false;
+
+  let demandes = null;
+  let erreurTechnique = null;
+  try {
+    const { data, error } = await sbAuth
+      .from('v_mes_demandes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { erreurTechnique = error; } else { demandes = data || []; }
+  } catch (e) {
+    erreurTechnique = e;
+  }
+
+  // Une panne ne doit jamais être présentée comme un refus de droits :
+  // même distinction que pour l'administrateur.
+  if (erreurTechnique) {
+    console.error('Erreur technique lors de l\'ouverture de l\'espace client :', erreurTechnique);
+    if (alertEl) { alertEl.textContent = '⚠️ Impossible d\'ouvrir votre espace client.'; alertEl.style.display = 'flex'; }
+    return false;
+  }
+
+  const premiere = (demandes || [])[0] || {};
+  window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [] };
+  currentRole = 'client';
+  const prenom = premiere.prenom || '';
+  const nom = premiere.nom || '';
+  if (PAGE_TITLES['client-dashboard']) {
+    PAGE_TITLES['client-dashboard'][1] = 'Bienvenue' + (prenom ? ' ' + prenom : '');
+  }
+  initApp({
+    role: 'client',
+    name: ((prenom + ' ' + nom).trim()) || email,
+    initials: (prenom || email || '?')[0].toUpperCase()
+  });
+  return true;
+}
+
+// ============================================================
+// ADMINISTRATEUR — INFORMATIONS NÉCESSAIRES À LA MISSION
+// ============================================================
+// Bloc affiché dans la fiche de chaque demande. Les décisions
+// (Valider / À corriger) sont écrites dans Supabase : elles résistent à
+// F5 puisque le bloc est systématiquement rechargé depuis la base à
+// l'ouverture de la fiche.
+//
+// AUCUNE de ces décisions n'envoie d'e-mail, ne crée de mission, ni ne
+// fait avancer un statut de paiement : Stripe n'existe pas et rien ici
+// ne le simule.
+
+var _infosDemandeEnCours = null;
+
+async function chargerInfosDemandeAdmin(demandeId) {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function deciderInformation(demandeId, cle, decision) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const valeurs = { statut: decision };
+  if (decision === 'a_corriger') {
+    // Motif court OBLIGATOIRE : sans lui, le client ne saurait pas quoi
+    // corriger. On n'écrit rien tant qu'il n'est pas saisi.
+    const motif = (prompt('Motif de la correction (obligatoire, visible par le client) :') || '').trim();
+    if (!motif) { alert('Aucun motif saisi : rien n\'a été enregistré.'); return false; }
+    valeurs.commentaire = motif;
+  } else {
+    valeurs.commentaire = null;
+  }
+  const { error } = await sbAuth
+    .from('demande_informations_manquantes')
+    .update(valeurs)
+    .eq('client_id', demandeId)
+    .eq('cle', cle);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+async function changerDecisionInformation(demandeId, cle, decision) {
+  try {
+    const fait = await deciderInformation(demandeId, cle, decision);
+    if (!fait) return;
+  } catch (e) {
+    alert('La décision n\'a pas pu être enregistrée.\n\n' + e.message);
+    return;
+  }
+  await rendreInfosDemandeAdmin({ id: demandeId });
+}
+
+function _dateHeureFr(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return String(iso); }
+}
+
+async function rendreInfosDemandeAdmin(c) {
+  const zone = document.getElementById('fiche-demande-infos');
+  if (!zone || !c || !c.id) return;
+  _infosDemandeEnCours = c.id;
+  zone.innerHTML = '<div style="font-size:.85rem;color:#666;margin-top:16px">'
+    + 'Chargement des informations…</div>';
+
+  let lignes = [];
+  try {
+    lignes = await chargerInfosDemandeAdmin(c.id);
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red);margin-top:16px">'
+      + 'Informations indisponibles : ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  if (_infosDemandeEnCours !== c.id) return;   // fiche changée entre-temps
+
+  if (!lignes.length) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:#666;margin-top:16px">'
+      + 'Aucune information n\'est requise pour ce service.</div>';
+    return;
+  }
+
+  const demande = (_demandesDevisListe || []).filter(function (x) {
+    return String(x.id) === String(c.id);
+  })[0] || c;
+  const devis = (typeof _devisParClient !== 'undefined') ? _devisParClient[String(c.id)] : null;
+
+  const recues = lignes.filter(function (l) { return l.statut !== 'attendue'; });
+  const manquantes = lignes.filter(function (l) { return l.statut === 'attendue'; });
+  const nouvelles = lignes.filter(function (l) { return l.statut === 'transmise'; });
+
+  const ligneHtml = function (l) {
+    const badge = l.statut === 'validee' ? 'badge-active'
+                : l.statut === 'a_corriger' ? 'badge-refused'
+                : 'badge-progress';
+    let actions = '';
+    if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
+      actions = '<div style="margin-top:6px;display:flex;gap:8px">'
+        + '<button class="btn btn-sm btn-primary" onclick="changerDecisionInformation(\''
+        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'validee\')">Valider</button>'
+        + '<button class="btn btn-sm btn-secondary" onclick="changerDecisionInformation(\''
+        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'a_corriger\')">À corriger</button>'
+        + '</div>';
+    }
+    return '<div class="detail-row" style="align-items:flex-start">'
+      + '<span class="detail-label">' + escapeHtml(l.libelle) + '</span>'
+      + '<span class="detail-val">'
+      + '<span class="badge ' + badge + '">' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + '</span>'
+      + (l.valeur ? '<br>' + escapeHtml(l.valeur) : '')
+      + (l.commentaire ? '<br><em>Motif : ' + escapeHtml(l.commentaire) + '</em>' : '')
+      + actions
+      + '</span></div>';
+  };
+
+  zone.innerHTML =
+    '<div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--gray-light)">'
+    + '<div style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;'
+    + 'color:var(--red);margin-bottom:10px">Informations nécessaires à la mission</div>'
+    + '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-val">'
+    + escapeHtml(((demande.prenom || '') + ' ' + (demande.nom || '')).trim() || '—') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Référence</span><span class="detail-val">'
+    + escapeHtml(demande.numero_client || '—') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Devis associé</span><span class="detail-val">'
+    + escapeHtml(devis && devis.reference ? devis.reference : 'Aucun') + '</span></div>'
+    + (nouvelles.length
+        ? '<div class="detail-row"><span class="detail-label">Transmises le</span><span class="detail-val">'
+          + nouvelles.map(function (l) {
+              return escapeHtml(l.libelle) + ' — ' + escapeHtml(_dateHeureFr(l.transmise_le) || 'récemment');
+            }).join('<br>')
+          + '</span></div>'
+        : '')
+    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Déjà reçues</div>'
+    + (recues.length ? recues.map(ligneHtml).join('')
+        : '<div style="font-size:.85rem;color:#666">Aucune pour le moment.</div>')
+    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes</div>'
+    + (manquantes.length ? manquantes.map(ligneHtml).join('')
+        : '<div style="font-size:.85rem;color:#666">Aucune : tout a été transmis.</div>')
+    + '</div>';
+}
+
+// ============================================================
+// ESPACE CLIENT — DEMANDES ET INFORMATIONS À COMPLÉTER
+// ============================================================
+// Aucune copie du formulaire ici. « Faire une nouvelle demande » ouvre
+// le VRAI formulaire public (index.html) en mode connecté : mêmes
+// questions, mêmes règles conditionnelles, mêmes compteurs, mêmes
+// accordéons, mêmes calendriers, mêmes validations, même récapitulatif
+// et même payload — parce que c'est le même code.
+
+const LIB_SERVICE_CLIENT = {
+  convoyage: 'Convoyage automobile',
+  stockage: 'Stockage automobile',
+  nettoyage: 'Nettoyage automobile',
+  professionnel: 'Trouver un professionnel automobile'
+};
+
+const LIB_STATUT_INFO = {
+  fournie:    'Reçue',
+  attendue:   'Manquante',
+  transmise:  'Transmise',
+  validee:    'Validée',
+  a_corriger: 'À corriger'
+};
+
+function ouvrirNouvelleDemande() {
+  // La session Supabase est partagée entre les deux pages (même
+  // origine) : rien à transmettre, et aucune identité à faire confiance
+  // côté navigateur.
+  window.location.href = 'index.html?nouvelle-demande=1';
+}
+
+function ouvrirCompletionDemande(id) {
+  window.location.href = 'index.html?completer=' + encodeURIComponent(id);
+}
+
+function _libelleServiceClient(s) {
+  return LIB_SERVICE_CLIENT[s] || (s || 'Demande');
+}
+
+// Recharge les demandes du client depuis la vue (jamais la table) et
+// les affiche. Résiste à F5 : tout vient du serveur, rien du cache.
+async function chargerDemandesClient() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth
+    .from('v_mes_demandes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadDemandesClient() {
+  const zone = document.getElementById('client-demandes-liste');
+  if (!zone) return;
+  let demandes = [];
+  try {
+    demandes = await chargerDemandesClient();
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
+      + 'Impossible de charger vos demandes pour le moment.</div>';
+    return;
+  }
+  if (window._currentClient) window._currentClient.demandes = demandes;
+  if (!demandes.length) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:#666">'
+      + 'Vous n\'avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</div>';
+    return;
+  }
+  zone.innerHTML = demandes.map(function (d) {
+    return '<div class="detail-row">'
+      + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
+      + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
+      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></span>'
+      + '</div>';
+  }).join('');
+}
+
+// Onglet « Informations à compléter ». La liste des rubriques et leur
+// statut sont CALCULÉS PAR LE SERVEUR (informations_demande) à partir
+// des données réellement enregistrées : le navigateur ne décide jamais
+// de ce qui est requis.
+async function chargerInformationsDemande(demandeId) {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadInfosClient() {
+  const zone = document.getElementById('client-infos-liste');
+  if (!zone) return;
+  zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>';
+
+  let demandes = [];
+  try {
+    demandes = await chargerDemandesClient();
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
+      + 'Impossible de charger vos demandes pour le moment.</div>';
+    return;
+  }
+
+  const blocs = [];
+  for (const d of demandes) {
+    let lignes = [];
+    try {
+      lignes = await chargerInformationsDemande(d.id);
+    } catch (e) { continue; }
+    if (!lignes.length) continue;
+
+    const total = lignes.length;
+    const fournies = lignes.filter(function (l) {
+      return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
+    }).length;
+    const restantes = lignes.filter(function (l) {
+      return l.statut === 'attendue' || l.statut === 'a_corriger';
+    });
+
+    // N'afficher QUE les demandes qui nécessitent réellement quelque chose.
+    if (!restantes.length) continue;
+
+    const recues = lignes.filter(function (l) {
+      return l.statut !== 'attendue' && l.statut !== 'a_corriger';
+    });
+
+    blocs.push(
+      '<div class="card" style="margin-bottom:16px">'
+      + '<div class="card-header"><div>'
+      + '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
+      + '<div style="font-size:.85rem;color:#555;margin-top:4px">'
+      + escapeHtml(_libelleServiceClient(d.type_service))
+      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></div>'
+      + '</div>'
+      + '<button class="btn btn-sm btn-primary" onclick="ouvrirCompletionDemande(\''
+      + escapeHtml(d.id) + '\')">Compléter mes informations →</button>'
+      + '</div>'
+      + '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
+      + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '')
+      + ' sur ' + total + '</strong> déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.'
+      + '</div>'
+      + (recues.length
+          ? '<div class="detail-row"><span class="detail-label">Déjà reçues</span>'
+            + '<span class="detail-val">'
+            + recues.map(function (l) {
+                return escapeHtml(l.libelle) + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')';
+              }).join('<br>')
+            + '</span></div>'
+          : '')
+      + '<div class="detail-row"><span class="detail-label">Encore attendues</span>'
+      + '<span class="detail-val">'
+      + restantes.map(function (l) {
+          const motif = (l.statut === 'a_corriger' && l.commentaire)
+            ? ' — <em>' + escapeHtml(l.commentaire) + '</em>' : '';
+          return escapeHtml(l.libelle)
+            + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')' + motif;
+        }).join('<br>')
+      + '</span></div>'
+      + '</div>'
+    );
+  }
+
+  zone.innerHTML = blocs.length
+    ? blocs.join('')
+    : '<div style="font-size:.85rem;color:#666">'
+      + 'Aucune information ne manque actuellement. Merci !</div>';
+}
+
 // Vérifie qu'une session Supabase Auth valide correspond bien à un
 // administrateur actif (public.admins) avant d'accorder l'accès —
 // une session Supabase valide SANS ligne admins active n'ouvre PAS
@@ -2669,7 +3069,11 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 async function finaliserSessionParUid(email, authUserId) {
   const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
   if (estAdmin) return;
-  await finaliserSessionConvoyeur(email, null, authUserId, false);
+  const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
+  if (estConvoyeur) return;
+  // Ni admin ni partenaire : c'est un client. Sa session est réelle,
+  // exactement comme les deux autres rôles.
+  await finaliserSessionClient(email, null, authUserId, false);
 }
 
 function initApp(user) {
@@ -2712,9 +3116,10 @@ function buildNav(role) {
 }
 
 function doLogout() {
-  if ((window._currentConvoyeur || window._currentAdmin) && sbAuth) { sbAuth.auth.signOut(); }
+  if ((window._currentConvoyeur || window._currentAdmin || window._currentClient) && sbAuth) { sbAuth.auth.signOut(); }
   window._currentConvoyeur = null;
   window._currentAdmin = null;
+  window._currentClient = null;
   try { localStorage.removeItem('helixcar_demo_email'); } catch (e) {}
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
@@ -2746,6 +3151,7 @@ const PAGE_TITLES = {
   'convoyeur-profil':     ['Mon profil', 'Gérez vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue Marc'],
   'client-missions':     ['Mes missions', 'Historique et suivi'],
+  'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],
   'client-fidelite':     ['Programme fidélité', 'Vos récompenses HelixCar'],
   'client-profil':       ['Mon profil', 'Gérez vos informations'],
@@ -2775,6 +3181,8 @@ function showPage(id) {
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
   if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
+  if (id === 'client-dashboard') { loadDemandesClient(); }
+  if (id === 'client-infos') { loadInfosClient(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
   if (id === 'admin-acquisition') { loadAcquisition(); }
@@ -6906,6 +7314,7 @@ function ouvrirFicheDemande(clientId) {
     if (titreN) titreN.textContent = 'Demande nettoyage — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
     if (corpsN) corpsN.innerHTML = html;
     openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
     return;
   }
 
@@ -7003,6 +7412,7 @@ function ouvrirFicheDemande(clientId) {
     if (titreP) titreP.textContent = 'Demande professionnel — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
     if (corpsP) corpsP.innerHTML = html;
     openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
     return;
   }
 
@@ -7301,6 +7711,7 @@ function ouvrirFicheDemande(clientId) {
   if (titre) titre.textContent = 'Demande — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
   if (corps) corps.innerHTML = html;
   openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
 }
 
 // ── GÉNÉRATION DU DEVIS ─────────────────────────────────────

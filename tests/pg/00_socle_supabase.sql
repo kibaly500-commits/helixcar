@@ -95,7 +95,29 @@ create table if not exists public.clients (
   -- comporte davantage : seules celles dont dépendent les migrations
   -- sont reproduites ici.
   type_service          text,
+  type_client           text,
+  societe               text,
+  siret                 text,
+  source_acquisition        text,
+  source_acquisition_detail text,
   nettoyage_details     jsonb,
+  professionnel_details jsonb,
+  statut                text not null default 'nouveau',
+  prenom                text,
+  telephone             text,
+  nb_vehicules          integer,
+  immatriculation       text,
+  marque_modele         text,
+  date_prise_en_charge  date,
+  contact_pc_nom        text,
+  contact_pc_tel        text,
+  adresse_arrivee_rue   text,
+  ville_depart          text,
+  ville_arrivee         text,
+  stockage_ville        text,
+  stockage_date_debut   date,
+  -- Colonne interne : sert à prouver qu'elle ne fuit JAMAIS vers le client.
+  prix_interne          numeric,
   created_at            timestamptz not null default now()
 );
 

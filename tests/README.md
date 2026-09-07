@@ -18,7 +18,7 @@ Le chemin de Chromium est défini dans `lib.js` (constante `EXE`) ; adaptez-le
 
 ```bash
 cd tests
-for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin t_decisions; do
+for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin t_decisions t_client t_infos; do
   echo "== $f"; node $f.js || echo "ÉCHEC $f"
 done
 
@@ -49,6 +49,8 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_brouillon.js` | Effacer / OK des rubriques, brouillon écrit puis restauré après F5 |
 | `t_video.js` | Vidéo partenaire : exigence et durée selon les activités, formats, taille, durée réelle, remplacement, suppression, envoi et erreurs réseau |
 | `t_video_admin.js` | Dashboard : fiche unique, états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
+| `t_client.js` | **Espace client** : session réelle, action « Faire une nouvelle demande », ouverture du VRAI formulaire public en mode connecté, profil prérempli, compte et e-mail non redemandés, payload rattaché au compte, récapitulatif, contact sur place, retour arrière, double clic, F5, coupure réseau |
+| `t_infos.js` | **Informations à compléter** : onglet client, progression, écran de complétion (rubriques manquantes uniquement), transmission, bloc administrateur (Valider / À corriger avec motif obligatoire), persistance, garde-fous |
 | `t_rls.sh` | **Politiques RLS exécutées pour de vrai** sur un PostgreSQL 16 local jetable : compatibilité de la phase préparatoire avec l'ancien Dashboard, effet du durcissement, partenaire bloqué (fiche visible, zéro mission, auto-déblocage impossible, décisions conservées), déblocage administrateur, idempotence de la chaîne complète |
 | `t_decisions.js` | **Décisions par activité et blocage partenaire** : indépendance des activités, six transitions, confirmation explicite et annulation sans écriture, historique complet, persistance après F5, blocage réellement enregistré, refus d'autorisation, invalidation d'une session ouverte, zéro e-mail |
 | `t_video_securite.mjs` | **Sécurité** : exécute le vrai code de la fonction serveur `candidature-video` contre un double Supabase (jeton, chemin imposé par le serveur, cloisonnement A/B, contrôles format/taille/durée, usage unique, orphelins) |
@@ -91,6 +93,12 @@ Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
   après application.
 - `t_rls.sh` a besoin des binaires PostgreSQL 16 et des droits root
   (`su postgres`). Il ne se connecte **jamais** à Supabase.
+- `t_client.js` et `t_infos.js` exécutent le **vrai code** des deux pages
+  contre un double Supabase en mémoire. Ils prouvent le comportement de
+  l'interface (ce qui est envoyé, ce qui ne l'est pas, ce qui est
+  redemandé ou non) ; la **preuve côté base** — cloisonnement entre
+  clients, impossibilité de s'auto-valider, calcul serveur des rubriques
+  requises — est apportée par `t_rls.sh` sur un PostgreSQL réel.
 - Les tests n'écrivent jamais dans Supabase : ils s'arrêtent au payload
   construit côté navigateur. Aucune donnée réelle n'est touchée.
 - Les données de test sont préfixées `TEST-QA` et utilisent des adresses en
