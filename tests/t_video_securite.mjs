@@ -315,11 +315,15 @@ const JETON_B = 'b'.repeat(64);
   // ── 9. Aucun secret ni URL persistée ──
   {
     const fs = await import('node:fs');
-    const fonction = fs.readFileSync('supabase/functions/candidature-video/index.ts', 'utf8');
+    // Chemins résolus depuis CE fichier : le test fonctionne quel que
+    // soit le répertoire courant.
+    const racine = new URL('../', import.meta.url);
+    const lire = (rel) => fs.readFileSync(new URL(rel, racine), 'utf8');
+    const fonction = lire('supabase/functions/candidature-video/index.ts');
     check('9.1 La clé service_role n\'est lue que depuis l\'environnement serveur',
       /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/.test(fonction)
       && !/eyJ[A-Za-z0-9_-]{20,}/.test(fonction), 'clé en dur détectée');
-    const idx = fs.readFileSync('index.html', 'utf8');
+    const idx = lire('index.html');
     // Le mot « service_role » apparaît dans des commentaires qui
     // attestent justement que la clé reste côté serveur. Ce qui doit
     // être vérifié, c'est l'absence de clé RÉELLE : un JWT dont la
@@ -334,7 +338,7 @@ const JETON_B = 'b'.repeat(64);
         });
     }
     check('9.2 Aucune clé privilégiée réelle dans le navigateur',
-      jwtsPrivilegies(idx).length === 0 && jwtsPrivilegies(fs.readFileSync('dashboard.html', 'utf8')).length === 0);
+      jwtsPrivilegies(idx).length === 0 && jwtsPrivilegies(lire('dashboard.html')).length === 0);
     check('9.2b Le navigateur ne lit jamais une variable de clé privilégiée',
       !/SUPABASE_SERVICE_ROLE_KEY/.test(idx));
     check('9.3 Le navigateur n\'écrit jamais directement dans le bucket',
@@ -343,12 +347,12 @@ const JETON_B = 'b'.repeat(64);
       /object\/upload\/sign\/candidatures-videos/.test(idx));
     check('9.5 Le navigateur ne propose aucun chemin de stockage',
       !/candidatures\/'\s*\+/.test(idx) && !/'candidatures\/'/.test(idx));
-    const migration = fs.readFileSync('migrations/03_videos_candidature.sql', 'utf8');
+    const migration = lire('migrations/03_videos_candidature.sql');
     check('9.6 Aucune politique de stockage accordée à anon',
       !/for insert to anon|to anon, authenticated/.test(migration));
     check('9.7 Aucune URL signée n\'est stockée en base',
       !/signed_url|url_signee|video_url/i.test(migration));
-    const dash = fs.readFileSync('dashboard.html', 'utf8');
+    const dash = lire('dashboard.html');
     check('9.8 Le Dashboard ne persiste jamais l\'URL signée',
       /_urlVideoSignee = null/.test(dash) && !/localStorage[^\n]*signee/i.test(dash));
   }
