@@ -6572,6 +6572,35 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
           </div>
 
+          <!-- CONTACT SUR PLACE — composant transversal, rattaché au lieu
+               d'intervention. Même balisage et même code pour tous les
+               services concernés (cf. hcContactSurPlaceChange). -->
+          <div class="modal-form-group" id="nett-contact-sp-group">
+            <label>Qui sera le contact sur place ? <span class="field-required">*</span></label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+              <label class="radio-opt"><input type="radio" name="nett-contact-sp" value="moi" onclick="hcContactSurPlaceChange('nett')"><span>Moi-même</span></label>
+              <label class="radio-opt"><input type="radio" name="nett-contact-sp" value="autre" onclick="hcContactSurPlaceChange('nett')"><span>Une autre personne</span></label>
+            </div>
+          </div>
+
+          <div id="nett-contact-sp-moi" style="display:none">
+            <div id="nett-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+            <div id="nett-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+          </div>
+
+          <div id="nett-contact-sp-autre" style="display:none">
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Nom et prénom <span class="field-required">*</span></label>
+                <input type="text" id="nett-contact-sp-nom" placeholder="Ex : Karim B." autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Téléphone <span class="field-required">*</span></label>
+                <input type="tel" id="nett-contact-sp-tel" placeholder="+33 6 00 00 00 00" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+          </div>
+
           <div class="modal-form-group">
             <label>Quelle est la date souhaitée ? <span class="field-required">*</span></label>
             <input type="date" id="nett-date" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
@@ -7826,6 +7855,48 @@ function _nettTypeNettoyage() {
   return el ? el.value : '';
 }
 
+// CORRECTIF - MEME CAUSE, ETAPE 4. Les 8 lecteurs ci-dessous etaient
+// appeles par _validateNettoyageEtape4(), nettOnLieuChange(),
+// nettOnDispoChange() et _construireDetailsNettoyage() sans avoir
+// jamais ete definis : la meme ReferenceError silencieuse empechait
+// d'atteindre le recapitulatif et donc de creer la demande. Aucune
+// regle metier n'est ajoutee ici : ces fonctions ne font que lire ce
+// que l'etape 4 affiche deja, avec les conventions du fichier
+// (radios comme _typeServiceChoisi, champs texte trimes).
+function _nettLieu() {
+  var el = document.querySelector('input[name="nett-lieu"]:checked');
+  return el ? el.value : '';
+}
+// L'adresse n'est demandee que pour une intervention reellement situee
+// chez le client. Les deux seules valeurs proposees aujourd'hui le
+// sont ; les valeurs historiques (helixcar / a_definir) restent lues
+// ailleurs pour l'affichage des anciennes demandes, mais n'appellent
+// aucune saisie d'adresse.
+function _nettAdresseApplicable() {
+  var l = _nettLieu();
+  return l === 'locaux_client' || l === 'parc_client';
+}
+function _nettDate() {
+  return ((document.getElementById('nett-date') || {}).value || '').trim();
+}
+function _nettTypeDispo() {
+  var el = document.querySelector('input[name="nett-dispo"]:checked');
+  return el ? el.value : '';
+}
+function _nettHeure() {
+  return ((document.getElementById('nett-heure') || {}).value || '').trim();
+}
+function _nettCreneauDebut() {
+  return ((document.getElementById('nett-creneau-debut') || {}).value || '').trim();
+}
+function _nettCreneauFin() {
+  return ((document.getElementById('nett-creneau-fin') || {}).value || '').trim();
+}
+function _nettDelai() {
+  var el = document.querySelector('input[name="nett-delai"]:checked');
+  return el ? el.value : '';
+}
+
 function nettOnTypeChange() { _clearGroupError('nett-type-group'); _nettMajBoutonContinuer(); }
 
 // Bouton Effacer : agit UNIQUEMENT sur la section "Quel nettoyage
@@ -7897,6 +7968,134 @@ function nettOnDispoChange() {
     });
   }
   _clearGroupError('nett-dispo-group');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CONTACT SUR PLACE — composant transversal
+// ══════════════════════════════════════════════════════════════
+// UN SEUL composant, parametre par un prefixe (nett, pro-tech,
+// pro-renfort...), partage par tous les services comportant un lieu
+// d'intervention. Aucune regle dupliquee, aucun second systeme.
+//
+// Deux choix seulement :
+//   'moi'   -> la donnee est DERIVEE du compte, jamais ressaisie ;
+//   'autre' -> nom ET telephone deviennent reellement obligatoires.
+// Aucune valeur n'est inventee : si le compte ne porte pas encore un
+// nom et un telephone exploitables, le client est invite a les
+// completer plutot que de voir apparaitre une donnee fabriquee.
+
+// Profil deja enregistre, fourni par l'espace client lorsqu'il existe.
+// Dans le formulaire public il reste null : le "compte" est alors
+// exactement celui que l'etape 1 est en train de creer, donc la meme
+// source de verite — jamais une copie parallele.
+var _hcProfilConnecte = null;
+
+function _hcCompteIdentite() {
+  if (_hcProfilConnecte && typeof _hcProfilConnecte === 'object') {
+    return {
+      nom: [_hcProfilConnecte.prenom, _hcProfilConnecte.nom].filter(Boolean).join(' ').trim(),
+      telephone: String(_hcProfilConnecte.telephone || '').trim()
+    };
+  }
+  var g = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+  return {
+    nom: [g('client-prenom'), g('client-nom')].filter(Boolean).join(' ').trim(),
+    telephone: g('client-tel')
+  };
+}
+
+function _hcContactSpType(p) {
+  var el = document.querySelector('input[name="' + p + '-contact-sp"]:checked');
+  return el ? el.value : '';
+}
+function _hcContactSpNomAutre(p) {
+  return ((document.getElementById(p + '-contact-sp-nom') || {}).value || '').trim();
+}
+function _hcContactSpTelAutre(p) {
+  return ((document.getElementById(p + '-contact-sp-tel') || {}).value || '').trim();
+}
+
+// DONNEE RESOLUE — source unique lue par le recapitulatif, le payload,
+// le dashboard et le PDF. Retourne null tant que le choix n'est pas
+// fait ou qu'une donnee necessaire manque : jamais un objet partiel,
+// donc jamais un "Contact sur place" affiche a moitie.
+function _hcContactSurPlace(p) {
+  var type = _hcContactSpType(p);
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    if (!id.nom || !id.telephone) return null;
+    return { type: 'moi', nom: id.nom, telephone: id.telephone };
+  }
+  if (type === 'autre') {
+    var nom = _hcContactSpNomAutre(p), tel = _hcContactSpTelAutre(p);
+    if (!nom || !tel) return null;
+    return { type: 'autre', nom: nom, telephone: tel };
+  }
+  return null;
+}
+
+function hcContactSurPlaceChange(p) {
+  var type = _hcContactSpType(p);
+  var blocMoi = document.getElementById(p + '-contact-sp-moi');
+  var blocAutre = document.getElementById(p + '-contact-sp-autre');
+  if (blocMoi) blocMoi.style.display = (type === 'moi') ? 'block' : 'none';
+  if (blocAutre) blocAutre.style.display = (type === 'autre') ? 'block' : 'none';
+
+  // Le choix change : les donnees devenues obsoletes sont REELLEMENT
+  // effacees, jamais conservees "au cas ou". Elles ne peuvent donc plus
+  // repartir dans le payload ni reapparaitre dans le recapitulatif.
+  if (type !== 'autre') {
+    [p + '-contact-sp-nom', p + '-contact-sp-tel'].forEach(function (id) {
+      var e = document.getElementById(id);
+      if (e) e.value = '';
+      _clearFieldError(id);
+    });
+  }
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    var complet = !!(id.nom && id.telephone);
+    var zone = document.getElementById(p + '-contact-sp-moi-valeur');
+    var manque = document.getElementById(p + '-contact-sp-moi-manque');
+    if (zone) {
+      zone.textContent = complet ? (id.nom + ' — ' + id.telephone) : '';
+      zone.style.display = complet ? 'block' : 'none';
+    }
+    if (manque) manque.style.display = complet ? 'none' : 'block';
+  }
+  _clearGroupError(p + '-contact-sp-group');
+}
+
+// Validation commune. `fail(id)` est la fonction du validateur appelant :
+// le composant n'invente jamais sa propre mecanique d'erreur.
+function _hcValiderContactSurPlace(p, fail) {
+  var type = _hcContactSpType(p);
+  if (!type) {
+    _showGroupError(p + '-contact-sp-group', 'Indiquez qui sera le contact sur place.');
+    fail(p + '-contact-sp-group');
+    return false;
+  }
+  _clearGroupError(p + '-contact-sp-group');
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    if (!id.nom || !id.telephone) {
+      _showGroupError(p + '-contact-sp-group',
+        'Complétez votre nom et votre téléphone pour vous désigner comme contact sur place.');
+      fail(p + '-contact-sp-group');
+      return false;
+    }
+    return true;
+  }
+  var ok = true;
+  if (!_checkRequiredText(p + '-contact-sp-nom', null, true)) { fail(p + '-contact-sp-nom'); ok = false; }
+  if (!_checkPhone(p + '-contact-sp-tel', true)) { fail(p + '-contact-sp-tel'); ok = false; }
+  return ok;
+}
+
+// Libelle unique affiche partout (recap, dashboard, PDF) a partir de la
+// donnee resolue. Une seule ecriture possible du "Contact sur place".
+function _hcContactSurPlaceTexte(c) {
+  if (!c || !c.nom || !c.telephone) return '';
+  return c.nom + ' — ' + c.telephone;
 }
 
 // ── VALIDATION ──────────────────────────────────
@@ -7971,6 +8170,10 @@ function _validateNettoyageEtape4() {
     if (!_checkRequiredText('nett-adresse-ville', null, true)) fail('nett-adresse-ville');
   }
 
+  // Contact sur place : composant transversal, meme regle pour tous les
+  // services concernes (cf. _hcValiderContactSurPlace).
+  _hcValiderContactSurPlace('nett', fail);
+
   if (!_checkDate('nett-date', true)) fail('nett-date');
   else {
     // Aucune date passee. Comparaison en date locale, sans heure.
@@ -8033,7 +8236,10 @@ function _construireDetailsNettoyage() {
     heure_precise: _nettHeure() || null,
     creneau_debut: _nettCreneauDebut() || null,
     creneau_fin: _nettCreneauFin() || null,
-    delai: _nettDelai() || null
+    delai: _nettDelai() || null,
+    // Contact sur place : objet explicite et resolu (type + valeurs
+    // finales), jamais l'utilisateur connecte ni un texte libre.
+    contact_sur_place: _hcContactSurPlace('nett')
   };
   if (_nettAdresseApplicable()) {
     d.adresse_rue = ((document.getElementById('nett-adresse-rue') || {}).value || '').trim() || null;
@@ -8081,6 +8287,8 @@ function construireRecapNettoyage() {
   var orga = _recapLigne('Lieu d\'intervention', NETT_LIEUX[d.lieu] || '');
   if (d.adresse_rue) orga += _recapLigne('Adresse', d.adresse_rue);
   if (d.adresse_cp || d.adresse_ville) orga += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
+  // Libelle unique, identique au dashboard et au PDF.
+  orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
   orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
   if (d.dispo_type === 'precise') orga += _recapLigne('Heure', d.heure_precise);
   else if (d.dispo_type === 'creneau') orga += _recapLigne('Cr\u00e9neau', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
