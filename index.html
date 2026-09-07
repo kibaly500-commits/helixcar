@@ -6227,10 +6227,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <label>Mot de passe <span class="field-required">*</span></label>
 
+        <div id="client-password-aide" style="font-size:.75rem;color:#6B7280;margin-bottom:6px">8 caractères minimum.</div>
+
         <div style="position:relative">
-          <input type="password" id="client-password" required style="padding-right:44px">
+          <input type="password" id="client-password" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" aria-describedby="client-password-aide" style="padding-right:44px">
           <button type="button" class="btn-oeil" onclick="basculerMotDePasse('client-password', this)"
-                  aria-label="Afficher le mot de passe" aria-pressed="false">
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
@@ -7419,7 +7422,14 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="modal-form-group">
         <label>Mot de passe <span class="field-required">*</span></label>
-        <input type="password" id="connexion-password" placeholder="••••••••">
+        <div style="position:relative">
+          <input type="password" id="connexion-password" placeholder="••••••••" data-mdp="1"
+                 autocomplete="current-password" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('connexion-password', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </div>
 
       <div id="connexion-message" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#991B1B"></div>
@@ -11487,15 +11497,51 @@ function _libelleGabarit(cle) {
 
 
 // ── §11 Œil du mot de passe : n'altère jamais la valeur saisie ──
+// ── AFFICHER / MASQUER UN MOT DE PASSE ──
+// Bascule UNIQUEMENT le type du champ entre password et text. La valeur
+// n'est ni lue, ni copiée, ni mémorisée nulle part : rien n'est écrit
+// dans une variable persistante, dans localStorage, ni dans un journal.
+// Le bouton est un <button type="button"> : il ne soumet jamais le
+// formulaire, et Entrée comme Espace l'activent nativement.
 function basculerMotDePasse(id, bouton) {
   var el = document.getElementById(id);
   if (!el) return;
-  var visible = el.type === 'text';
-  el.type = visible ? 'password' : 'text';
+  var doitAfficher = el.type === 'password';
+
+  // Position du curseur mémorisée puis restaurée : changer le type
+  // replace autrement le curseur en fin de champ.
+  var debut = null, fin = null;
+  try { debut = el.selectionStart; fin = el.selectionEnd; } catch (e) {}
+
+  el.type = doitAfficher ? 'text' : 'password';
+
+  try {
+    el.focus({ preventScroll: true });
+    if (debut !== null && fin !== null) el.setSelectionRange(debut, fin);
+  } catch (e) {}
+
   if (bouton) {
-    bouton.classList.toggle('actif', !visible);
-    bouton.setAttribute('aria-pressed', String(!visible));
-    bouton.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+    var libelle = doitAfficher ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+    bouton.classList.toggle('actif', doitAfficher);
+    bouton.setAttribute('aria-pressed', String(doitAfficher));
+    bouton.setAttribute('aria-label', libelle);
+    bouton.setAttribute('title', libelle);
+  }
+}
+
+// Remet TOUS les champs de mot de passe à l'état masqué. Appelé à
+// l'ouverture et à la fermeture d'une fenêtre : rouvrir un formulaire ne
+// doit jamais laisser un mot de passe affiché en clair.
+function reinitialiserAffichageMotsDePasse(racine) {
+  var zone = racine || document;
+  var champs = zone.querySelectorAll('input[data-mdp="1"]');
+  for (var i = 0; i < champs.length; i++) champs[i].type = 'password';
+  var boutons = zone.querySelectorAll('.btn-oeil');
+  for (var j = 0; j < boutons.length; j++) {
+    boutons[j].classList.remove('actif');
+    boutons[j].setAttribute('aria-pressed', 'false');
+    boutons[j].setAttribute('aria-label', 'Afficher le mot de passe');
+    boutons[j].setAttribute('title', 'Afficher le mot de passe');
   }
 }
 
@@ -12327,12 +12373,22 @@ function _checkEmail(id, forcer) {
 // message dédié. Réutilise _showFieldError/_clearFieldError, le même
 // système d'erreurs que tout le reste du formulaire — aucune logique
 // de validation parallèle créée.
+// Longueur minimale d'un mot de passe CRÉÉ ou MODIFIÉ. Valeur unique
+// pour tout le site public ; le Dashboard et la création de compte
+// partenaire appliquent la même. Elle ne s'applique JAMAIS à la
+// connexion : un compte plus ancien doit pouvoir tenter de se connecter
+// avec son mot de passe historique, c'est Supabase Auth qui tranche.
+var HC_MDP_LONGUEUR_MIN = 8;
+
 function _checkPassword(id, forcer) {
   var el = document.getElementById(id);
   if (!el || (!forcer && !_isVisible(el))) return true;
   var v = el.value || '';
   if (!v.trim()) { _showFieldError(id, 'Ce champ est obligatoire.'); return false; }
-  if (v.length < 6) { _showFieldError(id, 'Le mot de passe doit contenir au moins 6 caractères.'); return false; }
+  if (v.length < HC_MDP_LONGUEUR_MIN) {
+    _showFieldError(id, 'Le mot de passe doit contenir au moins ' + HC_MDP_LONGUEUR_MIN + ' caractères.');
+    return false;
+  }
   _clearFieldError(id);
   return true;
 }
@@ -14951,6 +15007,10 @@ function openModal(type) {
 
   document.getElementById('modal-' + type).classList.add('open');
 
+  // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
+  // l'état laissé lors de la fermeture précédente.
+  reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
+
   document.body.style.overflow = 'hidden';
   document.body.classList.add('hc-modal-open');
 
@@ -14970,6 +15030,8 @@ function closeModal(type) {
   // V77.3 - ORDRE STRICT : le brouillon est finalise AVANT tout retrait
   // de la classe open, pour ne dependre d'aucun effet de bord du DOM.
   if (type === 'client') _finaliserBrouillonClientAvantFermeture();
+
+  reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
 
   document.getElementById('modal-' + type).classList.remove('open');
 

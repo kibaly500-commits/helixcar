@@ -228,7 +228,20 @@ et **ne bloquer aucun partenaire avant la phase C**.
    N'ajoutez que les origines réellement servies : chaque entrée est une
    destination de redirection acceptée après authentification.
 
-6. **Authentification des clients (Supabase → Authentication).** Les
+6. **Longueur minimale du mot de passe côté Auth (Supabase → Authentication
+   → Providers → Email → *Minimum password length*).** Régler sur **8**.
+
+   Les trois parcours de création ou de modification appliquent déjà 8
+   caractères dans le navigateur (inscription client, inscription
+   partenaire, nouveau mot de passe). Ce réglage ferme la porte côté
+   serveur : sans lui, un appel direct à l'API Supabase pourrait encore
+   créer un mot de passe plus court.
+
+   > La règle porte sur la **création et la modification**. Elle
+   > n'empêche pas un compte plus ancien de se connecter avec un mot de
+   > passe historique plus court — c'est voulu.
+
+7. **Authentification des clients (Supabase → Authentication).** Les
    comptes clients sont désormais créés par le formulaire public
    (`auth.signUp`). Décider explicitement si la **confirmation d'adresse
    e-mail** est exigée : si elle l'est, le client ne peut pas se
@@ -236,7 +249,7 @@ et **ne bloquer aucun partenaire avant la phase C**.
    inaccessible entre-temps. Adapter le modèle d'e-mail de confirmation
    dans Supabase — c'est un e-mail **du service d'authentification**, pas
    un e-mail EmailJS ; aucun modèle EmailJS n'a été touché.
-7. **Demandes déposées sans compte** : `clients.auth_user_id` reste NULL.
+8. **Demandes déposées sans compte** : `clients.auth_user_id` reste NULL.
    Elles n'apparaissent dans aucun espace client — comportement voulu,
    aucun rattachement automatique par e-mail n'est effectué.
 

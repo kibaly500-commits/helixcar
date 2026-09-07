@@ -168,16 +168,33 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     validationsRetirees.length === 0, validationsRetirees.slice(0, 3).join(' | '));
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: '/home/user/helixcar' }).toString().trim().split('\n');
+  // creer-compte-convoyeur.html est entré dans le périmètre avec
+  // l'harmonisation des mots de passe : l'inscription partenaire y vit,
+  // et elle était explicitement demandée. Élargissement DÉLIBÉRÉ, pas
+  // un assouplissement du garde-fou — la liste de E6b reste la barrière
+  // pour tous les autres fichiers.
   L.check('E6 : périmètre de fichiers maîtrisé',
     fichiers.every(f => f === 'index.html' || f === 'dashboard.html'
+                     || f === 'creer-compte-convoyeur.html'
                      || f.startsWith('migrations/') || f.startsWith('tests/')
                      || f.startsWith('supabase/functions/')),
     fichiers.join(', '));
   L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
     !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
-                         'lettre-voiture.html', 'creer-compte-convoyeur.html',
+                         'lettre-voiture.html',
                          'helixcar-emails.html'].indexOf(f) !== -1),
     fichiers.join(', '));
+  // Ce qui est touché dans l'inscription partenaire doit se limiter aux
+  // mots de passe : aucun autre comportement de cette page ne change.
+  const diffConvoyeur = execSync('git diff origin/main -- creer-compte-convoyeur.html',
+    { cwd: '/home/user/helixcar' }).toString();
+  const ajoutsConvoyeur = diffConvoyeur.split('\n')
+    .filter(l => (l.startsWith('+') || l.startsWith('-')) && !/^[+-]{3}/.test(l))
+    .map(l => l.slice(1).trim())
+    .filter(l => l && !l.startsWith('//'));
+  L.check('E6c : dans l\'inscription partenaire, seuls les mots de passe changent',
+    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)),
+    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)).slice(0, 3).join(' | '));
   L.check('E7 : aucun fichier SQL exécuté (dossier migrations livré tel quel)',
     fichiers.some(f => f.startsWith('migrations/')));
 

@@ -18,7 +18,7 @@ Le chemin de Chromium est défini dans `lib.js` (constante `EXE`) ; adaptez-le
 
 ```bash
 cd tests
-for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin t_decisions t_client t_infos t_motdepasse; do
+for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin t_decisions t_client t_infos t_motdepasse t_mdp_ui; do
   echo "== $f"; node $f.js || echo "ÉCHEC $f"
 done
 
@@ -52,6 +52,7 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_client.js` | **Espace client** : session réelle, action « Faire une nouvelle demande », ouverture du VRAI formulaire public en mode connecté, profil prérempli, compte et e-mail non redemandés, payload rattaché au compte, récapitulatif, contact sur place, retour arrière, double clic, F5, coupure réseau |
 | `t_infos.js` | **Informations à compléter** : onglet client, progression, écran de complétion (rubriques manquantes uniquement), transmission, bloc administrateur (Valider / À corriger avec motif obligatoire), persistance, garde-fous |
 | `t_motdepasse.js` | **Réinitialisation du mot de passe** : le lien ne tente plus de connexion, adresse vide ou invalide, message neutre identique pour une adresse connue et inconnue, double clic, limitation d'envoi, coupure réseau, formulaire à deux champs, mots de passe différents, lien expiré ou déjà utilisé, F5 pendant le parcours, ancien mot de passe refusé et nouveau accepté, aucun e-mail EmailJS |
+| `t_mdp_ui.js` | **Longueur minimale et bouton œil** : 6 et 7 caractères refusés à la création, 8 accepté, la connexion ne juge jamais la longueur, œil sur les six champs (masqué par défaut, bascule, valeur et curseur conservés, yeux indépendants, pas de soumission, clavier, tactile, petit écran, retour à l'état masqué à la réouverture) |
 | `t_rls.sh` | **Politiques RLS exécutées pour de vrai** sur un PostgreSQL 16 local jetable : compatibilité de la phase préparatoire avec l'ancien Dashboard, effet du durcissement, partenaire bloqué (fiche visible, zéro mission, auto-déblocage impossible, décisions conservées), déblocage administrateur, idempotence de la chaîne complète |
 | `t_decisions.js` | **Décisions par activité et blocage partenaire** : indépendance des activités, six transitions, confirmation explicite et annulation sans écriture, historique complet, persistance après F5, blocage réellement enregistré, refus d'autorisation, invalidation d'une session ouverte, zéro e-mail |
 | `t_video_securite.mjs` | **Sécurité** : exécute le vrai code de la fonction serveur `candidature-video` contre un double Supabase (jeton, chemin imposé par le serveur, cloisonnement A/B, contrôles format/taille/durée, usage unique, orphelins) |
