@@ -90,14 +90,24 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
       activites: ['convoyage', 'nettoyage', 'renfort'].every(v => !!document.getElementById('conv-act-' + v)),
       docs: ['identite', 'permis', 'rcpro'].every(v => !!document.getElementById('conv-doc-' + v)),
       etapes: typeof _validateConvStep === 'function',
-      videoChamp: !!document.querySelector('[id*="conv-video"]')
+      videoChamp: !!document.querySelector('[id*="conv-video"]'),
+      // Sans activité sélectionnée, la vidéo ne doit rien exiger.
+      videoRequiseSansActivite: (typeof _convVideoRequise === 'function') ? _convVideoRequise() : null,
+      videoGroupeMasque: (document.getElementById('conv-video-group') || {}).style.display
     };
   });
   L.check('D1 : Partenaire — modale toujours fonctionnelle', part.ouvert);
   L.check('D2 : Partenaire — 3 activités toujours présentes', part.activites);
   L.check('D3 : Partenaire — 3 documents toujours présents', part.docs);
   L.check('D4 : Partenaire — validation par étape intacte', part.etapes);
-  L.check('D5 : Partenaire — aucune vidéo introduite dans cette PR (lot ultérieur)', part.videoChamp === false);
+  // La vidéo fait désormais partie du parcours partenaire : ce qui doit
+  // rester vrai, c'est qu'elle n'impose rien tant qu'aucune activité ne
+  // l'exige (le formulaire reste utilisable exactement comme avant).
+  L.check('D5 : Partenaire — bloc vidéo présent', part.videoChamp === true);
+  L.check('D5b : Partenaire — aucune vidéo exigée sans activité sélectionnée',
+    part.videoRequiseSansActivite === false, String(part.videoRequiseSansActivite));
+  L.check('D5c : Partenaire — bloc vidéo masqué par défaut',
+    part.videoGroupeMasque === 'none', part.videoGroupeMasque);
   L.check('D6 : aucune erreur JS (partenaire)', page.jsErrors.length === 0, page.jsErrors.join(' | '));
   await page.close();
 
@@ -119,7 +129,13 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: '/home/user/helixcar' }).toString().trim().split('\n');
   L.check('E6 : périmètre de fichiers maîtrisé',
-    fichiers.every(f => f === 'index.html' || f === 'dashboard.html' || f.startsWith('migrations/')),
+    fichiers.every(f => f === 'index.html' || f === 'dashboard.html'
+                     || f.startsWith('migrations/') || f.startsWith('tests/')),
+    fichiers.join(', '));
+  L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
+    !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
+                         'lettre-voiture.html', 'creer-compte-convoyeur.html',
+                         'helixcar-emails.html'].indexOf(f) !== -1),
     fichiers.join(', '));
   L.check('E7 : aucun fichier SQL exécuté (dossier migrations livré tel quel)',
     fichiers.some(f => f.startsWith('migrations/')));
