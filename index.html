@@ -7427,7 +7427,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;font-size:.92rem" onclick="submitConnexionForm()">Se connecter →</button>
 
       <p style="text-align:center;margin-top:16px">
-        <a href="#" class="hc-forgot-link" onclick="event.preventDefault();submitConnexionForm()">Mot de passe oublié ?</a>
+        <a href="#" class="hc-forgot-link" onclick="event.preventDefault();demanderReinitialisationMotDePasse()">Mot de passe oublié ?</a>
       </p>
 
       <div class="hc-signup-zone">
@@ -15015,6 +15015,90 @@ function hero2ChangeScenario(direction) {
 // Supabase Auth, ni session, ni Dashboard client). Cette modale
 // prépare uniquement l'interface visuelle demandée ; elle ne simule
 // aucune connexion réussie et ne crée aucune session.
+// ============================================================
+// MOT DE PASSE OUBLIÉ
+// ============================================================
+// Ce lien tentait auparavant une CONNEXION : il appelait
+// submitConnexionForm(). Corrigé — il déclenche désormais la vraie
+// réinitialisation de Supabase Auth.
+//
+// Aucun second système : c'est la même fonction Supabase
+// (resetPasswordForEmail) et la même page d'atterrissage
+// (dashboard.html) que le parcours déjà en place pour les partenaires
+// et les administrateurs. Le mot de passe lui-même n'est jamais saisi
+// ici : il l'est sur la page d'arrivée, après le clic sur le lien reçu.
+
+var _reinitEnvoiEnCours = false;
+
+// Même URL de retour que le Dashboard, construite depuis l'origine
+// réellement servie. Chaque origine utilisée doit être autorisée dans
+// Supabase (voir le dossier de recette).
+function _hcUrlRetourReinitialisation() {
+  try {
+    var o = window.location.origin;
+    if (o && /^https?:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+}
+
+// Message TOUJOURS identique, que l'adresse existe ou non.
+var HC_REINIT_MESSAGE_NEUTRE =
+  'Si un compte correspond à cette adresse, un lien de réinitialisation vient d\'être envoyé. Pensez à vérifier vos courriers indésirables.';
+
+async function demanderReinitialisationMotDePasse() {
+  if (event) event.preventDefault();
+  var msg = document.getElementById('connexion-message');
+  var afficher = function (texte) {
+    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
+  };
+
+  // Double clic : le second appel ne renvoie pas un deuxième e-mail.
+  if (_reinitEnvoiEnCours) return;
+
+  // L'adresse est reprise du champ de connexion déjà rempli ; on ne la
+  // demande que si elle est absente.
+  var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
+  if (!email) {
+    afficher('Renseignez votre adresse e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié ? ».');
+    var champ = document.getElementById('connexion-email');
+    if (champ) champ.focus();
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    afficher('Cette adresse e-mail n\'est pas valide.');
+    return;
+  }
+  if (!_sb || !_sb.auth) {
+    afficher('Service momentanément indisponible. Réessayez dans quelques instants.');
+    return;
+  }
+
+  _reinitEnvoiEnCours = true;
+  afficher('Envoi en cours…');
+  try {
+    var res = await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: _hcUrlRetourReinitialisation()
+    });
+    var erreur = res && res.error;
+    // Limitation temporaire des envois : on le dit, sans jamais
+    // indiquer si un compte existe.
+    var trop = erreur && (erreur.status === 429
+      || /rate limit|too many requests|seconds/i.test(String(erreur.message || '')));
+    if (trop) {
+      afficher('Trop de demandes en peu de temps. Patientez quelques minutes avant de réessayer.');
+      return;
+    }
+    // Toute autre erreur reste silencieuse : la distinguer d'un succès
+    // révélerait l'existence du compte.
+    if (erreur) console.error('resetPasswordForEmail:', erreur);
+    afficher(HC_REINIT_MESSAGE_NEUTRE);
+  } catch (e) {
+    afficher('L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.');
+  } finally {
+    _reinitEnvoiEnCours = false;
+  }
+}
+
 async function submitConnexionForm() {
   event && event.preventDefault();
   var msg = document.getElementById('connexion-message');

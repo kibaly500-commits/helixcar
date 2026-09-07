@@ -212,7 +212,23 @@ et **ne bloquer aucun partenaire avant la phase C**.
    demandes existantes à un compte est laissé volontairement non exécuté
    (requête fournie en commentaire dans `06`) — un rapprochement par
    e-mail peut exposer la demande d'un tiers en cas d'adresse réutilisée.
-5. **Authentification des clients (Supabase → Authentication).** Les
+5. **URL de redirection à autoriser (Supabase → Authentication → URL Configuration).**
+   Le lien de réinitialisation du mot de passe renvoie vers
+   `<origine du site>/dashboard.html`. Supabase **refuse** toute
+   redirection non autorisée : le lien retomberait alors sur la page
+   d'accueil sans ouvrir le formulaire. À déclarer :
+
+   | Champ | Valeur |
+   |---|---|
+   | Site URL | `https://helixcar-i89b.vercel.app` |
+   | Redirect URLs | `https://helixcar-i89b.vercel.app/dashboard.html` |
+   | Redirect URLs (préversions Vercel, si utilisées pour la recette) | `https://helixcar-i89b-*.vercel.app/dashboard.html` |
+   | Redirect URLs (développement local, si utilisé) | `http://localhost:3000/dashboard.html` |
+
+   N'ajoutez que les origines réellement servies : chaque entrée est une
+   destination de redirection acceptée après authentification.
+
+6. **Authentification des clients (Supabase → Authentication).** Les
    comptes clients sont désormais créés par le formulaire public
    (`auth.signUp`). Décider explicitement si la **confirmation d'adresse
    e-mail** est exigée : si elle l'est, le client ne peut pas se
@@ -220,7 +236,7 @@ et **ne bloquer aucun partenaire avant la phase C**.
    inaccessible entre-temps. Adapter le modèle d'e-mail de confirmation
    dans Supabase — c'est un e-mail **du service d'authentification**, pas
    un e-mail EmailJS ; aucun modèle EmailJS n'a été touché.
-6. **Demandes déposées sans compte** : `clients.auth_user_id` reste NULL.
+7. **Demandes déposées sans compte** : `clients.auth_user_id` reste NULL.
    Elles n'apparaissent dans aucun espace client — comportement voulu,
    aucun rattachement automatique par e-mail n'est effectué.
 

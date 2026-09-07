@@ -2374,6 +2374,46 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
+<!-- ============================================================
+     NOUVEAU MOT DE PASSE — page d'atterrissage du lien reçu par e-mail
+     ============================================================
+     Point d'arrivée UNIQUE des trois rôles (client, partenaire,
+     administrateur) : le lien de réinitialisation de Supabase Auth
+     renvoie ici, quel que soit l'endroit d'où la demande est partie —
+     l'écran de connexion de cette page, ou le site public.
+     Remplace l'ancien double prompt(), qui ne demandait aucune
+     confirmation et ne pouvait donc pas détecter une faute de frappe. -->
+<div class="modal-overlay" id="modal-reinit-mdp">
+  <div class="modal" style="position:relative;max-width:440px;text-align:left">
+    <h3 style="margin-bottom:6px">Nouveau mot de passe</h3>
+    <p id="reinit-sous-titre" style="font-size:.85rem;color:#666;margin-top:0">
+      Choisissez un nouveau mot de passe pour votre compte HelixCar.
+    </p>
+
+    <div id="reinit-alert" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;color:#991B1B"></div>
+
+    <div id="reinit-formulaire">
+      <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Nouveau mot de passe</label>
+      <input type="password" id="reinit-mdp" autocomplete="new-password"
+             style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:4px;margin-bottom:12px;font-size:.9rem">
+
+      <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Confirmer le mot de passe</label>
+      <input type="password" id="reinit-mdp2" autocomplete="new-password"
+             style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:4px;margin-bottom:16px;font-size:.9rem">
+
+      <button class="btn btn-primary btn-full" id="reinit-valider"
+              onclick="enregistrerNouveauMotDePasse()">Enregistrer le mot de passe</button>
+    </div>
+
+    <div id="reinit-succes" style="display:none">
+      <div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:4px;padding:12px 14px;font-size:.85rem;color:#065F46;margin-bottom:14px">
+        Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.
+      </div>
+      <button class="btn btn-primary btn-full" onclick="terminerReinitialisation()">Aller à la connexion</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-fiche-demande">
   <div class="modal" style="position:relative;max-width:720px;text-align:left;max-height:88vh;overflow-y:auto">
     <h3 id="fiche-demande-titre" style="margin-bottom:14px">Demande</h3>
@@ -3283,21 +3323,187 @@ const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPA
   } catch (e) { console.error('Erreur restauration session démo:', e); }
 })();
 
+// ============================================================
+// RÉINITIALISATION DU MOT DE PASSE — parcours unique
+// ============================================================
+// Un seul mécanisme pour les trois rôles. Le site public (index.html)
+// appelle la même fonction Supabase avec la même URL de retour ; c'est
+// cette page qui reçoit le lien et propose le nouveau mot de passe.
+//
+// Le mot de passe ne transite QUE par Supabase Auth : il n'entre dans
+// aucune table, dans aucun payload de demande, dans aucun e-mail
+// EmailJS, et n'est jamais écrit dans la console.
+
+// Longueur minimale : 8 caractères. C'est la règle qui s'appliquait
+// déjà à ce parcours avant ce correctif — on ne l'affaiblit pas.
+const REINIT_LONGUEUR_MIN = 8;
+
+// URL de retour du lien reçu par e-mail. Construite depuis l'origine
+// réellement servie pour que les environnements de préversion
+// fonctionnent, avec repli sur l'adresse de production quand l'origine
+// n'est pas exploitable (ouverture d'un fichier local, par exemple).
+// Chaque origine utilisée doit être autorisée dans Supabase.
+function urlRetourReinitialisation() {
+  try {
+    const o = window.location.origin;
+    if (o && /^https?:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+}
+
+// Message TOUJOURS identique, que l'adresse existe ou non : il ne doit
+// jamais permettre de découvrir qui a un compte chez HelixCar.
+const REINIT_MESSAGE_NEUTRE =
+  'Si un compte correspond à cette adresse, un lien de réinitialisation vient d\'être envoyé. Pensez à vérifier vos courriers indésirables.';
+
+// Vrai si l'erreur renvoyée par Supabase est une limitation temporaire
+// du nombre d'envois. On l'annonce sans révéler l'existence du compte.
+function _estLimitationEnvoi(erreur) {
+  const m = String((erreur && erreur.message) || '').toLowerCase();
+  return (erreur && (erreur.status === 429 || erreur.code === 'over_email_send_rate_limit'))
+      || /rate limit|too many requests|seconds/.test(m);
+}
+
+let _envoiReinitEnCours = false;
+
+// Envoi du lien. `email` est fourni par l'appelant (champ de connexion
+// du site public, ou saisie ici) : cette fonction ne devine rien.
+// Retourne { ok, message } — l'appelant décide de l'affichage.
+async function envoyerLienReinitialisation(email) {
+  if (_envoiReinitEnCours) return { ok: false, message: null, enCours: true };
+  const adresse = String(email || '').trim();
+  if (!adresse) {
+    return { ok: false, message: 'Renseignez votre adresse e-mail pour recevoir un lien.' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(adresse)) {
+    return { ok: false, message: 'Cette adresse e-mail n\'est pas valide.' };
+  }
+  if (!sbAuth || !sbAuth.auth) {
+    return { ok: false, message: 'Service momentanément indisponible. Réessayez dans quelques instants.' };
+  }
+
+  _envoiReinitEnCours = true;
+  try {
+    const { error } = await sbAuth.auth.resetPasswordForEmail(adresse, {
+      redirectTo: urlRetourReinitialisation()
+    });
+    if (error && _estLimitationEnvoi(error)) {
+      return { ok: false, message: 'Trop de demandes en peu de temps. Patientez quelques minutes avant de réessayer.' };
+    }
+    // Toute autre erreur serveur reste silencieuse pour l'utilisateur :
+    // la distinguer d'un succès révélerait si l'adresse existe.
+    if (error) console.error('resetPasswordForEmail:', error);
+    return { ok: true, message: REINIT_MESSAGE_NEUTRE };
+  } catch (e) {
+    return { ok: false, message: 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.' };
+  } finally {
+    _envoiReinitEnCours = false;
+  }
+}
+
+// Entrée depuis l'écran de connexion du Dashboard.
 async function ouvrirMotDePasseOublie(e) {
   if (e) e.preventDefault();
-  const email = prompt('Entre ton adresse email pour recevoir un lien de réinitialisation :');
-  if (!email || !email.trim()) return;
-  if (!sbAuth) { alert('❌ Erreur technique (Supabase non initialisé).'); return; }
-  try {
-    const { error } = await sbAuth.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html'
-    });
-    if (error) { alert('❌ ' + error.message); return; }
-    alert('📬 Si un compte existe avec cet email, un lien de réinitialisation vient d\'être envoyé (pense à vérifier les spams).');
-  } catch (e2) {
-    console.error('Erreur réinitialisation mot de passe:', e2);
-    alert('❌ Erreur lors de l\'envoi (voir la console).');
+  const champ = document.getElementById('login-email');
+  let adresse = champ ? champ.value.trim() : '';
+  if (!adresse) {
+    adresse = (prompt('Votre adresse e-mail, pour recevoir un lien de réinitialisation :') || '').trim();
+    if (!adresse) return;
   }
+  const r = await envoyerLienReinitialisation(adresse);
+  if (r.enCours) return;
+  alert(r.message);
+}
+
+// ------------------------------------------------------------
+// Écran « Nouveau mot de passe »
+// ------------------------------------------------------------
+let _enregistrementMdpEnCours = false;
+
+function _reinitAfficherErreur(texte) {
+  const el = document.getElementById('reinit-alert');
+  if (!el) return;
+  if (!texte) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = texte;
+}
+
+function ouvrirFormulaireNouveauMotDePasse() {
+  // Mémorisé pour survivre à un F5 : après rechargement, Supabase ne
+  // rejoue pas l'événement PASSWORD_RECOVERY, mais la session de
+  // récupération est toujours ouverte — le formulaire doit revenir.
+  try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+  const f = document.getElementById('reinit-formulaire');
+  const s = document.getElementById('reinit-succes');
+  if (f) f.style.display = '';
+  if (s) s.style.display = 'none';
+  _reinitAfficherErreur('');
+  const a = document.getElementById('reinit-mdp');
+  const b = document.getElementById('reinit-mdp2');
+  if (a) a.value = '';
+  if (b) b.value = '';
+  openModal('reinit-mdp');
+  if (a) a.focus();
+}
+
+async function enregistrerNouveauMotDePasse() {
+  // Double clic : le second appel ne fait rien tant que le premier
+  // n'a pas répondu. Aucun double enregistrement.
+  if (_enregistrementMdpEnCours) return;
+
+  const a = document.getElementById('reinit-mdp');
+  const b = document.getElementById('reinit-mdp2');
+  const mdp = a ? a.value : '';
+  const mdp2 = b ? b.value : '';
+
+  if (!mdp || !mdp2) { _reinitAfficherErreur('Renseignez les deux champs.'); return; }
+  if (mdp.length < REINIT_LONGUEUR_MIN) {
+    _reinitAfficherErreur('Le mot de passe doit contenir au moins ' + REINIT_LONGUEUR_MIN + ' caractères.');
+    return;
+  }
+  if (mdp !== mdp2) { _reinitAfficherErreur('Les deux mots de passe ne sont pas identiques.'); return; }
+
+  _enregistrementMdpEnCours = true;
+  const bouton = document.getElementById('reinit-valider');
+  const libelle = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
+  _reinitAfficherErreur('');
+
+  try {
+    const { error } = await sbAuth.auth.updateUser({ password: mdp });
+    if (error) {
+      // Lien expiré ou déjà utilisé : la session de récupération
+      // n'existe plus. On le dit clairement et on renvoie vers la
+      // demande d'un nouveau lien.
+      const m = String(error.message || '').toLowerCase();
+      if (/expired|invalid|session|not authenticated|jwt/.test(m)) {
+        _reinitAfficherErreur('Ce lien n\'est plus valide : il a expiré ou a déjà été utilisé. Demandez un nouveau lien depuis « Mot de passe oublié ? ».');
+      } else {
+        _reinitAfficherErreur('Le mot de passe n\'a pas pu être enregistré. Réessayez.');
+      }
+      return;
+    }
+    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    const f = document.getElementById('reinit-formulaire');
+    const s = document.getElementById('reinit-succes');
+    if (f) f.style.display = 'none';
+    if (s) s.style.display = '';
+  } catch (e) {
+    _reinitAfficherErreur('L\'enregistrement n\'a pas abouti. Vérifiez votre connexion et réessayez.');
+  } finally {
+    _enregistrementMdpEnCours = false;
+    if (bouton) { bouton.disabled = false; bouton.textContent = libelle || 'Enregistrer le mot de passe'; }
+  }
+}
+
+// Ferme le parcours et rend la main à la connexion normale. On ferme la
+// session de récupération : le compte se reconnecte avec le NOUVEAU mot
+// de passe, ce qui vérifie du même coup qu'il fonctionne.
+async function terminerReinitialisation() {
+  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  closeModal('reinit-mdp');
+  try { if (sbAuth && sbAuth.auth) await sbAuth.auth.signOut(); } catch (e) {}
+  try { doLogout(); } catch (e) {}
 }
 
 // Déclenché quand la personne arrive via un lien reçu par email (confirmation de compte,
@@ -3308,20 +3514,22 @@ async function ouvrirMotDePasseOublie(e) {
 if (sbAuth) {
   sbAuth.auth.onAuthStateChange(function(event, session) {
     if (event === 'PASSWORD_RECOVERY') {
-      const nouveauMdp = prompt('Choisis ton nouveau mot de passe (8 caractères minimum) :');
-      if (!nouveauMdp) return;
-      if (nouveauMdp.length < 8) {
-        alert('❌ Le mot de passe doit contenir au moins 8 caractères. Réutilise le lien reçu par email pour réessayer.');
-        return;
-      }
-      sbAuth.auth.updateUser({ password: nouveauMdp }).then(function(res) {
-        if (res.error) { alert('❌ ' + res.error.message); }
-        else { alert('✅ Mot de passe mis à jour ! Tu es maintenant connecté sur ton espace.'); }
-      });
+      ouvrirFormulaireNouveauMotDePasse();
       return;
     }
     // Réagit à toute session valide détectée (connexion fraîche, lien cliqué, ou session
     // déjà active en revenant sur la page) — la reconnexion automatique reste active.
+    // Reprise après un F5 en pleine réinitialisation : Supabase ne
+    // rejoue pas PASSWORD_RECOVERY, mais la session de récupération est
+    // encore ouverte. On rouvre le formulaire au lieu d'ouvrir l'espace,
+    // sans quoi la personne se retrouverait connectée sans jamais avoir
+    // choisi son nouveau mot de passe.
+    let _reinitEnCours = false;
+    try { _reinitEnCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
+    if (_reinitEnCours && session && session.user) {
+      ouvrirFormulaireNouveauMotDePasse();
+      return;
+    }
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session && session.user && session.user.email) {
       const cleUser = session.user.id;
       if (window._dernierAuthUserTraite === cleUser) return; // déjà traité cet utilisateur, évite les doublons
