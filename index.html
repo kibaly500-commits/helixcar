@@ -6350,9 +6350,210 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
-      <div id="bloc-socle-professionnel" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
-        <div class="modal-section-title">Votre besoin en personnel</div>
-        <p style="color:#666;font-size:.85rem;line-height:1.6;margin:0">Ce parcours est en cours de préparation chez HelixCar. Il vous permettra bientôt de décrire précisément le professionnel automobile recherché.</p>
+      <!-- TROUVER UN PROFESSIONNEL AUTOMOBILE — parcours complet, porté
+           par l'étape 2 existante : aucune nouvelle étape globale.
+           Rubriques repliables reprenant STRICTEMENT les classes des
+           sous-accordéons véhicules (veh-sous-*), donc le même design,
+           les mêmes boutons Effacer / OK et aucune nouvelle icône. -->
+      <div id="bloc-socle-professionnel" style="display:none">
+
+        <!-- RUBRIQUE — Votre besoin -->
+        <div class="veh-sous-accordeon" id="pro-acc-besoin">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('besoin')">
+            <span class="veh-sous-num" data-pro-num="besoin">1</span><span class="veh-sous-titre">Votre besoin</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group" id="pro-categorie-group">
+              <label>De quel professionnel avez-vous besoin ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="technicien" onclick="proOnCategorieChange()"><span>Technicien automobile<span class="hc-opt-desc">Mécanique, carrosserie, diagnostic et autres spécialités</span></span></label>
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Jockey automobile, accueil et préparation des véhicules, et d'autres missions</span></span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-specialite-group" style="display:none">
+              <label>Quelle spécialité recherchez-vous ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="mecanique" onclick="proOnMetierChange()"><span>Mécanique</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="carrosserie" onclick="proOnMetierChange()"><span>Carrosserie</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="diagnostic" onclick="proOnMetierChange()"><span>Diagnostic</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="autre" onclick="proOnMetierChange()"><span>Une autre spécialité</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="conseil" onclick="proOnMetierChange()"><span>Je souhaite être conseillé</span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-mission-group" style="display:none">
+              <label>Quelle mission souhaitez-vous confier ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="jockey" onclick="proOnMetierChange()"><span>Jockey automobile</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="accueil_preparation" onclick="proOnMetierChange()"><span>Accueil et préparation des véhicules</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="autre" onclick="proOnMetierChange()"><span>Une autre mission</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="conseil" onclick="proOnMetierChange()"><span>Je souhaite être conseillé</span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-metier-precision-group" style="display:none">
+              <label>Précisez <span class="field-required">*</span></label>
+              <input type="text" id="pro-metier-precision" placeholder="Ex : électricité automobile" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+
+            <div class="modal-form-group" id="pro-nb-pros-group" style="display:none">
+              <label>Combien de professionnels souhaitez-vous ? <span class="field-required">*</span></label>
+              <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn-compteur" onclick="proMajNbPros(-1)" aria-label="Retirer un professionnel">&minus;</button>
+                <input type="number" id="pro-nb-pros" value="1" min="1" max="20" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
+                <button type="button" class="btn-compteur" onclick="proMajNbPros(1)" aria-label="Ajouter un professionnel">+</button>
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('besoin')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('besoin')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Véhicules (technicien uniquement) -->
+        <div class="veh-sous-accordeon" id="pro-acc-vehicules" style="display:none">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('vehicules')">
+            <span class="veh-sous-num" data-pro-num="vehicules">2</span><span class="veh-sous-titre" id="pro-vehicules-titre">Informations sur les véhicules</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label>Combien de véhicules sont concernés ? <span class="field-required">*</span></label>
+              <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(-1)" aria-label="Retirer un véhicule">&minus;</button>
+                <input type="number" id="pro-nb-vehicules" value="1" min="1" max="3" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
+                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(1)" aria-label="Ajouter un véhicule">+</button>
+              </div>
+            </div>
+
+            <div id="pro-vehicules-liste"></div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('vehicules')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('vehicules')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Lieu d'intervention (+ contact sur place) -->
+        <div class="veh-sous-accordeon" id="pro-acc-lieu">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('lieu')">
+            <span class="veh-sous-num" data-pro-num="lieu">3</span><span class="veh-sous-titre">Lieu d'intervention</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label>Adresse postale <span class="field-required">*</span></label>
+              <input type="text" id="pro-adresse-rue" placeholder="Ex : 18 rue de Paris" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Code postal <span class="field-required">*</span></label>
+                <input type="text" id="pro-adresse-cp" placeholder="93160" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Ville <span class="field-required">*</span></label>
+                <input type="text" id="pro-adresse-ville" placeholder="Noisy-le-Grand" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-contact-sp-group">
+              <label>Qui sera le contact sur place ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-contact-sp" value="moi" onclick="hcContactSurPlaceChange('pro')"><span>Moi-même</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-contact-sp" value="autre" onclick="hcContactSurPlaceChange('pro')"><span>Une autre personne</span></label>
+              </div>
+            </div>
+
+            <div id="pro-contact-sp-moi" style="display:none">
+              <div id="pro-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+              <div id="pro-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+            </div>
+
+            <div id="pro-contact-sp-autre" style="display:none">
+              <div class="modal-row">
+                <div class="modal-form-group">
+                  <label>Nom et prénom <span class="field-required">*</span></label>
+                  <input type="text" id="pro-contact-sp-nom" placeholder="Ex : Karim B." autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                </div>
+                <div class="modal-form-group">
+                  <label>Téléphone <span class="field-required">*</span></label>
+                  <input type="tel" id="pro-contact-sp-tel" placeholder="+33 6 00 00 00 00" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                </div>
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('lieu')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('lieu')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Période et horaires -->
+        <div class="veh-sous-accordeon" id="pro-acc-periode">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('periode')">
+            <span class="veh-sous-num" data-pro-num="periode">4</span><span class="veh-sous-titre">Période et horaires</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Date de début <span class="field-required">*</span></label>
+                <input type="date" id="pro-date-debut" readonly onchange="proOnDateChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Date de fin <span class="field-required">*</span></label>
+                <input type="date" id="pro-date-fin" readonly onchange="proOnDateChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Heure de début <span class="field-required">*</span></label>
+                <input type="time" id="pro-horaire-cdeb" readonly onchange="proOnHoraireChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Heure de fin <span class="field-required">*</span></label>
+                <input type="time" id="pro-horaire-cfin" readonly onchange="proOnHoraireChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('periode')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('periode')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Mission -->
+        <div class="veh-sous-accordeon" id="pro-acc-mission">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('mission')">
+            <span class="veh-sous-num" data-pro-num="mission">5</span><span class="veh-sous-titre" id="pro-mission-titre">Mission</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label id="pro-description-label">Décrivez la mission <span class="field-required">*</span></label>
+              <textarea id="pro-description" rows="3" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+            </div>
+
+            <div class="modal-form-group">
+              <label>Informations complémentaires</label>
+              <textarea id="pro-infos" rows="3" placeholder="Tout élément utile à l'organisation de l'intervention" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('mission')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('mission')">OK</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
@@ -8304,6 +8505,644 @@ function _nettLibelleCategorie(v) {
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// TROUVER UN PROFESSIONNEL AUTOMOBILE
+// ══════════════════════════════════════════════════════════════
+// Parcours porte par l'ETAPE 2 existante : aucune nouvelle etape
+// globale, "Continuer" mene directement au recapitulatif habituel
+// (cf. _estEtapeApplicable, qui rend l'etape 4 inapplicable ici).
+// Toutes les donnees metier vivent dans professionnel_details, sur le
+// meme modele que nettoyage_details : liste blanche stricte, aucun
+// champ Convoyage/Stockage ne peut s'y glisser.
+
+var PRO_LIB_CATEGORIE = {
+  technicien: 'Technicien automobile',
+  renfort: 'Renfort automobile sur site'
+};
+var PRO_LIB_SPECIALITE = {
+  mecanique: 'Mécanique', carrosserie: 'Carrosserie', diagnostic: 'Diagnostic',
+  autre: 'Autre spécialité', conseil: 'Client à conseiller'
+};
+var PRO_LIB_MISSION = {
+  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  autre: 'Autre mission', conseil: 'Client à conseiller'
+};
+var PRO_MAX_VEHICULES = 3;
+var PRO_MAX_PROS = 20;
+
+// ── LECTEURS ────────────────────────────────────────
+function _proCategorie() {
+  var el = document.querySelector('input[name="pro-categorie"]:checked');
+  return el ? el.value : '';
+}
+function _proSpecialite() {
+  var el = document.querySelector('input[name="pro-specialite"]:checked');
+  return el ? el.value : '';
+}
+function _proMission() {
+  var el = document.querySelector('input[name="pro-mission"]:checked');
+  return el ? el.value : '';
+}
+// Metier reellement choisi, quelle que soit la categorie.
+function _proMetier() {
+  var c = _proCategorie();
+  if (c === 'technicien') return _proSpecialite();
+  if (c === 'renfort') return _proMission();
+  return '';
+}
+// "Je souhaite etre conseille" : le client n'a pas encore de metier ni
+// de nombre de professionnels a imposer. Rien ne lui est exige de plus.
+function _proConseil() { return _proMetier() === 'conseil'; }
+function _proMetierPrecision() {
+  return ((document.getElementById('pro-metier-precision') || {}).value || '').trim();
+}
+function _proPrecisionApplicable() { return _proMetier() === 'autre'; }
+function _proNbPros() {
+  var n = Number((document.getElementById('pro-nb-pros') || {}).value);
+  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_PROS) : 1;
+}
+// Les vehicules n'existent QUE pour le technicien : un renfort sur site
+// n'est jamais rattache a une liste de vehicules.
+function _proVehiculesApplicables() { return _proCategorie() === 'technicien'; }
+function _proNbVehicules() {
+  var n = Number((document.getElementById('pro-nb-vehicules') || {}).value);
+  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_VEHICULES) : 1;
+}
+function _proAdresseRue() { return ((document.getElementById('pro-adresse-rue') || {}).value || '').trim(); }
+function _proAdresseCp() { return ((document.getElementById('pro-adresse-cp') || {}).value || '').trim(); }
+function _proAdresseVille() { return ((document.getElementById('pro-adresse-ville') || {}).value || '').trim(); }
+function _proDateDebut() { return ((document.getElementById('pro-date-debut') || {}).value || '').trim(); }
+function _proDateFin() { return ((document.getElementById('pro-date-fin') || {}).value || '').trim(); }
+function _proHeureDebut() { return ((document.getElementById('pro-horaire-cdeb') || {}).value || '').trim(); }
+function _proHeureFin() { return ((document.getElementById('pro-horaire-cfin') || {}).value || '').trim(); }
+function _proDescription() { return ((document.getElementById('pro-description') || {}).value || '').trim(); }
+function _proInfos() { return ((document.getElementById('pro-infos') || {}).value || '').trim(); }
+
+// Duree REELLEMENT deduite des deux dates : jamais demandee au client,
+// jamais inventee. Retourne 0 tant que la periode est incomplete.
+function _proDureeJours() {
+  var d = _hcParserYMD(_proDateDebut()), f = _hcParserYMD(_proDateFin());
+  if (!d || !f || f < d) return 0;
+  return Math.round((f - d) / 86400000) + 1;   // bornes incluses
+}
+
+// ── VEHICULES (technicien) ──────────────────────────
+// Meme principe que _nettQuantites : la MEMOIRE JS est la source de
+// verite, jamais le DOM. Les cartes sont re-rendues sans perdre une
+// saisie, et une carte retiree disparait reellement du payload.
+var _proMemoireVehicules = {};
+
+function _reinitialiserVehiculesProfessionnel() { _proMemoireVehicules = {}; }
+
+function _proMemoriserVehicule(i) {
+  _proMemoireVehicules[i] = {
+    type_vehicule: (document.getElementById('pro-veh-' + i + '-type') || {}).value || '',
+    marque_modele: ((document.getElementById('pro-veh-' + i + '-marque') || {}).value || '').trim()
+  };
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  if (typeof _masquerNoticeBrouillonDesReprise === 'function') _masquerNoticeBrouillonDesReprise();
+  _proMajBoutonContinuer();
+}
+
+// Vehicules destines au brouillon / au payload : uniquement ceux qui
+// existent reellement dans le compteur courant.
+function _proVehiculesRetenus() {
+  var out = [];
+  if (!_proVehiculesApplicables()) return out;
+  var n = _proNbVehicules();
+  for (var i = 0; i < n; i++) {
+    var m = _proMemoireVehicules[i] || {};
+    out.push({
+      position: i + 1,
+      type_vehicule: m.type_vehicule || null,
+      marque_modele: m.marque_modele || null
+    });
+  }
+  return out;
+}
+function _proVehiculesPourBrouillon() {
+  var out = {};
+  Object.keys(_proMemoireVehicules).forEach(function (k) {
+    var m = _proMemoireVehicules[k];
+    if (m && typeof m === 'object') {
+      out[k] = { type_vehicule: m.type_vehicule || '', marque_modele: m.marque_modele || '' };
+    }
+  });
+  return out;
+}
+function _proRestaurerVehiculesDepuisBrouillon(source) {
+  _proMemoireVehicules = {};
+  if (!source || typeof source !== 'object') return;   // ancien brouillon : aucune erreur
+  Object.keys(source).forEach(function (k) {
+    var m = source[k];
+    if (m && typeof m === 'object') {
+      _proMemoireVehicules[k] = {
+        type_vehicule: String(m.type_vehicule || ''),
+        marque_modele: String(m.marque_modele || '')
+      };
+    }
+  });
+}
+
+function proRendreVehicules() {
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (!zone) return;
+  var n = _proNbVehicules();
+  var html = '';
+  for (var i = 0; i < n; i++) {
+    var mem = _proMemoireVehicules[i] || {};
+    var options = '<option value="">— Sélectionnez —</option>';
+    // Reutilise la liste de gabarits DEJA existante : aucune nouvelle
+    // nomenclature de vehicules creee pour ce parcours.
+    TYPES_VEHICULE.forEach(function (t) {
+      options += '<option value="' + t[0] + '"' + (mem.type_vehicule === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
+    });
+    html += '<div class="pro-veh-acc" id="pro-veh-acc-' + i + '">' +
+      '<button type="button" class="pro-veh-barre" onclick="proBasculerVehicule(' + i + ')">' +
+        '<span class="pro-veh-num">' + (i + 1) + '</span>' +
+        '<span class="pro-veh-titre">Véhicule ' + (i + 1) + '</span>' +
+        '<span class="pro-veh-chevron">&rsaquo;</span>' +
+      '</button>' +
+      '<div class="pro-veh-contenu">' +
+        '<div class="modal-form-group"><label>Type de véhicule <span class="field-required">*</span></label>' +
+        '<select id="pro-veh-' + i + '-type" onchange="_proMemoriserVehicule(' + i + ');_clearFieldError(\'pro-veh-' + i + '-type\')">' + options + '</select></div>' +
+        '<div class="modal-form-group"><label>Marque et modèle <span class="field-required">*</span></label>' +
+        '<input type="text" id="pro-veh-' + i + '-marque" value="' + _attr(mem.marque_modele || '') + '" placeholder="Ex : BMW Série 3" autocomplete="off" oninput="_proMemoriserVehicule(' + i + ')" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box"></div>' +
+      '</div></div>';
+  }
+  zone.innerHTML = html;
+  _proMajLibelleVehicules();
+}
+
+function proBasculerVehicule(i) {
+  var el = document.getElementById('pro-veh-acc-' + i);
+  if (!el) return;
+  var vaSouvrir = !el.classList.contains('ouvert');
+  // Un clic ouvre UNIQUEMENT la carte choisie.
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (zone) {
+    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (x) {
+      if (x !== el) x.classList.remove('ouvert');
+    });
+  }
+  el.classList.toggle('ouvert', vaSouvrir);
+}
+
+// Libelle dynamique : singulier a 1 vehicule, pluriel au-dela.
+function _proMajLibelleVehicules() {
+  var t = document.getElementById('pro-vehicules-titre');
+  if (t) t.textContent = (_proNbVehicules() > 1) ? 'Informations sur les véhicules' : 'Information sur le véhicule';
+}
+
+function proMajNbVehicules(delta) {
+  var el = document.getElementById('pro-nb-vehicules');
+  if (!el) return;
+  var avant = _proNbVehicules();
+  var apres = Math.min(PRO_MAX_VEHICULES, Math.max(1, avant + delta));
+  if (apres === avant) return;
+  el.value = apres;
+  // Une carte retiree ne doit plus jamais reapparaitre dans le payload.
+  for (var i = apres; i < PRO_MAX_VEHICULES; i++) delete _proMemoireVehicules[i];
+  proRendreVehicules();
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+function proMajNbPros(delta) {
+  var el = document.getElementById('pro-nb-pros');
+  if (!el) return;
+  el.value = Math.min(PRO_MAX_PROS, Math.max(1, _proNbPros() + delta));
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+// ── RUBRIQUES ───────────────────────────────────────
+var PRO_RUBRIQUES = ['besoin', 'vehicules', 'lieu', 'periode', 'mission'];
+
+// Accordeons fermes par defaut : AUCUN ne s'ouvre automatiquement, et
+// un clic n'ouvre que celui qui a ete choisi.
+function proBasculerRubrique(cle) {
+  var el = document.getElementById('pro-acc-' + cle);
+  if (!el) return;
+  var vaSouvrir = !el.classList.contains('ouvert');
+  PRO_RUBRIQUES.forEach(function (k) {
+    var x = document.getElementById('pro-acc-' + k);
+    if (x && x !== el) x.classList.remove('ouvert');
+  });
+  el.classList.toggle('ouvert', vaSouvrir);
+}
+
+// OK : valide LOCALEMENT la rubrique puis la referme si elle est
+// complete. Aucun message d'avancement, aucune ouverture automatique
+// d'une autre rubrique.
+function proOkRubrique(cle) {
+  var ok = _proValiderRubrique(cle, function () {});
+  if (ok) {
+    var el = document.getElementById('pro-acc-' + cle);
+    if (el) el.classList.remove('ouvert');
+  }
+  _proMajBoutonContinuer();
+}
+
+// Effacer : ne nettoie QUE cette rubrique.
+function proEffacerRubrique(cle) {
+  function viderChamps(ids) {
+    ids.forEach(function (id) {
+      var e = document.getElementById(id);
+      if (e) e.value = '';
+      _clearFieldError(id);
+    });
+  }
+  function decocher(name) {
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="' + name + '"]'), function (r) { r.checked = false; });
+  }
+  if (cle === 'besoin') {
+    decocher('pro-categorie'); decocher('pro-specialite'); decocher('pro-mission');
+    viderChamps(['pro-metier-precision']);
+    var nbp = document.getElementById('pro-nb-pros'); if (nbp) nbp.value = 1;
+    _clearGroupError('pro-categorie-group'); _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
+    proOnCategorieChange();
+  } else if (cle === 'vehicules') {
+    _reinitialiserVehiculesProfessionnel();
+    var nbv = document.getElementById('pro-nb-vehicules'); if (nbv) nbv.value = 1;
+    proRendreVehicules();
+  } else if (cle === 'lieu') {
+    viderChamps(['pro-adresse-rue', 'pro-adresse-cp', 'pro-adresse-ville']);
+    decocher('pro-contact-sp');
+    viderChamps(['pro-contact-sp-nom', 'pro-contact-sp-tel']);
+    _clearGroupError('pro-contact-sp-group');
+    hcContactSurPlaceChange('pro');
+  } else if (cle === 'periode') {
+    viderChamps(['pro-date-debut', 'pro-date-fin', 'pro-horaire-cdeb', 'pro-horaire-cfin']);
+  } else if (cle === 'mission') {
+    viderChamps(['pro-description', 'pro-infos']);
+  }
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+// Numerotation continue des rubriques REELLEMENT visibles : sans
+// vehicules (renfort), aucun trou dans la numerotation.
+function _proMajNumerosRubriques() {
+  var n = 0;
+  PRO_RUBRIQUES.forEach(function (cle) {
+    var acc = document.getElementById('pro-acc-' + cle);
+    if (!acc || acc.style.display === 'none') return;
+    n++;
+    var num = acc.querySelector('[data-pro-num]');
+    if (num) num.textContent = String(n);
+  });
+}
+
+// ── CHANGEMENTS ─────────────────────────────────────
+// Changer de categorie remet REELLEMENT a zero toutes les reponses
+// dependantes : elles disparaissent de l'interface ET du payload.
+function proOnCategorieChange() {
+  var c = _proCategorie();
+  var gSpec = document.getElementById('pro-specialite-group');
+  var gMiss = document.getElementById('pro-mission-group');
+  if (gSpec) gSpec.style.display = (c === 'technicien') ? 'block' : 'none';
+  if (gMiss) gMiss.style.display = (c === 'renfort') ? 'block' : 'none';
+
+  // Le metier de l'AUTRE categorie ne doit jamais survivre.
+  var aDecocher = (c === 'technicien') ? 'pro-mission' : 'pro-specialite';
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="' + aDecocher + '"]'), function (r) { r.checked = false; });
+  _clearGroupError('pro-specialite-group');
+  _clearGroupError('pro-mission-group');
+  _clearGroupError('pro-categorie-group');
+
+  // Les vehicules n'appartiennent qu'au technicien : en renfort, la
+  // rubrique disparait et sa memoire est reellement videe.
+  var accVeh = document.getElementById('pro-acc-vehicules');
+  if (accVeh) accVeh.style.display = (c === 'technicien') ? 'block' : 'none';
+  if (c !== 'technicien') {
+    _reinitialiserVehiculesProfessionnel();
+    var nbv = document.getElementById('pro-nb-vehicules');
+    if (nbv) nbv.value = 1;
+    if (accVeh) accVeh.classList.remove('ouvert');
+  } else {
+    proRendreVehicules();
+  }
+
+  var titreMission = document.getElementById('pro-mission-titre');
+  if (titreMission) titreMission.textContent = (c === 'renfort') ? 'Type de mission' : 'Mission';
+  var labelDesc = document.getElementById('pro-description-label');
+  if (labelDesc) {
+    labelDesc.innerHTML = (c === 'renfort' ? 'Décrivez le type de mission' : 'Décrivez la mission') +
+      ' <span class="field-required">*</span>';
+  }
+
+  proOnMetierChange();
+  _proMajNumerosRubriques();
+}
+
+// Changer de metier remet a zero ce qui en depend (precision, nombre
+// de professionnels lorsqu'il n'a plus lieu d'etre).
+function proOnMetierChange() {
+  var gPrec = document.getElementById('pro-metier-precision-group');
+  var applicable = _proPrecisionApplicable();
+  if (gPrec) gPrec.style.display = applicable ? 'block' : 'none';
+  if (!applicable) {
+    var p = document.getElementById('pro-metier-precision');
+    if (p) p.value = '';
+    _clearFieldError('pro-metier-precision');
+  }
+
+  // "Je souhaite etre conseille" : aucun nombre de professionnels n'est
+  // impose au client, la question disparait et la valeur ne part pas
+  // dans le payload.
+  var gNb = document.getElementById('pro-nb-pros-group');
+  var metier = _proMetier();
+  if (gNb) gNb.style.display = (metier && metier !== 'conseil') ? 'block' : 'none';
+
+  _clearGroupError('pro-specialite-group');
+  _clearGroupError('pro-mission-group');
+  _proMajBoutonContinuer();
+}
+
+function proOnDateChange() {
+  _clearFieldError('pro-date-debut');
+  _clearFieldError('pro-date-fin');
+  // Une fin anterieure au debut ne peut pas rester silencieuse.
+  var d = _proDateDebut(), f = _proDateFin();
+  if (d && f && f < d) {
+    _showFieldError('pro-date-fin', 'La date de fin ne peut pas précéder la date de début.');
+  }
+  proOnHoraireChange();
+  _proMajBoutonContinuer();
+}
+
+// Le meme jour, une heure de fin anterieure a l'heure de debut est
+// refusee. Sur plusieurs jours, les deux horaires sont independants
+// (fin de journee du dernier jour).
+function proOnHoraireChange() {
+  _clearFieldError('pro-horaire-cfin');
+  if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
+    _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+  }
+  _proMajBoutonContinuer();
+}
+function _proMemeJour() {
+  var d = _proDateDebut(), f = _proDateFin();
+  return !!(d && f && d === f);
+}
+
+// ── VALIDATION ──────────────────────────────────────
+// Une rubrique = un bloc de regles. Le validateur d'etape et le bouton
+// OK de chaque rubrique appellent EXACTEMENT les memes regles.
+function _proValiderRubrique(cle, fail) {
+  var ok = true;
+  function ko(id) { ok = false; fail(id); }
+
+  if (cle === 'besoin') {
+    var c = _proCategorie();
+    if (!c) { _showGroupError('pro-categorie-group', 'Sélectionnez le professionnel recherché.'); ko('pro-categorie-group'); return false; }
+    _clearGroupError('pro-categorie-group');
+    var metier = _proMetier();
+    if (!metier) {
+      var grp = (c === 'technicien') ? 'pro-specialite-group' : 'pro-mission-group';
+      _showGroupError(grp, (c === 'technicien') ? 'Sélectionnez une spécialité.' : 'Sélectionnez une mission.');
+      ko(grp);
+    } else {
+      _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
+    }
+    if (_proPrecisionApplicable() && !_proMetierPrecision()) {
+      _showFieldError('pro-metier-precision', 'Précisez votre besoin.');
+      ko('pro-metier-precision');
+    } else _clearFieldError('pro-metier-precision');
+    return ok;
+  }
+
+  if (cle === 'vehicules') {
+    if (!_proVehiculesApplicables()) return true;   // renfort : rubrique absente
+    var n = _proNbVehicules();
+    for (var i = 0; i < n; i++) {
+      var m = _proMemoireVehicules[i] || {};
+      if (!m.type_vehicule) { _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-type'); }
+      else _clearFieldError('pro-veh-' + i + '-type');
+      if (!m.marque_modele) { _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-marque'); }
+      else _clearFieldError('pro-veh-' + i + '-marque');
+    }
+    return ok;
+  }
+
+  if (cle === 'lieu') {
+    if (!_checkRequiredText('pro-adresse-rue', null, true)) ko('pro-adresse-rue');
+    if (!_checkCodePostal('pro-adresse-cp', true)) ko('pro-adresse-cp');
+    if (!_checkRequiredText('pro-adresse-ville', null, true)) ko('pro-adresse-ville');
+    if (!_hcValiderContactSurPlace('pro', function (id) { ko(id); })) ok = false;
+    return ok;
+  }
+
+  if (cle === 'periode') {
+    if (!_checkDate('pro-date-debut', true)) ko('pro-date-debut');
+    if (!_checkDate('pro-date-fin', true)) ko('pro-date-fin');
+    var d = _proDateDebut(), f = _proDateFin();
+    if (d) {
+      var auj = new Date(); auj.setHours(0, 0, 0, 0);
+      if (new Date(d + 'T00:00:00') < auj) { _showFieldError('pro-date-debut', 'La date ne peut pas être dans le passé.'); ko('pro-date-debut'); }
+    }
+    if (d && f && f < d) { _showFieldError('pro-date-fin', 'La date de fin ne peut pas précéder la date de début.'); ko('pro-date-fin'); }
+    if (!_checkRequiredText('pro-horaire-cdeb', null, true)) ko('pro-horaire-cdeb');
+    if (!_checkRequiredText('pro-horaire-cfin', null, true)) ko('pro-horaire-cfin');
+    if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
+      _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+      ko('pro-horaire-cfin');
+    }
+    return ok;
+  }
+
+  if (cle === 'mission') {
+    if (!_checkRequiredText('pro-description', null, true)) ko('pro-description');
+    return ok;   // informations complementaires : reellement facultatives
+  }
+  return true;
+}
+
+// Validation complete de l'etape 2 pour ce service. Meme contrat de
+// retour que _validateNettoyageEtape2 : { ok, first }.
+function _validateProfessionnelEtape2() {
+  var ok = true, first = null;
+  function fail(id) { ok = false; if (!first) first = id; }
+  PRO_RUBRIQUES.forEach(function (cle) {
+    if (!_proValiderRubrique(cle, fail)) ok = false;
+  });
+  // La rubrique fautive est ouverte pour que l'erreur soit visible :
+  // aucune validation invisible.
+  if (first) {
+    var champ = document.getElementById(first);
+    var acc = champ && champ.closest ? champ.closest('.veh-sous-accordeon') : null;
+    if (acc) acc.classList.add('ouvert');
+    var carte = champ && champ.closest ? champ.closest('.pro-veh-acc') : null;
+    if (carte) carte.classList.add('ouvert');
+  }
+  return { ok: ok, first: first };
+}
+
+// Condition UNIQUE d'activation du bouton Continuer pour ce service.
+function _proPeutContinuerEtape2() {
+  var sec = true;
+  PRO_RUBRIQUES.forEach(function (cle) {
+    // Silencieux : aucune erreur affichee, on ne fait que mesurer.
+    if (!_proRubriqueComplete(cle)) sec = false;
+  });
+  return sec;
+}
+
+// Mesure SANS effet de bord (n'affiche ni n'efface aucune erreur) :
+// sert uniquement a l'etat du bouton, jamais a guider le client.
+function _proRubriqueComplete(cle) {
+  if (cle === 'besoin') {
+    if (!_proCategorie() || !_proMetier()) return false;
+    if (_proPrecisionApplicable() && !_proMetierPrecision()) return false;
+    return true;
+  }
+  if (cle === 'vehicules') {
+    if (!_proVehiculesApplicables()) return true;
+    var n = _proNbVehicules();
+    for (var i = 0; i < n; i++) {
+      var m = _proMemoireVehicules[i] || {};
+      if (!m.type_vehicule || !m.marque_modele) return false;
+    }
+    return true;
+  }
+  if (cle === 'lieu') {
+    if (!_proAdresseRue() || !_proAdresseCp() || !_proAdresseVille()) return false;
+    return !!_hcContactSurPlace('pro');
+  }
+  if (cle === 'periode') {
+    var d = _proDateDebut(), f = _proDateFin();
+    if (!d || !f || f < d) return false;
+    if (!_proHeureDebut() || !_proHeureFin()) return false;
+    if (_proMemeJour() && _proHeureFin() <= _proHeureDebut()) return false;
+    return true;
+  }
+  if (cle === 'mission') return !!_proDescription();
+  return true;
+}
+
+// Meme mecanique que le nettoyage : le bouton reflete en permanence
+// l'etat reel, et l'etapeur ne peut pas etre contourne tant que
+// l'etape 2 n'est pas reellement complete.
+function _proMajBoutonContinuer() {
+  if (!_avecProfessionnel()) return;
+  var btn = document.getElementById('client-step-next-btn');
+  var complet = _proPeutContinuerEtape2();
+  if (btn) {
+    btn.disabled = !complet;
+    btn.style.opacity = complet ? '' : '.5';
+    btn.style.cursor = complet ? '' : 'not-allowed';
+  }
+  if (!complet) {
+    _etapeMax = Math.min(_etapeMax, 2);
+    if (_formStepState.client > 2) _formStepState.client = 2;
+  }
+}
+
+// ── DONNEES METIER (liste blanche) ──────────────────
+// UNIQUE constructeur des donnees Professionnel. Recapitulatif,
+// dashboard et payload lisent tous CE resultat.
+function _construireDetailsProfessionnel() {
+  var c = _proCategorie();
+  var conseil = _proConseil();
+  var d = {
+    schema_version: 1,
+    categorie: c || null,
+    // Le metier n'est ecrit que s'il est reellement choisi ; en mode
+    // conseil, aucun metier n'est impose au client.
+    conseil: conseil,
+    specialite: (c === 'technicien' && !conseil) ? (_proSpecialite() || null) : null,
+    mission: (c === 'renfort' && !conseil) ? (_proMission() || null) : null,
+    precision: _proPrecisionApplicable() ? (_proMetierPrecision() || null) : null,
+    // En mode conseil, le nombre de professionnels n'est pas demande :
+    // il ne doit donc jamais partir avec une valeur par defaut.
+    nombre_professionnels: conseil ? null : _proNbPros(),
+    nombre_vehicules: _proVehiculesApplicables() ? _proNbVehicules() : null,
+    vehicules: _proVehiculesRetenus(),
+    adresse_rue: _proAdresseRue() || null,
+    adresse_cp: _proAdresseCp() || null,
+    adresse_ville: _proAdresseVille() || null,
+    contact_sur_place: _hcContactSurPlace('pro'),
+    date_debut: _proDateDebut() || null,
+    date_fin: _proDateFin() || null,
+    duree_jours: _proDureeJours() || null,
+    heure_debut: _proHeureDebut() || null,
+    heure_fin: _proHeureFin() || null,
+    description: _proDescription() || null,
+    informations_complementaires: _proInfos() || null
+  };
+  return d;
+}
+
+// Libelle du metier reellement choisi, pour l'affichage seulement.
+function _proLibelleMetier(d) {
+  if (!d) return '';
+  if (d.conseil) return 'Client à conseiller';
+  if (d.categorie === 'technicien') return PRO_LIB_SPECIALITE[d.specialite] || '';
+  if (d.categorie === 'renfort') return PRO_LIB_MISSION[d.mission] || '';
+  return '';
+}
+
+function construireRecapProfessionnel() {
+  var zone = document.getElementById('recap-demande');
+  if (!zone) return;
+  var d = _construireDetailsProfessionnel();
+  var g = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+
+  var client = _recapLigne('Prénom', g('client-prenom')) +
+               _recapLigne('Nom', g('client-nom')) +
+               _recapLigne('Société', g('client-societe')) +
+               _recapLigne('Email', g('client-email')) +
+               _recapLigne('Téléphone', g('client-tel'));
+  var html = _recapBloc('Client', client, 1);
+
+  html += _recapBloc('Service', _recapLigne('Prestation', 'Trouver un professionnel automobile'), 2);
+
+  var besoin = _recapLigne('Besoin', PRO_LIB_CATEGORIE[d.categorie] || '');
+  besoin += _recapLigne(d.categorie === 'renfort' ? 'Mission' : 'Spécialité', _proLibelleMetier(d));
+  if (d.precision) besoin += _recapLigne('Précision', d.precision);
+  if (d.nombre_professionnels) besoin += _recapLigne('Professionnels', String(d.nombre_professionnels));
+  html += _recapBloc('Votre besoin', besoin, 2);
+
+  if (d.nombre_vehicules) {
+    var veh = _recapLigne('Nombre de véhicules', String(d.nombre_vehicules));
+    (d.vehicules || []).forEach(function (v, idx) {
+      var libelle = [_libelleTypeVehicule(v.type_vehicule), v.marque_modele].filter(Boolean).join(' — ');
+      veh += _recapLigne('Véhicule ' + (idx + 1), libelle);
+    });
+    html += _recapBloc(d.nombre_vehicules > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', veh, 2);
+  }
+
+  var lieu = _recapLigne('Adresse', d.adresse_rue);
+  if (d.adresse_cp || d.adresse_ville) lieu += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
+  lieu += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
+  html += _recapBloc("Lieu d'intervention", lieu, 2);
+
+  var periode = _recapLigne('Du', _formaterDateFr(d.date_debut)) +
+                _recapLigne('Au', _formaterDateFr(d.date_fin));
+  if (d.duree_jours) periode += _recapLigne('Durée', d.duree_jours + (d.duree_jours > 1 ? ' jours' : ' jour'));
+  if (d.heure_debut || d.heure_fin) periode += _recapLigne('Horaires', [d.heure_debut, d.heure_fin].filter(Boolean).join(' — '));
+  html += _recapBloc('Période et horaires', periode, 2);
+
+  var mission = _recapLigne(d.categorie === 'renfort' ? 'Type de mission' : 'Mission', d.description);
+  // Informations complementaires : le texte libre du client, et rien
+  // d'autre. Le bloc disparait entierement s'il est vide.
+  if (d.informations_complementaires) mission += _recapLigne('Informations complémentaires', d.informations_complementaires);
+  html += _recapBloc('Mission', mission, 2);
+
+  zone.innerHTML = '<div class="recap-cadre">' + html + '</div>';
+}
+
+// Libelle d'un type de vehicule, depuis la liste de gabarits existante.
+function _libelleTypeVehicule(v) {
+  for (var i = 0; i < TYPES_VEHICULE.length; i++) if (TYPES_VEHICULE[i][0] === v) return TYPES_VEHICULE[i][1];
+  return v || '';
+}
+
 // Affiche uniquement les blocs correspondant au service choisi.
 function onChoixService() {
   var t = _typeServiceChoisi();
@@ -8380,19 +9219,21 @@ function onChoixService() {
   // sans deuxieme variable de navigation.
   var btnNext = document.getElementById('client-step-next-btn');
   var msgSocle = document.getElementById('client-socle-msg');
-  // CORRECTIF - le nettoyage a maintenant sa propre source de verite
-  // (_nettMajBoutonContinuer(), qui verifie professionnel + 2 confirmations
-  // + total + repartition + prestation) : ce bloc ne gere plus que le
-  // socle "Trouver un professionnel automobile", toujours bloque tant
-  // qu'il n'est pas construit.
-  var bloque = pro;
+  // Chaque service porte desormais sa propre source de verite :
+  //  - Nettoyage    -> _nettMajBoutonContinuer()
+  //  - Professionnel-> _proMajBoutonContinuer()
+  //  - Convoyage / Stockage / Compte : comportement historique intact
+  //    (bouton actif, validation au clic).
+  // Le blocage "socle" du parcours Professionnel disparait : ce
+  // parcours est reellement construit.
   if (btnNext) {
-    btnNext.disabled = bloque;
-    btnNext.style.opacity = bloque ? '.5' : '';
-    btnNext.style.cursor = bloque ? 'not-allowed' : '';
+    btnNext.disabled = false;
+    btnNext.style.opacity = '';
+    btnNext.style.cursor = '';
   }
   if (nett) _nettMajBoutonContinuer();
-  if (msgSocle) msgSocle.style.display = pro ? 'block' : 'none';
+  if (pro) { proOnCategorieChange(); _proMajBoutonContinuer(); }
+  if (msgSocle) msgSocle.style.display = 'none';
 
   // Lot 2 (V73) — CORRECTION : contournement par l'étapeur. Si le client
   // avait déjà progressé (_etapeMax > 2) avec Convoyage/Stockage puis revient
@@ -8407,9 +9248,9 @@ function onChoixService() {
   // il doit reparcourir les étapes normalement (Continuer les fait
   // remonter naturellement via Math.max déjà présent dans _renderFormStep).
   // Aucune valeur "d'avant" n'est mémorisée ni restaurée : une seule vérité.
-  if (pro) {
-    _etapeMax = Math.min(_etapeMax, 2);
-  }
+  // Le plafonnement reste assuré pour le Professionnel, mais par sa
+  // propre source de vérité (_proMajBoutonContinuer, appelée ci-dessus) :
+  // il n'est levé que lorsque l'étape 2 est réellement complète.
 
   _clearGroupError('service-type-group');
   _renderFormStep('client');
@@ -8740,7 +9581,11 @@ function _typeHoraire(i, prefixe) {
 // inférieure au maximum atteint, y compris une étape volontairement
 // sautée. On distingue APPLICABLE (sens métier) et ATTEINTE (parcourue).
 function _estEtapeApplicable(n) {
-  if (n === 1 || n === 2 || n === 4 || n === 5) return true;
+  if (n === 1 || n === 2 || n === 5) return true;
+  // Trouver un professionnel : tout le parcours tient dans l'étape 2.
+  // « Continuer » mène donc directement au récapitulatif habituel,
+  // sans créer ni traverser aucune étape supplémentaire.
+  if (n === 4) return !_avecProfessionnel();
   if (n === 3) return !!_blocsGlobauxActifs().pc;   // prise en charge globale
   return false;
 }
@@ -9925,7 +10770,10 @@ function construireRecap() {
   // Lot 3 (V74) — le nettoyage a son PROPRE récapitulatif, construit de
   // zéro. Professionnel reste sans récapitulatif jusqu'au lot 4.
   if (t === 'nettoyage') { construireRecapNettoyage(); return; }
-  if (!t || t === 'compte' || t === 'professionnel') { zone.innerHTML = ''; return; }
+  // Le parcours Professionnel a désormais son PROPRE récapitulatif,
+  // construit de zéro à partir de _construireDetailsProfessionnel().
+  if (t === 'professionnel') { construireRecapProfessionnel(); return; }
+  if (!t || t === 'compte') { zone.innerHTML = ''; return; }
 
   var LIB = { convoyage: 'Convoyage automobile', stockage: 'Stockage automobile',
               convoyage_stockage: 'Convoyage + stockage automobile' };
@@ -11199,6 +12047,21 @@ function _validateClientStep(n) {
       return ok;
     }
 
+    // Trouver un professionnel : validation dédiée puis sortie
+    // immédiate, exactement comme le Nettoyage. Aucune règle
+    // Convoyage/Stockage plus bas ne doit s'appliquer.
+    if (typeService === 'professionnel') {
+      var rP2 = _validateProfessionnelEtape2();
+      if (!rP2.ok) {
+        ok = false;
+        if (!firstInvalid) firstInvalid = document.getElementById(rP2.first);
+      }
+      if (firstInvalid) {
+        try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+      }
+      return ok;
+    }
+
     // Nombre de véhicules : commun aux trois services
     if (typeService && typeService !== 'compte') {
       var nbEl = document.getElementById('nb-vehicules');
@@ -11591,7 +12454,8 @@ function _construireBrouillonClient() {
     radios: _lireRadiosCochees(overlay),
     // V77.1 - copie (jamais la reference) des quantites Nettoyage, qui
     // ne sont portees par aucun champ HTML serialisable.
-    nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {}
+    nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {},
+    professionnelVehicules: (typeof _proVehiculesPourBrouillon === 'function') ? _proVehiculesPourBrouillon() : {}
   };
 }
 
@@ -11887,6 +12751,13 @@ function _restaurerBrouillonClientSiPresent() {
   if (typeof _nettRestaurerQuantitesDepuisBrouillon === 'function') {
     _nettRestaurerQuantitesDepuisBrouillon(brouillon.nettoyageQuantites);
   }
+  // Meme principe pour les vehicules du parcours Professionnel :
+  // restaures AVANT onChoixService(), qui declenche proRendreVehicules().
+  // Un ancien brouillon depourvu de professionnelVehicules laisse
+  // simplement la memoire vide, sans erreur.
+  if (typeof _proRestaurerVehiculesDepuisBrouillon === 'function') {
+    _proRestaurerVehiculesDepuisBrouillon(brouillon.professionnelVehicules);
+  }
 
   if (typeof onChoixService === 'function') onChoixService();
   if (typeof nettRendreRepartition === 'function') nettRendreRepartition();
@@ -12012,6 +12883,9 @@ function resetClientForm() {
   // vraie reinitialisation (jamais lors d'un simple Retour ni d'une
   // bascule temporaire de service).
   _reinitialiserQuantitesNettoyage();
+  // Meme raison : _proMemoireVehicules est une variable JS persistante
+  // que la restauration du HTML d'origine ne remet pas a zero.
+  if (typeof _reinitialiserVehiculesProfessionnel === 'function') _reinitialiserVehiculesProfessionnel();
   var _mc = document.getElementById('modal-client');
   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
@@ -12510,6 +13384,22 @@ function submitClientForm() {
       return;   // aucun payload, aucun Supabase, aucun email
     }
   }
+
+  // Meme garde-fou final pour Trouver un professionnel : tout le
+  // parcours tenant dans l'etape 2, seules les etapes 1 et 2 sont
+  // rejouees, avec les MEMES validateurs que la navigation.
+  if (_avecProfessionnel()) {
+    var _etapeKOPro = null;
+    if (!_validateClientStep(1)) _etapeKOPro = 1;
+    if (!_etapeKOPro && !_validateClientStep(2)) _etapeKOPro = 2;
+    if (_etapeKOPro) {
+      _formStepState.client = _etapeKOPro;
+      _etapeMax = Math.max(_etapeMax, _etapeKOPro);
+      _renderFormStep('client');
+      _validateClientStep(_etapeKOPro);
+      return;   // aucun payload, aucun Supabase, aucun email
+    }
+  }
   // `disponibilite` conserve exactement ses valeurs historiques :
   //   'pas-maintenant' = simple création de compte
   //   'planifie'       = vraie demande, avec des dates précises
@@ -12599,6 +13489,32 @@ function submitClientForm() {
       statut:            'nouveau'
     };
     console.log('Payload nettoyage (liste blanche):', payload);
+  } else if (_avecProfessionnel()) {
+    // MEME PRINCIPE que le nettoyage : liste blanche stricte, aucune
+    // lecture d'un champ Convoyage/Stockage, aucun bloc trajet /
+    // vehicule / livraison / restitution / stockage.
+    payload = {
+      numero_client:   clientNum,
+      code_parrainage: parrCode,
+      parraine_par:    codeUtilise || null,
+      prenom:          prenom_val,
+      nom:             nom_val,
+      email:           email_val,
+      telephone:       tel_val,
+      type_client:     type_val,
+      societe:         societe_val || null,
+      siret:           siret_val || null,
+      disponibilite:   'planifie',
+      source_acquisition:        source_val || null,
+      source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
+      utm_source:      _utmCapture.utm_source || null,
+      utm_medium:      _utmCapture.utm_medium || null,
+      utm_campaign:    _utmCapture.utm_campaign || null,
+      type_service:          'professionnel',
+      professionnel_details: _construireDetailsProfessionnel(),
+      statut:                'nouveau'
+    };
+    console.log('Payload professionnel (liste blanche):', payload);
   } else {
   // Infos mission
   var from_val    = (document.getElementById('client-from') || {}).value || '';
@@ -15493,6 +16409,11 @@ function _hcContexteChamp(id) {
   // globalement au rendu, subsiste : aujourd'hui et le futur sont
   // acceptes, le passe est refuse. C'est exactement la regle demandee.
   if (id === 'nett-date') return { type: 'nettoyage', prefixe: 'nett-date' };
+  // Trouver un professionnel : periode reelle debut -> fin, colorable
+  // comme celle du Convoyage/Stockage, avec la seule borne metier qui
+  // existe vraiment ici (la fin ne precede jamais le debut).
+  if (id === 'pro-date-debut') return { type: 'professionnel', prefixe: 'pro-date-debut' };
+  if (id === 'pro-date-fin') return { type: 'professionnel', prefixe: 'pro-date-fin' };
   return null;
 }
 
@@ -15554,6 +16475,18 @@ function _hcPeriodePourChamp(id) {
   // V76 — le nettoyage n'a aucune periode a colorer : ni stockage, ni
   // convoyage, ni restitution.
   if (ctx.type === 'nettoyage') return { debut: null, finLiv: null, finRestit: null };
+  // Periode d'intervention du professionnel : memes bornes visuelles que
+  // Convoyage/Stockage (debut et fin en rouge, jours intermediaires en
+  // teinte plus legere, demi-teintes si debut et fin le meme jour) —
+  // aucune regle de coloration dupliquee, seule la source des 2 dates
+  // change.
+  if (ctx.type === 'professionnel') {
+    return {
+      debut: _hcParserYMD((document.getElementById('pro-date-debut') || {}).value),
+      finLiv: _hcParserYMD((document.getElementById('pro-date-fin') || {}).value),
+      finRestit: null
+    };
+  }
   return ctx.type === 'vehicule' ? _hcPeriodeVehicule(ctx.i) : _hcPeriodeGlobale();
 }
 
@@ -15576,6 +16509,10 @@ function _hcDateMinimaleChamp(id) {
   if (!ctx) return null;
   if (ctx.prefixe === 'stock-fin') {
     return _hcParserYMD((document.getElementById('stock-debut') || {}).value);
+  }
+  // La fin d'intervention ne precede jamais son debut.
+  if (ctx.prefixe === 'pro-date-fin') {
+    return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
   }
   if (ctx.prefixe === 'liv') {
     if (_avecStockage()) {
@@ -15733,11 +16670,49 @@ function _hcOuvrirCalendrier(champ) {
   }
   var overlay = _hcConstruireOverlay();
   var auj = _hcAujourdhui();
-  var reference = dateReference && dateReference >= auj ? dateReference : auj;
+  var reference = _hcMoisOuvertureReference(champ.id, dateReference, auj);
   _hcCalAnneeAffichee = reference.getFullYear();
   _hcCalMoisAffiche = reference.getMonth();
   _hcRendreCalendrier();
   overlay.classList.add('open');
+}
+
+// ── MOIS D'OUVERTURE D'UN CALENDRIER DEPENDANT ──────────────
+// CORRECTIF DE REGRESSION - un calendrier dependant s'ouvrait toujours
+// sur le MOIS ACTUEL tant qu'il ne portait pas lui-meme de date :
+// une prise en charge / un debut de stockage choisi en decembre
+// rouvrait la livraison sur le mois courant, obligeant a renaviguer
+// mois par mois (et exposant a un clic sur une date desactivee).
+// L'ordre demande est applique strictement, sans jamais ecrire de date
+// ni en deduire une :
+//   1. sa propre date deja selectionnee ;
+//   2. sinon la premiere date minimale valide liee (ex. debut/fin de
+//      stockage, livraison pour une restitution) ;
+//   3. sinon la date de debut / prise en charge deja choisie ;
+//   4. le mois actuel seulement si aucune date liee n'existe.
+// Un candidat anterieur a aujourd'hui n'est jamais retenu : le
+// calendrier n'ouvre jamais sur un mois entierement desactive.
+function _hcMoisOuvertureReference(id, dateChamp, auj) {
+  var candidats = [dateChamp, _hcDateMinimaleChamp(id), _hcDateDebutLiee(id)];
+  for (var k = 0; k < candidats.length; k++) {
+    var d = candidats[k];
+    if (d && d >= auj) return d;
+  }
+  return auj;
+}
+
+// Date de debut REELLEMENT liee a ce champ. Lit exclusivement les
+// fonctions de periode deja existantes : aucune regle de scenario
+// recopiee, aucune date inventee.
+function _hcDateDebutLiee(id) {
+  var ctx = _hcContexteChamp(id);
+  if (!ctx) return null;
+  if (ctx.type === 'vehicule') return _hcPeriodeVehicule(ctx.i).debut || null;
+  if (ctx.type === 'mono') return _hcPeriodeGlobale().debut || null;
+  if (ctx.type === 'professionnel') {
+    return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
+  }
+  return null;   // nettoyage : aucune date liee
 }
 
 // V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
@@ -16463,6 +17438,22 @@ document.addEventListener('click', function (e) {
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
 /* Sous-accordéons véhicule : deux actions équilibrées. */
+/* Cartes véhicule du parcours « Trouver un professionnel ».
+   Classes DÉDIÉES volontairement : ces cartes sont imbriquées dans une
+   rubrique .veh-sous-accordeon, et la règle existante
+   « .veh-sous-accordeon.ouvert .veh-sous-contenu » est un sélecteur
+   DESCENDANT — réutiliser littéralement ces classes aurait ouvert
+   toutes les cartes dès l'ouverture de la rubrique. Le rendu visuel
+   reste strictement celui des sous-accordéons existants. */
+#modal-client .pro-veh-acc { border:1px solid rgba(16,24,32,.11); border-radius:12px; margin:10px 0; overflow:hidden; background:#fff; }
+#modal-client .pro-veh-barre { width:100%; border:0; background:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; text-align:left; font-family:var(--font-body); }
+#modal-client .pro-veh-num { width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#f4eeee;color:var(--accent);font-size:.7rem;font-weight:700;flex:0 0 25px; }
+#modal-client .pro-veh-titre { flex:1; color:var(--ink); font-size:.88rem; font-weight:660; }
+#modal-client .pro-veh-chevron { color:#8A8F93; font-size:1.15rem; transform:rotate(90deg); transition:transform .18s ease; }
+#modal-client .pro-veh-acc.ouvert .pro-veh-chevron { transform:rotate(-90deg); }
+#modal-client .pro-veh-contenu { display:none; padding:0 16px 14px; }
+#modal-client .pro-veh-acc.ouvert > .pro-veh-contenu { display:block; }
+
 #modal-client .veh-sous-ok { gap:9px; align-items:center; }
 #modal-client .veh-sous-ok .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
 #modal-client .veh-sous-ok .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
