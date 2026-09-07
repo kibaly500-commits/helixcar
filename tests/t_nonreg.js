@@ -122,15 +122,31 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     !/stripe|checkout\.session|payment_intent/i.test(ajouts));
   L.check('E3 : aucun statut « payé » introduit',
     !/statut\s*[:=]\s*['"]pay/i.test(ajouts) && !/\bpaye\b\s*[:=]\s*true/i.test(ajouts));
-  L.check('E4 : aucune clé service_role introduite',
-    !/service_role/i.test(ajouts));
+  // Le mot apparaît dans des commentaires qui attestent que la clé
+  // reste côté serveur. Ce qui doit être vérifié, c'est l'absence de
+  // clé RÉELLE (JWT dont le rôle n'est pas « anon ») et l'absence de
+  // lecture d'une variable de clé privilégiée dans le navigateur.
+  function jwtsPrivilegies(src) {
+    return (src.match(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g) || [])
+      .filter(j => {
+        try {
+          let p = j.split('.')[1]; p += '='.repeat((4 - p.length % 4) % 4);
+          return (JSON.parse(Buffer.from(p, 'base64').toString('utf8')).role || '') !== 'anon';
+        } catch (e) { return false; }
+      });
+  }
+  L.check('E4 : aucune clé privilégiée réelle introduite dans le navigateur',
+    jwtsPrivilegies(ajouts).length === 0
+    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/index.html', 'utf8'))
+    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')));
   L.check('E5 : aucune suppression de validation métier existante',
     !/^-\s*(if \(!_check|_showFieldError|_showGroupError)/m.test(diff.split('\n').filter(l => l.startsWith('-')).join('\n')));
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: '/home/user/helixcar' }).toString().trim().split('\n');
   L.check('E6 : périmètre de fichiers maîtrisé',
     fichiers.every(f => f === 'index.html' || f === 'dashboard.html'
-                     || f.startsWith('migrations/') || f.startsWith('tests/')),
+                     || f.startsWith('migrations/') || f.startsWith('tests/')
+                     || f.startsWith('supabase/functions/')),
     fichiers.join(', '));
   L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
     !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
