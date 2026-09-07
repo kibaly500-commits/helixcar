@@ -31,9 +31,23 @@ cette Pull Request : sans lui, l'enregistrement d'une demande
 `02` est fortement recommandé dans la foulée (garde-fous du contact sur
 place, déjà écrit par le formulaire).
 
-Les fichiers `03` à `06` préparent la suite du lot ; leur interface
-utilisateur n'est **pas** livrée dans cette Pull Request (voir la section
-« Ce qui n'est pas fait » de la description de la PR).
+`03_videos_candidature.sql` est requis par la **vidéo de candidature**
+(livrée), et `04` + `05` par les **décisions par activité et le blocage
+partenaire** (livrés). Sans `04`, la fiche partenaire affichera les
+activités mais aucune décision ne pourra être enregistrée. Sans `05`, le
+bouton Bloquer/Débloquer écrira `bloque` sans qu'aucune politique
+serveur ne l'applique : le blocage resterait **déclaratif**.
+
+Seul `06_informations_manquantes.sql` prépare la suite : son interface
+utilisateur (espace client, informations à compléter) n'est **pas**
+livrée dans cette Pull Request.
+
+> **Prérequis applicatif de `05`.** Ces politiques reposent sur
+> `auth.uid()`. Le Dashboard envoyait auparavant la clé `anon` sur *tous*
+> ses appels REST : `auth.uid()` valait `null` et l'activation de la RLS
+> aurait **vidé le Dashboard**. C'est corrigé dans `dashboard.html`
+> (`sbFetch()` transmet désormais le JWT de la session ouverte). Vérifier
+> que cette version est bien déployée **avant** d'appliquer `05`.
 
 ## Réglages manuels Supabase (hors SQL)
 
@@ -70,14 +84,27 @@ Après `05_blocage_partenaire.sql`, contrôler que le blocage est **réel**
 et pas seulement visuel, depuis la session d'un partenaire de test bloqué :
 
 ```sql
-select * from convoyeurs;           -- doit renvoyer 0 ligne
-select * from convoyeur_decisions;  -- doit renvoyer 0 ligne
+-- 1 ligne : un partenaire bloqué garde SA fiche, et elle seule.
+--    Choix assumé : la masquer ferait échouer la connexion sur
+--    « aucun dossier trouvé », un message trompeur. C'est précisément
+--    cette ligne que le contrôle d'accès relit pour afficher le message
+--    neutre de suspension puis fermer la session.
+select id, bloque from convoyeurs;
+
+-- 0 ligne : les décisions sont réservées aux administrateurs.
+select * from convoyeur_decisions;
+
+-- 0 ligne : c'est ICI que le blocage produit son effet réel.
+select * from missions;
+
+-- doit échouer : insufficient_privilege — jamais réussir.
 update convoyeurs set bloque = false where auth_user_id = auth.uid();
--- doit échouer : insufficient_privilege
 ```
 
 Le contrôle doit rester vrai après déconnexion / reconnexion et par
-navigation directe.
+navigation directe. Vérifier ensuite qu'un **déblocage** depuis un compte
+administrateur rétablit l'accès aux missions **sans** modifier aucune
+décision : une activité refusée ou en attente doit le rester.
 
 ## Stripe
 

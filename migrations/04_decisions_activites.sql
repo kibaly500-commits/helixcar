@@ -58,6 +58,15 @@ begin
     return new;   -- aucune décision réellement changée : rien à tracer
   end if;
 
+  -- Amorçage : la création d'une ligne « en attente » n'est pas une
+  -- décision prise par un administrateur. Elle est donc horodatée mais
+  -- n'entre pas dans l'historique, qui ne doit contenir que de vraies
+  -- décisions.
+  if tg_op = 'INSERT' and new.decision = 'en_attente' then
+    new.updated_at := now();
+    return new;
+  end if;
+
   new.updated_at := now();
   if new.decision <> 'en_attente' then
     new.decide_le  := now();

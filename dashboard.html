@@ -2148,6 +2148,9 @@ body.scroll-verrouille { overflow: hidden; }
     <h3 id="dossier-name">Dossier convoyeur</h3>
     <p>Vérifiez les informations avant de valider ou refuser.</p>
     <div id="dossier-content"></div>
+    <!-- Décisions par activité : une seule fiche, une décision
+         indépendante par activité. Rempli par rendreDecisionsPartenaire(). -->
+    <div id="dossier-decisions"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
       <div class="form-group" id="block-reason-group" style="display:none">
         <label>Motif du blocage</label>
@@ -2749,6 +2752,14 @@ const PAGE_TITLES = {
 };
 
 function showPage(id) {
+  // Une session partenaire déjà ouverte est revérifiée à chaque
+  // navigation : un blocage décidé entre-temps prend effet sans
+  // attendre une reconnexion. Vérification asynchrone, contre la
+  // valeur réellement enregistrée — jamais contre un état conservé
+  // dans le JavaScript.
+  if (typeof verifierAccesPartenaireEnCours === 'function') {
+    try { verifierAccesPartenaireEnCours(); } catch (e) {}
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -2912,11 +2923,32 @@ if (sbAuth) {
   });
 }
 
-function sbFetch(path, options) {
+// Jeton de la session Supabase en cours, s'il y en a une.
+// Sans session (page publique, utilisateur déconnecté) : null.
+async function _jetonSessionSupabase() {
+  try {
+    if (typeof sbAuth === 'undefined' || !sbAuth || !sbAuth.auth) return null;
+    const { data } = await sbAuth.auth.getSession();
+    return (data && data.session && data.session.access_token) || null;
+  } catch (e) { return null; }
+}
+
+// POINT DE PASSAGE UNIQUE de tous les appels REST du Dashboard.
+// CORRECTION DE FOND : cette fonction envoyait TOUJOURS la clé anon en
+// Authorization. `auth.uid()` valait donc null pour PostgREST, et
+// AUCUNE politique RLS fondée sur l'identité (est_admin(), propriétaire
+// d'une ligne...) ne pouvait fonctionner — activer RLS aurait vidé le
+// Dashboard. On transmet désormais le JWT de la session ouverte quand
+// il existe ; l'en-tête `apikey` reste la clé anon, comme Supabase
+// l'attend. Sans session, le comportement précédent est conservé à
+// l'identique : aucune régression sur les écrans publics.
+// Un seul endroit modifié : aucun second système d'accès aux données.
+async function sbFetch(path, options) {
   options = options || {};
+  const jetonSession = await _jetonSessionSupabase();
   const headers = Object.assign({
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + (jetonSession || SUPABASE_KEY),
     'Content-Type': 'application/json'
   }, options.headers || {});
   return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, { headers }))
@@ -4226,7 +4258,282 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
   `;
+  // Décisions par activité + état de blocage RÉELLEMENT enregistré.
+  preparerFichePartenaire(c);
   openModal('dossier');
+}
+
+// ══════════════════════════════════════════════════════════════
+// DÉCISIONS PAR ACTIVITÉ ET BLOCAGE PARTENAIRE
+// ══════════════════════════════════════════════════════════════
+// UNE SEULE fiche par candidat. Chaque activité qu'il a déclarée reçoit
+// sa propre décision, indépendante des autres : décider pour l'une ne
+// touche jamais les autres.
+//
+// Toutes les écritures passent par `sbAuth`, le client PORTEUR DE LA
+// SESSION : c'est ce qui permet aux politiques RLS de reconnaître un
+// administrateur réel. Aucune écriture n'est faite avec la clé anon.
+//
+// AUCUN EMAIL n'est déclenché par ces actions — ni pour Oui, ni pour
+// Non, ni pour En attente. EmailJS n'est pas sollicité ici.
+
+var LIB_DECISION = { oui: 'Oui', non: 'Non', en_attente: 'En attente' };
+var LIB_ACTIVITE_DECISION = {
+  convoyage: 'Convoyage automobile',
+  nettoyage: 'Nettoyage automobile',
+  renfort: 'Renfort automobile sur site'
+};
+
+// Fiche actuellement ouverte : identifiant, nom, décisions chargées.
+var _partenaireFiche = { id: null, nom: '', activites: [], decisions: {} };
+
+function _sbAuthPret() {
+  return (typeof sbAuth !== 'undefined') && !!sbAuth && !!sbAuth.from;
+}
+
+// Décisions RÉELLEMENT enregistrées. Une activité sans ligne est « en
+// attente » : c'est la valeur par défaut, jamais une décision implicite.
+async function chargerDecisionsPartenaire(convoyeurId) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const res = await sbAuth.from('convoyeur_decisions')
+    .select('activite, decision').eq('convoyeur_id', convoyeurId);
+  if (res.error) throw new Error(res.error.message);
+  const out = {};
+  (res.data || []).forEach(function (d) { out[d.activite] = d.decision; });
+  return out;
+}
+
+async function enregistrerDecisionPartenaire(convoyeurId, activite, decision) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const res = await sbAuth.from('convoyeur_decisions')
+    .upsert({ convoyeur_id: convoyeurId, activite: activite, decision: decision },
+            { onConflict: 'convoyeur_id,activite' });
+  if (res.error) throw new Error(res.error.message);
+}
+
+async function chargerHistoriqueDecisions(convoyeurId) {
+  if (!_sbAuthPret()) return [];
+  const res = await sbAuth.from('convoyeur_decisions_historique')
+    .select('activite, ancienne_decision, nouvelle_decision, modifie_le')
+    .eq('convoyeur_id', convoyeurId)
+    .order('modifie_le', { ascending: false }).limit(25);
+  if (res.error) { console.error('historique décisions:', res.error); return []; }
+  return res.data || [];
+}
+
+function _boutonDecision(activite, valeur, courante) {
+  const actif = (courante === valeur);
+  const couleurs = { oui: '#1f7a4d', non: '#b3261e', en_attente: '#8a6d3b' };
+  const style = actif
+    ? 'background:' + couleurs[valeur] + ';color:#fff;border-color:' + couleurs[valeur] + ';font-weight:700'
+    : 'background:#fff;color:#555;border-color:rgba(0,0,0,.16)';
+  return '<button type="button" class="btn btn-sm" aria-pressed="' + (actif ? 'true' : 'false') +
+    '" data-activite="' + escapeHtml(activite) + '" data-decision="' + valeur + '"' +
+    ' style="' + style + ';padding:5px 12px;border-width:1px;border-style:solid;border-radius:7px;margin-right:6px"' +
+    ' onclick="changerDecisionActivite(\'' + escapeHtml(activite) + '\',\'' + valeur + '\')">' +
+    LIB_DECISION[valeur] + '</button>';
+}
+
+// Rendu complet du bloc décisions + historique pour la fiche ouverte.
+async function rendreDecisionsPartenaire(convoyeur) {
+  const zone = document.getElementById('dossier-decisions');
+  if (!zone) return;
+  const activites = normaliserActivites(convoyeur && convoyeur.activites);
+  _partenaireFiche = {
+    id: convoyeur ? convoyeur.id : null,
+    nom: ((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || ''),
+    activites: activites,
+    decisions: {}
+  };
+  _partenaireFiche.nom = _partenaireFiche.nom.trim() || 'ce partenaire';
+
+  if (!activites.length) { zone.innerHTML = ''; return; }
+  zone.innerHTML = '<div style="margin-top:14px;color:#888;font-size:.82rem">Chargement des décisions…</div>';
+
+  let decisions = {};
+  try { decisions = await chargerDecisionsPartenaire(_partenaireFiche.id); }
+  catch (e) {
+    zone.innerHTML = '<div style="margin-top:14px;padding:12px;border-radius:8px;background:rgba(179,38,30,.06);' +
+      'color:#b3261e;font-size:.82rem">Décisions indisponibles : ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  _partenaireFiche.decisions = decisions;
+
+  let html = '<div style="margin-top:16px;border-top:1px solid rgba(0,0,0,.08);padding-top:14px">' +
+    '<div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:10px">' +
+    'Décisions par activité</div>';
+
+  activites.forEach(function (a) {
+    const courante = decisions[a] || 'en_attente';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;' +
+      'padding:8px 0;border-bottom:1px solid rgba(0,0,0,.05)">' +
+      '<span style="font-size:.86rem;font-weight:600">' + escapeHtml(LIB_ACTIVITE_DECISION[a] || a) + '</span>' +
+      '<span data-decision-activite="' + escapeHtml(a) + '">' +
+        _boutonDecision(a, 'oui', courante) +
+        _boutonDecision(a, 'non', courante) +
+        _boutonDecision(a, 'en_attente', courante) +
+      '</span></div>';
+  });
+
+  const histo = await chargerHistoriqueDecisions(_partenaireFiche.id);
+  html += '<div style="margin-top:14px"><div style="font-size:.75rem;font-weight:700;text-transform:uppercase;' +
+    'letter-spacing:.06em;color:#888;margin-bottom:6px">Historique des décisions</div>';
+  if (!histo.length) {
+    html += '<div style="font-size:.8rem;color:#999">Aucune décision enregistrée pour le moment.</div>';
+  } else {
+    html += '<div style="font-size:.79rem;color:#666;line-height:1.7">';
+    histo.forEach(function (h) {
+      const quand = h.modifie_le ? new Date(h.modifie_le).toLocaleString('fr-FR') : '—';
+      html += '<div>' + escapeHtml(quand) + ' · <b>' + escapeHtml(LIB_ACTIVITE_DECISION[h.activite] || h.activite) + '</b> : ' +
+        escapeHtml(LIB_DECISION[h.ancienne_decision] || 'En attente') + ' → ' +
+        escapeHtml(LIB_DECISION[h.nouvelle_decision] || h.nouvelle_decision) + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  zone.innerHTML = html;
+}
+
+// Changement d'une décision. Confirmation explicite AVANT écriture,
+// nommant le candidat, l'activité, l'ancienne et la nouvelle décision.
+// Une annulation n'écrit rien du tout.
+async function changerDecisionActivite(activite, nouvelle) {
+  const id = _partenaireFiche.id;
+  if (!id) return;
+  const ancienne = _partenaireFiche.decisions[activite] || 'en_attente';
+  if (ancienne === nouvelle) return;   // déjà cette valeur : aucune action
+
+  const message =
+    'Modifier une décision\n\n' +
+    'Candidat : ' + _partenaireFiche.nom + '\n' +
+    'Activité : ' + (LIB_ACTIVITE_DECISION[activite] || activite) + '\n' +
+    'Décision actuelle : ' + LIB_DECISION[ancienne] + '\n' +
+    'Nouvelle décision : ' + LIB_DECISION[nouvelle] + '\n\n' +
+    'Confirmer ce changement ?';
+  if (!confirm(message)) return;   // annulation : rien n'est enregistré
+
+  try {
+    await enregistrerDecisionPartenaire(id, activite, nouvelle);
+  } catch (e) {
+    alert('La décision n\'a pas pu être enregistrée.\n\n' + e.message);
+    return;
+  }
+  // Aucun email : ce lot n'en déclenche aucun, quel que soit le sens
+  // du changement.
+  const convoyeur = (window._candidaturesData || {})[id] || (window._convoyeursActifsData || {})[id]
+    || { id: id, activites: _partenaireFiche.activites, prenom: _partenaireFiche.nom, nom: '' };
+  await rendreDecisionsPartenaire(convoyeur);
+}
+
+// ── BLOCAGE RÉEL ────────────────────────────────────────────
+// La source de vérité est convoyeurs.bloque — EXACTEMENT la colonne que
+// le contrôle d'accès existant (finaliserSessionConvoyeur) lit déjà
+// avant d'ouvrir l'espace partenaire. Aucun second champ n'est créé.
+async function definirBlocagePartenaire(convoyeurId, bloque, motif) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const valeurs = { bloque: !!bloque };
+  if (bloque) valeurs.bloque_motif = motif || null;
+  const res = await sbAuth.from('convoyeurs').update(valeurs).eq('id', convoyeurId);
+  if (res.error) throw new Error(res.error.message);
+  // bloque_le et bloque_par sont renseignés côté base par un trigger :
+  // impossible d'avoir un blocage sans trace de qui et quand.
+}
+
+async function toggleBlockConvoyeur() {
+  const id = _partenaireFiche.id;
+  if (!id) { alert('Aucun partenaire sélectionné.'); return; }
+  const nom = _partenaireFiche.nom;
+  const estBloque = !!window._currentConvBlocked;
+
+  if (estBloque) {
+    if (!confirm(
+      'Débloquer l\'accès de ' + nom + ' ?\n\n' +
+      'Son accès sera rétabli uniquement pour les activités déjà autorisées.\n' +
+      'Les décisions par activité ne sont pas modifiées et aucune mission ' +
+      'ne lui est attribuée automatiquement.'
+    )) return;
+    try { await definirBlocagePartenaire(id, false, null); }
+    catch (e) { alert('Le déblocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
+    window._currentConvBlocked = false;
+    _majBoutonBlocage(false);
+    alert('Accès rétabli pour ' + nom + '.');
+  } else {
+    const groupeMotif = document.getElementById('block-reason-group');
+    if (groupeMotif && groupeMotif.style.display === 'none') {
+      groupeMotif.style.display = 'block';
+      return;   // premier clic : on demande d'abord le motif
+    }
+    const motif = (document.getElementById('block-reason') || {}).value;
+    if (!motif) { alert('Veuillez sélectionner un motif.'); return; }
+    if (!confirm(
+      'Bloquer l\'accès de ' + nom + ' ?\n\n' +
+      'Motif : ' + motif + '\n\n' +
+      'Il perdra l\'accès à son espace partenaire et à ses missions.'
+    )) return;
+    try { await definirBlocagePartenaire(id, true, motif); }
+    catch (e) { alert('Le blocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
+    window._currentConvBlocked = true;
+    _majBoutonBlocage(true);
+    if (groupeMotif) groupeMotif.style.display = 'none';
+    alert('Accès bloqué pour ' + nom + '.');
+  }
+
+  // Les listes reflètent immédiatement l'état réellement enregistré.
+  if (typeof loadCandidatures === 'function') loadCandidatures();
+  if (typeof loadConvoyeursActifs === 'function') loadConvoyeursActifs();
+}
+
+function _majBoutonBlocage(bloque) {
+  const btn = document.getElementById('dossier-btn-block');
+  if (!btn) return;
+  btn.textContent = bloque ? '🔓 Débloquer l\'accès' : '🚫 Bloquer l\'accès';
+  btn.style.background = bloque ? '#1f7a4d' : '';
+  btn.style.borderColor = bloque ? '#1f7a4d' : '';
+}
+
+// Prépare la fiche ouverte : identité, état de blocage RÉEL (jamais une
+// valeur supposée) et décisions par activité.
+async function preparerFichePartenaire(convoyeur) {
+  window._currentConvNom = (((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || '')).trim()
+    || 'ce partenaire';
+  window._currentConvBlocked = !!(convoyeur && convoyeur.bloque);
+  _majBoutonBlocage(window._currentConvBlocked);
+  const groupeMotif = document.getElementById('block-reason-group');
+  if (groupeMotif) groupeMotif.style.display = 'none';
+  await rendreDecisionsPartenaire(convoyeur);
+}
+
+// ── RE-VÉRIFICATION D'UNE SESSION PARTENAIRE DÉJÀ OUVERTE ───
+// Un blocage décidé pendant qu'un partenaire est connecté doit prendre
+// effet à la prochaine vérification, sans attendre une reconnexion.
+// Réutilise la même source de vérité que la connexion : la ligne
+// convoyeurs et sa colonne `bloque`.
+async function verifierAccesPartenaireEnCours() {
+  if (currentRole !== 'convoyeur') return true;
+  const conv = window._currentConvoyeur;
+  if (!conv || !conv.id) return true;
+  let ligne = null;
+  try {
+    const rows = await sbFetch('convoyeurs?id=eq.' + encodeURIComponent(conv.id) + '&select=id,bloque,statut');
+    ligne = (rows || [])[0];
+  } catch (e) {
+    return true;   // incident réseau : on ne déconnecte pas arbitrairement
+  }
+  // Ligne devenue invisible, compte bloqué ou désactivé : on ferme
+  // proprement la session avec un message neutre.
+  if (!ligne || ligne.bloque === true || ligne.statut !== 'actif') {
+    // On réutilise la déconnexion existante du Dashboard (doLogout) plutôt
+    // que d'inventer un second chemin de sortie : elle ferme la session
+    // Supabase, oublie le partenaire courant et ramène l'écran de
+    // connexion. Le message reste neutre : aucun détail technique, aucune
+    // mention de politique, de table ou de motif.
+    try { doLogout(); } catch (e) {
+      try { if (_sbAuthPret() && sbAuth.auth) await sbAuth.auth.signOut(); } catch (e2) {}
+    }
+    alert('L\'accès à votre compte est suspendu. Contactez HelixCar.');
+    return false;
+  }
+  return true;
 }
 
 // ── VIDÉO DE CANDIDATURE — LECTURE SÉCURISÉE ────────────────
@@ -4451,10 +4758,10 @@ function voirConvoyeurSb(id) {
     <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Missions effectuées</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
     <div style="color:#888;font-size:.78rem;margin-top:10px">📋 Pénalités & récompenses : pas encore connectées à de vraies données (pages Pannes/Notations/Challenge toujours fictives).</div>
   `;
-  window._currentConvNom = nom;
-  window._currentConvBlocked = false;
-  const blockBtn = document.getElementById('dossier-btn-block');
-  if (blockBtn) { blockBtn.textContent = '🚫 Bloquer l\u0027accès'; blockBtn.style.background = ''; blockBtn.style.borderColor = ''; }
+  // CORRECTION : l'état de blocage était codé en dur à false, si bien que
+  // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la
+  // ligne réellement enregistrée, comme le fait le contrôle d'accès.
+  preparerFichePartenaire(c);
   openModal('dossier');
 
   sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
@@ -5644,28 +5951,13 @@ function voirDocumentsConvoyeur() {
   alert('📄 Documents de ' + (window._currentConvNom || 'ce convoyeur') + '\n\n✅ Permis de conduire — valide\n✅ Pièce d\'identité — valide\n✅ RC Pro — valide jusqu\'au 12/2025\n✅ RIB — FR76 3000 1234 5678…\n\n💡 En production : les PDFs s\'ouvriront directement depuis Supabase Storage.\nLes documents envoyés à helixcardoc@gmail.com seront associés automatiquement via leur code mission.');
 }
 
-function toggleBlockConvoyeur() {
-  const nom = window._currentConvNom || 'ce convoyeur';
-  const isBlocked = window._currentConvBlocked;
-  if (isBlocked) {
-    if(confirm('🔓 Débloquer l\'accès de ' + nom + ' ?')) {
-      alert('✅ Accès rétabli pour ' + nom + '.\nUn email de notification lui a été envoyé.');
-      closeModal('dossier');
-    }
-  } else {
-    const reasonGroup = document.getElementById('block-reason-group');
-    if (reasonGroup.style.display === 'none') {
-      reasonGroup.style.display = 'block';
-      return;
-    }
-    const reason = document.getElementById('block-reason').value;
-    if (!reason) { alert('⚠️ Veuillez sélectionner un motif.'); return; }
-    if(confirm('⚠️ Bloquer ' + nom + ' ?\nMotif : ' + reason)) {
-      alert('🚫 Accès bloqué — ' + nom + '.\nMotif : ' + reason + '\nUn email lui a été envoyé.');
-      closeModal('dossier');
-    }
-  }
-}
+// ANCIENNE VERSION SUPPRIMÉE — elle n'écrivait RIEN dans Supabase :
+// elle affichait seulement une alerte, refermait la fiche, et annonçait
+// à tort qu'un email avait été envoyé. Le blocage n'était donc qu'un
+// effet visuel, sans aucune persistance ni aucun effet réel sur l'accès.
+// La version qui fait foi est définie plus haut : elle enregistre
+// réellement `convoyeurs.bloque` via la session administrateur, garde la
+// trace de qui et quand, et ne déclenche aucun email.
 
 function refuserFromModal() {
   const header = document.getElementById('dossier-name').textContent;

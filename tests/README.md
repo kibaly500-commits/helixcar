@@ -18,7 +18,7 @@ Le chemin de Chromium est défini dans `lib.js` (constante `EXE`) ; adaptez-le
 
 ```bash
 cd tests
-for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin; do
+for f in t_nettoyage t_contact t_pro t_dates t_devis t_nonreg t_brouillon t_video t_video_admin t_decisions; do
   echo "== $f"; node $f.js || echo "ÉCHEC $f"
 done
 
@@ -45,6 +45,7 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_brouillon.js` | Effacer / OK des rubriques, brouillon écrit puis restauré après F5 |
 | `t_video.js` | Vidéo partenaire : exigence et durée selon les activités, formats, taille, durée réelle, remplacement, suppression, envoi et erreurs réseau |
 | `t_video_admin.js` | Dashboard : fiche unique, états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
+| `t_decisions.js` | **Décisions par activité et blocage partenaire** : indépendance des activités, six transitions, confirmation explicite et annulation sans écriture, historique complet, persistance après F5, blocage réellement enregistré, refus d'autorisation, invalidation d'une session ouverte, zéro e-mail |
 | `t_video_securite.mjs` | **Sécurité** : exécute le vrai code de la fonction serveur `candidature-video` contre un double Supabase (jeton, chemin imposé par le serveur, cloisonnement A/B, contrôles format/taille/durée, usage unique, orphelins) |
 
 Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
@@ -69,6 +70,13 @@ Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
 - L'envoi vers Supabase Storage est éprouvé via l'interception réseau de
   Playwright (succès, refus serveur, coupure) : aucun octet ne part
   réellement vers Supabase.
+- `t_decisions.js` exécute le **vrai code du Dashboard** contre un double
+  Supabase en mémoire qui **simule** les refus RLS selon le rôle. Il prouve
+  donc que l'interface réagit correctement à un refus serveur et n'écrit
+  jamais ce qu'elle n'a pas le droit d'écrire — il ne prouve **pas** que les
+  politiques du fichier `05_blocage_partenaire.sql` sont actives : celles-ci
+  n'ont pas été exécutées. La vérification correspondante figure dans
+  `migrations/README.md` et doit être faite après application.
 - Les tests n'écrivent jamais dans Supabase : ils s'arrêtent au payload
   construit côté navigateur. Aucune donnée réelle n'est touchée.
 - Les données de test sont préfixées `TEST-QA` et utilisent des adresses en

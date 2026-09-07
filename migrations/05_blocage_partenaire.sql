@@ -79,12 +79,18 @@ grant execute on function public.partenaire_actif() to authenticated;
 -- ------------------------------------------------------------
 alter table public.convoyeurs enable row level security;
 
--- Un partenaire lit SA candidature, et seulement s'il n'est pas bloqué.
--- C'est ici que le blocage devient réel : la ligne cesse d'être visible.
+-- Un partenaire lit SA PROPRE fiche, bloqué ou non.
+-- CHOIX ASSUMÉ : masquer aussi sa fiche ferait échouer la connexion sur
+-- « aucun dossier trouvé » — un message trompeur. Le contrôle d'accès
+-- existant (finaliserSessionConvoyeur) lit précisément `bloque` sur
+-- cette ligne pour afficher un message neutre de suspension puis fermer
+-- la session. Ce sont les DONNÉES PROTÉGÉES (missions) qui deviennent
+-- inaccessibles, pas l'information « mon compte est suspendu ».
 drop policy if exists "convoyeurs : lecture par le proprietaire non bloque" on public.convoyeurs;
-create policy "convoyeurs : lecture par le proprietaire non bloque"
+drop policy if exists "convoyeurs : lecture par le proprietaire" on public.convoyeurs;
+create policy "convoyeurs : lecture par le proprietaire"
   on public.convoyeurs for select to authenticated
-  using (auth_user_id = auth.uid() and bloque is false);
+  using (auth_user_id = auth.uid());
 
 -- Un administrateur actif voit tout, y compris les partenaires bloqués
 -- (sans quoi il ne pourrait plus jamais les débloquer).
@@ -142,6 +148,72 @@ drop trigger if exists trg_garde_colonnes_sensibles_convoyeur on public.convoyeu
 create trigger trg_garde_colonnes_sensibles_convoyeur
   before update on public.convoyeurs
   for each row execute function public.garde_colonnes_sensibles_convoyeur();
+
+-- ------------------------------------------------------------
+-- DONNÉES PROTÉGÉES : LES MISSIONS
+-- ------------------------------------------------------------
+-- C'est ICI que le blocage produit son effet réel. Un partenaire bloqué
+-- garde sa fiche (pour voir qu'il est suspendu) mais ne lit ni ne
+-- modifie plus aucune mission — quel que soit le JavaScript exécuté
+-- dans son navigateur, en tapant l'URL de son espace, ou en appelant
+-- directement l'API Supabase.
+alter table public.missions enable row level security;
+
+-- Lecture : administrateur, ou partenaire ACTIF ET NON BLOQUÉ. Un
+-- partenaire actif voit ses missions et celles encore non attribuées,
+-- exactement comme aujourd'hui.
+drop policy if exists "missions : lecture admin" on public.missions;
+create policy "missions : lecture admin"
+  on public.missions for select to authenticated
+  using (public.est_admin());
+
+drop policy if exists "missions : lecture partenaire actif" on public.missions;
+create policy "missions : lecture partenaire actif"
+  on public.missions for select to authenticated
+  using (
+    public.partenaire_actif()
+    and (
+      convoyeur_id is null
+      or exists (
+        select 1 from public.convoyeurs c
+         where c.id = missions.convoyeur_id
+           and c.auth_user_id = auth.uid()
+      )
+    )
+  );
+
+-- Écriture : un partenaire actif n'agit que sur SES missions (accepter,
+-- avancer). Toute autre écriture reste réservée à l'administrateur.
+drop policy if exists "missions : mise a jour partenaire actif" on public.missions;
+create policy "missions : mise a jour partenaire actif"
+  on public.missions for update to authenticated
+  using (
+    public.partenaire_actif()
+    and (
+      convoyeur_id is null
+      or exists (
+        select 1 from public.convoyeurs c
+         where c.id = missions.convoyeur_id
+           and c.auth_user_id = auth.uid()
+      )
+    )
+  )
+  with check (public.partenaire_actif());
+
+drop policy if exists "missions : ecriture admin" on public.missions;
+create policy "missions : ecriture admin"
+  on public.missions for all to authenticated
+  using (public.est_admin()) with check (public.est_admin());
+
+-- ------------------------------------------------------------
+-- PRÉREQUIS CÔTÉ APPLICATION
+-- ------------------------------------------------------------
+-- Ces politiques reposent sur `auth.uid()`. Le Dashboard envoyait
+-- jusqu'ici la clé anon sur TOUS ses appels REST : `auth.uid()` valait
+-- null et aucune politique d'identité n'aurait fonctionné (le Dashboard
+-- se serait vidé). Corrigé dans dashboard.html : sbFetch() transmet
+-- désormais le JWT de la session ouverte quand il y en a une.
+-- Vérifier ce point AVANT d'appliquer ce fichier.
 
 -- ------------------------------------------------------------
 -- VÉRIFICATION MANUELLE RECOMMANDÉE APRÈS APPLICATION

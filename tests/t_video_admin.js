@@ -35,7 +35,12 @@ const INIT_SUPABASE = `
         auth: { onAuthStateChange: function () { return { data: { subscription: { unsubscribe: function () {} } } }; },
                 getSession: async function () { return { data: { session: null } }; },
                 signOut: async function () { return {}; } },
+        // Double minimal du query builder PostgREST. order, limit et then
+        // sont indispensables : la fiche partenaire charge desormais les
+        // decisions et leur historique, qui trient les lignes.
         from: function () { return { select: function () { return this; }, eq: function () { return this; },
+                 order: function () { return this; }, limit: function () { return this; },
+                 then: function (resoudre) { return Promise.resolve({ data: [], error: null }).then(resoudre); },
                  maybeSingle: async function () { return { data: null, error: null }; },
                  insert: async function () { return {}; }, update: function () { return this; } }; },
         storage: {
@@ -98,9 +103,14 @@ async function definirResultatSignature(page, litteral) {
 
   // ── B. Lecture réussie par URL signée ──
   await definirResultatSignature(page, { data: { signedUrl: 'https://exemple.invalid/signed?token=abc&expires=300' }, error: null });
-  await page.evaluate(() => ouvrirVideoCandidature('cand-1'));
-  await page.waitForTimeout(250);
-  let lecture = await page.evaluate(() => ({
+  // On lit l'etat dans le MEME evaluate que l'appel : l'hote de test
+  // n'existe pas, donc <video> finit toujours par declencher onerror et
+  // remasquer le lecteur. Ce repli est le comportement voulu en cas de
+  // fichier illisible ; il ne doit pas masquer ce qu'on verifie ici,
+  // a savoir que l'URL signee obtenue est bien affichee.
+  let lecture = await page.evaluate(async () => {
+    await ouvrirVideoCandidature('cand-1');
+    return ({
     modaleOuverte: document.getElementById('modal-video-candidature').classList.contains('open'),
     lecteurVisible: document.getElementById('video-candidature-lecteur').style.display,
     src: document.getElementById('video-candidature-lecteur').getAttribute('src') || '',
@@ -108,7 +118,8 @@ async function definirResultatSignature(page, litteral) {
     meta: document.getElementById('video-candidature-meta').textContent,
     titre: document.getElementById('video-candidature-titre').textContent,
     signatures: window.__signatures
-  }));
+  });
+  });
   check('B1 : modale de lecture ouverte', lecture.modaleOuverte);
   check('B2 : lecteur affiché', lecture.lecteurVisible === 'block');
   check('B3 : la source est bien l\'URL SIGNÉE', /signed\?token=abc/.test(lecture.src), lecture.src);
