@@ -76,15 +76,47 @@ if (typeof Deno !== "undefined" && Deno.env?.get("ALLOW_LOCALHOST_CORS") === "tr
   ORIGINES_AUTORISEES.push("http://localhost:3000", "http://127.0.0.1:3000");
 }
 
+// En-têtes que le navigateur est autorisé à envoyer.
+//
+// DÉFAUT CORRIGÉ : la liste ne contenait que `content-type` et
+// `authorization`. Or le navigateur envoie `apikey` — Supabase l'exige
+// sur toute requête vers le gateway. Le preflight OPTIONS échouait donc
+// AVANT le POST, et la requête réelle n'était jamais émise : côté
+// candidat, « Connexion interrompue », sans la moindre trace serveur.
+//
+// Les valeurs sont comparées en minuscules parce que le navigateur
+// envoie Access-Control-Request-Headers en minuscules.
+export const ENTETES_AUTORISES = [
+  "content-type",
+  "authorization",
+  "apikey",
+  // Envoyés par supabase-js sur les requêtes qu'il émet lui-même.
+  "x-client-info",
+  "x-supabase-api-version",
+];
+
 export function enTetesCors(origine: string | null) {
   const autorisee = !!origine && ORIGINES_AUTORISEES.includes(origine);
   const entetes: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization",
-    "Vary": "Origin",
+    "Access-Control-Allow-Headers": ENTETES_AUTORISES.join(", "),
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin, Access-Control-Request-Headers",
   };
   if (autorisee) entetes["Access-Control-Allow-Origin"] = origine as string;
   return { entetes, autorisee };
+}
+
+// Un preflight ne doit réussir que si TOUS les en-têtes demandés sont
+// autorisés. Répondre 204 en en oubliant un laisserait le navigateur
+// bloquer la requête réelle sans que le serveur n'en sache rien : on
+// préfère un refus explicite, visible dans les journaux.
+export function preflightAcceptable(demandes: string | null): boolean {
+  if (!demandes) return true;
+  return demandes.split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => h.length > 0)
+    .every((h) => ENTETES_AUTORISES.includes(h));
 }
 
 function reponseJson(corps: unknown, statutHttp: number, entetesCors: Record<string, string>) {
@@ -353,7 +385,13 @@ export async function traiterRequete(sb: any, req: Request): Promise<Response> {
   const { entetes: cors, autorisee } = enTetesCors(origine);
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: autorisee ? 204 : 403, headers: cors });
+    if (!autorisee) return new Response(null, { status: 403, headers: cors });
+    const demandes = req.headers.get("access-control-request-headers");
+    if (!preflightAcceptable(demandes)) {
+      console.error("Preflight refusé — en-têtes non autorisés :", demandes);
+      return new Response(null, { status: 403, headers: cors });
+    }
+    return new Response(null, { status: 204, headers: cors });
   }
   if (!autorisee) return erreur("ORIGIN_NOT_ALLOWED", "Origine non autorisée.", 403, cors);
   if (req.method !== "POST") return erreur("METHOD_NOT_ALLOWED", "Seul POST est accepté.", 405, cors);

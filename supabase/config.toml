@@ -1,0 +1,34 @@
+# Configuration Supabase versionnée — HelixCar
+# ============================================
+# Ce fichier est lu par la CLI Supabase (`supabase functions deploy`,
+# `supabase start`). Il rend explicite, DANS LE DÉPÔT, un réglage dont
+# dépend le fonctionnement du dépôt de vidéo : sans lui, la fonction
+# serait déployée avec la vérification JWT active par défaut et TOUTE
+# candidature échouerait avant même d'atteindre le code.
+
+project_id = "helixcar"
+
+[functions.candidature-video]
+# La candidature partenaire est déposée AVANT toute authentification :
+# un candidat n'a pas de compte au moment où il envoie sa vidéo. Le
+# navigateur envoie donc `apikey` (clé publique) mais AUCUN JWT
+# utilisateur en Authorization. Avec la vérification JWT du gateway
+# active, Supabase répondrait 401 avant d'exécuter la moindre ligne.
+#
+# Désactiver la vérification du gateway n'ouvre RIEN : l'autorisation
+# réelle est assurée par la fonction elle-même, et elle est plus stricte
+# que ce que le gateway saurait faire —
+#
+#   * un jeton applicatif à USAGE UNIQUE, haché en base, lié à UNE
+#     candidature précise (`convoyeurs.video_jeton_hash`) ;
+#   * un chemin de destination GÉNÉRÉ PAR LE SERVEUR : le navigateur ne
+#     propose jamais où écrire ;
+#   * une URL d'envoi signée, temporaire, portant sur ce seul chemin,
+#     dans un bucket PRIVÉ ;
+#   * une origine HTTP contrôlée (liste blanche CORS) ;
+#   * la clé service_role qui ne quitte jamais l'environnement de la
+#     fonction.
+#
+# Autrement dit : le gateway ne peut pas autoriser ce parcours, et la
+# fonction l'autorise mieux que lui.
+verify_jwt = false

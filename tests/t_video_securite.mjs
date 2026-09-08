@@ -5,6 +5,7 @@
 //   node --experimental-strip-types tests/t_video_securite.mjs
 import {
   traiterRequete, hasherJeton, dureeMaxPourActivites, enTetesCors,
+  ENTETES_AUTORISES, preflightAcceptable,
 } from '../supabase/functions/candidature-video/index.ts';
 
 let pass = 0, fail = 0; const echecs = [];
@@ -15,6 +16,12 @@ function check(l, c, e) {
 
 const ORIGINE = 'https://helixcar-i89b.vercel.app';
 const BUCKET = 'candidatures-videos';
+
+// Lecture des fichiers du dépôt. Chemins résolus depuis CE fichier :
+// le test fonctionne quel que soit le répertoire courant.
+const fs = await import('node:fs');
+const racine = new URL('../', import.meta.url);
+const lire = (rel) => fs.readFileSync(new URL(rel, racine), 'utf8');
 
 // ── Double Supabase en mémoire ──────────────────────────────
 function creerDouble(etat) {
@@ -312,6 +319,85 @@ const JETON_B = 'b'.repeat(64);
       corsOk.entetes['Access-Control-Allow-Origin'] === ORIGINE && corsOk.autorisee === true);
   }
 
+  // ── 7 bis. PREFLIGHT CORS RÉEL ──
+  // Un navigateur n'envoie pas le POST tant que le preflight OPTIONS
+  // n'a pas répondu que les en-têtes qu'il compte envoyer sont permis.
+  // Si `apikey` manque, la requête réelle N'EST JAMAIS ÉMISE : rien
+  // n'apparaît côté serveur, et le candidat ne voit qu'une « connexion
+  // interrompue ». C'est le défaut que cette section verrouille.
+  {
+    const etat = etatDeBase();
+    const { sb } = creerDouble(etat);
+
+    // Les en-têtes que le VRAI code du formulaire envoie. On les lit
+    // dans index.html plutôt que de les recopier : si un en-tête est
+    // ajouté un jour côté navigateur sans être autorisé ici, ce test
+    // tombe.
+    const idxSrc = lire('index.html');
+    const bloc = idxSrc.slice(idxSrc.indexOf('function _convAppelerFonctionVideo'));
+    const headersLitteral = bloc.slice(bloc.indexOf('headers:'), bloc.indexOf('body:'));
+    const entetesEnvoyes = [...headersLitteral.matchAll(/'([A-Za-z][A-Za-z0-9-]*)'\s*:/g)]
+      .map(m => m[1].toLowerCase());
+
+    check('7.6 Le formulaire envoie bien apikey à la fonction',
+      entetesEnvoyes.includes('apikey'), entetesEnvoyes.join(','));
+
+    const nonAutorises = entetesEnvoyes.filter(h => !ENTETES_AUTORISES.includes(h));
+    check('7.7 TOUS les en-têtes réellement envoyés sont autorisés par le CORS',
+      nonAutorises.length === 0, 'refusés : ' + nonAutorises.join(','));
+
+    // Le vrai preflight, tel que le navigateur l'émet.
+    function preflight(entetesDemandes, origine) {
+      const h = { 'access-control-request-method': 'POST' };
+      if (origine !== null) h['origin'] = origine || ORIGINE;
+      if (entetesDemandes !== null) h['access-control-request-headers'] = entetesDemandes;
+      return new Request('https://exemple.invalid/candidature-video', { method: 'OPTIONS', headers: h });
+    }
+
+    let rep = await traiterRequete(sb, preflight(entetesEnvoyes.join(', ')));
+    check('7.8 Preflight avec les en-têtes réellement envoyés -> 204',
+      rep.status === 204, String(rep.status));
+    check('7.9 Le preflight autorise explicitement apikey',
+      (rep.headers.get('access-control-allow-headers') || '').toLowerCase().includes('apikey'),
+      rep.headers.get('access-control-allow-headers'));
+    check('7.10 Le preflight autorise l\'origine officielle',
+      rep.headers.get('access-control-allow-origin') === ORIGINE);
+
+    rep = await traiterRequete(sb, preflight('content-type, apikey'));
+    check('7.11 Preflight content-type + apikey -> 204', rep.status === 204, String(rep.status));
+
+    // Un en-tête que nous n'autorisons pas doit faire échouer le
+    // preflight, pas passer inaperçu.
+    rep = await traiterRequete(sb, preflight('content-type, x-inconnu-pirate'));
+    check('7.12 Un en-tête non prévu fait échouer le preflight',
+      rep.status === 403, String(rep.status));
+
+    // Origine inconnue : refus, et surtout aucun Allow-Origin.
+    rep = await traiterRequete(sb, preflight('content-type, apikey', 'https://site-pirate.invalid'));
+    check('7.13 Preflight d\'une origine non autorisée -> 403', rep.status === 403, String(rep.status));
+    check('7.14 ... et aucun Access-Control-Allow-Origin ne lui est accordé',
+      !rep.headers.get('access-control-allow-origin'));
+
+    // Le POST réel depuis une origine pirate reste refusé même si le
+    // pirate ignore le preflight (curl, script serveur).
+    const rPirate = await appeler(sb, { action: 'autoriser', jeton: JETON_A },
+                                  { origine: 'https://site-pirate.invalid' });
+    check('7.15 POST direct depuis une origine pirate -> 403',
+      rPirate.statut === 403 && rPirate.json.code === 'ORIGIN_NOT_ALLOWED');
+
+    check('7.16 preflightAcceptable refuse un en-tête hors liste',
+      preflightAcceptable('content-type, apikey') === true &&
+      preflightAcceptable('content-type, x-autre') === false);
+
+    // La configuration versionnée doit exister : sans verify_jwt=false,
+    // le gateway répond 401 avant que ce code ne s'exécute.
+    const cfg = lire('supabase/config.toml');
+    check('7.17 La configuration de la fonction est versionnée',
+      /\[functions\.candidature-video\]/.test(cfg));
+    check('7.18 ... et désactive explicitement la vérification JWT du gateway',
+      /\[functions\.candidature-video\][\s\S]*?verify_jwt\s*=\s*false/.test(cfg));
+  }
+
   // ── 8. Règle métier centralisée ──
   check('8.1 Durée max : nettoyage seul = aucune vidéo', dureeMaxPourActivites(['nettoyage']) === 0);
   check('8.2 Durée max : convoyage = 60 s', dureeMaxPourActivites(['convoyage']) === 60);
@@ -321,11 +407,6 @@ const JETON_B = 'b'.repeat(64);
 
   // ── 9. Aucun secret ni URL persistée ──
   {
-    const fs = await import('node:fs');
-    // Chemins résolus depuis CE fichier : le test fonctionne quel que
-    // soit le répertoire courant.
-    const racine = new URL('../', import.meta.url);
-    const lire = (rel) => fs.readFileSync(new URL(rel, racine), 'utf8');
     const fonction = lire('supabase/functions/candidature-video/index.ts');
     check('9.1 La clé service_role n\'est lue que depuis l\'environnement serveur',
       /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/.test(fonction)
