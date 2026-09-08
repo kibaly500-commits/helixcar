@@ -824,6 +824,19 @@ body.scroll-verrouille { overflow: hidden; }
 <!-- ══════════════════════════════════════════════════════════
      LOGIN
 ══════════════════════════════════════════════════════════ -->
+<style>
+  /* Bouton œil — même dessin et même comportement que le site public,
+     pour ne pas avoir deux icônes différentes dans le produit. */
+  .btn-oeil {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; padding: 8px;
+    color: rgba(16,24,32,.45); line-height: 0; border-radius: 3px;
+    min-width: 34px; min-height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn-oeil:hover, .btn-oeil:focus-visible { color: var(--red); }
+  .btn-oeil.actif { color: var(--red); }
+</style>
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">
@@ -846,8 +859,10 @@ body.scroll-verrouille { overflow: hidden; }
     <div class="form-group">
       <label>Mot de passe</label>
       <div style="position:relative">
-        <input type="password" id="login-pw" placeholder="••••••••" style="padding-right:40px" onkeydown="if(event.key==='Enter')doLogin()">
-        <button type="button" onclick="togglePw('login-pw', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;line-height:1;color:#888">👁️</button>
+        <input type="password" id="login-pw" placeholder="••••••••" data-mdp="1"
+               autocomplete="current-password" style="padding-right:44px" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="btn-oeil" onclick="basculerMotDePasse('login-pw', this)"
+                aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
       <div style="text-align:right;margin-top:6px">
         <a href="#" onclick="ouvrirMotDePasseOublie(event)" style="font-size:.78rem;color:var(--blue-mid);text-decoration:none">Mot de passe oublié ?</a>
@@ -1970,6 +1985,25 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CLIENT: Dashboard -->
       <div class="page" id="page-client-dashboard">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Une nouvelle prestation ?</div>
+              <div style="font-size:.85rem;color:#555;margin-top:4px">
+                Convoyage, stockage, nettoyage ou recherche d'un professionnel automobile.
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="ouvrirNouvelleDemande()">Faire une nouvelle demande →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Mes demandes</div></div>
+          <div id="client-demandes-liste">
+            <div style="font-size:.85rem;color:#666">Chargement…</div>
+          </div>
+        </div>
+
         <div class="stats-row">
           <div class="stat-card yellow"><div class="stat-label">Missions effectuées</div><div class="stat-value">8</div></div>
           <div class="stat-card green"><div class="stat-label">Km parcourus</div><div class="stat-value">3 840</div></div>
@@ -2029,6 +2063,15 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- CLIENT: Fidélité -->
+      <div class="page" id="page-client-infos">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Demandes nécessitant des informations</div></div>
+          <div id="client-infos-liste">
+            <div style="font-size:.85rem;color:#666">Chargement…</div>
+          </div>
+        </div>
+      </div>
+
       <div class="page" id="page-client-fidelite">
         <div class="card">
           <div class="card-header"><div class="card-title">Votre progression</div></div>
@@ -2148,9 +2191,9 @@ body.scroll-verrouille { overflow: hidden; }
     <h3 id="dossier-name">Dossier convoyeur</h3>
     <p>Vérifiez les informations avant de valider ou refuser.</p>
     <div id="dossier-content"></div>
-    <div style="background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.3);border-radius:8px;padding:12px;margin-top:12px;font-size:.82rem;color:#555;line-height:1.6">
-      🎥 <strong>Vidéo de présentation :</strong> une vidéo de présentation enregistrée par le convoyeur lors de sa candidature. Elle sera visible ici une fois que tu auras connecté Supabase (stockage de fichiers). En attendant, elle est stockée et accessible directement dans ton espace Supabase Storage.
-    </div>
+    <!-- Décisions par activité : une seule fiche, une décision
+         indépendante par activité. Rempli par rendreDecisionsPartenaire(). -->
+    <div id="dossier-decisions"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
       <div class="form-group" id="block-reason-group" style="display:none">
         <label>Motif du blocage</label>
@@ -2171,6 +2214,20 @@ body.scroll-verrouille { overflow: hidden; }
         <button class="btn btn-red" id="dossier-btn-block" onclick="toggleBlockConvoyeur()">🚫 Bloquer l'accès</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- LECTEUR VIDÉO SÉCURISÉ — la source est une URL SIGNÉE TEMPORAIRE,
+     obtenue après contrôle d'autorisation, et effacée à la fermeture.
+     Aucune URL n'est conservée dans le DOM au-delà de la lecture. -->
+<div class="modal-overlay" id="modal-video-candidature">
+  <div class="modal" style="position:relative;max-width:760px">
+    <button class="modal-close" onclick="fermerVideoCandidature()">✕</button>
+    <h3 id="video-candidature-titre">Vidéo de présentation</h3>
+    <div id="video-candidature-etat" style="font-size:.85rem;color:#888;margin-bottom:12px">Préparation de la lecture sécurisée…</div>
+    <video id="video-candidature-lecteur" controls playsinline preload="metadata"
+           style="display:none;width:100%;max-height:62vh;border-radius:10px;background:#000"></video>
+    <div id="video-candidature-meta" style="font-size:.8rem;color:#888;margin-top:10px"></div>
   </div>
 </div>
 
@@ -2332,10 +2389,61 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
+<!-- ============================================================
+     NOUVEAU MOT DE PASSE — page d'atterrissage du lien reçu par e-mail
+     ============================================================
+     Point d'arrivée UNIQUE des trois rôles (client, partenaire,
+     administrateur) : le lien de réinitialisation de Supabase Auth
+     renvoie ici, quel que soit l'endroit d'où la demande est partie —
+     l'écran de connexion de cette page, ou le site public.
+     Remplace l'ancien double prompt(), qui ne demandait aucune
+     confirmation et ne pouvait donc pas détecter une faute de frappe. -->
+<div class="modal-overlay" id="modal-reinit-mdp">
+  <div class="modal" style="position:relative;max-width:440px;text-align:left">
+    <h3 style="margin-bottom:6px">Nouveau mot de passe</h3>
+    <p id="reinit-sous-titre" style="font-size:.85rem;color:#666;margin-top:0">
+      Choisissez un nouveau mot de passe pour votre compte HelixCar.
+    </p>
+
+    <div id="reinit-alert" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;color:#991B1B"></div>
+
+    <div id="reinit-formulaire">
+      <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Nouveau mot de passe</label>
+      <div style="position:relative;margin-bottom:12px">
+        <input type="password" id="reinit-mdp" autocomplete="new-password" minlength="8" data-mdp="1"
+               aria-describedby="reinit-aide"
+               style="width:100%;padding:10px 44px 10px 12px;border:1.5px solid #ddd;border-radius:4px;font-size:.9rem">
+        <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp', this)"
+                aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <div id="reinit-aide" style="font-size:.75rem;color:#6B7280;margin:-6px 0 12px">8 caractères minimum.</div>
+
+      <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Confirmer le mot de passe</label>
+      <div style="position:relative;margin-bottom:16px">
+        <input type="password" id="reinit-mdp2" autocomplete="new-password" minlength="8" data-mdp="1"
+               style="width:100%;padding:10px 44px 10px 12px;border:1.5px solid #ddd;border-radius:4px;font-size:.9rem">
+        <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp2', this)"
+                aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="reinit-valider"
+              onclick="enregistrerNouveauMotDePasse()">Enregistrer le mot de passe</button>
+    </div>
+
+    <div id="reinit-succes" style="display:none">
+      <div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:4px;padding:12px 14px;font-size:.85rem;color:#065F46;margin-bottom:14px">
+        Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.
+      </div>
+      <button class="btn btn-primary btn-full" onclick="terminerReinitialisation()">Aller à la connexion</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-fiche-demande">
   <div class="modal" style="position:relative;max-width:720px;text-align:left;max-height:88vh;overflow-y:auto">
     <h3 id="fiche-demande-titre" style="margin-bottom:14px">Demande</h3>
     <div id="fiche-demande-corps"></div>
+    <div id="fiche-demande-infos"></div>
     <button class="btn btn-secondary btn-full" style="margin-top:16px" onclick="closeModal('fiche-demande')">Fermer</button>
   </div>
 </div>
@@ -2363,8 +2471,10 @@ const USERS = {
   // V50.5B.2 — le compte de démonstration admin a été retiré : l'admin
   // s'authentifie désormais réellement via sbAuth.auth.signInWithPassword
   // (cf. doLoginAdmin/finaliserSessionAdmin plus bas). Le rôle 'client'
-  // reste un mock local inchangé — sa migration vers une vraie
-  // authentification est une phase ultérieure, non traitée ici.
+  // s'authentifie lui aussi réellement depuis le chantier « espace
+  // client » (doLoginClient/finaliserSessionClient) : cette table ne
+  // sert plus à aucune connexion. Elle est conservée telle quelle pour
+  // ne rien casser d'autre qui la lirait.
   'convoyeur@helixcar.com': { pw: 'demo123', role: 'convoyeur', name: 'Antoine A.',  initials: 'A' },
   'client@helixcar.com':    { pw: 'demo123', role: 'client',    name: 'Marc D.',     initials: 'M' },
 };
@@ -2398,20 +2508,56 @@ const NAVS = {
   client: [
     { id: 'client-dashboard', icon: '📊', label: 'Tableau de bord' },
     { id: 'client-missions',  icon: '🚗', label: 'Mes missions' },
+    { id: 'client-infos',     icon: '📝', label: 'Informations à compléter' },
     { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badge: 1 },
     { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité' },
     { id: 'client-profil',    icon: '👤', label: 'Mon profil' },
   ],
 };
 
-function togglePw(inputId, btn) {
-  var input = document.getElementById(inputId);
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.textContent = '🙈';
-  } else {
-    input.type = 'password';
-    btn.textContent = '👁️';
+// ── AFFICHER / MASQUER UN MOT DE PASSE ──
+// Bascule UNIQUEMENT le type du champ. La valeur n'est ni lue, ni
+// copiée, ni mémorisée : rien dans une variable persistante, dans
+// localStorage ou sessionStorage, rien dans un journal. Le bouton est
+// un <button type="button"> : il ne soumet jamais le formulaire, et
+// Entrée comme Espace l'activent nativement.
+function basculerMotDePasse(id, bouton) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var doitAfficher = el.type === 'password';
+
+  var debut = null, fin = null;
+  try { debut = el.selectionStart; fin = el.selectionEnd; } catch (e) {}
+
+  el.type = doitAfficher ? 'text' : 'password';
+
+  try {
+    el.focus({ preventScroll: true });
+    if (debut !== null && fin !== null) el.setSelectionRange(debut, fin);
+  } catch (e) {}
+
+  if (bouton) {
+    var libelle = doitAfficher ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+    bouton.classList.toggle('actif', doitAfficher);
+    bouton.setAttribute('aria-pressed', String(doitAfficher));
+    bouton.setAttribute('aria-label', libelle);
+    bouton.setAttribute('title', libelle);
+  }
+}
+
+// Conservé comme alias : d'anciens appels peuvent subsister.
+function togglePw(inputId, btn) { basculerMotDePasse(inputId, btn); }
+
+function reinitialiserAffichageMotsDePasse(racine) {
+  var zone = racine || document;
+  var champs = zone.querySelectorAll('input[data-mdp="1"]');
+  for (var i = 0; i < champs.length; i++) champs[i].type = 'password';
+  var boutons = zone.querySelectorAll('.btn-oeil');
+  for (var j = 0; j < boutons.length; j++) {
+    boutons[j].classList.remove('actif');
+    boutons[j].setAttribute('aria-pressed', 'false');
+    boutons[j].setAttribute('aria-label', 'Afficher le mot de passe');
+    boutons[j].setAttribute('title', 'Afficher le mot de passe');
   }
 }
 
@@ -2444,16 +2590,10 @@ async function doLogin() {
       return;
     }
 
-    // Client : identifiants de démo encore en place — migration vers une
-    // vraie authentification prévue dans une phase ultérieure distincte.
-    const user = USERS[email];
-    if (!user || user.pw !== pw) {
-      if (alertEl) alertEl.style.display = 'flex';
-      return;
-    }
-    currentRole = user.role;
-    try { localStorage.setItem('helixcar_demo_email', email); } catch (e) {}
-    initApp(user);
+    // Client : vraie session Supabase Auth, comme l'admin et le
+    // convoyeur. Le compte est créé par le formulaire public au moment
+    // où le client choisit son mot de passe.
+    await doLoginClient(email, pw, alertEl);
   } catch(e) {
     alert('Erreur connexion : ' + e.message);
   }
@@ -2582,6 +2722,380 @@ async function doLoginAdmin(email, pw, alertEl) {
   }
 }
 
+async function doLoginClient(email, pw, alertEl) {
+  const btn = document.querySelector('#login-screen .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
+  try {
+    const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
+    if (error) {
+      if (alertEl) {
+        alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.' : error.message);
+        alertEl.style.display = 'flex';
+      }
+      return;
+    }
+    await finaliserSessionClient(email, alertEl, data.user ? data.user.id : null);
+  } catch (e) {
+    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    console.error(e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
+  }
+}
+
+// Ouvre l'espace client sur une session RÉELLE. On lit la vue
+// v_mes_demandes (jamais la table clients) : elle filtre elle-même sur
+// auth.uid() et ne projette aucune donnée interne.
+async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec) {
+  if (signOutSiEchec === undefined) signOutSiEchec = true;
+  if (!authUserId) return false;
+
+  let demandes = null;
+  let erreurTechnique = null;
+  try {
+    const { data, error } = await sbAuth
+      .from('v_mes_demandes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { erreurTechnique = error; } else { demandes = data || []; }
+  } catch (e) {
+    erreurTechnique = e;
+  }
+
+  // Une panne ne doit jamais être présentée comme un refus de droits :
+  // même distinction que pour l'administrateur.
+  if (erreurTechnique) {
+    console.error('Erreur technique lors de l\'ouverture de l\'espace client :', erreurTechnique);
+    if (alertEl) { alertEl.textContent = '⚠️ Impossible d\'ouvrir votre espace client.'; alertEl.style.display = 'flex'; }
+    return false;
+  }
+
+  const premiere = (demandes || [])[0] || {};
+  window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [] };
+  currentRole = 'client';
+  const prenom = premiere.prenom || '';
+  const nom = premiere.nom || '';
+  if (PAGE_TITLES['client-dashboard']) {
+    PAGE_TITLES['client-dashboard'][1] = 'Bienvenue' + (prenom ? ' ' + prenom : '');
+  }
+  initApp({
+    role: 'client',
+    name: ((prenom + ' ' + nom).trim()) || email,
+    initials: (prenom || email || '?')[0].toUpperCase()
+  });
+  return true;
+}
+
+// ============================================================
+// ADMINISTRATEUR — INFORMATIONS NÉCESSAIRES À LA MISSION
+// ============================================================
+// Bloc affiché dans la fiche de chaque demande. Les décisions
+// (Valider / À corriger) sont écrites dans Supabase : elles résistent à
+// F5 puisque le bloc est systématiquement rechargé depuis la base à
+// l'ouverture de la fiche.
+//
+// AUCUNE de ces décisions n'envoie d'e-mail, ne crée de mission, ni ne
+// fait avancer un statut de paiement : Stripe n'existe pas et rien ici
+// ne le simule.
+
+var _infosDemandeEnCours = null;
+
+async function chargerInfosDemandeAdmin(demandeId) {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function deciderInformation(demandeId, cle, decision) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const valeurs = { statut: decision };
+  if (decision === 'a_corriger') {
+    // Motif court OBLIGATOIRE : sans lui, le client ne saurait pas quoi
+    // corriger. On n'écrit rien tant qu'il n'est pas saisi.
+    const motif = (prompt('Motif de la correction (obligatoire, visible par le client) :') || '').trim();
+    if (!motif) { alert('Aucun motif saisi : rien n\'a été enregistré.'); return false; }
+    valeurs.commentaire = motif;
+  } else {
+    valeurs.commentaire = null;
+  }
+  const { error } = await sbAuth
+    .from('demande_informations_manquantes')
+    .update(valeurs)
+    .eq('client_id', demandeId)
+    .eq('cle', cle);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+async function changerDecisionInformation(demandeId, cle, decision) {
+  try {
+    const fait = await deciderInformation(demandeId, cle, decision);
+    if (!fait) return;
+  } catch (e) {
+    alert('La décision n\'a pas pu être enregistrée.\n\n' + e.message);
+    return;
+  }
+  await rendreInfosDemandeAdmin({ id: demandeId });
+}
+
+function _dateHeureFr(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return String(iso); }
+}
+
+async function rendreInfosDemandeAdmin(c) {
+  const zone = document.getElementById('fiche-demande-infos');
+  if (!zone || !c || !c.id) return;
+  _infosDemandeEnCours = c.id;
+  zone.innerHTML = '<div style="font-size:.85rem;color:#666;margin-top:16px">'
+    + 'Chargement des informations…</div>';
+
+  let lignes = [];
+  try {
+    lignes = await chargerInfosDemandeAdmin(c.id);
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red);margin-top:16px">'
+      + 'Informations indisponibles : ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  if (_infosDemandeEnCours !== c.id) return;   // fiche changée entre-temps
+
+  if (!lignes.length) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:#666;margin-top:16px">'
+      + 'Aucune information n\'est requise pour ce service.</div>';
+    return;
+  }
+
+  const demande = (_demandesDevisListe || []).filter(function (x) {
+    return String(x.id) === String(c.id);
+  })[0] || c;
+  const devis = (typeof _devisParClient !== 'undefined') ? _devisParClient[String(c.id)] : null;
+
+  const recues = lignes.filter(function (l) { return l.statut !== 'attendue'; });
+  const manquantes = lignes.filter(function (l) { return l.statut === 'attendue'; });
+  const nouvelles = lignes.filter(function (l) { return l.statut === 'transmise'; });
+
+  const ligneHtml = function (l) {
+    const badge = l.statut === 'validee' ? 'badge-active'
+                : l.statut === 'a_corriger' ? 'badge-refused'
+                : 'badge-progress';
+    let actions = '';
+    if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
+      actions = '<div style="margin-top:6px;display:flex;gap:8px">'
+        + '<button class="btn btn-sm btn-primary" onclick="changerDecisionInformation(\''
+        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'validee\')">Valider</button>'
+        + '<button class="btn btn-sm btn-secondary" onclick="changerDecisionInformation(\''
+        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'a_corriger\')">À corriger</button>'
+        + '</div>';
+    }
+    return '<div class="detail-row" style="align-items:flex-start">'
+      + '<span class="detail-label">' + escapeHtml(l.libelle) + '</span>'
+      + '<span class="detail-val">'
+      + '<span class="badge ' + badge + '">' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + '</span>'
+      + (l.valeur ? '<br>' + escapeHtml(l.valeur) : '')
+      + (l.commentaire ? '<br><em>Motif : ' + escapeHtml(l.commentaire) + '</em>' : '')
+      + actions
+      + '</span></div>';
+  };
+
+  zone.innerHTML =
+    '<div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--gray-light)">'
+    + '<div style="font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;'
+    + 'color:var(--red);margin-bottom:10px">Informations nécessaires à la mission</div>'
+    + '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-val">'
+    + escapeHtml(((demande.prenom || '') + ' ' + (demande.nom || '')).trim() || '—') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Référence</span><span class="detail-val">'
+    + escapeHtml(demande.numero_client || '—') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Devis associé</span><span class="detail-val">'
+    + escapeHtml(devis && devis.reference ? devis.reference : 'Aucun') + '</span></div>'
+    + (nouvelles.length
+        ? '<div class="detail-row"><span class="detail-label">Transmises le</span><span class="detail-val">'
+          + nouvelles.map(function (l) {
+              return escapeHtml(l.libelle) + ' — ' + escapeHtml(_dateHeureFr(l.transmise_le) || 'récemment');
+            }).join('<br>')
+          + '</span></div>'
+        : '')
+    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Déjà reçues</div>'
+    + (recues.length ? recues.map(ligneHtml).join('')
+        : '<div style="font-size:.85rem;color:#666">Aucune pour le moment.</div>')
+    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes</div>'
+    + (manquantes.length ? manquantes.map(ligneHtml).join('')
+        : '<div style="font-size:.85rem;color:#666">Aucune : tout a été transmis.</div>')
+    + '</div>';
+}
+
+// ============================================================
+// ESPACE CLIENT — DEMANDES ET INFORMATIONS À COMPLÉTER
+// ============================================================
+// Aucune copie du formulaire ici. « Faire une nouvelle demande » ouvre
+// le VRAI formulaire public (index.html) en mode connecté : mêmes
+// questions, mêmes règles conditionnelles, mêmes compteurs, mêmes
+// accordéons, mêmes calendriers, mêmes validations, même récapitulatif
+// et même payload — parce que c'est le même code.
+
+const LIB_SERVICE_CLIENT = {
+  convoyage: 'Convoyage automobile',
+  stockage: 'Stockage automobile',
+  nettoyage: 'Nettoyage automobile',
+  professionnel: 'Trouver un professionnel automobile'
+};
+
+const LIB_STATUT_INFO = {
+  fournie:    'Reçue',
+  attendue:   'Manquante',
+  transmise:  'Transmise',
+  validee:    'Validée',
+  a_corriger: 'À corriger'
+};
+
+function ouvrirNouvelleDemande() {
+  // La session Supabase est partagée entre les deux pages (même
+  // origine) : rien à transmettre, et aucune identité à faire confiance
+  // côté navigateur.
+  window.location.href = 'index.html?nouvelle-demande=1';
+}
+
+function ouvrirCompletionDemande(id) {
+  window.location.href = 'index.html?completer=' + encodeURIComponent(id);
+}
+
+function _libelleServiceClient(s) {
+  return LIB_SERVICE_CLIENT[s] || (s || 'Demande');
+}
+
+// Recharge les demandes du client depuis la vue (jamais la table) et
+// les affiche. Résiste à F5 : tout vient du serveur, rien du cache.
+async function chargerDemandesClient() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth
+    .from('v_mes_demandes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadDemandesClient() {
+  const zone = document.getElementById('client-demandes-liste');
+  if (!zone) return;
+  let demandes = [];
+  try {
+    demandes = await chargerDemandesClient();
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
+      + 'Impossible de charger vos demandes pour le moment.</div>';
+    return;
+  }
+  if (window._currentClient) window._currentClient.demandes = demandes;
+  if (!demandes.length) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:#666">'
+      + 'Vous n\'avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</div>';
+    return;
+  }
+  zone.innerHTML = demandes.map(function (d) {
+    return '<div class="detail-row">'
+      + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
+      + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
+      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></span>'
+      + '</div>';
+  }).join('');
+}
+
+// Onglet « Informations à compléter ». La liste des rubriques et leur
+// statut sont CALCULÉS PAR LE SERVEUR (informations_demande) à partir
+// des données réellement enregistrées : le navigateur ne décide jamais
+// de ce qui est requis.
+async function chargerInformationsDemande(demandeId) {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadInfosClient() {
+  const zone = document.getElementById('client-infos-liste');
+  if (!zone) return;
+  zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>';
+
+  let demandes = [];
+  try {
+    demandes = await chargerDemandesClient();
+  } catch (e) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
+      + 'Impossible de charger vos demandes pour le moment.</div>';
+    return;
+  }
+
+  const blocs = [];
+  for (const d of demandes) {
+    let lignes = [];
+    try {
+      lignes = await chargerInformationsDemande(d.id);
+    } catch (e) { continue; }
+    if (!lignes.length) continue;
+
+    const total = lignes.length;
+    const fournies = lignes.filter(function (l) {
+      return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
+    }).length;
+    const restantes = lignes.filter(function (l) {
+      return l.statut === 'attendue' || l.statut === 'a_corriger';
+    });
+
+    // N'afficher QUE les demandes qui nécessitent réellement quelque chose.
+    if (!restantes.length) continue;
+
+    const recues = lignes.filter(function (l) {
+      return l.statut !== 'attendue' && l.statut !== 'a_corriger';
+    });
+
+    blocs.push(
+      '<div class="card" style="margin-bottom:16px">'
+      + '<div class="card-header"><div>'
+      + '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
+      + '<div style="font-size:.85rem;color:#555;margin-top:4px">'
+      + escapeHtml(_libelleServiceClient(d.type_service))
+      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></div>'
+      + '</div>'
+      + '<button class="btn btn-sm btn-primary" onclick="ouvrirCompletionDemande(\''
+      + escapeHtml(d.id) + '\')">Compléter mes informations →</button>'
+      + '</div>'
+      + '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
+      + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '')
+      + ' sur ' + total + '</strong> déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.'
+      + '</div>'
+      + (recues.length
+          ? '<div class="detail-row"><span class="detail-label">Déjà reçues</span>'
+            + '<span class="detail-val">'
+            + recues.map(function (l) {
+                return escapeHtml(l.libelle) + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')';
+              }).join('<br>')
+            + '</span></div>'
+          : '')
+      + '<div class="detail-row"><span class="detail-label">Encore attendues</span>'
+      + '<span class="detail-val">'
+      + restantes.map(function (l) {
+          const motif = (l.statut === 'a_corriger' && l.commentaire)
+            ? ' — <em>' + escapeHtml(l.commentaire) + '</em>' : '';
+          return escapeHtml(l.libelle)
+            + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')' + motif;
+        }).join('<br>')
+      + '</span></div>'
+      + '</div>'
+    );
+  }
+
+  zone.innerHTML = blocs.length
+    ? blocs.join('')
+    : '<div style="font-size:.85rem;color:#666">'
+      + 'Aucune information ne manque actuellement. Merci !</div>';
+}
+
 // Vérifie qu'une session Supabase Auth valide correspond bien à un
 // administrateur actif (public.admins) avant d'accorder l'accès —
 // une session Supabase valide SANS ligne admins active n'ouvre PAS
@@ -2655,7 +3169,11 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 async function finaliserSessionParUid(email, authUserId) {
   const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
   if (estAdmin) return;
-  await finaliserSessionConvoyeur(email, null, authUserId, false);
+  const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
+  if (estConvoyeur) return;
+  // Ni admin ni partenaire : c'est un client. Sa session est réelle,
+  // exactement comme les deux autres rôles.
+  await finaliserSessionClient(email, null, authUserId, false);
 }
 
 function initApp(user) {
@@ -2698,9 +3216,10 @@ function buildNav(role) {
 }
 
 function doLogout() {
-  if ((window._currentConvoyeur || window._currentAdmin) && sbAuth) { sbAuth.auth.signOut(); }
+  if ((window._currentConvoyeur || window._currentAdmin || window._currentClient) && sbAuth) { sbAuth.auth.signOut(); }
   window._currentConvoyeur = null;
   window._currentAdmin = null;
+  window._currentClient = null;
   try { localStorage.removeItem('helixcar_demo_email'); } catch (e) {}
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
@@ -2732,12 +3251,21 @@ const PAGE_TITLES = {
   'convoyeur-profil':     ['Mon profil', 'Gérez vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue Marc'],
   'client-missions':     ['Mes missions', 'Historique et suivi'],
+  'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],
   'client-fidelite':     ['Programme fidélité', 'Vos récompenses HelixCar'],
   'client-profil':       ['Mon profil', 'Gérez vos informations'],
 };
 
 function showPage(id) {
+  // Une session partenaire déjà ouverte est revérifiée à chaque
+  // navigation : un blocage décidé entre-temps prend effet sans
+  // attendre une reconnexion. Vérification asynchrone, contre la
+  // valeur réellement enregistrée — jamais contre un état conservé
+  // dans le JavaScript.
+  if (typeof verifierAccesPartenaireEnCours === 'function') {
+    try { verifierAccesPartenaireEnCours(); } catch (e) {}
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -2753,6 +3281,8 @@ function showPage(id) {
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
   if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
+  if (id === 'client-dashboard') { loadDemandesClient(); }
+  if (id === 'client-infos') { loadInfosClient(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
   if (id === 'admin-acquisition') { loadAcquisition(); }
@@ -2818,8 +3348,20 @@ function _retirerVerrouScroll(source) {
 // la MÊME modale plusieurs fois (ex. ouvrirFicheDemande() rappelée
 // après génération de devis, modification de prix, envoi réussi) ne
 // pose jamais qu'UN seul verrou grâce à l'idempotence de _poserVerrouScroll.
-function openModal(id) { document.getElementById('modal-' + id).classList.add('open'); _poserVerrouScroll('modal:' + id); }
-function closeModal(id) { document.getElementById('modal-' + id).classList.remove('open'); _retirerVerrouScroll('modal:' + id); }
+function openModal(id) {
+  const el = document.getElementById('modal-' + id);
+  el.classList.add('open');
+  // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
+  // l'état laissé lors de la fermeture précédente.
+  reinitialiserAffichageMotsDePasse(el);
+  _poserVerrouScroll('modal:' + id);
+}
+function closeModal(id) {
+  const el = document.getElementById('modal-' + id);
+  reinitialiserAffichageMotsDePasse(el);
+  el.classList.remove('open');
+  _retirerVerrouScroll('modal:' + id);
+}
 
 document.querySelectorAll('.modal-overlay').forEach(o => {
   o.addEventListener('click', e => {
@@ -2853,21 +3395,192 @@ const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPA
   } catch (e) { console.error('Erreur restauration session démo:', e); }
 })();
 
+// ============================================================
+// RÉINITIALISATION DU MOT DE PASSE — parcours unique
+// ============================================================
+// Un seul mécanisme pour les trois rôles. Le site public (index.html)
+// appelle la même fonction Supabase avec la même URL de retour ; c'est
+// cette page qui reçoit le lien et propose le nouveau mot de passe.
+//
+// Le mot de passe ne transite QUE par Supabase Auth : il n'entre dans
+// aucune table, dans aucun payload de demande, dans aucun e-mail
+// EmailJS, et n'est jamais écrit dans la console.
+
+// Longueur minimale d'un mot de passe CRÉÉ ou MODIFIÉ. Même valeur que
+// l'inscription client (index.html) et l'inscription partenaire
+// (creer-compte-convoyeur.html) : une seule règle dans tout le produit.
+// Elle ne s'applique JAMAIS à la connexion — un compte plus ancien doit
+// pouvoir tenter sa chance avec son mot de passe historique, c'est
+// Supabase Auth qui tranche.
+const REINIT_LONGUEUR_MIN = 8;
+
+// URL de retour du lien reçu par e-mail. Construite depuis l'origine
+// réellement servie pour que les environnements de préversion
+// fonctionnent, avec repli sur l'adresse de production quand l'origine
+// n'est pas exploitable (ouverture d'un fichier local, par exemple).
+// Chaque origine utilisée doit être autorisée dans Supabase.
+function urlRetourReinitialisation() {
+  try {
+    const o = window.location.origin;
+    if (o && /^https?:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+}
+
+// Message TOUJOURS identique, que l'adresse existe ou non : il ne doit
+// jamais permettre de découvrir qui a un compte chez HelixCar.
+const REINIT_MESSAGE_NEUTRE =
+  'Si un compte correspond à cette adresse, un lien de réinitialisation vient d\'être envoyé. Pensez à vérifier vos courriers indésirables.';
+
+// Vrai si l'erreur renvoyée par Supabase est une limitation temporaire
+// du nombre d'envois. On l'annonce sans révéler l'existence du compte.
+function _estLimitationEnvoi(erreur) {
+  const m = String((erreur && erreur.message) || '').toLowerCase();
+  return (erreur && (erreur.status === 429 || erreur.code === 'over_email_send_rate_limit'))
+      || /rate limit|too many requests|seconds/.test(m);
+}
+
+let _envoiReinitEnCours = false;
+
+// Envoi du lien. `email` est fourni par l'appelant (champ de connexion
+// du site public, ou saisie ici) : cette fonction ne devine rien.
+// Retourne { ok, message } — l'appelant décide de l'affichage.
+async function envoyerLienReinitialisation(email) {
+  if (_envoiReinitEnCours) return { ok: false, message: null, enCours: true };
+  const adresse = String(email || '').trim();
+  if (!adresse) {
+    return { ok: false, message: 'Renseignez votre adresse e-mail pour recevoir un lien.' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(adresse)) {
+    return { ok: false, message: 'Cette adresse e-mail n\'est pas valide.' };
+  }
+  if (!sbAuth || !sbAuth.auth) {
+    return { ok: false, message: 'Service momentanément indisponible. Réessayez dans quelques instants.' };
+  }
+
+  _envoiReinitEnCours = true;
+  try {
+    const { error } = await sbAuth.auth.resetPasswordForEmail(adresse, {
+      redirectTo: urlRetourReinitialisation()
+    });
+    if (error && _estLimitationEnvoi(error)) {
+      return { ok: false, message: 'Trop de demandes en peu de temps. Patientez quelques minutes avant de réessayer.' };
+    }
+    // Toute autre erreur serveur reste silencieuse pour l'utilisateur :
+    // la distinguer d'un succès révélerait si l'adresse existe.
+    if (error) console.error('resetPasswordForEmail:', error);
+    return { ok: true, message: REINIT_MESSAGE_NEUTRE };
+  } catch (e) {
+    return { ok: false, message: 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.' };
+  } finally {
+    _envoiReinitEnCours = false;
+  }
+}
+
+// Entrée depuis l'écran de connexion du Dashboard.
 async function ouvrirMotDePasseOublie(e) {
   if (e) e.preventDefault();
-  const email = prompt('Entre ton adresse email pour recevoir un lien de réinitialisation :');
-  if (!email || !email.trim()) return;
-  if (!sbAuth) { alert('❌ Erreur technique (Supabase non initialisé).'); return; }
-  try {
-    const { error } = await sbAuth.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html'
-    });
-    if (error) { alert('❌ ' + error.message); return; }
-    alert('📬 Si un compte existe avec cet email, un lien de réinitialisation vient d\'être envoyé (pense à vérifier les spams).');
-  } catch (e2) {
-    console.error('Erreur réinitialisation mot de passe:', e2);
-    alert('❌ Erreur lors de l\'envoi (voir la console).');
+  const champ = document.getElementById('login-email');
+  let adresse = champ ? champ.value.trim() : '';
+  if (!adresse) {
+    adresse = (prompt('Votre adresse e-mail, pour recevoir un lien de réinitialisation :') || '').trim();
+    if (!adresse) return;
   }
+  const r = await envoyerLienReinitialisation(adresse);
+  if (r.enCours) return;
+  alert(r.message);
+}
+
+// ------------------------------------------------------------
+// Écran « Nouveau mot de passe »
+// ------------------------------------------------------------
+let _enregistrementMdpEnCours = false;
+
+function _reinitAfficherErreur(texte) {
+  const el = document.getElementById('reinit-alert');
+  if (!el) return;
+  if (!texte) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = texte;
+}
+
+function ouvrirFormulaireNouveauMotDePasse() {
+  // Mémorisé pour survivre à un F5 : après rechargement, Supabase ne
+  // rejoue pas l'événement PASSWORD_RECOVERY, mais la session de
+  // récupération est toujours ouverte — le formulaire doit revenir.
+  try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+  const f = document.getElementById('reinit-formulaire');
+  const s = document.getElementById('reinit-succes');
+  if (f) f.style.display = '';
+  if (s) s.style.display = 'none';
+  _reinitAfficherErreur('');
+  const a = document.getElementById('reinit-mdp');
+  const b = document.getElementById('reinit-mdp2');
+  if (a) a.value = '';
+  if (b) b.value = '';
+  openModal('reinit-mdp');
+  reinitialiserAffichageMotsDePasse(document.getElementById('modal-reinit-mdp'));
+  if (a) a.focus();
+}
+
+async function enregistrerNouveauMotDePasse() {
+  // Double clic : le second appel ne fait rien tant que le premier
+  // n'a pas répondu. Aucun double enregistrement.
+  if (_enregistrementMdpEnCours) return;
+
+  const a = document.getElementById('reinit-mdp');
+  const b = document.getElementById('reinit-mdp2');
+  const mdp = a ? a.value : '';
+  const mdp2 = b ? b.value : '';
+
+  if (!mdp || !mdp2) { _reinitAfficherErreur('Renseignez les deux champs.'); return; }
+  if (mdp.length < REINIT_LONGUEUR_MIN) {
+    _reinitAfficherErreur('Le mot de passe doit contenir au moins ' + REINIT_LONGUEUR_MIN + ' caractères.');
+    return;
+  }
+  if (mdp !== mdp2) { _reinitAfficherErreur('Les deux mots de passe ne sont pas identiques.'); return; }
+
+  _enregistrementMdpEnCours = true;
+  const bouton = document.getElementById('reinit-valider');
+  const libelle = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
+  _reinitAfficherErreur('');
+
+  try {
+    const { error } = await sbAuth.auth.updateUser({ password: mdp });
+    if (error) {
+      // Lien expiré ou déjà utilisé : la session de récupération
+      // n'existe plus. On le dit clairement et on renvoie vers la
+      // demande d'un nouveau lien.
+      const m = String(error.message || '').toLowerCase();
+      if (/expired|invalid|session|not authenticated|jwt/.test(m)) {
+        _reinitAfficherErreur('Ce lien n\'est plus valide : il a expiré ou a déjà été utilisé. Demandez un nouveau lien depuis « Mot de passe oublié ? ».');
+      } else {
+        _reinitAfficherErreur('Le mot de passe n\'a pas pu être enregistré. Réessayez.');
+      }
+      return;
+    }
+    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    const f = document.getElementById('reinit-formulaire');
+    const s = document.getElementById('reinit-succes');
+    if (f) f.style.display = 'none';
+    if (s) s.style.display = '';
+  } catch (e) {
+    _reinitAfficherErreur('L\'enregistrement n\'a pas abouti. Vérifiez votre connexion et réessayez.');
+  } finally {
+    _enregistrementMdpEnCours = false;
+    if (bouton) { bouton.disabled = false; bouton.textContent = libelle || 'Enregistrer le mot de passe'; }
+  }
+}
+
+// Ferme le parcours et rend la main à la connexion normale. On ferme la
+// session de récupération : le compte se reconnecte avec le NOUVEAU mot
+// de passe, ce qui vérifie du même coup qu'il fonctionne.
+async function terminerReinitialisation() {
+  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  closeModal('reinit-mdp');
+  try { if (sbAuth && sbAuth.auth) await sbAuth.auth.signOut(); } catch (e) {}
+  try { doLogout(); } catch (e) {}
 }
 
 // Déclenché quand la personne arrive via un lien reçu par email (confirmation de compte,
@@ -2878,20 +3591,22 @@ async function ouvrirMotDePasseOublie(e) {
 if (sbAuth) {
   sbAuth.auth.onAuthStateChange(function(event, session) {
     if (event === 'PASSWORD_RECOVERY') {
-      const nouveauMdp = prompt('Choisis ton nouveau mot de passe (8 caractères minimum) :');
-      if (!nouveauMdp) return;
-      if (nouveauMdp.length < 8) {
-        alert('❌ Le mot de passe doit contenir au moins 8 caractères. Réutilise le lien reçu par email pour réessayer.');
-        return;
-      }
-      sbAuth.auth.updateUser({ password: nouveauMdp }).then(function(res) {
-        if (res.error) { alert('❌ ' + res.error.message); }
-        else { alert('✅ Mot de passe mis à jour ! Tu es maintenant connecté sur ton espace.'); }
-      });
+      ouvrirFormulaireNouveauMotDePasse();
       return;
     }
     // Réagit à toute session valide détectée (connexion fraîche, lien cliqué, ou session
     // déjà active en revenant sur la page) — la reconnexion automatique reste active.
+    // Reprise après un F5 en pleine réinitialisation : Supabase ne
+    // rejoue pas PASSWORD_RECOVERY, mais la session de récupération est
+    // encore ouverte. On rouvre le formulaire au lieu d'ouvrir l'espace,
+    // sans quoi la personne se retrouverait connectée sans jamais avoir
+    // choisi son nouveau mot de passe.
+    let _reinitEnCours = false;
+    try { _reinitEnCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
+    if (_reinitEnCours && session && session.user) {
+      ouvrirFormulaireNouveauMotDePasse();
+      return;
+    }
     if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session && session.user && session.user.email) {
       const cleUser = session.user.id;
       if (window._dernierAuthUserTraite === cleUser) return; // déjà traité cet utilisateur, évite les doublons
@@ -2901,11 +3616,32 @@ if (sbAuth) {
   });
 }
 
-function sbFetch(path, options) {
+// Jeton de la session Supabase en cours, s'il y en a une.
+// Sans session (page publique, utilisateur déconnecté) : null.
+async function _jetonSessionSupabase() {
+  try {
+    if (typeof sbAuth === 'undefined' || !sbAuth || !sbAuth.auth) return null;
+    const { data } = await sbAuth.auth.getSession();
+    return (data && data.session && data.session.access_token) || null;
+  } catch (e) { return null; }
+}
+
+// POINT DE PASSAGE UNIQUE de tous les appels REST du Dashboard.
+// CORRECTION DE FOND : cette fonction envoyait TOUJOURS la clé anon en
+// Authorization. `auth.uid()` valait donc null pour PostgREST, et
+// AUCUNE politique RLS fondée sur l'identité (est_admin(), propriétaire
+// d'une ligne...) ne pouvait fonctionner — activer RLS aurait vidé le
+// Dashboard. On transmet désormais le JWT de la session ouverte quand
+// il existe ; l'en-tête `apikey` reste la clé anon, comme Supabase
+// l'attend. Sans session, le comportement précédent est conservé à
+// l'identique : aucune régression sur les écrans publics.
+// Un seul endroit modifié : aucun second système d'accès aux données.
+async function sbFetch(path, options) {
   options = options || {};
+  const jetonSession = await _jetonSessionSupabase();
   const headers = Object.assign({
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + (jetonSession || SUPABASE_KEY),
     'Content-Type': 'application/json'
   }, options.headers || {});
   return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, { headers }))
@@ -4213,9 +4949,411 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
+    <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
   `;
+  // Décisions par activité + état de blocage RÉELLEMENT enregistré.
+  preparerFichePartenaire(c);
   openModal('dossier');
 }
+
+// ══════════════════════════════════════════════════════════════
+// DÉCISIONS PAR ACTIVITÉ ET BLOCAGE PARTENAIRE
+// ══════════════════════════════════════════════════════════════
+// UNE SEULE fiche par candidat. Chaque activité qu'il a déclarée reçoit
+// sa propre décision, indépendante des autres : décider pour l'une ne
+// touche jamais les autres.
+//
+// Toutes les écritures passent par `sbAuth`, le client PORTEUR DE LA
+// SESSION : c'est ce qui permet aux politiques RLS de reconnaître un
+// administrateur réel. Aucune écriture n'est faite avec la clé anon.
+//
+// AUCUN EMAIL n'est déclenché par ces actions — ni pour Oui, ni pour
+// Non, ni pour En attente. EmailJS n'est pas sollicité ici.
+
+var LIB_DECISION = { oui: 'Oui', non: 'Non', en_attente: 'En attente' };
+var LIB_ACTIVITE_DECISION = {
+  convoyage: 'Convoyage automobile',
+  nettoyage: 'Nettoyage automobile',
+  renfort: 'Renfort automobile sur site'
+};
+
+// Fiche actuellement ouverte : identifiant, nom, décisions chargées.
+var _partenaireFiche = { id: null, nom: '', activites: [], decisions: {} };
+
+function _sbAuthPret() {
+  return (typeof sbAuth !== 'undefined') && !!sbAuth && !!sbAuth.from;
+}
+
+// Décisions RÉELLEMENT enregistrées. Une activité sans ligne est « en
+// attente » : c'est la valeur par défaut, jamais une décision implicite.
+async function chargerDecisionsPartenaire(convoyeurId) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const res = await sbAuth.from('convoyeur_decisions')
+    .select('activite, decision').eq('convoyeur_id', convoyeurId);
+  if (res.error) throw new Error(res.error.message);
+  const out = {};
+  (res.data || []).forEach(function (d) { out[d.activite] = d.decision; });
+  return out;
+}
+
+async function enregistrerDecisionPartenaire(convoyeurId, activite, decision) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const res = await sbAuth.from('convoyeur_decisions')
+    .upsert({ convoyeur_id: convoyeurId, activite: activite, decision: decision },
+            { onConflict: 'convoyeur_id,activite' });
+  if (res.error) throw new Error(res.error.message);
+}
+
+async function chargerHistoriqueDecisions(convoyeurId) {
+  if (!_sbAuthPret()) return [];
+  const res = await sbAuth.from('convoyeur_decisions_historique')
+    .select('activite, ancienne_decision, nouvelle_decision, modifie_le')
+    .eq('convoyeur_id', convoyeurId)
+    .order('modifie_le', { ascending: false }).limit(25);
+  if (res.error) { console.error('historique décisions:', res.error); return []; }
+  return res.data || [];
+}
+
+function _boutonDecision(activite, valeur, courante) {
+  const actif = (courante === valeur);
+  const couleurs = { oui: '#1f7a4d', non: '#b3261e', en_attente: '#8a6d3b' };
+  const style = actif
+    ? 'background:' + couleurs[valeur] + ';color:#fff;border-color:' + couleurs[valeur] + ';font-weight:700'
+    : 'background:#fff;color:#555;border-color:rgba(0,0,0,.16)';
+  return '<button type="button" class="btn btn-sm" aria-pressed="' + (actif ? 'true' : 'false') +
+    '" data-activite="' + escapeHtml(activite) + '" data-decision="' + valeur + '"' +
+    ' style="' + style + ';padding:5px 12px;border-width:1px;border-style:solid;border-radius:7px;margin-right:6px"' +
+    ' onclick="changerDecisionActivite(\'' + escapeHtml(activite) + '\',\'' + valeur + '\')">' +
+    LIB_DECISION[valeur] + '</button>';
+}
+
+// Rendu complet du bloc décisions + historique pour la fiche ouverte.
+async function rendreDecisionsPartenaire(convoyeur) {
+  const zone = document.getElementById('dossier-decisions');
+  if (!zone) return;
+  const activites = normaliserActivites(convoyeur && convoyeur.activites);
+  _partenaireFiche = {
+    id: convoyeur ? convoyeur.id : null,
+    nom: ((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || ''),
+    activites: activites,
+    decisions: {}
+  };
+  _partenaireFiche.nom = _partenaireFiche.nom.trim() || 'ce partenaire';
+
+  if (!activites.length) { zone.innerHTML = ''; return; }
+  zone.innerHTML = '<div style="margin-top:14px;color:#888;font-size:.82rem">Chargement des décisions…</div>';
+
+  let decisions = {};
+  try { decisions = await chargerDecisionsPartenaire(_partenaireFiche.id); }
+  catch (e) {
+    zone.innerHTML = '<div style="margin-top:14px;padding:12px;border-radius:8px;background:rgba(179,38,30,.06);' +
+      'color:#b3261e;font-size:.82rem">Décisions indisponibles : ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  _partenaireFiche.decisions = decisions;
+
+  let html = '<div style="margin-top:16px;border-top:1px solid rgba(0,0,0,.08);padding-top:14px">' +
+    '<div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:10px">' +
+    'Décisions par activité</div>';
+
+  activites.forEach(function (a) {
+    const courante = decisions[a] || 'en_attente';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;' +
+      'padding:8px 0;border-bottom:1px solid rgba(0,0,0,.05)">' +
+      '<span style="font-size:.86rem;font-weight:600">' + escapeHtml(LIB_ACTIVITE_DECISION[a] || a) + '</span>' +
+      '<span data-decision-activite="' + escapeHtml(a) + '">' +
+        _boutonDecision(a, 'oui', courante) +
+        _boutonDecision(a, 'non', courante) +
+        _boutonDecision(a, 'en_attente', courante) +
+      '</span></div>';
+  });
+
+  const histo = await chargerHistoriqueDecisions(_partenaireFiche.id);
+  html += '<div style="margin-top:14px"><div style="font-size:.75rem;font-weight:700;text-transform:uppercase;' +
+    'letter-spacing:.06em;color:#888;margin-bottom:6px">Historique des décisions</div>';
+  if (!histo.length) {
+    html += '<div style="font-size:.8rem;color:#999">Aucune décision enregistrée pour le moment.</div>';
+  } else {
+    html += '<div style="font-size:.79rem;color:#666;line-height:1.7">';
+    histo.forEach(function (h) {
+      const quand = h.modifie_le ? new Date(h.modifie_le).toLocaleString('fr-FR') : '—';
+      html += '<div>' + escapeHtml(quand) + ' · <b>' + escapeHtml(LIB_ACTIVITE_DECISION[h.activite] || h.activite) + '</b> : ' +
+        escapeHtml(LIB_DECISION[h.ancienne_decision] || 'En attente') + ' → ' +
+        escapeHtml(LIB_DECISION[h.nouvelle_decision] || h.nouvelle_decision) + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  zone.innerHTML = html;
+}
+
+// Changement d'une décision. Confirmation explicite AVANT écriture,
+// nommant le candidat, l'activité, l'ancienne et la nouvelle décision.
+// Une annulation n'écrit rien du tout.
+async function changerDecisionActivite(activite, nouvelle) {
+  const id = _partenaireFiche.id;
+  if (!id) return;
+  const ancienne = _partenaireFiche.decisions[activite] || 'en_attente';
+  if (ancienne === nouvelle) return;   // déjà cette valeur : aucune action
+
+  const message =
+    'Modifier une décision\n\n' +
+    'Candidat : ' + _partenaireFiche.nom + '\n' +
+    'Activité : ' + (LIB_ACTIVITE_DECISION[activite] || activite) + '\n' +
+    'Décision actuelle : ' + LIB_DECISION[ancienne] + '\n' +
+    'Nouvelle décision : ' + LIB_DECISION[nouvelle] + '\n\n' +
+    'Confirmer ce changement ?';
+  if (!confirm(message)) return;   // annulation : rien n'est enregistré
+
+  try {
+    await enregistrerDecisionPartenaire(id, activite, nouvelle);
+  } catch (e) {
+    alert('La décision n\'a pas pu être enregistrée.\n\n' + e.message);
+    return;
+  }
+  // Aucun email : ce lot n'en déclenche aucun, quel que soit le sens
+  // du changement.
+  const convoyeur = (window._candidaturesData || {})[id] || (window._convoyeursActifsData || {})[id]
+    || { id: id, activites: _partenaireFiche.activites, prenom: _partenaireFiche.nom, nom: '' };
+  await rendreDecisionsPartenaire(convoyeur);
+}
+
+// ── BLOCAGE RÉEL ────────────────────────────────────────────
+// La source de vérité est convoyeurs.bloque — EXACTEMENT la colonne que
+// le contrôle d'accès existant (finaliserSessionConvoyeur) lit déjà
+// avant d'ouvrir l'espace partenaire. Aucun second champ n'est créé.
+async function definirBlocagePartenaire(convoyeurId, bloque, motif) {
+  if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
+  const valeurs = { bloque: !!bloque };
+  if (bloque) valeurs.bloque_motif = motif || null;
+  const res = await sbAuth.from('convoyeurs').update(valeurs).eq('id', convoyeurId);
+  if (res.error) throw new Error(res.error.message);
+  // bloque_le et bloque_par sont renseignés côté base par un trigger :
+  // impossible d'avoir un blocage sans trace de qui et quand.
+}
+
+async function toggleBlockConvoyeur() {
+  const id = _partenaireFiche.id;
+  if (!id) { alert('Aucun partenaire sélectionné.'); return; }
+  const nom = _partenaireFiche.nom;
+  const estBloque = !!window._currentConvBlocked;
+
+  if (estBloque) {
+    if (!confirm(
+      'Débloquer l\'accès de ' + nom + ' ?\n\n' +
+      'Son accès sera rétabli uniquement pour les activités déjà autorisées.\n' +
+      'Les décisions par activité ne sont pas modifiées et aucune mission ' +
+      'ne lui est attribuée automatiquement.'
+    )) return;
+    try { await definirBlocagePartenaire(id, false, null); }
+    catch (e) { alert('Le déblocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
+    window._currentConvBlocked = false;
+    _majBoutonBlocage(false);
+    alert('Accès rétabli pour ' + nom + '.');
+  } else {
+    const groupeMotif = document.getElementById('block-reason-group');
+    if (groupeMotif && groupeMotif.style.display === 'none') {
+      groupeMotif.style.display = 'block';
+      return;   // premier clic : on demande d'abord le motif
+    }
+    const motif = (document.getElementById('block-reason') || {}).value;
+    if (!motif) { alert('Veuillez sélectionner un motif.'); return; }
+    if (!confirm(
+      'Bloquer l\'accès de ' + nom + ' ?\n\n' +
+      'Motif : ' + motif + '\n\n' +
+      'Il perdra l\'accès à son espace partenaire et à ses missions.'
+    )) return;
+    try { await definirBlocagePartenaire(id, true, motif); }
+    catch (e) { alert('Le blocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
+    window._currentConvBlocked = true;
+    _majBoutonBlocage(true);
+    if (groupeMotif) groupeMotif.style.display = 'none';
+    alert('Accès bloqué pour ' + nom + '.');
+  }
+
+  // Les listes reflètent immédiatement l'état réellement enregistré.
+  if (typeof loadCandidatures === 'function') loadCandidatures();
+  if (typeof loadConvoyeursActifs === 'function') loadConvoyeursActifs();
+}
+
+function _majBoutonBlocage(bloque) {
+  const btn = document.getElementById('dossier-btn-block');
+  if (!btn) return;
+  btn.textContent = bloque ? '🔓 Débloquer l\'accès' : '🚫 Bloquer l\'accès';
+  btn.style.background = bloque ? '#1f7a4d' : '';
+  btn.style.borderColor = bloque ? '#1f7a4d' : '';
+}
+
+// Prépare la fiche ouverte : identité, état de blocage RÉEL (jamais une
+// valeur supposée) et décisions par activité.
+async function preparerFichePartenaire(convoyeur) {
+  window._currentConvNom = (((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || '')).trim()
+    || 'ce partenaire';
+  window._currentConvBlocked = !!(convoyeur && convoyeur.bloque);
+  _majBoutonBlocage(window._currentConvBlocked);
+  const groupeMotif = document.getElementById('block-reason-group');
+  if (groupeMotif) groupeMotif.style.display = 'none';
+  await rendreDecisionsPartenaire(convoyeur);
+}
+
+// ── RE-VÉRIFICATION D'UNE SESSION PARTENAIRE DÉJÀ OUVERTE ───
+// Un blocage décidé pendant qu'un partenaire est connecté doit prendre
+// effet à la prochaine vérification, sans attendre une reconnexion.
+// Réutilise la même source de vérité que la connexion : la ligne
+// convoyeurs et sa colonne `bloque`.
+async function verifierAccesPartenaireEnCours() {
+  if (currentRole !== 'convoyeur') return true;
+  const conv = window._currentConvoyeur;
+  if (!conv || !conv.id) return true;
+  let ligne = null;
+  try {
+    const rows = await sbFetch('convoyeurs?id=eq.' + encodeURIComponent(conv.id) + '&select=id,bloque,statut');
+    ligne = (rows || [])[0];
+  } catch (e) {
+    return true;   // incident réseau : on ne déconnecte pas arbitrairement
+  }
+  // Ligne devenue invisible, compte bloqué ou désactivé : on ferme
+  // proprement la session avec un message neutre.
+  if (!ligne || ligne.bloque === true || ligne.statut !== 'actif') {
+    // On réutilise la déconnexion existante du Dashboard (doLogout) plutôt
+    // que d'inventer un second chemin de sortie : elle ferme la session
+    // Supabase, oublie le partenaire courant et ramène l'écran de
+    // connexion. Le message reste neutre : aucun détail technique, aucune
+    // mention de politique, de table ou de motif.
+    try { doLogout(); } catch (e) {
+      try { if (_sbAuthPret() && sbAuth.auth) await sbAuth.auth.signOut(); } catch (e2) {}
+    }
+    alert('L\'accès à votre compte est suspendu. Contactez HelixCar.');
+    return false;
+  }
+  return true;
+}
+
+// ── VIDÉO DE CANDIDATURE — LECTURE SÉCURISÉE ────────────────
+// La base ne contient QUE le chemin de stockage : aucune URL publique
+// n'existe. La lecture passe par une URL signée temporaire créée à la
+// demande, uniquement pour un administrateur authentifié (les
+// politiques du bucket privé refusent la signature à quiconque d'autre).
+
+// La vidéo n'est attendue que pour le convoyage et le renfort : un
+// candidat « nettoyage seul » n'a pas de vidéo manquante, il n'en a
+// simplement pas besoin.
+function _videoAttenduePourActivites(activites) {
+  var a = normaliserActivites(activites);
+  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1;
+}
+
+function _celluleVideoCandidature(c) {
+  if (c && c.video_chemin) {
+    var meta = [];
+    if (c.video_duree_secondes) meta.push(Math.round(c.video_duree_secondes) + ' s');
+    if (c.video_taille_octets) meta.push((c.video_taille_octets / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo');
+    return '<button class="btn btn-sm btn-outline" onclick="ouvrirVideoCandidature(\'' + escapeHtml(String(c.id)) + '\')">' +
+           '🎥 Voir la vidéo</button>' +
+           (meta.length ? '<span style="margin-left:8px;color:#888;font-size:.78rem">' + escapeHtml(meta.join(' · ')) + '</span>' : '');
+  }
+  if (!_videoAttenduePourActivites(c && c.activites)) {
+    return '<span class="badge badge-pending">Non requise</span>';
+  }
+  return '<span class="badge badge-pending">⏳ Manquante</span>';
+}
+
+// URL signée en cours : conservée le temps de la lecture seulement.
+var _urlVideoSignee = null;
+
+async function ouvrirVideoCandidature(id) {
+  var c = (window._candidaturesData || {})[id] || (window._convoyeursActifsData || {})[id];
+  var lecteur = document.getElementById('video-candidature-lecteur');
+  var etat = document.getElementById('video-candidature-etat');
+  var meta = document.getElementById('video-candidature-meta');
+  var titre = document.getElementById('video-candidature-titre');
+  if (!lecteur || !etat) return;
+
+  lecteur.style.display = 'none';
+  meta.textContent = '';
+  etat.style.display = 'block';
+  etat.style.color = '#888';
+  etat.textContent = 'Préparation de la lecture sécurisée…';
+  if (titre) {
+    titre.textContent = 'Vidéo de présentation — ' + ((c && ((c.prenom || '') + ' ' + (c.nom || '')).trim()) || 'candidature');
+  }
+  openModal('video-candidature');
+
+  if (!c || !c.video_chemin) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Vidéo indisponible : aucune vidéo n\'est associée à cette candidature.';
+    return;
+  }
+  if (typeof sbAuth === 'undefined' || !sbAuth || !sbAuth.storage) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Lecture impossible : session administrateur requise.';
+    return;
+  }
+
+  try {
+    // 300 s : le temps de regarder, pas davantage.
+    var res = await sbAuth.storage.from('candidatures-videos').createSignedUrl(c.video_chemin, 300);
+    if (res && res.error) {
+      var m = String((res.error && res.error.message) || '').toLowerCase();
+      etat.style.color = 'var(--red)';
+      etat.textContent = /not found|does not exist|introuvable/.test(m)
+        ? 'Vidéo indisponible : le fichier est introuvable dans le stockage.'
+        : 'Erreur : lecture non autorisée ou service indisponible.';
+      console.error('createSignedUrl:', res.error);
+      return;
+    }
+    var url = res && res.data && (res.data.signedUrl || res.data.signedURL);
+    if (!url) {
+      etat.style.color = 'var(--red)';
+      etat.textContent = 'Erreur : aucune URL de lecture n\'a pu être obtenue.';
+      return;
+    }
+    _urlVideoSignee = url;
+    lecteur.src = url;
+    lecteur.style.display = 'block';
+    etat.style.display = 'none';
+    if (c.video_duree_secondes || c.video_taille_octets) {
+      meta.textContent = [
+        c.video_duree_secondes ? Math.round(c.video_duree_secondes) + ' s' : '',
+        c.video_taille_octets ? (c.video_taille_octets / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo' : '',
+        c.video_mime || ''
+      ].filter(Boolean).join(' · ');
+    }
+    lecteur.onerror = function () {
+      lecteur.style.display = 'none';
+      etat.style.display = 'block';
+      etat.style.color = 'var(--red)';
+      etat.textContent = 'Erreur de lecture : le fichier n\'a pas pu être lu.';
+    };
+  } catch (e) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Erreur : lecture non autorisée ou service indisponible.';
+    console.error('ouvrirVideoCandidature:', e);
+  }
+}
+
+// Fermeture : le lecteur est vidé ET l'URL signée oubliée. Elle n'est
+// jamais conservée dans le DOM ni dans une variable après la lecture.
+function fermerVideoCandidature() {
+  var lecteur = document.getElementById('video-candidature-lecteur');
+  if (lecteur) {
+    try { lecteur.pause(); } catch (e) {}
+    lecteur.onerror = null;
+    lecteur.removeAttribute('src');
+    try { lecteur.load(); } catch (e) {}
+    lecteur.style.display = 'none';
+  }
+  var meta = document.getElementById('video-candidature-meta');
+  if (meta) meta.textContent = '';
+  _urlVideoSignee = null;
+  closeModal('video-candidature');
+}
+
+// Un clic sur le fond doit nettoyer exactement comme le bouton Fermer.
+document.addEventListener('DOMContentLoaded', function () {
+  var ov = document.getElementById('modal-video-candidature');
+  if (ov) ov.addEventListener('click', function (e) { if (e.target === ov) fermerVideoCandidature(); });
+});
 
 // ── CONVOYEURS ACTIFS (Supabase) ─────────────────────────────
 function loadConvoyeursActifs() {
@@ -4313,10 +5451,10 @@ function voirConvoyeurSb(id) {
     <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Missions effectuées</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
     <div style="color:#888;font-size:.78rem;margin-top:10px">📋 Pénalités & récompenses : pas encore connectées à de vraies données (pages Pannes/Notations/Challenge toujours fictives).</div>
   `;
-  window._currentConvNom = nom;
-  window._currentConvBlocked = false;
-  const blockBtn = document.getElementById('dossier-btn-block');
-  if (blockBtn) { blockBtn.textContent = '🚫 Bloquer l\u0027accès'; blockBtn.style.background = ''; blockBtn.style.borderColor = ''; }
+  // CORRECTION : l'état de blocage était codé en dur à false, si bien que
+  // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la
+  // ligne réellement enregistrée, comme le fait le contrôle d'accès.
+  preparerFichePartenaire(c);
   openModal('dossier');
 
   sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
@@ -5506,28 +6644,13 @@ function voirDocumentsConvoyeur() {
   alert('📄 Documents de ' + (window._currentConvNom || 'ce convoyeur') + '\n\n✅ Permis de conduire — valide\n✅ Pièce d\'identité — valide\n✅ RC Pro — valide jusqu\'au 12/2025\n✅ RIB — FR76 3000 1234 5678…\n\n💡 En production : les PDFs s\'ouvriront directement depuis Supabase Storage.\nLes documents envoyés à helixcardoc@gmail.com seront associés automatiquement via leur code mission.');
 }
 
-function toggleBlockConvoyeur() {
-  const nom = window._currentConvNom || 'ce convoyeur';
-  const isBlocked = window._currentConvBlocked;
-  if (isBlocked) {
-    if(confirm('🔓 Débloquer l\'accès de ' + nom + ' ?')) {
-      alert('✅ Accès rétabli pour ' + nom + '.\nUn email de notification lui a été envoyé.');
-      closeModal('dossier');
-    }
-  } else {
-    const reasonGroup = document.getElementById('block-reason-group');
-    if (reasonGroup.style.display === 'none') {
-      reasonGroup.style.display = 'block';
-      return;
-    }
-    const reason = document.getElementById('block-reason').value;
-    if (!reason) { alert('⚠️ Veuillez sélectionner un motif.'); return; }
-    if(confirm('⚠️ Bloquer ' + nom + ' ?\nMotif : ' + reason)) {
-      alert('🚫 Accès bloqué — ' + nom + '.\nMotif : ' + reason + '\nUn email lui a été envoyé.');
-      closeModal('dossier');
-    }
-  }
-}
+// ANCIENNE VERSION SUPPRIMÉE — elle n'écrivait RIEN dans Supabase :
+// elle affichait seulement une alerte, refermait la fiche, et annonçait
+// à tort qu'un email avait été envoyé. Le blocage n'était donc qu'un
+// effet visuel, sans aucune persistance ni aucun effet réel sur l'accès.
+// La version qui fait foi est définie plus haut : elle enregistre
+// réellement `convoyeurs.bloque` via la session administrateur, garde la
+// trace de qui et quand, et ne déclenche aucun email.
 
 function refuserFromModal() {
   const header = document.getElementById('dossier-name').textContent;
@@ -5728,8 +6851,109 @@ var LIBELLES_SERVICE = {
   convoyage:          'Convoyage',
   stockage:           'Stockage',
   convoyage_stockage: 'Convoyage + stockage',
-  nettoyage:          'Nettoyage automobile professionnel'
+  nettoyage:          'Nettoyage automobile professionnel',
+  professionnel:      'Trouver un professionnel automobile'
 };
+
+// ── TROUVER UN PROFESSIONNEL AUTOMOBILE ─────────────────────
+// Mêmes principes que le nettoyage : toutes les données métier vivent
+// dans la colonne JSONB clients.professionnel_details, écrite par liste
+// blanche côté site. Aucune donnée n'est déduite ni inventée ici.
+var PRO_LIB_CATEGORIE = {
+  technicien: 'Technicien automobile',
+  renfort:    'Renfort automobile sur site'
+};
+var PRO_LIB_SPECIALITE = {
+  mecanique: 'Mécanique', carrosserie: 'Carrosserie', diagnostic: 'Diagnostic',
+  autre: 'Autre spécialité', conseil: 'Client à conseiller'
+};
+var PRO_LIB_MISSION = {
+  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  autre: 'Autre mission', conseil: 'Client à conseiller'
+};
+// Gabarits véhicules — identiques à TYPES_VEHICULE dans index.html.
+var PRO_LIB_TYPE_VEHICULE = {
+  citadine: 'Citadine', berline: 'Berline', break: 'Break',
+  suv: 'SUV / Crossover', monospace: 'Monospace',
+  'utilitaire-leger': 'Utilitaire léger / camionnette', fourgon: 'Fourgon',
+  'grand-fourgon': 'Grand fourgon / utilitaire jusqu’à 20 m³',
+  'autre-vl': 'Autre véhicule léger'
+};
+
+// Horaire réellement porté par une demande de nettoyage : heure précise,
+// créneau, ou disponibilité flexible. Jamais une valeur reconstituée.
+function _nettHoraireTexte(nd) {
+  if (!nd) return '';
+  if (nd.dispo_type === 'precise') return nd.heure_precise || '';
+  if (nd.dispo_type === 'creneau') return [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
+  if (nd.dispo_type === 'flexible') return 'Flexible';
+  return '';
+}
+function _nettAdresseTexte(nd) {
+  if (!nd) return '';
+  return [nd.adresse_rue, [nd.adresse_cp, nd.adresse_ville].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+}
+
+function _estDemandeProfessionnel(c) { return _typeServiceDemande(c) === 'professionnel'; }
+// Tolère un JSONB rendu en objet OU en chaîne selon le client REST.
+function _proDetails(c) {
+  var d = c && c.professionnel_details;
+  if (!d) return null;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { return null; } }
+  return (d && typeof d === 'object') ? d : null;
+}
+// Métier réellement choisi — jamais un métier imposé à un client qui a
+// demandé à être conseillé.
+function _proLibelleMetier(d) {
+  if (!d) return '';
+  if (d.conseil) return 'Client à conseiller';
+  if (d.categorie === 'technicien') return PRO_LIB_SPECIALITE[d.specialite] || d.specialite || '';
+  if (d.categorie === 'renfort') return PRO_LIB_MISSION[d.mission] || d.mission || '';
+  return '';
+}
+// CONTACT SUR PLACE — libellé unique, identique au formulaire, au
+// récapitulatif client et au PDF. Retourne '' si la donnée n'a pas été
+// réellement résolue : aucun contact partiel n'est affiché.
+function _contactSurPlaceTexte(cs) {
+  if (!cs || typeof cs !== 'object') return '';
+  if (!cs.nom || !cs.telephone) return '';
+  return cs.nom + ' — ' + cs.telephone;
+}
+// Durée en jours réellement portée par la demande (bornes incluses).
+function _proDureeTexte(d) {
+  if (!d || !d.duree_jours) return '';
+  return d.duree_jours + (d.duree_jours > 1 ? ' jours' : ' jour');
+}
+function _proPeriodeTexte(d) {
+  if (!d || !d.date_debut) return '';
+  var deb = _dvDate(d.date_debut);
+  if (!d.date_fin || d.date_fin === d.date_debut) return 'Le ' + deb;
+  return 'Du ' + deb + ' au ' + _dvDate(d.date_fin);
+}
+function _proHorairesTexte(d) {
+  if (!d) return '';
+  return [d.heure_debut, d.heure_fin].filter(Boolean).join(' – ');
+}
+function _proAdresseTexte(d) {
+  if (!d) return '';
+  return [d.adresse_rue, [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' ')]
+    .filter(Boolean).join(', ');
+}
+// Prestation formulée à partir de ce que le client a RÉELLEMENT demandé.
+function _proPrestationTexte(d) {
+  if (!d) return '';
+  var n = d.nombre_professionnels;
+  if (d.categorie === 'technicien') {
+    if (!n || n === 1) return 'Mise à disposition d\'un technicien automobile';
+    return 'Mise à disposition de ' + n + ' techniciens automobiles';
+  }
+  if (d.categorie === 'renfort') {
+    if (!n || n === 1) return 'Mise à disposition d\'un renfort automobile sur site';
+    return 'Mise à disposition de ' + n + ' renforts automobiles sur site';
+  }
+  return '';
+}
 
 // ── LOT 3 (V74) — NETTOYAGE AUTOMOBILE PROFESSIONNEL ─────────
 // Toutes les données métier vivent dans la colonne JSONB
@@ -6350,6 +7574,9 @@ function ouvrirFicheDemande(clientId) {
     if (nd.adresse_cp || nd.adresse_ville) {
       org += L('Ville', [nd.adresse_cp, nd.adresse_ville].filter(Boolean).join(' '));
     }
+    // Libellé unique, identique au formulaire, au récapitulatif client
+    // et au devis PDF.
+    org += L('Contact sur place', _contactSurPlaceTexte(nd.contact_sur_place));
     // Clés d'avant V75 : affichées uniquement si la demande les porte.
     if (nd.acces_eau) org += L('Accès à l\'eau (demande antérieure)', NETT_LIB_OUINON[nd.acces_eau] || nd.acces_eau);
     if (nd.acces_electricite) org += L('Prise électrique (demande antérieure)', NETT_LIB_OUINON[nd.acces_electricite] || nd.acces_electricite);
@@ -6372,6 +7599,105 @@ function ouvrirFicheDemande(clientId) {
     if (titreN) titreN.textContent = 'Demande nettoyage — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
     if (corpsN) corpsN.innerHTML = html;
     openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
+    return;
+  }
+
+  // ── FICHE DÉDIÉE — TROUVER UN PROFESSIONNEL AUTOMOBILE ─────
+  // Rendu totalement séparé, sur le modèle exact de la fiche Nettoyage :
+  // aucune ligne de trajet, prise en charge, livraison, restitution ou
+  // stockage n'est produite ici, et aucun champ sans rapport avec le
+  // service n'est affiché. Toutes les valeurs client passent par
+  // escapeHtml().
+  if (_estDemandeProfessionnel(c)) {
+    var pd = _proDetails(c) || {};
+    var estTech = (pd.categorie === 'technicien');
+    var LP = function (label, valeur) {
+      if (valeur === null || valeur === undefined || valeur === '') return '';
+      return '<div class="detail-row"><span class="detail-label">' + escapeHtml(label) +
+             '</span><span class="detail-val">' + escapeHtml(String(valeur)) + '</span></div>';
+    };
+    var SP = function (titre, contenu) {
+      if (!contenu) return '';
+      return '<div style="margin-bottom:16px"><div style="font-weight:700;font-size:.78rem;' +
+             'text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:6px">' +
+             escapeHtml(titre) + '</div>' + contenu + '</div>';
+    };
+
+    html += '<div class="badge badge-active" style="margin-bottom:14px">TROUVER UN PROFESSIONNEL AUTOMOBILE</div>';
+
+    html += SP('Client',
+      LP('Nom', ((c.prenom || '') + ' ' + (c.nom || '')).trim()) +
+      LP('Société', c.societe) + LP('SIRET', c.siret) +
+      LP('Email', c.email) + LP('Téléphone', c.telephone) +
+      LP('N° client', c.numero_client));
+
+    // PRESTATION DEMANDÉE + type de partenaire réellement nécessaire.
+    html += SP('Prestation demandée',
+      LP('Besoin', PRO_LIB_CATEGORIE[pd.categorie] || pd.categorie) +
+      LP(estTech ? 'Spécialité' : 'Mission', _proLibelleMetier(pd)) +
+      LP('Précision', pd.precision) +
+      LP('Professionnels', pd.nombre_professionnels) +
+      LP('Prestation', _proPrestationTexte(pd)) +
+      LP('Type de partenaire nécessaire',
+        estTech ? 'Partenaire technicien automobile'
+                : 'Partenaire renfort automobile sur site'));
+
+    // Véhicules — uniquement pour le technicien, et uniquement ce qui a
+    // réellement été saisi (ni immatriculation, ni VIN, ni restitution).
+    if (estTech && (pd.vehicules || []).length) {
+      var vhPro = LP('Nombre de véhicules', pd.nombre_vehicules);
+      pd.vehicules.forEach(function (v, i) {
+        vhPro += LP('Véhicule ' + (i + 1),
+          [PRO_LIB_TYPE_VEHICULE[v.type_vehicule] || v.type_vehicule, v.marque_modele]
+            .filter(Boolean).join(' — '));
+      });
+      html += SP(pd.vehicules.length > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', vhPro);
+    }
+
+    html += SP("Lieu d'intervention",
+      LP('Adresse', pd.adresse_rue) +
+      LP('Ville', [pd.adresse_cp, pd.adresse_ville].filter(Boolean).join(' ')) +
+      LP('Contact sur place', _contactSurPlaceTexte(pd.contact_sur_place)));
+
+    html += SP('Période et horaires',
+      LP('Période', _proPeriodeTexte(pd)) +
+      LP('Durée', _proDureeTexte(pd)) +
+      LP('Horaires', _proHorairesTexte(pd)));
+
+    html += SP(estTech ? 'Mission' : 'Type de mission',
+      LP('Description', pd.description) +
+      LP('Informations complémentaires', pd.informations_complementaires));
+
+    // INFORMATIONS MANQUANTES — calculées à partir de ce que la demande
+    // porte réellement, jamais d'une liste fixe.
+    var manquantsPro = [];
+    if (!pd.categorie) manquantsPro.push('Besoin');
+    if (!pd.conseil && !pd.specialite && !pd.mission) manquantsPro.push(estTech ? 'Spécialité' : 'Mission');
+    if (pd.conseil) manquantsPro.push('Métier et nombre de professionnels à définir avec le client');
+    if (!pd.adresse_rue || !pd.adresse_ville) manquantsPro.push("Adresse d'intervention");
+    if (!_contactSurPlaceTexte(pd.contact_sur_place)) manquantsPro.push('Contact sur place');
+    if (!pd.date_debut || !pd.date_fin) manquantsPro.push('Période');
+    if (!pd.heure_debut || !pd.heure_fin) manquantsPro.push('Horaires');
+    if (!pd.description) manquantsPro.push('Description de la mission');
+    html += SP('Informations manquantes',
+      manquantsPro.length ? LP('À compléter', manquantsPro.join(' · '))
+                          : LP('Statut', 'Aucune information manquante'));
+
+    html += SP('Suivi',
+      LP('Statut de la prestation', c.statut) +
+      LP('Reçue le', _dvDateHeure ? _dvDateHeure(c.created_at) : c.created_at));
+
+    html += '<div style="margin-top:14px;text-align:right">' +
+      '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
+      'Marquer comme non lue</button></div>';
+
+    var corpsP = document.getElementById('fiche-demande-corps');
+    var titreP = document.getElementById('fiche-demande-titre');
+    if (titreP) titreP.textContent = 'Demande professionnel — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
+    if (corpsP) corpsP.innerHTML = html;
+    openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
     return;
   }
 
@@ -6670,6 +7996,7 @@ function ouvrirFicheDemande(clientId) {
   if (titre) titre.textContent = 'Demande — ' + _dv(c.prenom) + ' ' + _dv(c.nom);
   if (corps) corps.innerHTML = html;
   openModal('fiche-demande');
+    rendreInfosDemandeAdmin(c);
 }
 
 // ── GÉNÉRATION DU DEVIS ─────────────────────────────────────
@@ -7409,6 +8736,162 @@ function _construirePdfDevis(c, d) {
   // source exacte pour ce cas.
   var _nbVehiculesTrajet = c.nb_vehicules || (c._vehicules ? c._vehicules.length : 0) || 1;
   var _estMultiIndividuelTrajet = (_nbVehiculesTrajet >= 2 && c.trajet_commun !== true);
+
+  // ══ SERVICES SUR SITE — Nettoyage / Trouver un professionnel ══
+  // Ces deux services n'ont ni trajet, ni prise en charge, ni livraison,
+  // ni restitution, ni fiche véhicule en base : les sections Stockage /
+  // Trajet / Véhicules ci-dessous ne produisent donc déjà rien pour eux
+  // (leurs propres conditions sont fausses). On n'ajoute ici que leurs
+  // blocs métier, avec EXACTEMENT les mêmes primitives que le reste du
+  // devis (titre rouge, carte grise, bandeau d'indicateurs, puces) :
+  // aucun second modèle de devis n'est créé, aucune couleur ni
+  // typographie nouvelle.
+
+  // Ligne « Libellé : valeur » — la valeur est posée JUSTE APRÈS le
+  // libellé, à partir de sa largeur réellement mesurée : petit
+  // espacement, jamais une grande colonne vide.
+  function ligneLV(label, valeur, x, yy, dess) {
+    if (dess) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
+      doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
+      var l = String(label) + ' :';
+      T(l, x, yy);
+      var w = doc.getTextWidth(l);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
+      doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+      T(String(valeur), x + w + 2.6, yy);
+    }
+  }
+
+  // Carte de lignes « libellé : valeur ». Une ligne par donnée
+  // RÉELLEMENT présente ; la carte entière disparaît si tout est vide.
+  function carteLignes(titre, lignes) {
+    var utiles = (lignes || []).filter(function (l) {
+      return l && l[1] !== null && l[1] !== undefined && String(l[1]) !== '';
+    });
+    if (!utiles.length) return;
+    sectionAvecBloc(titre, function (dess) {
+      var y0 = y, cur = y0 + 7.4;
+      utiles.forEach(function (l) {
+        ligneLV(l[0], l[1], xG, cur, dess);
+        cur += 6.5;
+      });
+      return (cur - y0) - 6.5 + 7.4;
+    });
+  }
+
+  // Carte de texte libre : le texte du client, et rien d'autre.
+  function carteTexte(titre, texte) {
+    if (!texte) return;
+    sectionAvecBloc(titre, function (dess) {
+      var y0 = y, cur = y0 + 7.4;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.8);
+      var lignes = doc.splitTextToSize(String(texte), LARGEUR - 14);
+      if (dess) {
+        doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+        lignes.forEach(function (lg, i) { T(lg, xG, cur + i * 4.7); });
+      }
+      cur += (lignes.length - 1) * 4.7;
+      return (cur - y0) + 7.0;
+    });
+  }
+
+  // Bandeau d'indicateurs — même rendu que la rangée d'indicateurs du
+  // bloc Stockage : colonnes de largeur égale, libellé au-dessus de sa
+  // valeur. Mesuré AVANT dessin, jamais supposé.
+  function bandeauIndicateurs(items) {
+    var utiles = (items || []).filter(function (it) {
+      return it && it[1] !== null && it[1] !== undefined && String(it[1]) !== '';
+    });
+    if (!utiles.length) return;
+    var n = utiles.length, w = (LARGEUR - 12) / n;
+    var nlLabel = 1, nlVal = 1;
+    utiles.forEach(function (it, i) {
+      nlLabel = Math.max(nlLabel, etiquetteAdaptativeLisible(it[0], xG + i * w, 0, w, 10.4, 9.2, false));
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.2);
+      nlVal = Math.max(nlVal, doc.splitTextToSize(String(it[1]), w - 3).slice(0, 2).length);
+    });
+    var h = 6.5 + (nlLabel - 1) * 3.6 + 5.0 + nlVal * 4.4 + 2.5;
+    if (y + h > BAS_PAGE) { doc.addPage(); y = M; }
+    var y0 = y;
+    doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
+    doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'F');
+    doc.setDrawColor(GRIS_FILET[0], GRIS_FILET[1], GRIS_FILET[2]); doc.setLineWidth(0.15);
+    doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'S');
+    var curLabel = y0 + 6.5;
+    utiles.forEach(function (it, i) {
+      etiquetteAdaptativeLisible(it[0], xG + i * w, curLabel, w, 10.4, 9.2, true);
+    });
+    var yVal = curLabel + (nlLabel - 1) * 3.6 + 5.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.2);
+    doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
+    utiles.forEach(function (it, i) {
+      doc.splitTextToSize(String(it[1]), w - 3).slice(0, 2).forEach(function (lg, k) {
+        T(lg, xG + i * w, yVal + k * 4.4);
+      });
+    });
+    y = y0 + h;
+  }
+
+  if (_estDemandeNettoyage(c)) {
+    var ndPdf = _nettDetails(c) || {};
+    y += ESPACE_AVANT_TITRE_GLOBAL;
+    sectionTitre('Nettoyage automobile');
+    bandeauIndicateurs([
+      ['Véhicules', ndPdf.nombre_vehicules_approx || ''],
+      ['Formule', NETT_LIB_TYPE[ndPdf.type_nettoyage] || ''],
+      ['Date', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Horaire', _nettHoraireTexte(ndPdf)]
+    ]);
+    carteLignes("Lieu d'intervention", [
+      ['Adresse', _nettAdresseTexte(ndPdf)],
+      ['Contact sur place', _contactSurPlaceTexte(ndPdf.contact_sur_place)]
+    ]);
+    carteLignes('Véhicules à nettoyer',
+      (ndPdf.repartition_categories || []).filter(function (r) { return r && r.quantite > 0; })
+        .map(function (r) {
+          var lib = NETT_LIB_CAT[r.categorie] || r.categorie;
+          if (r.precision) lib += ' (' + r.precision + ')';
+          return [lib, r.quantite + (r.quantite > 1 ? ' véhicules' : ' véhicule')];
+        }));
+  }
+
+  if (_estDemandeProfessionnel(c)) {
+    var pdPdf = _proDetails(c) || {};
+    var estTechPdf = (pdPdf.categorie === 'technicien');
+    y += ESPACE_AVANT_TITRE_GLOBAL;
+    sectionTitre('Trouver un professionnel automobile');
+    bandeauIndicateurs(estTechPdf ? [
+      ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
+      ['Spécialité', _proLibelleMetier(pdPdf)],
+      ['Véhicules', pdPdf.nombre_vehicules || ''],
+      ['Professionnels', pdPdf.nombre_professionnels || '']
+    ] : [
+      ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
+      ['Mission', _proLibelleMetier(pdPdf)],
+      ['Professionnels', pdPdf.nombre_professionnels || ''],
+      ['Durée', _proDureeTexte(pdPdf)]
+    ]);
+    carteLignes(estTechPdf ? 'Intervention' : 'Mission sur site', [
+      ['Lieu', _proAdresseTexte(pdPdf)],
+      ['Contact sur place', _contactSurPlaceTexte(pdPdf.contact_sur_place)],
+      ['Période', _proPeriodeTexte(pdPdf)],
+      ['Horaires', _proHorairesTexte(pdPdf)],
+      ['Précision', pdPdf.precision || ''],
+      [estTechPdf ? 'Mission' : 'Type de mission', pdPdf.description || '']
+    ]);
+    if (estTechPdf && (pdPdf.vehicules || []).length) {
+      carteLignes(pdPdf.vehicules.length > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule',
+        pdPdf.vehicules.map(function (v, i) {
+          return ['Véhicule ' + (i + 1),
+            [PRO_LIB_TYPE_VEHICULE[v.type_vehicule] || v.type_vehicule, v.marque_modele]
+              .filter(Boolean).join(' — ')];
+        }));
+    }
+    // Uniquement le texte libre du client ; bloc entièrement absent s'il
+    // est vide.
+    carteTexte('Informations complémentaires', pdPdf.informations_complementaires);
+  }
 
   // ══ STOCKAGE — mêmes codes graphiques que les autres blocs ══
   if (_aStockage(c)) {
@@ -8536,7 +10019,16 @@ function _construirePdfDevis(c, d) {
   // Chaque prestation réellement assurée apparaît. Le convoyage vers le
   // stockage disparaissait auparavant du devis.
   var prestations = [];
-  if (_aStockage(c)) {
+  // Services sur site : la prestation est celle que le client a
+  // RÉELLEMENT demandée — jamais une formulation ajoutée d'office.
+  if (_estDemandeNettoyage(c)) {
+    var _ndPrest = _nettDetails(c) || {};
+    var _libNettPrest = NETT_LIB_TYPE[_ndPrest.type_nettoyage];
+    if (_libNettPrest) prestations.push(_libNettPrest);
+  } else if (_estDemandeProfessionnel(c)) {
+    var _pdPrest = _proPrestationTexte(_proDetails(c));
+    if (_pdPrest) prestations.push(_pdPrest);
+  } else if (_aStockage(c)) {
     if (_operationDossier(c, 'pc')) prestations.push('Convoyage vers le stockage');
     prestations.push('Stockage automobile');
     if (_operationDossier(c, 'liv')) prestations.push('Livraison après stockage');

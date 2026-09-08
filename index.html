@@ -4124,6 +4124,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 #modal-convoyeur .hc-doc-btn-action { flex:0 0 auto; font-size:.76rem; font-weight:600; color:var(--accent); text-decoration:underline; }
 #modal-convoyeur .hc-doc-btn-plus { flex:0 0 auto; color:var(--accent); font-weight:700; }
 
+/* Vidéo de présentation — reprend strictement le langage visuel des
+   zones documents ci-dessus : même bordure, même rayon, même accent. */
+#modal-convoyeur .hc-video-btn {
+  flex:1 1 auto; min-height:48px; padding:12px 16px;
+  border:1px solid rgba(23,28,33,.13); border-radius:11px;
+  background:#fff; color:#171C21; font-size:.86rem; font-weight:500;
+  cursor:pointer; text-align:center; font-family:var(--font-body);
+}
+#modal-convoyeur .hc-video-btn:hover { border-color:rgba(158,63,70,.34); }
+#modal-convoyeur .hc-video-btn--mini { flex:0 0 auto; min-height:38px; padding:8px 15px; font-size:.79rem; font-weight:600; }
+#modal-convoyeur .hc-video-btn--danger { color:#8a3a3a; }
+#modal-convoyeur .hc-video-btn:disabled { opacity:.5; cursor:not-allowed; }
+#modal-convoyeur .hc-video-msg--ok { color:#247443; }
+#modal-convoyeur .hc-video-msg--err { color:#B3261E; }
+#modal-convoyeur .hc-video-msg--info { color:#7A7F84; }
+
 /* HelixCar — Premium V2. Couche strictement visuelle du formulaire Devenir client. */
 #modal-convoyeur {
   --accent: #9E3F46;
@@ -6196,6 +6212,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
+      <div id="hc-bandeau-connecte"
+           style="display:none;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#065F46"></div>
+
       <div class="modal-form-group">
 
         <label>Téléphone <span class="field-required">*</span></label>
@@ -6208,10 +6227,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <label>Mot de passe <span class="field-required">*</span></label>
 
+        <div id="client-password-aide" style="font-size:.75rem;color:#6B7280;margin-bottom:6px">8 caractères minimum.</div>
+
         <div style="position:relative">
-          <input type="password" id="client-password" required style="padding-right:44px">
+          <input type="password" id="client-password" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" aria-describedby="client-password-aide" style="padding-right:44px">
           <button type="button" class="btn-oeil" onclick="basculerMotDePasse('client-password', this)"
-                  aria-label="Afficher le mot de passe" aria-pressed="false">
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
@@ -6350,9 +6372,210 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
-      <div id="bloc-socle-professionnel" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
-        <div class="modal-section-title">Votre besoin en personnel</div>
-        <p style="color:#666;font-size:.85rem;line-height:1.6;margin:0">Ce parcours est en cours de préparation chez HelixCar. Il vous permettra bientôt de décrire précisément le professionnel automobile recherché.</p>
+      <!-- TROUVER UN PROFESSIONNEL AUTOMOBILE — parcours complet, porté
+           par l'étape 2 existante : aucune nouvelle étape globale.
+           Rubriques repliables reprenant STRICTEMENT les classes des
+           sous-accordéons véhicules (veh-sous-*), donc le même design,
+           les mêmes boutons Effacer / OK et aucune nouvelle icône. -->
+      <div id="bloc-socle-professionnel" style="display:none">
+
+        <!-- RUBRIQUE — Votre besoin -->
+        <div class="veh-sous-accordeon" id="pro-acc-besoin">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('besoin')">
+            <span class="veh-sous-num" data-pro-num="besoin">1</span><span class="veh-sous-titre">Votre besoin</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group" id="pro-categorie-group">
+              <label>De quel professionnel avez-vous besoin ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="technicien" onclick="proOnCategorieChange()"><span>Technicien automobile<span class="hc-opt-desc">Mécanique, carrosserie, diagnostic et autres spécialités</span></span></label>
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Jockey automobile, accueil et préparation des véhicules, et d'autres missions</span></span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-specialite-group" style="display:none">
+              <label>Quelle spécialité recherchez-vous ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="mecanique" onclick="proOnMetierChange()"><span>Mécanique</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="carrosserie" onclick="proOnMetierChange()"><span>Carrosserie</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="diagnostic" onclick="proOnMetierChange()"><span>Diagnostic</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="autre" onclick="proOnMetierChange()"><span>Une autre spécialité</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-specialite" value="conseil" onclick="proOnMetierChange()"><span>Je souhaite être conseillé</span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-mission-group" style="display:none">
+              <label>Quelle mission souhaitez-vous confier ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="jockey" onclick="proOnMetierChange()"><span>Jockey automobile</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="accueil_preparation" onclick="proOnMetierChange()"><span>Accueil et préparation des véhicules</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="autre" onclick="proOnMetierChange()"><span>Une autre mission</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="conseil" onclick="proOnMetierChange()"><span>Je souhaite être conseillé</span></label>
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-metier-precision-group" style="display:none">
+              <label>Précisez <span class="field-required">*</span></label>
+              <input type="text" id="pro-metier-precision" placeholder="Ex : électricité automobile" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+
+            <div class="modal-form-group" id="pro-nb-pros-group" style="display:none">
+              <label>Combien de professionnels souhaitez-vous ? <span class="field-required">*</span></label>
+              <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn-compteur" onclick="proMajNbPros(-1)" aria-label="Retirer un professionnel">&minus;</button>
+                <input type="number" id="pro-nb-pros" value="1" min="1" max="20" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
+                <button type="button" class="btn-compteur" onclick="proMajNbPros(1)" aria-label="Ajouter un professionnel">+</button>
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('besoin')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('besoin')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Véhicules (technicien uniquement) -->
+        <div class="veh-sous-accordeon" id="pro-acc-vehicules" style="display:none">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('vehicules')">
+            <span class="veh-sous-num" data-pro-num="vehicules">2</span><span class="veh-sous-titre" id="pro-vehicules-titre">Informations sur les véhicules</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label>Combien de véhicules sont concernés ? <span class="field-required">*</span></label>
+              <div style="display:flex;align-items:center;gap:12px">
+                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(-1)" aria-label="Retirer un véhicule">&minus;</button>
+                <input type="number" id="pro-nb-vehicules" value="1" min="1" max="3" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
+                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(1)" aria-label="Ajouter un véhicule">+</button>
+              </div>
+            </div>
+
+            <div id="pro-vehicules-liste"></div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('vehicules')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('vehicules')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Lieu d'intervention (+ contact sur place) -->
+        <div class="veh-sous-accordeon" id="pro-acc-lieu">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('lieu')">
+            <span class="veh-sous-num" data-pro-num="lieu">3</span><span class="veh-sous-titre">Lieu d'intervention</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label>Adresse postale <span class="field-required">*</span></label>
+              <input type="text" id="pro-adresse-rue" placeholder="Ex : 18 rue de Paris" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Code postal <span class="field-required">*</span></label>
+                <input type="text" id="pro-adresse-cp" placeholder="93160" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Ville <span class="field-required">*</span></label>
+                <input type="text" id="pro-adresse-ville" placeholder="Noisy-le-Grand" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="modal-form-group" id="pro-contact-sp-group">
+              <label>Qui sera le contact sur place ? <span class="field-required">*</span></label>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                <label class="radio-opt"><input type="radio" name="pro-contact-sp" value="moi" onclick="hcContactSurPlaceChange('pro')"><span>Moi-même</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-contact-sp" value="autre" onclick="hcContactSurPlaceChange('pro')"><span>Une autre personne</span></label>
+              </div>
+            </div>
+
+            <div id="pro-contact-sp-moi" style="display:none">
+              <div id="pro-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+              <div id="pro-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+            </div>
+
+            <div id="pro-contact-sp-autre" style="display:none">
+              <div class="modal-row">
+                <div class="modal-form-group">
+                  <label>Nom et prénom <span class="field-required">*</span></label>
+                  <input type="text" id="pro-contact-sp-nom" placeholder="Ex : Karim B." autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                </div>
+                <div class="modal-form-group">
+                  <label>Téléphone <span class="field-required">*</span></label>
+                  <input type="tel" id="pro-contact-sp-tel" placeholder="+33 6 00 00 00 00" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                </div>
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('lieu')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('lieu')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Période et horaires -->
+        <div class="veh-sous-accordeon" id="pro-acc-periode">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('periode')">
+            <span class="veh-sous-num" data-pro-num="periode">4</span><span class="veh-sous-titre">Période et horaires</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Date de début <span class="field-required">*</span></label>
+                <input type="date" id="pro-date-debut" readonly onchange="proOnDateChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Date de fin <span class="field-required">*</span></label>
+                <input type="date" id="pro-date-fin" readonly onchange="proOnDateChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Heure de début <span class="field-required">*</span></label>
+                <input type="time" id="pro-horaire-cdeb" readonly onchange="proOnHoraireChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Heure de fin <span class="field-required">*</span></label>
+                <input type="time" id="pro-horaire-cfin" readonly onchange="proOnHoraireChange()" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('periode')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('periode')">OK</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RUBRIQUE — Mission -->
+        <div class="veh-sous-accordeon" id="pro-acc-mission">
+          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('mission')">
+            <span class="veh-sous-num" data-pro-num="mission">5</span><span class="veh-sous-titre" id="pro-mission-titre">Mission</span><span class="veh-sous-chevron">&rsaquo;</span>
+          </button>
+          <div class="veh-sous-contenu">
+
+            <div class="modal-form-group">
+              <label id="pro-description-label">Décrivez la mission <span class="field-required">*</span></label>
+              <textarea id="pro-description" rows="3" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+            </div>
+
+            <div class="modal-form-group">
+              <label>Informations complémentaires</label>
+              <textarea id="pro-infos" rows="3" placeholder="Tout élément utile à l'organisation de l'intervention" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+            </div>
+
+            <div class="veh-sous-ok">
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('mission')">Effacer</button>
+              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('mission')">OK</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
@@ -6446,7 +6669,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
       <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
-        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez compléter une demande de convoyage à tout moment depuis votre espace client.</div>
+        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
         <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
         <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
       </div>
@@ -6568,6 +6791,35 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               <div class="modal-form-group">
                 <label>Ville <span class="field-required">*</span></label>
                 <input type="text" id="nett-adresse-ville" placeholder="Noisy-le-Grand" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+            </div>
+          </div>
+
+          <!-- CONTACT SUR PLACE — composant transversal, rattaché au lieu
+               d'intervention. Même balisage et même code pour tous les
+               services concernés (cf. hcContactSurPlaceChange). -->
+          <div class="modal-form-group" id="nett-contact-sp-group">
+            <label>Qui sera le contact sur place ? <span class="field-required">*</span></label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+              <label class="radio-opt"><input type="radio" name="nett-contact-sp" value="moi" onclick="hcContactSurPlaceChange('nett')"><span>Moi-même</span></label>
+              <label class="radio-opt"><input type="radio" name="nett-contact-sp" value="autre" onclick="hcContactSurPlaceChange('nett')"><span>Une autre personne</span></label>
+            </div>
+          </div>
+
+          <div id="nett-contact-sp-moi" style="display:none">
+            <div id="nett-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+            <div id="nett-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+          </div>
+
+          <div id="nett-contact-sp-autre" style="display:none">
+            <div class="modal-row">
+              <div class="modal-form-group">
+                <label>Nom et prénom <span class="field-required">*</span></label>
+                <input type="text" id="nett-contact-sp-nom" placeholder="Ex : Karim B." autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              </div>
+              <div class="modal-form-group">
+                <label>Téléphone <span class="field-required">*</span></label>
+                <input type="tel" id="nett-contact-sp-tel" placeholder="+33 6 00 00 00 00" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
           </div>
@@ -7040,6 +7292,40 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           </div>
         </div>
 
+        <!-- VIDÉO DE PRÉSENTATION — affichée uniquement quand une activité
+             la rend réellement nécessaire. La durée maximale annoncée
+             s'adapte aux activités choisies ; aucune explication interne
+             sur le nombre de vidéos n'est montrée au candidat. -->
+        <div class="modal-form-group" id="conv-video-group" style="display:none">
+          <label>Vidéo de présentation</label>
+          <div style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
+            Présentez-vous brièvement en vidéo : <b><span id="conv-video-duree-txt">1 minute maximum</span></b>. Formats acceptés : MP4, MOV ou WebM.
+          </div>
+
+          <div class="hc-doc-zone" id="conv-zone-video">
+            <input type="file" id="conv-video-capture" accept="video/mp4,video/quicktime,video/webm" capture="user" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+            <input type="file" id="conv-video-fichier" accept="video/mp4,video/quicktime,video/webm" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+
+            <div id="conv-video-choix" style="display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" class="hc-video-btn" id="conv-video-btn-capture" onclick="convOuvrirSelecteurVideo('capture')">Enregistrer une vidéo</button>
+              <button type="button" class="hc-video-btn" id="conv-video-btn-fichier" onclick="convOuvrirSelecteurVideo('fichier')">Choisir un fichier</button>
+            </div>
+
+            <div id="conv-video-etat" style="display:none;background:#fff;border:1px solid rgba(21,27,33,.10);border-radius:12px;padding:14px 16px">
+              <div id="conv-video-nom" style="font-size:.86rem;font-weight:600;color:var(--ink);word-break:break-all"></div>
+              <div id="conv-video-meta" style="font-size:.78rem;color:#7A7F84;margin-top:3px"></div>
+              <div id="conv-video-piste" style="display:none;height:6px;border-radius:99px;background:#EDEDEA;margin-top:10px;overflow:hidden">
+                <div id="conv-video-barre" style="height:100%;width:0%;background:var(--accent);transition:width .18s ease"></div>
+              </div>
+              <div id="conv-video-message" style="display:none;font-size:.8rem;margin-top:9px;line-height:1.5"></div>
+              <div id="conv-video-actions" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+                <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirSelecteurVideo('fichier')">Remplacer</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger" onclick="convSupprimerVideo()">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="form-step" data-step="4">
@@ -7085,6 +7371,38 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 <!-- V61 — MODALE CONNEXION (vitrine uniquement, aucune authentification réelle) -->
 
+<!-- ============================================================
+     COMPLÉTER MES INFORMATIONS
+     ============================================================
+     Ouvert depuis l'espace client (dashboard.html) par
+     index.html?completer=<id>. Volontairement hébergé ICI, avec le
+     formulaire : les rubriques réutilisent les mêmes classes et les
+     mêmes composants, donc le même design, sans en dupliquer aucun.
+     Seules les rubriques encore manquantes ou à corriger sont
+     affichées ; les informations déjà validées ne sont jamais
+     redemandées. -->
+<div class="modal-overlay" id="modal-completer">
+  <div class="modal" style="position:relative;max-width:560px">
+    <button type="button" class="modal-close" onclick="closeModal('completer')" aria-label="Fermer">&times;</button>
+    <h2>Compléter mes informations</h2>
+    <p id="completer-sous-titre">Ces éléments nous manquent pour organiser votre prestation.</p>
+
+    <div id="completer-message"
+         style="display:none;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem"></div>
+
+    <div id="completer-progression"
+         style="display:none;font-size:.8rem;color:#4B5563;margin-bottom:14px"></div>
+
+    <form id="modal-completer-form" onsubmit="event.preventDefault();return false">
+      <div id="completer-rubriques"></div>
+    </form>
+
+    <button type="button" id="completer-envoyer" class="btn btn-primary"
+            style="width:100%;justify-content:center;font-size:.92rem"
+            onclick="envoyerInformationsCompletees()">Enregistrer mes informations</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-connexion">
 
   <div class="modal">
@@ -7104,7 +7422,14 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="modal-form-group">
         <label>Mot de passe <span class="field-required">*</span></label>
-        <input type="password" id="connexion-password" placeholder="••••••••">
+        <div style="position:relative">
+          <input type="password" id="connexion-password" placeholder="••••••••" data-mdp="1"
+                 autocomplete="current-password" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('connexion-password', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </div>
 
       <div id="connexion-message" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#991B1B"></div>
@@ -7112,7 +7437,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;font-size:.92rem" onclick="submitConnexionForm()">Se connecter →</button>
 
       <p style="text-align:center;margin-top:16px">
-        <a href="#" class="hc-forgot-link" onclick="event.preventDefault();submitConnexionForm()">Mot de passe oublié ?</a>
+        <a href="#" class="hc-forgot-link" onclick="event.preventDefault();demanderReinitialisationMotDePasse()">Mot de passe oublié ?</a>
       </p>
 
       <div class="hc-signup-zone">
@@ -7312,6 +7637,10 @@ function resetFormSteps(type) {
       var el = document.getElementById('conv-act-' + v);
       if (el) el.checked = false;
     });
+    // La vidéo est une variable JS persistante : la remise à zéro du
+    // formulaire doit la vider réellement, sans quoi elle survivrait à
+    // une candidature et contaminerait la suivante.
+    if (typeof _reinitialiserVideoPartenaire === 'function') _reinitialiserVideoPartenaire();
     if (typeof onChoixActivitesPartenaire === 'function') onChoixActivitesPartenaire();
   }
   _renderFormStep(type);
@@ -7401,6 +7730,9 @@ function _renderFormStep(type) {
   if (type === 'convoyeur' && n === _dernierePasType('convoyeur') && typeof construireRecapConvoyeur === 'function') {
     construireRecapConvoyeur();
   }
+  // L'état du bouton Continuer de l'étape 3 partenaire dépend de la
+  // vidéo : recalculé à chaque rendu, jamais laissé périmé.
+  if (type === 'convoyeur' && typeof _convVideoMajBouton === 'function') _convVideoMajBouton();
 }
 
 // La question "Êtes-vous prêt à lancer le convoyage ?" a été supprimée :
@@ -7600,17 +7932,13 @@ function nettOnEligibiliteChange(sansRendu) {
   if (corps) corps.style.display = ok ? 'block' : 'none';
   if (orga) orga.style.display = (ok && _avecNettoyage()) ? 'block' : 'none';
 
-  // V77 - plus aucun grand rectangle. Le bouton Continuer n'est grise
-  // QUE pour un particulier ; un professionnel garde un bouton normal et
-  // recoit une petite erreur sous les cases s'il clique sans avoir
-  // confirme (cf. _validateNettoyageEtape2).
-  var btn = document.getElementById('client-step-next-btn');
-  if (btn && _avecNettoyage()) {
-    var bloque = !_nettEstProfessionnel();
-    btn.disabled = bloque;
-    btn.style.opacity = bloque ? '.5' : '';
-    btn.style.cursor = bloque ? 'not-allowed' : '';
-  }
+  // CORRECTIF - le bouton Continuer refletait uniquement le statut
+  // professionnel (V77), jamais les 2 confirmations, le total, la
+  // repartition ou la prestation : un professionnel pouvait voir le
+  // bouton actif alors qu'une autre condition manquait encore, ou
+  // inversement rester sur un etat perime apres une correction. Source
+  // UNIQUE desormais : _nettPeutContinuerEtape2(), via _nettMajBoutonContinuer().
+  _nettMajBoutonContinuer();
   if (_avecNettoyage() && !ok) {
     _etapeMax = Math.min(_etapeMax, 2);
     if (_formStepState.client > 2) _formStepState.client = 2;
@@ -7730,6 +8058,7 @@ function nettRendreRepartition() {
     if (ip) ip.value = '';
     _clearFieldError('nett-autre-precision');
   }
+  _nettMajBoutonContinuer();
 }
 
 // REGLE ANTI-DEPASSEMENT : une categorie ne peut jamais faire depasser le
@@ -7798,6 +8127,11 @@ function nettMajRepartition() {
     if (ip) ip.value = '';
     _clearFieldError('nett-autre-precision');
   }
+  // CORRECTIF - chaque ajustement de quantite (boutons +/-) ou de total
+  // peut faire varier la condition "repartition === total" : le bouton
+  // Continuer doit refleter ce nouvel etat immediatement, sans attendre
+  // un clic ailleurs dans la page.
+  _nettMajBoutonContinuer();
 }
 
 // Changement du total : ne modifie JAMAIS silencieusement une quantite
@@ -7813,7 +8147,60 @@ function nettOnTotalChange() {
   _clearFieldError('nett-nb-approx');
 }
 
-function nettOnTypeChange() { _clearGroupError('nett-type-group'); }
+// CORRECTIF - cette lecture du type de nettoyage choisi (radio nett-type)
+// etait appelee par _validateNettoyageEtape2()/_construireDetailsNettoyage()
+// sans jamais avoir ete definie : une ReferenceError silencieuse au clic
+// sur "Continuer" interrompait toute la validation de l'etape 2, ce qui
+// empechait la progression meme lorsque toutes les conditions etaient
+// reellement remplies. Meme convention que _typeServiceChoisi().
+function _nettTypeNettoyage() {
+  var el = document.querySelector('input[name="nett-type"]:checked');
+  return el ? el.value : '';
+}
+
+// CORRECTIF - MEME CAUSE, ETAPE 4. Les 8 lecteurs ci-dessous etaient
+// appeles par _validateNettoyageEtape4(), nettOnLieuChange(),
+// nettOnDispoChange() et _construireDetailsNettoyage() sans avoir
+// jamais ete definis : la meme ReferenceError silencieuse empechait
+// d'atteindre le recapitulatif et donc de creer la demande. Aucune
+// regle metier n'est ajoutee ici : ces fonctions ne font que lire ce
+// que l'etape 4 affiche deja, avec les conventions du fichier
+// (radios comme _typeServiceChoisi, champs texte trimes).
+function _nettLieu() {
+  var el = document.querySelector('input[name="nett-lieu"]:checked');
+  return el ? el.value : '';
+}
+// L'adresse n'est demandee que pour une intervention reellement situee
+// chez le client. Les deux seules valeurs proposees aujourd'hui le
+// sont ; les valeurs historiques (helixcar / a_definir) restent lues
+// ailleurs pour l'affichage des anciennes demandes, mais n'appellent
+// aucune saisie d'adresse.
+function _nettAdresseApplicable() {
+  var l = _nettLieu();
+  return l === 'locaux_client' || l === 'parc_client';
+}
+function _nettDate() {
+  return ((document.getElementById('nett-date') || {}).value || '').trim();
+}
+function _nettTypeDispo() {
+  var el = document.querySelector('input[name="nett-dispo"]:checked');
+  return el ? el.value : '';
+}
+function _nettHeure() {
+  return ((document.getElementById('nett-heure') || {}).value || '').trim();
+}
+function _nettCreneauDebut() {
+  return ((document.getElementById('nett-creneau-debut') || {}).value || '').trim();
+}
+function _nettCreneauFin() {
+  return ((document.getElementById('nett-creneau-fin') || {}).value || '').trim();
+}
+function _nettDelai() {
+  var el = document.querySelector('input[name="nett-delai"]:checked');
+  return el ? el.value : '';
+}
+
+function nettOnTypeChange() { _clearGroupError('nett-type-group'); _nettMajBoutonContinuer(); }
 
 // Bouton Effacer : agit UNIQUEMENT sur la section "Quel nettoyage
 // souhaitez-vous ?". Ne touche ni aux coordonnees, ni au service choisi,
@@ -7822,6 +8209,38 @@ function nettEffacerTypeNettoyage() {
   var radios = document.querySelectorAll('input[name="nett-type"]');
   Array.prototype.forEach.call(radios, function (r) { r.checked = false; });
   _clearGroupError('nett-type-group');
+  _nettMajBoutonContinuer();
+}
+
+// CORRECTIF - source UNIQUE de verite pour activer "Continuer" a l'etape 2
+// du nettoyage : professionnel confirme, les 2 conditions d'intervention
+// cochees, un total de vehicules valide, une repartition par categorie qui
+// correspond EXACTEMENT a ce total, et une prestation selectionnee.
+// Reutilisee a la fois pour l'etat temps reel du bouton et par
+// _validateNettoyageEtape2() (garde-fou au clic), sans dupliquer la regle.
+function _nettPeutContinuerEtape2() {
+  if (!_nettEligibiliteOk()) return false;
+  var total = _nettTotalApprox();
+  if (total < 1) return false;
+  if (_nettTotalReparti() !== total) return false;
+  if (!_nettTypeNettoyage()) return false;
+  return true;
+}
+
+// CORRECTIF - recalcule l'etat (actif/grise) du bouton "Continuer" a
+// CHAQUE evenement pouvant faire varier une des 5 conditions ci-dessus
+// (statut professionnel, les 2 confirmations, le total, la repartition,
+// la prestation), et non plus seulement au moment du choix du service.
+// Ne touche au bouton que si le nettoyage est le service actif : les
+// parcours Convoyage/Stockage/Compte gardent leur propre logique,
+// inchangee.
+function _nettMajBoutonContinuer() {
+  var btn = document.getElementById('client-step-next-btn');
+  if (!btn || !_avecNettoyage()) return;
+  var bloque = !_nettPeutContinuerEtape2();
+  btn.disabled = bloque;
+  btn.style.opacity = bloque ? '.5' : '';
+  btn.style.cursor = bloque ? 'not-allowed' : '';
 }
 
 function nettOnLieuChange() {
@@ -7852,6 +8271,506 @@ function nettOnDispoChange() {
     });
   }
   _clearGroupError('nett-dispo-group');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CONTACT SUR PLACE — composant transversal
+// ══════════════════════════════════════════════════════════════
+// UN SEUL composant, parametre par un prefixe (nett, pro-tech,
+// pro-renfort...), partage par tous les services comportant un lieu
+// d'intervention. Aucune regle dupliquee, aucun second systeme.
+//
+// Deux choix seulement :
+//   'moi'   -> la donnee est DERIVEE du compte, jamais ressaisie ;
+//   'autre' -> nom ET telephone deviennent reellement obligatoires.
+// Aucune valeur n'est inventee : si le compte ne porte pas encore un
+// nom et un telephone exploitables, le client est invite a les
+// completer plutot que de voir apparaitre une donnee fabriquee.
+
+// Profil deja enregistre, fourni par l'espace client lorsqu'il existe.
+// Dans le formulaire public il reste null : le "compte" est alors
+// exactement celui que l'etape 1 est en train de creer, donc la meme
+// source de verite — jamais une copie parallele.
+var _hcProfilConnecte = null;
+
+// ============================================================
+// SESSION CLIENT — un seul moteur de formulaire, deux entrées
+// ============================================================
+// L'espace client (dashboard.html) n'embarque AUCUNE copie du
+// formulaire : « Faire une nouvelle demande » ouvre cette page-ci en
+// mode connecté. C'est la seule façon de garantir que les questions,
+// les règles conditionnelles, les compteurs, les accordéons, les
+// calendriers, les validations, le récapitulatif et le payload sont
+// EXACTEMENT les mêmes — puisque c'est le même code.
+//
+// Les deux pages partagent la même origine, donc la même session
+// Supabase (stockée par supabase-js) : il n'y a rien à transmettre
+// dans l'URL, et surtout aucune identité à faire confiance côté client.
+
+var _hcSessionClient = null;     // { userId, email } ou null
+
+function _hcNouvelIdentifiant() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+  } catch (e) {}
+  // Repli conforme UUID v4 pour les navigateurs sans randomUUID.
+  var oct = new Uint8Array(16);
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(oct);
+  } else {
+    for (var i = 0; i < 16; i++) oct[i] = Math.floor(Math.random() * 256);
+  }
+  oct[6] = (oct[6] & 0x0f) | 0x40;
+  oct[8] = (oct[8] & 0x3f) | 0x80;
+  var h = [];
+  for (var j = 0; j < 16; j++) h.push((oct[j] + 0x100).toString(16).slice(1));
+  return h.slice(0, 4).join('') + '-' + h.slice(4, 6).join('') + '-'
+       + h.slice(6, 8).join('') + '-' + h.slice(8, 10).join('') + '-'
+       + h.slice(10, 16).join('');
+}
+
+function _hcIdCompteConnecte() {
+  return (_hcSessionClient && _hcSessionClient.userId) || null;
+}
+
+// Lit la session réellement ouverte. Aucune donnée de profil n'est
+// jamais prise dans l'URL ou le localStorage applicatif : elles
+// viennent de la base, pour le compte que Supabase a authentifié.
+async function _hcChargerSessionClient() {
+  _hcSessionClient = null;
+  _hcProfilConnecte = null;
+  if (!_sb || !_sb.auth) return null;
+  var session = null;
+  try {
+    var res = await _sb.auth.getSession();
+    session = res && res.data && res.data.session;
+  } catch (e) { return null; }
+  if (!session || !session.user) return null;
+
+  _hcSessionClient = { userId: session.user.id, email: session.user.email || '' };
+
+  // Profil prérempli depuis la DERNIÈRE demande du compte. On lit la
+  // vue v_mes_demandes, jamais la table : elle ne projette que les
+  // colonnes destinées au client, sans aucune donnée interne.
+  try {
+    var r = await _sb.from('v_mes_demandes')
+      .select('prenom, nom, email, telephone, type_client, societe, siret, '
+            + 'source_acquisition, source_acquisition_detail')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    var ligne = r && r.data && r.data[0];
+    if (ligne) {
+      _hcProfilConnecte = {
+        prenom: ligne.prenom || '',
+        nom: ligne.nom || '',
+        email: ligne.email || _hcSessionClient.email,
+        telephone: ligne.telephone || '',
+        type_client: ligne.type_client || '',
+        societe: ligne.societe || '',
+        siret: ligne.siret || '',
+        source_acquisition: ligne.source_acquisition || '',
+        source_acquisition_detail: ligne.source_acquisition_detail || ''
+      };
+    } else {
+      _hcProfilConnecte = { prenom: '', nom: '', email: _hcSessionClient.email, telephone: '' };
+    }
+  } catch (e) {
+    _hcProfilConnecte = { prenom: '', nom: '', email: _hcSessionClient.email, telephone: '' };
+  }
+  return _hcSessionClient;
+}
+
+// Reporte le profil connecté dans les champs du formulaire et masque
+// ce qu'il ne faut plus redemander : création de compte, mot de passe,
+// et adresse e-mail déjà vérifiée.
+function _hcAppliquerModeConnecte() {
+  if (!_hcSessionClient) return;
+  var mettre = function (id, valeur) {
+    var el = document.getElementById(id);
+    if (el && valeur) el.value = valeur;
+  };
+  var pr = _hcProfilConnecte || {};
+  mettre('client-prenom', pr.prenom);
+  mettre('client-nom', pr.nom);
+  mettre('client-email', pr.email || _hcSessionClient.email);
+  mettre('client-tel', pr.telephone);
+
+  // Statut du demandeur (particulier / professionnel) et, le cas
+  // échéant, société et SIRET. Ce n'est PAS cosmétique : l'éligibilité
+  // du nettoyage professionnel en dépend directement. On déclenche le
+  // change pour que toute la logique conditionnelle existante
+  // (toggleClientType, nettSyncStatutPro…) s'exécute réellement.
+  if (pr.type_client) {
+    var selType = document.getElementById('client-type');
+    if (selType) {
+      selType.value = pr.type_client;
+      selType.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    mettre('client-societe', pr.societe);
+    mettre('client-siret', pr.siret);
+  }
+
+  // « Comment avez-vous connu HelixCar ? » concerne le COMPTE, pas
+  // chaque demande : on reprend la réponse déjà donnée.
+  if (pr.source_acquisition) {
+    var selSrc = document.getElementById('client-source');
+    if (selSrc) {
+      selSrc.value = pr.source_acquisition;
+      selSrc.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    mettre('client-source-detail', pr.source_acquisition_detail);
+  }
+
+  // Le mot de passe n'a plus lieu d'être : le compte existe déjà et la
+  // session est ouverte. On retire l'obligation pour que la validation
+  // existante ne bloque pas sur un champ devenu sans objet.
+  var mdp = document.getElementById('client-password');
+  if (mdp) {
+    mdp.required = false;
+    mdp.value = '';
+    var groupeMdp = mdp.closest ? mdp.closest('.modal-form-group') : null;
+    if (groupeMdp) groupeMdp.style.display = 'none';
+  }
+  var courriel = document.getElementById('client-email');
+  if (courriel) {
+    courriel.readOnly = true;
+    courriel.setAttribute('aria-readonly', 'true');
+    courriel.style.background = '#F3F4F6';
+  }
+  var banniere = document.getElementById('hc-bandeau-connecte');
+  if (banniere) {
+    banniere.style.display = 'block';
+    banniere.textContent = 'Vous êtes connecté'
+      + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
+      + '. Vos informations de compte sont déjà renseignées.';
+  }
+}
+
+// Entrée « Faire une nouvelle demande » depuis l'espace client :
+// index.html?nouvelle-demande=1 . On ouvre le parcours à la question
+// « Comment pouvons-nous vous accompagner ? ».
+async function _hcDemarrerDepuisEspaceClient() {
+  var params = new URLSearchParams(window.location.search || '');
+  if (params.get('nouvelle-demande') !== '1') return false;
+  await _hcChargerSessionClient();
+  if (!_hcSessionClient) {
+    // Pas de session : on ne prétend pas être connecté. Le parcours
+    // public normal reste accessible.
+    return false;
+  }
+  if (typeof openModal === 'function') openModal('client');
+  _hcAppliquerModeConnecte();
+  // L'étape 1 est l'identité et la création de compte : elle n'a plus
+  // lieu d'être pour un client déjà connecté. On ouvre le parcours sur
+  // « Comment pouvons-nous vous accompagner ? », qui est l'étape 2.
+  //
+  // SAUF si le statut du demandeur est inconnu : il conditionne de
+  // vraies règles métier (éligibilité du nettoyage professionnel). On
+  // ne l'invente pas — le client le renseigne une fois, à l'étape 1.
+  // Ce cas ne se produit que pour un compte sans aucune demande passée.
+  if (!(_hcProfilConnecte && _hcProfilConnecte.type_client)) {
+    if (typeof _renderFormStep === 'function') _renderFormStep('client');
+    return true;
+  }
+  _formStepState.client = 2;
+  if (typeof _etapeMax !== 'undefined') _etapeMax = Math.max(_etapeMax || 1, 2);
+  if (typeof _renderFormStep === 'function') _renderFormStep('client');
+  return true;
+}
+
+// ============================================================
+// COMPLÉTER MES INFORMATIONS
+// ============================================================
+// Le calcul de CE QUI MANQUE est fait par le serveur
+// (informations_demande) à partir des données réellement enregistrées :
+// le navigateur ne décide jamais de ce qui est requis, et ne peut donc
+// pas s'en dispenser. L'enregistrement passe par
+// repondre_informations_demande, qui revérifie la propriété de la
+// demande côté serveur.
+
+var _completerDemandeId = null;
+var _completerRubriques = [];
+var _completerEnvoiEnCours = false;
+
+function _completerAfficherMessage(texte, type) {
+  var el = document.getElementById('completer-message');
+  if (!el) return;
+  if (!texte) { el.style.display = 'none'; return; }
+  var vert = (type === 'ok');
+  el.style.display = 'block';
+  el.style.background = vert ? '#ECFDF5' : '#FEF2F2';
+  el.style.border = '1.5px solid ' + (vert ? '#6EE7B7' : '#FCA5A5');
+  el.style.color = vert ? '#065F46' : '#991B1B';
+  el.textContent = texte;
+}
+
+function _completerChampId(cle) { return 'completer-champ-' + cle; }
+
+// Rend UNIQUEMENT les rubriques encore manquantes ou à corriger, avec
+// les mêmes composants que le formulaire (.modal-form-group, label,
+// champ). Une rubrique validée n'apparaît jamais.
+function _completerRendre(lignes) {
+  var zone = document.getElementById('completer-rubriques');
+  var prog = document.getElementById('completer-progression');
+  if (!zone) return;
+  zone.innerHTML = '';
+
+  var total = lignes.length;
+  var fournies = lignes.filter(function (l) {
+    return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
+  }).length;
+  if (prog) {
+    prog.style.display = 'block';
+    prog.textContent = fournies + ' information' + (fournies > 1 ? 's' : '')
+      + ' sur ' + total + ' déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.';
+  }
+
+  var aCompleter = lignes.filter(function (l) {
+    return l.statut === 'attendue' || l.statut === 'a_corriger';
+  });
+  _completerRubriques = aCompleter;
+
+  if (!aCompleter.length) {
+    zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563">'
+      + 'Aucune information ne manque pour cette demande. Merci !</p>';
+    var b = document.getElementById('completer-envoyer');
+    if (b) b.style.display = 'none';
+    return;
+  }
+  var bouton = document.getElementById('completer-envoyer');
+  if (bouton) bouton.style.display = '';
+
+  aCompleter.forEach(function (l) {
+    var groupe = document.createElement('div');
+    groupe.className = 'modal-form-group';
+
+    var label = document.createElement('label');
+    label.textContent = l.libelle;
+    var etoile = document.createElement('span');
+    etoile.className = 'field-required';
+    etoile.textContent = '*';
+    label.appendChild(document.createTextNode(' '));
+    label.appendChild(etoile);
+    groupe.appendChild(label);
+
+    // Motif de correction : ce que l'administrateur demande de
+    // corriger. Aucun commentaire interne n'existe dans ce modèle, il
+    // ne peut donc pas en fuir.
+    if (l.statut === 'a_corriger' && l.commentaire) {
+      var motif = document.createElement('div');
+      motif.style.cssText = 'background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:2px;'
+        + 'padding:8px 10px;margin-bottom:8px;font-size:.78rem;color:#92400E';
+      motif.textContent = 'À corriger : ' + l.commentaire;
+      groupe.appendChild(motif);
+    }
+
+    var champ = document.createElement('input');
+    champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
+               : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
+    champ.id = _completerChampId(l.cle);
+    champ.value = l.valeur || '';
+    groupe.appendChild(champ);
+
+    zone.appendChild(groupe);
+  });
+}
+
+async function ouvrirCompleterInformations(demandeId) {
+  _completerDemandeId = demandeId;
+  _completerAfficherMessage('');
+  if (typeof openModal === 'function') openModal('completer');
+  var zone = document.getElementById('completer-rubriques');
+  if (zone) zone.innerHTML = '<p style="font-size:.85rem;color:#6B7280">Chargement…</p>';
+
+  await _hcChargerSessionClient();
+  if (!_hcSessionClient) {
+    _completerAfficherMessage('Votre session a expiré. Reconnectez-vous pour compléter vos informations.');
+    if (zone) zone.innerHTML = '';
+    return;
+  }
+  try {
+    var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
+    if (r && r.error) throw new Error(r.error.message);
+    _completerRendre((r && r.data) || []);
+  } catch (e) {
+    if (zone) zone.innerHTML = '';
+    _completerAfficherMessage('Impossible de charger vos informations pour le moment. Réessayez.');
+  }
+}
+
+async function envoyerInformationsCompletees() {
+  // Double clic : le second appel est ignoré tant que le premier n'a
+  // pas répondu. Rien n'est envoyé deux fois.
+  if (_completerEnvoiEnCours) return;
+  if (!_completerDemandeId) return;
+
+  var reponses = {};
+  var manquant = null;
+  _completerRubriques.forEach(function (l) {
+    var el = document.getElementById(_completerChampId(l.cle));
+    var v = el ? String(el.value || '').trim() : '';
+    if (!v) { if (!manquant) manquant = l.libelle; return; }
+    reponses[l.cle] = v;
+  });
+  if (manquant) {
+    _completerAfficherMessage('Renseignez « ' + manquant +' » avant d\'enregistrer.');
+    return;
+  }
+
+  _completerEnvoiEnCours = true;
+  var bouton = document.getElementById('completer-envoyer');
+  var libelleBouton = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
+  _completerAfficherMessage('');
+
+  try {
+    var r = await _sb.rpc('repondre_informations_demande', {
+      p_client_id: _completerDemandeId,
+      p_reponses: reponses
+    });
+    if (r && r.error) throw new Error(r.error.message);
+    _completerAfficherMessage('Vos informations ont bien été enregistrées.', 'ok');
+    // On relit l'état RÉEL depuis le serveur : après un F5 ou une
+    // reprise, l'écran montre toujours ce que la base contient.
+    var relu = await _sb.rpc('informations_demande', { p_client_id: _completerDemandeId });
+    if (relu && !relu.error) _completerRendre(relu.data || []);
+  } catch (e) {
+    // Coupure réseau ou refus : rien n'est perdu, les valeurs saisies
+    // restent à l'écran et l'envoi peut être relancé.
+    _completerAfficherMessage('L\'enregistrement n\'a pas abouti. Vos saisies sont conservées : réessayez.');
+  } finally {
+    _completerEnvoiEnCours = false;
+    if (bouton) { bouton.disabled = false; bouton.textContent = libelleBouton || 'Enregistrer mes informations'; }
+  }
+}
+
+// Entrée depuis l'espace client : index.html?completer=<id>
+async function _hcOuvrirCompletionDepuisUrl() {
+  var params = new URLSearchParams(window.location.search || '');
+  var id = params.get('completer');
+  if (!id) return false;
+  await ouvrirCompleterInformations(id);
+  return true;
+}
+
+// Branchement au chargement de la page. Volontairement non bloquant :
+// un échec ne doit jamais empêcher le site public de fonctionner.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    _hcDemarrerDepuisEspaceClient().catch(function () {});
+    _hcOuvrirCompletionDepuisUrl().catch(function () {});
+  } catch (e) {}
+});
+
+
+function _hcCompteIdentite() {
+  if (_hcProfilConnecte && typeof _hcProfilConnecte === 'object') {
+    return {
+      nom: [_hcProfilConnecte.prenom, _hcProfilConnecte.nom].filter(Boolean).join(' ').trim(),
+      telephone: String(_hcProfilConnecte.telephone || '').trim()
+    };
+  }
+  var g = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+  return {
+    nom: [g('client-prenom'), g('client-nom')].filter(Boolean).join(' ').trim(),
+    telephone: g('client-tel')
+  };
+}
+
+function _hcContactSpType(p) {
+  var el = document.querySelector('input[name="' + p + '-contact-sp"]:checked');
+  return el ? el.value : '';
+}
+function _hcContactSpNomAutre(p) {
+  return ((document.getElementById(p + '-contact-sp-nom') || {}).value || '').trim();
+}
+function _hcContactSpTelAutre(p) {
+  return ((document.getElementById(p + '-contact-sp-tel') || {}).value || '').trim();
+}
+
+// DONNEE RESOLUE — source unique lue par le recapitulatif, le payload,
+// le dashboard et le PDF. Retourne null tant que le choix n'est pas
+// fait ou qu'une donnee necessaire manque : jamais un objet partiel,
+// donc jamais un "Contact sur place" affiche a moitie.
+function _hcContactSurPlace(p) {
+  var type = _hcContactSpType(p);
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    if (!id.nom || !id.telephone) return null;
+    return { type: 'moi', nom: id.nom, telephone: id.telephone };
+  }
+  if (type === 'autre') {
+    var nom = _hcContactSpNomAutre(p), tel = _hcContactSpTelAutre(p);
+    if (!nom || !tel) return null;
+    return { type: 'autre', nom: nom, telephone: tel };
+  }
+  return null;
+}
+
+function hcContactSurPlaceChange(p) {
+  var type = _hcContactSpType(p);
+  var blocMoi = document.getElementById(p + '-contact-sp-moi');
+  var blocAutre = document.getElementById(p + '-contact-sp-autre');
+  if (blocMoi) blocMoi.style.display = (type === 'moi') ? 'block' : 'none';
+  if (blocAutre) blocAutre.style.display = (type === 'autre') ? 'block' : 'none';
+
+  // Le choix change : les donnees devenues obsoletes sont REELLEMENT
+  // effacees, jamais conservees "au cas ou". Elles ne peuvent donc plus
+  // repartir dans le payload ni reapparaitre dans le recapitulatif.
+  if (type !== 'autre') {
+    [p + '-contact-sp-nom', p + '-contact-sp-tel'].forEach(function (id) {
+      var e = document.getElementById(id);
+      if (e) e.value = '';
+      _clearFieldError(id);
+    });
+  }
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    var complet = !!(id.nom && id.telephone);
+    var zone = document.getElementById(p + '-contact-sp-moi-valeur');
+    var manque = document.getElementById(p + '-contact-sp-moi-manque');
+    if (zone) {
+      zone.textContent = complet ? (id.nom + ' — ' + id.telephone) : '';
+      zone.style.display = complet ? 'block' : 'none';
+    }
+    if (manque) manque.style.display = complet ? 'none' : 'block';
+  }
+  _clearGroupError(p + '-contact-sp-group');
+}
+
+// Validation commune. `fail(id)` est la fonction du validateur appelant :
+// le composant n'invente jamais sa propre mecanique d'erreur.
+function _hcValiderContactSurPlace(p, fail) {
+  var type = _hcContactSpType(p);
+  if (!type) {
+    _showGroupError(p + '-contact-sp-group', 'Indiquez qui sera le contact sur place.');
+    fail(p + '-contact-sp-group');
+    return false;
+  }
+  _clearGroupError(p + '-contact-sp-group');
+  if (type === 'moi') {
+    var id = _hcCompteIdentite();
+    if (!id.nom || !id.telephone) {
+      _showGroupError(p + '-contact-sp-group',
+        'Complétez votre nom et votre téléphone pour vous désigner comme contact sur place.');
+      fail(p + '-contact-sp-group');
+      return false;
+    }
+    return true;
+  }
+  var ok = true;
+  if (!_checkRequiredText(p + '-contact-sp-nom', null, true)) { fail(p + '-contact-sp-nom'); ok = false; }
+  if (!_checkPhone(p + '-contact-sp-tel', true)) { fail(p + '-contact-sp-tel'); ok = false; }
+  return ok;
+}
+
+// Libelle unique affiche partout (recap, dashboard, PDF) a partir de la
+// donnee resolue. Une seule ecriture possible du "Contact sur place".
+function _hcContactSurPlaceTexte(c) {
+  if (!c || !c.nom || !c.telephone) return '';
+  return c.nom + ' — ' + c.telephone;
 }
 
 // ── VALIDATION ──────────────────────────────────
@@ -7926,6 +8845,10 @@ function _validateNettoyageEtape4() {
     if (!_checkRequiredText('nett-adresse-ville', null, true)) fail('nett-adresse-ville');
   }
 
+  // Contact sur place : composant transversal, meme regle pour tous les
+  // services concernes (cf. _hcValiderContactSurPlace).
+  _hcValiderContactSurPlace('nett', fail);
+
   if (!_checkDate('nett-date', true)) fail('nett-date');
   else {
     // Aucune date passee. Comparaison en date locale, sans heure.
@@ -7988,7 +8911,10 @@ function _construireDetailsNettoyage() {
     heure_precise: _nettHeure() || null,
     creneau_debut: _nettCreneauDebut() || null,
     creneau_fin: _nettCreneauFin() || null,
-    delai: _nettDelai() || null
+    delai: _nettDelai() || null,
+    // Contact sur place : objet explicite et resolu (type + valeurs
+    // finales), jamais l'utilisateur connecte ni un texte libre.
+    contact_sur_place: _hcContactSurPlace('nett')
   };
   if (_nettAdresseApplicable()) {
     d.adresse_rue = ((document.getElementById('nett-adresse-rue') || {}).value || '').trim() || null;
@@ -8036,6 +8962,8 @@ function construireRecapNettoyage() {
   var orga = _recapLigne('Lieu d\'intervention', NETT_LIEUX[d.lieu] || '');
   if (d.adresse_rue) orga += _recapLigne('Adresse', d.adresse_rue);
   if (d.adresse_cp || d.adresse_ville) orga += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
+  // Libelle unique, identique au dashboard et au PDF.
+  orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
   orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
   if (d.dispo_type === 'precise') orga += _recapLigne('Heure', d.heure_precise);
   else if (d.dispo_type === 'creneau') orga += _recapLigne('Cr\u00e9neau', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
@@ -8050,6 +8978,644 @@ function _nettLibelleCategorie(v) {
   return v || '';
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// TROUVER UN PROFESSIONNEL AUTOMOBILE
+// ══════════════════════════════════════════════════════════════
+// Parcours porte par l'ETAPE 2 existante : aucune nouvelle etape
+// globale, "Continuer" mene directement au recapitulatif habituel
+// (cf. _estEtapeApplicable, qui rend l'etape 4 inapplicable ici).
+// Toutes les donnees metier vivent dans professionnel_details, sur le
+// meme modele que nettoyage_details : liste blanche stricte, aucun
+// champ Convoyage/Stockage ne peut s'y glisser.
+
+var PRO_LIB_CATEGORIE = {
+  technicien: 'Technicien automobile',
+  renfort: 'Renfort automobile sur site'
+};
+var PRO_LIB_SPECIALITE = {
+  mecanique: 'Mécanique', carrosserie: 'Carrosserie', diagnostic: 'Diagnostic',
+  autre: 'Autre spécialité', conseil: 'Client à conseiller'
+};
+var PRO_LIB_MISSION = {
+  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  autre: 'Autre mission', conseil: 'Client à conseiller'
+};
+var PRO_MAX_VEHICULES = 3;
+var PRO_MAX_PROS = 20;
+
+// ── LECTEURS ────────────────────────────────────────
+function _proCategorie() {
+  var el = document.querySelector('input[name="pro-categorie"]:checked');
+  return el ? el.value : '';
+}
+function _proSpecialite() {
+  var el = document.querySelector('input[name="pro-specialite"]:checked');
+  return el ? el.value : '';
+}
+function _proMission() {
+  var el = document.querySelector('input[name="pro-mission"]:checked');
+  return el ? el.value : '';
+}
+// Metier reellement choisi, quelle que soit la categorie.
+function _proMetier() {
+  var c = _proCategorie();
+  if (c === 'technicien') return _proSpecialite();
+  if (c === 'renfort') return _proMission();
+  return '';
+}
+// "Je souhaite etre conseille" : le client n'a pas encore de metier ni
+// de nombre de professionnels a imposer. Rien ne lui est exige de plus.
+function _proConseil() { return _proMetier() === 'conseil'; }
+function _proMetierPrecision() {
+  return ((document.getElementById('pro-metier-precision') || {}).value || '').trim();
+}
+function _proPrecisionApplicable() { return _proMetier() === 'autre'; }
+function _proNbPros() {
+  var n = Number((document.getElementById('pro-nb-pros') || {}).value);
+  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_PROS) : 1;
+}
+// Les vehicules n'existent QUE pour le technicien : un renfort sur site
+// n'est jamais rattache a une liste de vehicules.
+function _proVehiculesApplicables() { return _proCategorie() === 'technicien'; }
+function _proNbVehicules() {
+  var n = Number((document.getElementById('pro-nb-vehicules') || {}).value);
+  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_VEHICULES) : 1;
+}
+function _proAdresseRue() { return ((document.getElementById('pro-adresse-rue') || {}).value || '').trim(); }
+function _proAdresseCp() { return ((document.getElementById('pro-adresse-cp') || {}).value || '').trim(); }
+function _proAdresseVille() { return ((document.getElementById('pro-adresse-ville') || {}).value || '').trim(); }
+function _proDateDebut() { return ((document.getElementById('pro-date-debut') || {}).value || '').trim(); }
+function _proDateFin() { return ((document.getElementById('pro-date-fin') || {}).value || '').trim(); }
+function _proHeureDebut() { return ((document.getElementById('pro-horaire-cdeb') || {}).value || '').trim(); }
+function _proHeureFin() { return ((document.getElementById('pro-horaire-cfin') || {}).value || '').trim(); }
+function _proDescription() { return ((document.getElementById('pro-description') || {}).value || '').trim(); }
+function _proInfos() { return ((document.getElementById('pro-infos') || {}).value || '').trim(); }
+
+// Duree REELLEMENT deduite des deux dates : jamais demandee au client,
+// jamais inventee. Retourne 0 tant que la periode est incomplete.
+function _proDureeJours() {
+  var d = _hcParserYMD(_proDateDebut()), f = _hcParserYMD(_proDateFin());
+  if (!d || !f || f < d) return 0;
+  return Math.round((f - d) / 86400000) + 1;   // bornes incluses
+}
+
+// ── VEHICULES (technicien) ──────────────────────────
+// Meme principe que _nettQuantites : la MEMOIRE JS est la source de
+// verite, jamais le DOM. Les cartes sont re-rendues sans perdre une
+// saisie, et une carte retiree disparait reellement du payload.
+var _proMemoireVehicules = {};
+
+function _reinitialiserVehiculesProfessionnel() { _proMemoireVehicules = {}; }
+
+function _proMemoriserVehicule(i) {
+  _proMemoireVehicules[i] = {
+    type_vehicule: (document.getElementById('pro-veh-' + i + '-type') || {}).value || '',
+    marque_modele: ((document.getElementById('pro-veh-' + i + '-marque') || {}).value || '').trim()
+  };
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  if (typeof _masquerNoticeBrouillonDesReprise === 'function') _masquerNoticeBrouillonDesReprise();
+  _proMajBoutonContinuer();
+}
+
+// Vehicules destines au brouillon / au payload : uniquement ceux qui
+// existent reellement dans le compteur courant.
+function _proVehiculesRetenus() {
+  var out = [];
+  if (!_proVehiculesApplicables()) return out;
+  var n = _proNbVehicules();
+  for (var i = 0; i < n; i++) {
+    var m = _proMemoireVehicules[i] || {};
+    out.push({
+      position: i + 1,
+      type_vehicule: m.type_vehicule || null,
+      marque_modele: m.marque_modele || null
+    });
+  }
+  return out;
+}
+function _proVehiculesPourBrouillon() {
+  var out = {};
+  Object.keys(_proMemoireVehicules).forEach(function (k) {
+    var m = _proMemoireVehicules[k];
+    if (m && typeof m === 'object') {
+      out[k] = { type_vehicule: m.type_vehicule || '', marque_modele: m.marque_modele || '' };
+    }
+  });
+  return out;
+}
+function _proRestaurerVehiculesDepuisBrouillon(source) {
+  _proMemoireVehicules = {};
+  if (!source || typeof source !== 'object') return;   // ancien brouillon : aucune erreur
+  Object.keys(source).forEach(function (k) {
+    var m = source[k];
+    if (m && typeof m === 'object') {
+      _proMemoireVehicules[k] = {
+        type_vehicule: String(m.type_vehicule || ''),
+        marque_modele: String(m.marque_modele || '')
+      };
+    }
+  });
+}
+
+function proRendreVehicules() {
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (!zone) return;
+  var n = _proNbVehicules();
+  var html = '';
+  for (var i = 0; i < n; i++) {
+    var mem = _proMemoireVehicules[i] || {};
+    var options = '<option value="">— Sélectionnez —</option>';
+    // Reutilise la liste de gabarits DEJA existante : aucune nouvelle
+    // nomenclature de vehicules creee pour ce parcours.
+    TYPES_VEHICULE.forEach(function (t) {
+      options += '<option value="' + t[0] + '"' + (mem.type_vehicule === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
+    });
+    html += '<div class="pro-veh-acc" id="pro-veh-acc-' + i + '">' +
+      '<button type="button" class="pro-veh-barre" onclick="proBasculerVehicule(' + i + ')">' +
+        '<span class="pro-veh-num">' + (i + 1) + '</span>' +
+        '<span class="pro-veh-titre">Véhicule ' + (i + 1) + '</span>' +
+        '<span class="pro-veh-chevron">&rsaquo;</span>' +
+      '</button>' +
+      '<div class="pro-veh-contenu">' +
+        '<div class="modal-form-group"><label>Type de véhicule <span class="field-required">*</span></label>' +
+        '<select id="pro-veh-' + i + '-type" onchange="_proMemoriserVehicule(' + i + ');_clearFieldError(\'pro-veh-' + i + '-type\')">' + options + '</select></div>' +
+        '<div class="modal-form-group"><label>Marque et modèle <span class="field-required">*</span></label>' +
+        '<input type="text" id="pro-veh-' + i + '-marque" value="' + _attr(mem.marque_modele || '') + '" placeholder="Ex : BMW Série 3" autocomplete="off" oninput="_proMemoriserVehicule(' + i + ')" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box"></div>' +
+      '</div></div>';
+  }
+  zone.innerHTML = html;
+  _proMajLibelleVehicules();
+}
+
+function proBasculerVehicule(i) {
+  var el = document.getElementById('pro-veh-acc-' + i);
+  if (!el) return;
+  var vaSouvrir = !el.classList.contains('ouvert');
+  // Un clic ouvre UNIQUEMENT la carte choisie.
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (zone) {
+    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (x) {
+      if (x !== el) x.classList.remove('ouvert');
+    });
+  }
+  el.classList.toggle('ouvert', vaSouvrir);
+}
+
+// Libelle dynamique : singulier a 1 vehicule, pluriel au-dela.
+function _proMajLibelleVehicules() {
+  var t = document.getElementById('pro-vehicules-titre');
+  if (t) t.textContent = (_proNbVehicules() > 1) ? 'Informations sur les véhicules' : 'Information sur le véhicule';
+}
+
+function proMajNbVehicules(delta) {
+  var el = document.getElementById('pro-nb-vehicules');
+  if (!el) return;
+  var avant = _proNbVehicules();
+  var apres = Math.min(PRO_MAX_VEHICULES, Math.max(1, avant + delta));
+  if (apres === avant) return;
+  el.value = apres;
+  // Une carte retiree ne doit plus jamais reapparaitre dans le payload.
+  for (var i = apres; i < PRO_MAX_VEHICULES; i++) delete _proMemoireVehicules[i];
+  proRendreVehicules();
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+function proMajNbPros(delta) {
+  var el = document.getElementById('pro-nb-pros');
+  if (!el) return;
+  el.value = Math.min(PRO_MAX_PROS, Math.max(1, _proNbPros() + delta));
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+// ── RUBRIQUES ───────────────────────────────────────
+var PRO_RUBRIQUES = ['besoin', 'vehicules', 'lieu', 'periode', 'mission'];
+
+// Accordeons fermes par defaut : AUCUN ne s'ouvre automatiquement, et
+// un clic n'ouvre que celui qui a ete choisi.
+function proBasculerRubrique(cle) {
+  var el = document.getElementById('pro-acc-' + cle);
+  if (!el) return;
+  var vaSouvrir = !el.classList.contains('ouvert');
+  PRO_RUBRIQUES.forEach(function (k) {
+    var x = document.getElementById('pro-acc-' + k);
+    if (x && x !== el) x.classList.remove('ouvert');
+  });
+  el.classList.toggle('ouvert', vaSouvrir);
+}
+
+// OK : valide LOCALEMENT la rubrique puis la referme si elle est
+// complete. Aucun message d'avancement, aucune ouverture automatique
+// d'une autre rubrique.
+function proOkRubrique(cle) {
+  var ok = _proValiderRubrique(cle, function () {});
+  if (ok) {
+    var el = document.getElementById('pro-acc-' + cle);
+    if (el) el.classList.remove('ouvert');
+  }
+  _proMajBoutonContinuer();
+}
+
+// Effacer : ne nettoie QUE cette rubrique.
+function proEffacerRubrique(cle) {
+  function viderChamps(ids) {
+    ids.forEach(function (id) {
+      var e = document.getElementById(id);
+      if (e) e.value = '';
+      _clearFieldError(id);
+    });
+  }
+  function decocher(name) {
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="' + name + '"]'), function (r) { r.checked = false; });
+  }
+  if (cle === 'besoin') {
+    decocher('pro-categorie'); decocher('pro-specialite'); decocher('pro-mission');
+    viderChamps(['pro-metier-precision']);
+    var nbp = document.getElementById('pro-nb-pros'); if (nbp) nbp.value = 1;
+    _clearGroupError('pro-categorie-group'); _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
+    proOnCategorieChange();
+  } else if (cle === 'vehicules') {
+    _reinitialiserVehiculesProfessionnel();
+    var nbv = document.getElementById('pro-nb-vehicules'); if (nbv) nbv.value = 1;
+    proRendreVehicules();
+  } else if (cle === 'lieu') {
+    viderChamps(['pro-adresse-rue', 'pro-adresse-cp', 'pro-adresse-ville']);
+    decocher('pro-contact-sp');
+    viderChamps(['pro-contact-sp-nom', 'pro-contact-sp-tel']);
+    _clearGroupError('pro-contact-sp-group');
+    hcContactSurPlaceChange('pro');
+  } else if (cle === 'periode') {
+    viderChamps(['pro-date-debut', 'pro-date-fin', 'pro-horaire-cdeb', 'pro-horaire-cfin']);
+  } else if (cle === 'mission') {
+    viderChamps(['pro-description', 'pro-infos']);
+  }
+  _formulaireClientSale = true;
+  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
+  _proMajBoutonContinuer();
+}
+
+// Numerotation continue des rubriques REELLEMENT visibles : sans
+// vehicules (renfort), aucun trou dans la numerotation.
+function _proMajNumerosRubriques() {
+  var n = 0;
+  PRO_RUBRIQUES.forEach(function (cle) {
+    var acc = document.getElementById('pro-acc-' + cle);
+    if (!acc || acc.style.display === 'none') return;
+    n++;
+    var num = acc.querySelector('[data-pro-num]');
+    if (num) num.textContent = String(n);
+  });
+}
+
+// ── CHANGEMENTS ─────────────────────────────────────
+// Changer de categorie remet REELLEMENT a zero toutes les reponses
+// dependantes : elles disparaissent de l'interface ET du payload.
+function proOnCategorieChange() {
+  var c = _proCategorie();
+  var gSpec = document.getElementById('pro-specialite-group');
+  var gMiss = document.getElementById('pro-mission-group');
+  if (gSpec) gSpec.style.display = (c === 'technicien') ? 'block' : 'none';
+  if (gMiss) gMiss.style.display = (c === 'renfort') ? 'block' : 'none';
+
+  // Le metier de l'AUTRE categorie ne doit jamais survivre.
+  var aDecocher = (c === 'technicien') ? 'pro-mission' : 'pro-specialite';
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="' + aDecocher + '"]'), function (r) { r.checked = false; });
+  _clearGroupError('pro-specialite-group');
+  _clearGroupError('pro-mission-group');
+  _clearGroupError('pro-categorie-group');
+
+  // Les vehicules n'appartiennent qu'au technicien : en renfort, la
+  // rubrique disparait et sa memoire est reellement videe.
+  var accVeh = document.getElementById('pro-acc-vehicules');
+  if (accVeh) accVeh.style.display = (c === 'technicien') ? 'block' : 'none';
+  if (c !== 'technicien') {
+    _reinitialiserVehiculesProfessionnel();
+    var nbv = document.getElementById('pro-nb-vehicules');
+    if (nbv) nbv.value = 1;
+    if (accVeh) accVeh.classList.remove('ouvert');
+  } else {
+    proRendreVehicules();
+  }
+
+  var titreMission = document.getElementById('pro-mission-titre');
+  if (titreMission) titreMission.textContent = (c === 'renfort') ? 'Type de mission' : 'Mission';
+  var labelDesc = document.getElementById('pro-description-label');
+  if (labelDesc) {
+    labelDesc.innerHTML = (c === 'renfort' ? 'Décrivez le type de mission' : 'Décrivez la mission') +
+      ' <span class="field-required">*</span>';
+  }
+
+  proOnMetierChange();
+  _proMajNumerosRubriques();
+}
+
+// Changer de metier remet a zero ce qui en depend (precision, nombre
+// de professionnels lorsqu'il n'a plus lieu d'etre).
+function proOnMetierChange() {
+  var gPrec = document.getElementById('pro-metier-precision-group');
+  var applicable = _proPrecisionApplicable();
+  if (gPrec) gPrec.style.display = applicable ? 'block' : 'none';
+  if (!applicable) {
+    var p = document.getElementById('pro-metier-precision');
+    if (p) p.value = '';
+    _clearFieldError('pro-metier-precision');
+  }
+
+  // "Je souhaite etre conseille" : aucun nombre de professionnels n'est
+  // impose au client, la question disparait et la valeur ne part pas
+  // dans le payload.
+  var gNb = document.getElementById('pro-nb-pros-group');
+  var metier = _proMetier();
+  if (gNb) gNb.style.display = (metier && metier !== 'conseil') ? 'block' : 'none';
+
+  _clearGroupError('pro-specialite-group');
+  _clearGroupError('pro-mission-group');
+  _proMajBoutonContinuer();
+}
+
+function proOnDateChange() {
+  _clearFieldError('pro-date-debut');
+  _clearFieldError('pro-date-fin');
+  // Une fin anterieure au debut ne peut pas rester silencieuse.
+  var d = _proDateDebut(), f = _proDateFin();
+  if (d && f && f < d) {
+    _showFieldError('pro-date-fin', 'La date de fin ne peut pas précéder la date de début.');
+  }
+  proOnHoraireChange();
+  _proMajBoutonContinuer();
+}
+
+// Le meme jour, une heure de fin anterieure a l'heure de debut est
+// refusee. Sur plusieurs jours, les deux horaires sont independants
+// (fin de journee du dernier jour).
+function proOnHoraireChange() {
+  _clearFieldError('pro-horaire-cfin');
+  if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
+    _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+  }
+  _proMajBoutonContinuer();
+}
+function _proMemeJour() {
+  var d = _proDateDebut(), f = _proDateFin();
+  return !!(d && f && d === f);
+}
+
+// ── VALIDATION ──────────────────────────────────────
+// Une rubrique = un bloc de regles. Le validateur d'etape et le bouton
+// OK de chaque rubrique appellent EXACTEMENT les memes regles.
+function _proValiderRubrique(cle, fail) {
+  var ok = true;
+  function ko(id) { ok = false; fail(id); }
+
+  if (cle === 'besoin') {
+    var c = _proCategorie();
+    if (!c) { _showGroupError('pro-categorie-group', 'Sélectionnez le professionnel recherché.'); ko('pro-categorie-group'); return false; }
+    _clearGroupError('pro-categorie-group');
+    var metier = _proMetier();
+    if (!metier) {
+      var grp = (c === 'technicien') ? 'pro-specialite-group' : 'pro-mission-group';
+      _showGroupError(grp, (c === 'technicien') ? 'Sélectionnez une spécialité.' : 'Sélectionnez une mission.');
+      ko(grp);
+    } else {
+      _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
+    }
+    if (_proPrecisionApplicable() && !_proMetierPrecision()) {
+      _showFieldError('pro-metier-precision', 'Précisez votre besoin.');
+      ko('pro-metier-precision');
+    } else _clearFieldError('pro-metier-precision');
+    return ok;
+  }
+
+  if (cle === 'vehicules') {
+    if (!_proVehiculesApplicables()) return true;   // renfort : rubrique absente
+    var n = _proNbVehicules();
+    for (var i = 0; i < n; i++) {
+      var m = _proMemoireVehicules[i] || {};
+      if (!m.type_vehicule) { _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-type'); }
+      else _clearFieldError('pro-veh-' + i + '-type');
+      if (!m.marque_modele) { _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-marque'); }
+      else _clearFieldError('pro-veh-' + i + '-marque');
+    }
+    return ok;
+  }
+
+  if (cle === 'lieu') {
+    if (!_checkRequiredText('pro-adresse-rue', null, true)) ko('pro-adresse-rue');
+    if (!_checkCodePostal('pro-adresse-cp', true)) ko('pro-adresse-cp');
+    if (!_checkRequiredText('pro-adresse-ville', null, true)) ko('pro-adresse-ville');
+    if (!_hcValiderContactSurPlace('pro', function (id) { ko(id); })) ok = false;
+    return ok;
+  }
+
+  if (cle === 'periode') {
+    if (!_checkDate('pro-date-debut', true)) ko('pro-date-debut');
+    if (!_checkDate('pro-date-fin', true)) ko('pro-date-fin');
+    var d = _proDateDebut(), f = _proDateFin();
+    if (d) {
+      var auj = new Date(); auj.setHours(0, 0, 0, 0);
+      if (new Date(d + 'T00:00:00') < auj) { _showFieldError('pro-date-debut', 'La date ne peut pas être dans le passé.'); ko('pro-date-debut'); }
+    }
+    if (d && f && f < d) { _showFieldError('pro-date-fin', 'La date de fin ne peut pas précéder la date de début.'); ko('pro-date-fin'); }
+    if (!_checkRequiredText('pro-horaire-cdeb', null, true)) ko('pro-horaire-cdeb');
+    if (!_checkRequiredText('pro-horaire-cfin', null, true)) ko('pro-horaire-cfin');
+    if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
+      _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+      ko('pro-horaire-cfin');
+    }
+    return ok;
+  }
+
+  if (cle === 'mission') {
+    if (!_checkRequiredText('pro-description', null, true)) ko('pro-description');
+    return ok;   // informations complementaires : reellement facultatives
+  }
+  return true;
+}
+
+// Validation complete de l'etape 2 pour ce service. Meme contrat de
+// retour que _validateNettoyageEtape2 : { ok, first }.
+function _validateProfessionnelEtape2() {
+  var ok = true, first = null;
+  function fail(id) { ok = false; if (!first) first = id; }
+  PRO_RUBRIQUES.forEach(function (cle) {
+    if (!_proValiderRubrique(cle, fail)) ok = false;
+  });
+  // La rubrique fautive est ouverte pour que l'erreur soit visible :
+  // aucune validation invisible.
+  if (first) {
+    var champ = document.getElementById(first);
+    var acc = champ && champ.closest ? champ.closest('.veh-sous-accordeon') : null;
+    if (acc) acc.classList.add('ouvert');
+    var carte = champ && champ.closest ? champ.closest('.pro-veh-acc') : null;
+    if (carte) carte.classList.add('ouvert');
+  }
+  return { ok: ok, first: first };
+}
+
+// Condition UNIQUE d'activation du bouton Continuer pour ce service.
+function _proPeutContinuerEtape2() {
+  var sec = true;
+  PRO_RUBRIQUES.forEach(function (cle) {
+    // Silencieux : aucune erreur affichee, on ne fait que mesurer.
+    if (!_proRubriqueComplete(cle)) sec = false;
+  });
+  return sec;
+}
+
+// Mesure SANS effet de bord (n'affiche ni n'efface aucune erreur) :
+// sert uniquement a l'etat du bouton, jamais a guider le client.
+function _proRubriqueComplete(cle) {
+  if (cle === 'besoin') {
+    if (!_proCategorie() || !_proMetier()) return false;
+    if (_proPrecisionApplicable() && !_proMetierPrecision()) return false;
+    return true;
+  }
+  if (cle === 'vehicules') {
+    if (!_proVehiculesApplicables()) return true;
+    var n = _proNbVehicules();
+    for (var i = 0; i < n; i++) {
+      var m = _proMemoireVehicules[i] || {};
+      if (!m.type_vehicule || !m.marque_modele) return false;
+    }
+    return true;
+  }
+  if (cle === 'lieu') {
+    if (!_proAdresseRue() || !_proAdresseCp() || !_proAdresseVille()) return false;
+    return !!_hcContactSurPlace('pro');
+  }
+  if (cle === 'periode') {
+    var d = _proDateDebut(), f = _proDateFin();
+    if (!d || !f || f < d) return false;
+    if (!_proHeureDebut() || !_proHeureFin()) return false;
+    if (_proMemeJour() && _proHeureFin() <= _proHeureDebut()) return false;
+    return true;
+  }
+  if (cle === 'mission') return !!_proDescription();
+  return true;
+}
+
+// Meme mecanique que le nettoyage : le bouton reflete en permanence
+// l'etat reel, et l'etapeur ne peut pas etre contourne tant que
+// l'etape 2 n'est pas reellement complete.
+function _proMajBoutonContinuer() {
+  if (!_avecProfessionnel()) return;
+  var btn = document.getElementById('client-step-next-btn');
+  var complet = _proPeutContinuerEtape2();
+  if (btn) {
+    btn.disabled = !complet;
+    btn.style.opacity = complet ? '' : '.5';
+    btn.style.cursor = complet ? '' : 'not-allowed';
+  }
+  if (!complet) {
+    _etapeMax = Math.min(_etapeMax, 2);
+    if (_formStepState.client > 2) _formStepState.client = 2;
+  }
+}
+
+// ── DONNEES METIER (liste blanche) ──────────────────
+// UNIQUE constructeur des donnees Professionnel. Recapitulatif,
+// dashboard et payload lisent tous CE resultat.
+function _construireDetailsProfessionnel() {
+  var c = _proCategorie();
+  var conseil = _proConseil();
+  var d = {
+    schema_version: 1,
+    categorie: c || null,
+    // Le metier n'est ecrit que s'il est reellement choisi ; en mode
+    // conseil, aucun metier n'est impose au client.
+    conseil: conseil,
+    specialite: (c === 'technicien' && !conseil) ? (_proSpecialite() || null) : null,
+    mission: (c === 'renfort' && !conseil) ? (_proMission() || null) : null,
+    precision: _proPrecisionApplicable() ? (_proMetierPrecision() || null) : null,
+    // En mode conseil, le nombre de professionnels n'est pas demande :
+    // il ne doit donc jamais partir avec une valeur par defaut.
+    nombre_professionnels: conseil ? null : _proNbPros(),
+    nombre_vehicules: _proVehiculesApplicables() ? _proNbVehicules() : null,
+    vehicules: _proVehiculesRetenus(),
+    adresse_rue: _proAdresseRue() || null,
+    adresse_cp: _proAdresseCp() || null,
+    adresse_ville: _proAdresseVille() || null,
+    contact_sur_place: _hcContactSurPlace('pro'),
+    date_debut: _proDateDebut() || null,
+    date_fin: _proDateFin() || null,
+    duree_jours: _proDureeJours() || null,
+    heure_debut: _proHeureDebut() || null,
+    heure_fin: _proHeureFin() || null,
+    description: _proDescription() || null,
+    informations_complementaires: _proInfos() || null
+  };
+  return d;
+}
+
+// Libelle du metier reellement choisi, pour l'affichage seulement.
+function _proLibelleMetier(d) {
+  if (!d) return '';
+  if (d.conseil) return 'Client à conseiller';
+  if (d.categorie === 'technicien') return PRO_LIB_SPECIALITE[d.specialite] || '';
+  if (d.categorie === 'renfort') return PRO_LIB_MISSION[d.mission] || '';
+  return '';
+}
+
+function construireRecapProfessionnel() {
+  var zone = document.getElementById('recap-demande');
+  if (!zone) return;
+  var d = _construireDetailsProfessionnel();
+  var g = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+
+  var client = _recapLigne('Prénom', g('client-prenom')) +
+               _recapLigne('Nom', g('client-nom')) +
+               _recapLigne('Société', g('client-societe')) +
+               _recapLigne('Email', g('client-email')) +
+               _recapLigne('Téléphone', g('client-tel'));
+  var html = _recapBloc('Client', client, 1);
+
+  html += _recapBloc('Service', _recapLigne('Prestation', 'Trouver un professionnel automobile'), 2);
+
+  var besoin = _recapLigne('Besoin', PRO_LIB_CATEGORIE[d.categorie] || '');
+  besoin += _recapLigne(d.categorie === 'renfort' ? 'Mission' : 'Spécialité', _proLibelleMetier(d));
+  if (d.precision) besoin += _recapLigne('Précision', d.precision);
+  if (d.nombre_professionnels) besoin += _recapLigne('Professionnels', String(d.nombre_professionnels));
+  html += _recapBloc('Votre besoin', besoin, 2);
+
+  if (d.nombre_vehicules) {
+    var veh = _recapLigne('Nombre de véhicules', String(d.nombre_vehicules));
+    (d.vehicules || []).forEach(function (v, idx) {
+      var libelle = [_libelleTypeVehicule(v.type_vehicule), v.marque_modele].filter(Boolean).join(' — ');
+      veh += _recapLigne('Véhicule ' + (idx + 1), libelle);
+    });
+    html += _recapBloc(d.nombre_vehicules > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', veh, 2);
+  }
+
+  var lieu = _recapLigne('Adresse', d.adresse_rue);
+  if (d.adresse_cp || d.adresse_ville) lieu += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
+  lieu += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
+  html += _recapBloc("Lieu d'intervention", lieu, 2);
+
+  var periode = _recapLigne('Du', _formaterDateFr(d.date_debut)) +
+                _recapLigne('Au', _formaterDateFr(d.date_fin));
+  if (d.duree_jours) periode += _recapLigne('Durée', d.duree_jours + (d.duree_jours > 1 ? ' jours' : ' jour'));
+  if (d.heure_debut || d.heure_fin) periode += _recapLigne('Horaires', [d.heure_debut, d.heure_fin].filter(Boolean).join(' — '));
+  html += _recapBloc('Période et horaires', periode, 2);
+
+  var mission = _recapLigne(d.categorie === 'renfort' ? 'Type de mission' : 'Mission', d.description);
+  // Informations complementaires : le texte libre du client, et rien
+  // d'autre. Le bloc disparait entierement s'il est vide.
+  if (d.informations_complementaires) mission += _recapLigne('Informations complémentaires', d.informations_complementaires);
+  html += _recapBloc('Mission', mission, 2);
+
+  zone.innerHTML = '<div class="recap-cadre">' + html + '</div>';
+}
+
+// Libelle d'un type de vehicule, depuis la liste de gabarits existante.
+function _libelleTypeVehicule(v) {
+  for (var i = 0; i < TYPES_VEHICULE.length; i++) if (TYPES_VEHICULE[i][0] === v) return TYPES_VEHICULE[i][1];
+  return v || '';
+}
 
 // Affiche uniquement les blocs correspondant au service choisi.
 function onChoixService() {
@@ -8127,13 +9693,21 @@ function onChoixService() {
   // sans deuxieme variable de navigation.
   var btnNext = document.getElementById('client-step-next-btn');
   var msgSocle = document.getElementById('client-socle-msg');
-  var bloque = pro || (nett && !_nettEstProfessionnel());
+  // Chaque service porte desormais sa propre source de verite :
+  //  - Nettoyage    -> _nettMajBoutonContinuer()
+  //  - Professionnel-> _proMajBoutonContinuer()
+  //  - Convoyage / Stockage / Compte : comportement historique intact
+  //    (bouton actif, validation au clic).
+  // Le blocage "socle" du parcours Professionnel disparait : ce
+  // parcours est reellement construit.
   if (btnNext) {
-    btnNext.disabled = bloque;
-    btnNext.style.opacity = bloque ? '.5' : '';
-    btnNext.style.cursor = bloque ? 'not-allowed' : '';
+    btnNext.disabled = false;
+    btnNext.style.opacity = '';
+    btnNext.style.cursor = '';
   }
-  if (msgSocle) msgSocle.style.display = pro ? 'block' : 'none';
+  if (nett) _nettMajBoutonContinuer();
+  if (pro) { proOnCategorieChange(); _proMajBoutonContinuer(); }
+  if (msgSocle) msgSocle.style.display = 'none';
 
   // Lot 2 (V73) — CORRECTION : contournement par l'étapeur. Si le client
   // avait déjà progressé (_etapeMax > 2) avec Convoyage/Stockage puis revient
@@ -8148,9 +9722,9 @@ function onChoixService() {
   // il doit reparcourir les étapes normalement (Continuer les fait
   // remonter naturellement via Math.max déjà présent dans _renderFormStep).
   // Aucune valeur "d'avant" n'est mémorisée ni restaurée : une seule vérité.
-  if (pro) {
-    _etapeMax = Math.min(_etapeMax, 2);
-  }
+  // Le plafonnement reste assuré pour le Professionnel, mais par sa
+  // propre source de vérité (_proMajBoutonContinuer, appelée ci-dessus) :
+  // il n'est levé que lorsque l'étape 2 est réellement complète.
 
   _clearGroupError('service-type-group');
   _renderFormStep('client');
@@ -8481,7 +10055,11 @@ function _typeHoraire(i, prefixe) {
 // inférieure au maximum atteint, y compris une étape volontairement
 // sautée. On distingue APPLICABLE (sens métier) et ATTEINTE (parcourue).
 function _estEtapeApplicable(n) {
-  if (n === 1 || n === 2 || n === 4 || n === 5) return true;
+  if (n === 1 || n === 2 || n === 5) return true;
+  // Trouver un professionnel : tout le parcours tient dans l'étape 2.
+  // « Continuer » mène donc directement au récapitulatif habituel,
+  // sans créer ni traverser aucune étape supplémentaire.
+  if (n === 4) return !_avecProfessionnel();
   if (n === 3) return !!_blocsGlobauxActifs().pc;   // prise en charge globale
   return false;
 }
@@ -9515,6 +11093,14 @@ function construireRecapConvoyeur() {
   var docs = _recapLigne('Pièce d\'identité', _recapNomFichier('conv-doc-identite') || 'Non ajouté') +
              _recapLigne('Permis de conduire', _recapNomFichier('conv-doc-permis') || 'Non ajouté') +
              _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || 'Non ajouté');
+  // La ligne vidéo n'apparaît que si une activité la rend nécessaire :
+  // un candidat « nettoyage seul » ne doit jamais la voir.
+  if (typeof _convVideoRequise === 'function' && _convVideoRequise()) {
+    docs += _recapLigne('Vidéo de présentation',
+      (_convVideo && _convVideoUtilisable())
+        ? (_convVideo.nom + (_convVideo.duree ? ' (' + _convFormaterDuree(_convVideo.duree) + ')' : ''))
+        : 'Non ajoutée');
+  }
   html += _recapBlocConvoyeur('Profil & documents', profil + docs, 3);
 
   zone.innerHTML = '<div class="recap-cadre">' + html + '</div>';
@@ -9666,7 +11252,10 @@ function construireRecap() {
   // Lot 3 (V74) — le nettoyage a son PROPRE récapitulatif, construit de
   // zéro. Professionnel reste sans récapitulatif jusqu'au lot 4.
   if (t === 'nettoyage') { construireRecapNettoyage(); return; }
-  if (!t || t === 'compte' || t === 'professionnel') { zone.innerHTML = ''; return; }
+  // Le parcours Professionnel a désormais son PROPRE récapitulatif,
+  // construit de zéro à partir de _construireDetailsProfessionnel().
+  if (t === 'professionnel') { construireRecapProfessionnel(); return; }
+  if (!t || t === 'compte') { zone.innerHTML = ''; return; }
 
   var LIB = { convoyage: 'Convoyage automobile', stockage: 'Stockage automobile',
               convoyage_stockage: 'Convoyage + stockage automobile' };
@@ -9908,15 +11497,51 @@ function _libelleGabarit(cle) {
 
 
 // ── §11 Œil du mot de passe : n'altère jamais la valeur saisie ──
+// ── AFFICHER / MASQUER UN MOT DE PASSE ──
+// Bascule UNIQUEMENT le type du champ entre password et text. La valeur
+// n'est ni lue, ni copiée, ni mémorisée nulle part : rien n'est écrit
+// dans une variable persistante, dans localStorage, ni dans un journal.
+// Le bouton est un <button type="button"> : il ne soumet jamais le
+// formulaire, et Entrée comme Espace l'activent nativement.
 function basculerMotDePasse(id, bouton) {
   var el = document.getElementById(id);
   if (!el) return;
-  var visible = el.type === 'text';
-  el.type = visible ? 'password' : 'text';
+  var doitAfficher = el.type === 'password';
+
+  // Position du curseur mémorisée puis restaurée : changer le type
+  // replace autrement le curseur en fin de champ.
+  var debut = null, fin = null;
+  try { debut = el.selectionStart; fin = el.selectionEnd; } catch (e) {}
+
+  el.type = doitAfficher ? 'text' : 'password';
+
+  try {
+    el.focus({ preventScroll: true });
+    if (debut !== null && fin !== null) el.setSelectionRange(debut, fin);
+  } catch (e) {}
+
   if (bouton) {
-    bouton.classList.toggle('actif', !visible);
-    bouton.setAttribute('aria-pressed', String(!visible));
-    bouton.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+    var libelle = doitAfficher ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+    bouton.classList.toggle('actif', doitAfficher);
+    bouton.setAttribute('aria-pressed', String(doitAfficher));
+    bouton.setAttribute('aria-label', libelle);
+    bouton.setAttribute('title', libelle);
+  }
+}
+
+// Remet TOUS les champs de mot de passe à l'état masqué. Appelé à
+// l'ouverture et à la fermeture d'une fenêtre : rouvrir un formulaire ne
+// doit jamais laisser un mot de passe affiché en clair.
+function reinitialiserAffichageMotsDePasse(racine) {
+  var zone = racine || document;
+  var champs = zone.querySelectorAll('input[data-mdp="1"]');
+  for (var i = 0; i < champs.length; i++) champs[i].type = 'password';
+  var boutons = zone.querySelectorAll('.btn-oeil');
+  for (var j = 0; j < boutons.length; j++) {
+    boutons[j].classList.remove('actif');
+    boutons[j].setAttribute('aria-pressed', 'false');
+    boutons[j].setAttribute('aria-label', 'Afficher le mot de passe');
+    boutons[j].setAttribute('title', 'Afficher le mot de passe');
   }
 }
 
@@ -10748,12 +12373,22 @@ function _checkEmail(id, forcer) {
 // message dédié. Réutilise _showFieldError/_clearFieldError, le même
 // système d'erreurs que tout le reste du formulaire — aucune logique
 // de validation parallèle créée.
+// Longueur minimale d'un mot de passe CRÉÉ ou MODIFIÉ. Valeur unique
+// pour tout le site public ; le Dashboard et la création de compte
+// partenaire appliquent la même. Elle ne s'applique JAMAIS à la
+// connexion : un compte plus ancien doit pouvoir tenter de se connecter
+// avec son mot de passe historique, c'est Supabase Auth qui tranche.
+var HC_MDP_LONGUEUR_MIN = 8;
+
 function _checkPassword(id, forcer) {
   var el = document.getElementById(id);
   if (!el || (!forcer && !_isVisible(el))) return true;
   var v = el.value || '';
   if (!v.trim()) { _showFieldError(id, 'Ce champ est obligatoire.'); return false; }
-  if (v.length < 6) { _showFieldError(id, 'Le mot de passe doit contenir au moins 6 caractères.'); return false; }
+  if (v.length < HC_MDP_LONGUEUR_MIN) {
+    _showFieldError(id, 'Le mot de passe doit contenir au moins ' + HC_MDP_LONGUEUR_MIN + ' caractères.');
+    return false;
+  }
   _clearFieldError(id);
   return true;
 }
@@ -10907,8 +12542,20 @@ function _validateClientStep(n) {
     mark(_checkRequiredText('client-nom', null, true), 'client-nom');
     mark(_checkEmail('client-email', true), 'client-email');
     mark(_checkPhone('client-tel', true), 'client-tel');
-    mark(_checkPassword('client-password', true), 'client-password');
-    mark(_checkSelect('client-source', true), 'client-source');
+    // Le mot de passe sert UNIQUEMENT à créer le compte HelixCar. Pour
+    // un client déjà connecté, il n'y a pas de compte à créer : la règle
+    // n'a plus d'objet et n'est donc pas évaluée. Elle reste appliquée
+    // à l'identique pour tout dépôt public.
+    if (!_hcIdCompteConnecte()) {
+      mark(_checkPassword('client-password', true), 'client-password');
+    }
+    // Même raisonnement que le mot de passe : la question d'acquisition
+    // porte sur le compte et a déjà été posée. Elle est reprise du
+    // profil quand elle est connue, et n'est pas re-exigée d'un client
+    // connecté. Règle inchangée pour tout dépôt public.
+    if (!_hcIdCompteConnecte()) {
+      mark(_checkSelect('client-source', true), 'client-source');
+    }
     var srcEl = document.getElementById('client-source');
     if (srcEl && srcEl.value === 'autre') {
       mark(_checkRequiredText('client-source-detail', null, true), 'client-source-detail');
@@ -10933,6 +12580,21 @@ function _validateClientStep(n) {
       if (!rN2.ok) {
         ok = false;
         if (!firstInvalid) firstInvalid = document.getElementById(rN2.first);
+      }
+      if (firstInvalid) {
+        try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+      }
+      return ok;
+    }
+
+    // Trouver un professionnel : validation dédiée puis sortie
+    // immédiate, exactement comme le Nettoyage. Aucune règle
+    // Convoyage/Stockage plus bas ne doit s'appliquer.
+    if (typeService === 'professionnel') {
+      var rP2 = _validateProfessionnelEtape2();
+      if (!rP2.ok) {
+        ok = false;
+        if (!firstInvalid) firstInvalid = document.getElementById(rP2.first);
       }
       if (firstInvalid) {
         try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
@@ -11332,7 +12994,8 @@ function _construireBrouillonClient() {
     radios: _lireRadiosCochees(overlay),
     // V77.1 - copie (jamais la reference) des quantites Nettoyage, qui
     // ne sont portees par aucun champ HTML serialisable.
-    nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {}
+    nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {},
+    professionnelVehicules: (typeof _proVehiculesPourBrouillon === 'function') ? _proVehiculesPourBrouillon() : {}
   };
 }
 
@@ -11628,6 +13291,13 @@ function _restaurerBrouillonClientSiPresent() {
   if (typeof _nettRestaurerQuantitesDepuisBrouillon === 'function') {
     _nettRestaurerQuantitesDepuisBrouillon(brouillon.nettoyageQuantites);
   }
+  // Meme principe pour les vehicules du parcours Professionnel :
+  // restaures AVANT onChoixService(), qui declenche proRendreVehicules().
+  // Un ancien brouillon depourvu de professionnelVehicules laisse
+  // simplement la memoire vide, sans erreur.
+  if (typeof _proRestaurerVehiculesDepuisBrouillon === 'function') {
+    _proRestaurerVehiculesDepuisBrouillon(brouillon.professionnelVehicules);
+  }
 
   if (typeof onChoixService === 'function') onChoixService();
   if (typeof nettRendreRepartition === 'function') nettRendreRepartition();
@@ -11753,6 +13423,9 @@ function resetClientForm() {
   // vraie reinitialisation (jamais lors d'un simple Retour ni d'une
   // bascule temporaire de service).
   _reinitialiserQuantitesNettoyage();
+  // Meme raison : _proMemoireVehicules est une variable JS persistante
+  // que la restauration du HTML d'origine ne remet pas a zero.
+  if (typeof _reinitialiserVehiculesProfessionnel === 'function') _reinitialiserVehiculesProfessionnel();
   var _mc = document.getElementById('modal-client');
   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
@@ -11784,6 +13457,418 @@ function _fichierPresent(inputId) {
 function _docsPartenaireManquants() {
   return DOCS_PARTENAIRE.filter(function (d) { return !_fichierPresent(d.input); });
 }
+
+// ══════════════════════════════════════════════════════════════
+// VIDÉO DE PRÉSENTATION DE LA CANDIDATURE
+// ══════════════════════════════════════════════════════════════
+// Une candidature ne porte qu'UNE vidéo. L'exigence et la durée
+// maximale se déduisent des activités reellement selectionnees :
+//   nettoyage seul                -> aucune video
+//   convoyage (sans renfort)      -> obligatoire, 60 s
+//   des que renfort est coche     -> obligatoire, 120 s
+// Cette regle interne n'est JAMAIS expliquee au candidat : il ne voit
+// qu'une seule zone et la duree maximale qui s'applique a lui.
+//
+// Le fichier est valide des sa selection (format, taille, duree) puis
+// envoye au moment de la soumission, exactement comme les 3 documents
+// deja en place : aucun octet n'est envoye pour une candidature qui ne
+// sera jamais soumise.
+
+var CONV_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/webm'];
+var CONV_VIDEO_TAILLE_MAX = 50 * 1024 * 1024;   // doit rester <= file_size_limit du bucket
+var CONV_VIDEO_EXT_MIME = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
+
+// SOURCE DE VERITE : l'objet ci-dessous, jamais l'input file (un input
+// ne peut pas etre reaffecte de facon fiable et perd sa valeur au
+// re-rendu). { fichier, nom, taille, mime, duree }
+var _convVideo = null;
+// vide | verification | prete | invalide | envoi | envoyee | erreur
+var _convVideoEtat = 'vide';
+var _convVideoMsg = '';
+var _convVideoChemin = null;   // chemin de stockage apres envoi reussi
+
+function _reinitialiserVideoPartenaire() {
+  _convVideo = null;
+  _convVideoEtat = 'vide';
+  _convVideoMsg = '';
+  _convVideoChemin = null;
+}
+
+function _convVideoRequise() {
+  var a = _activitesPartenaire();
+  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1;
+}
+// Duree maximale REELLE pour les activites en cours. 0 = aucune video.
+function _convVideoDureeMax() {
+  var a = _activitesPartenaire();
+  if (a.indexOf('renfort') !== -1) return 120;
+  if (a.indexOf('convoyage') !== -1) return 60;
+  return 0;
+}
+function _convVideoDureeMaxTexte() {
+  return (_convVideoDureeMax() === 120) ? '2 minutes maximum' : '1 minute maximum';
+}
+function _convFormaterDuree(s) {
+  if (typeof s !== 'number' || !isFinite(s)) return '';
+  var m = Math.floor(s / 60), r = Math.round(s % 60);
+  if (r === 60) { m += 1; r = 0; }
+  return m > 0 ? (m + ' min ' + (r < 10 ? '0' : '') + r + ' s') : (r + ' s');
+}
+function _convFormaterTaille(o) {
+  if (!o) return '';
+  var mo = o / (1024 * 1024);
+  return (mo >= 1) ? (mo.toFixed(1).replace('.', ',') + ' Mo') : (Math.round(o / 1024) + ' Ko');
+}
+
+// Type reellement exploitable. Certains navigateurs renvoient un type
+// vide pour un .mov : on retombe alors sur l'extension, sans jamais
+// accepter un format hors liste.
+function _convMimeVideo(fichier) {
+  var t = String((fichier && fichier.type) || '').toLowerCase();
+  if (CONV_VIDEO_MIMES.indexOf(t) !== -1) return t;
+  var m = /\.(mp4|mov|webm)$/i.exec((fichier && fichier.name) || '');
+  return m ? CONV_VIDEO_EXT_MIME[m[1].toLowerCase()] : '';
+}
+function _convExtensionVideo(mime) {
+  if (mime === 'video/quicktime') return '.mov';
+  if (mime === 'video/webm') return '.webm';
+  return '.mp4';
+}
+
+// Lecture de la duree par le navigateur lui-meme. Un fichier que le
+// navigateur ne sait pas decoder ne renvoie aucune duree : il est alors
+// refuse, plutot que d'etre accepte sans controle.
+function _convLireDureeVideo(fichier) {
+  return new Promise(function (resolve) {
+    var url, video, termine = false;
+    function fin(d) {
+      if (termine) return;
+      termine = true;
+      try { if (video) { video.removeAttribute('src'); video.load(); } } catch (e) {}
+      try { if (url) URL.revokeObjectURL(url); } catch (e) {}
+      resolve(d);
+    }
+    try {
+      url = URL.createObjectURL(fichier);
+      video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.onloadedmetadata = function () {
+        var d = video.duration;
+        if (typeof d === 'number' && isFinite(d) && d > 0) { fin(d); return; }
+        // CAS REEL FREQUENT : une video issue d'un enregistrement direct
+        // (notamment WebM produit par un telephone) ne porte pas sa duree
+        // dans son en-tete ; le navigateur annonce alors Infinity. Sans
+        // ce rattrapage, une video parfaitement valide serait refusee.
+        // On force le navigateur a se placer en fin de media : il calcule
+        // alors la duree reelle, puis on revient au debut.
+        try {
+          video.ontimeupdate = function () {
+            video.ontimeupdate = null;
+            var d2 = video.duration;
+            try { video.currentTime = 0; } catch (e) {}
+            fin((typeof d2 === 'number' && isFinite(d2) && d2 > 0) ? d2 : null);
+          };
+          video.currentTime = 1e101;
+        } catch (e) { fin(null); }
+      };
+      video.onerror = function () { fin(null); };
+      setTimeout(function () { fin(null); }, 20000);
+      video.src = url;
+    } catch (e) { fin(null); }
+  });
+}
+
+function convOuvrirSelecteurVideo(mode) {
+  var id = (mode === 'capture') ? 'conv-video-capture' : 'conv-video-fichier';
+  var el = document.getElementById(id);
+  if (el) { el.value = ''; el.click(); }   // value vide : re-choisir le meme fichier declenche bien change
+}
+
+// Selection (ou remplacement) d'une video : tout est verifie AVANT de
+// considerer le fichier comme utilisable.
+function convOnVideoChoisie(input) {
+  var f = input && input.files && input.files[0];
+  if (!f) return;
+
+  _convVideoChemin = null;
+  var mime = _convMimeVideo(f);
+  if (!mime) {
+    _convVideo = null;
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Format non pris en charge. Choisissez un fichier MP4, MOV ou WebM.';
+    convMajAffichageVideo();
+    return;
+  }
+  if (f.size > CONV_VIDEO_TAILLE_MAX) {
+    _convVideo = null;
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Fichier trop volumineux (' + _convFormaterTaille(f.size) + '). Maximum : '
+      + _convFormaterTaille(CONV_VIDEO_TAILLE_MAX) + '.';
+    convMajAffichageVideo();
+    return;
+  }
+
+  _convVideo = { fichier: f, nom: f.name, taille: f.size, mime: mime, duree: null };
+  _convVideoEtat = 'verification';
+  _convVideoMsg = 'Vérification de la vidéo…';
+  convMajAffichageVideo();
+
+  _convLireDureeVideo(f).then(function (duree) {
+    // Une autre selection a pu intervenir entre-temps.
+    if (!_convVideo || _convVideo.fichier !== f) return;
+    if (duree === null) {
+      _convVideo = null;
+      _convVideoEtat = 'invalide';
+      _convVideoMsg = 'Vidéo illisible : sa durée n\'a pas pu être vérifiée. Réenregistrez-la ou choisissez un autre fichier.';
+      convMajAffichageVideo();
+      return;
+    }
+    _convVideo.duree = duree;
+    _convVideoAppliquerRegleDuree();
+    convMajAffichageVideo();
+  });
+}
+
+// Applique la regle de duree en vigueur POUR LES ACTIVITES ACTUELLES.
+// Rejouee a chaque changement d'activite : retirer le renfort en
+// gardant le convoyage fait repasser une video de plus d'une minute a
+// l'etat "a remplacer".
+function _convVideoAppliquerRegleDuree() {
+  if (!_convVideo || _convVideo.duree === null) return;
+  var max = _convVideoDureeMax();
+  if (max && _convVideo.duree > max + 0.5) {   // demi-seconde de tolerance d'arrondi
+    _convVideoEtat = 'invalide';
+    _convVideoMsg = 'Vidéo trop longue (' + _convFormaterDuree(_convVideo.duree) + '). '
+      + 'La durée maximale est de ' + _convVideoDureeMaxTexte().replace(' maximum', '') + '. Remplacez-la.';
+    return;
+  }
+  if (_convVideoEtat !== 'envoyee') {
+    _convVideoEtat = 'prete';
+    _convVideoMsg = 'Vidéo prête à être envoyée.';
+  }
+}
+
+function convSupprimerVideo() {
+  _reinitialiserVideoPartenaire();
+  ['conv-video-capture', 'conv-video-fichier'].forEach(function (id) {
+    var e = document.getElementById(id);
+    if (e) e.value = '';
+  });
+  _clearGroupError('conv-zone-video');
+  convMajAffichageVideo();
+}
+
+// Une video n'est utilisable que si elle est prete ou deja envoyee.
+function _convVideoUtilisable() {
+  return !!_convVideo && (_convVideoEtat === 'prete' || _convVideoEtat === 'envoyee');
+}
+// Condition UNIQUE de progression : soit la video n'est pas exigee,
+// soit elle est reellement utilisable.
+function _convVideoOk() {
+  return !_convVideoRequise() || _convVideoUtilisable();
+}
+
+function convMajAffichageVideo() {
+  var groupe = document.getElementById('conv-video-group');
+  if (!groupe) return;
+  var requise = _convVideoRequise();
+  groupe.style.display = requise ? 'block' : 'none';
+
+  var txtDuree = document.getElementById('conv-video-duree-txt');
+  if (txtDuree) txtDuree.textContent = _convVideoDureeMaxTexte();
+
+  var choix = document.getElementById('conv-video-choix');
+  var etat = document.getElementById('conv-video-etat');
+  var aFichier = !!_convVideo;
+  if (choix) choix.style.display = aFichier ? 'none' : 'flex';
+  if (etat) etat.style.display = aFichier ? 'block' : 'none';
+
+  if (aFichier) {
+    var nom = document.getElementById('conv-video-nom');
+    if (nom) nom.textContent = _convVideo.nom;
+    var meta = document.getElementById('conv-video-meta');
+    if (meta) {
+      meta.textContent = [_convFormaterTaille(_convVideo.taille), _convFormaterDuree(_convVideo.duree)]
+        .filter(Boolean).join(' · ');
+    }
+  }
+
+  var msg = document.getElementById('conv-video-message');
+  if (msg) {
+    msg.textContent = _convVideoMsg || '';
+    msg.style.display = _convVideoMsg ? 'block' : 'none';
+    msg.className = '';
+    if (_convVideoEtat === 'invalide' || _convVideoEtat === 'erreur') msg.classList.add('hc-video-msg--err');
+    else if (_convVideoEtat === 'prete' || _convVideoEtat === 'envoyee') msg.classList.add('hc-video-msg--ok');
+    else msg.classList.add('hc-video-msg--info');
+  }
+
+  var piste = document.getElementById('conv-video-piste');
+  if (piste) piste.style.display = (_convVideoEtat === 'envoi') ? 'block' : 'none';
+
+  // Pendant l'envoi, plus aucune action destructrice n'est possible.
+  var enEnvoi = (_convVideoEtat === 'envoi');
+  var actions = document.getElementById('conv-video-actions');
+  if (actions) {
+    Array.prototype.forEach.call(actions.querySelectorAll('button'), function (b) { b.disabled = enEnvoi; });
+  }
+  if (_convVideoEtat !== 'invalide') _clearGroupError('conv-zone-video');
+
+  _convVideoMajBouton();
+}
+
+function convMajProgressionVideo(pct) {
+  var barre = document.getElementById('conv-video-barre');
+  if (barre) barre.style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+
+// Le bouton Continuer de l'etape 3 refletee en permanence l'etat reel.
+// Les autres etapes du parcours partenaire ne sont pas touchees.
+function _convVideoMajBouton() {
+  var btn = document.getElementById('conv-step-next-btn');
+  if (!btn) return;
+  if (_formStepState.convoyeur !== 3) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    return;
+  }
+  var bloque = !_convVideoOk();
+  btn.disabled = bloque;
+  btn.style.opacity = bloque ? '.5' : '';
+  btn.style.cursor = bloque ? 'not-allowed' : '';
+}
+
+// ── ENVOI SECURISE DE LA VIDEO ──────────────────────
+// Le navigateur n'ecrit JAMAIS librement dans le bucket : il ne
+// possede aucun droit d'ecriture dessus. Il demande une autorisation
+// a la fonction serveur `candidature-video`, qui est seule a detenir
+// la cle service_role, qui GENERE elle-meme le chemin de destination,
+// et qui revalide format, taille et duree. Le navigateur ne recoit
+// qu'une URL d'envoi signee, temporaire et liee a ce seul chemin.
+var URL_FONCTION_VIDEO = SUPABASE_URL + '/functions/v1/candidature-video';
+
+// Jeton d'envoi a usage unique. Le SECRET reste dans ce navigateur ;
+// la base ne recoit que son empreinte SHA-256.
+var _convJetonEnvoi = null;
+
+function _convGenererJetonEnvoi() {
+  var t = new Uint8Array(32);
+  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(t);
+  else for (var i = 0; i < t.length; i++) t[i] = Math.floor(Math.random() * 256);
+  return Array.prototype.map.call(t, function (o) { return ('0' + o.toString(16)).slice(-2); }).join('');
+}
+
+function _convEmpreinteJeton(jeton) {
+  // Meme empreinte que celle recalculee par la fonction serveur.
+  if (!window.crypto || !window.crypto.subtle) {
+    return Promise.reject(new Error('CRYPTO_INDISPONIBLE'));
+  }
+  return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(jeton))
+    .then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (o) {
+        return ('0' + o.toString(16)).slice(-2);
+      }).join('');
+    });
+}
+
+function _convAppelerFonctionVideo(action, corps) {
+  return fetch(URL_FONCTION_VIDEO, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+    body: JSON.stringify(Object.assign({ action: action }, corps || {}))
+  }).then(function (r) {
+    return r.text().then(function (txt) {
+      var d = {};
+      try { d = JSON.parse(txt); } catch (e) {}
+      if (!r.ok || !d.ok) {
+        return { erreur: d.message || ('Envoi refusé (code ' + r.status + ').') };
+      }
+      return d;
+    });
+  }).catch(function () {
+    return { erreur: 'Connexion interrompue pendant l\'envoi de la vidéo.' };
+  });
+}
+
+// Depot sur l'URL SIGNEE fournie par le serveur. Aucun chemin n'est
+// choisi ici : on renvoie exactement celui que le serveur a genere.
+function _convEnvoyerVersUrlSignee(chemin, token) {
+  return new Promise(function (resolve) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', SUPABASE_URL + '/storage/v1/object/upload/sign/candidatures-videos/'
+      + chemin + '?token=' + encodeURIComponent(token), true);
+    xhr.setRequestHeader('Content-Type', _convVideo.mime);
+    xhr.timeout = 300000;
+    xhr.upload.onprogress = function (e) {
+      if (e.lengthComputable) convMajProgressionVideo(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true });
+      else if (xhr.status === 400 || xhr.status === 401 || xhr.status === 403) {
+        resolve({ erreur: 'Autorisation d\'envoi expirée. Réessayez.' });
+      } else resolve({ erreur: 'Envoi refusé (code ' + xhr.status + ').' });
+    };
+    xhr.onerror = function () { resolve({ erreur: 'Connexion interrompue pendant l\'envoi de la vidéo.' }); };
+    xhr.ontimeout = function () { resolve({ erreur: 'L\'envoi de la vidéo a expiré.' }); };
+    xhr.onabort = function () { resolve({ erreur: 'Envoi de la vidéo interrompu.' }); };
+    try { xhr.send(_convVideo.fichier); }
+    catch (e) { resolve({ erreur: 'Envoi de la vidéo impossible.' }); }
+  });
+}
+
+// Enchainement complet : autorisation -> depot -> confirmation.
+// Retourne { ok } ou { erreur }. Le chemin de stockage n'est jamais
+// decide ni transmis par le navigateur.
+function uploadVideoCandidature() {
+  return new Promise(function (resolve) {
+    if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
+    if (!_convJetonEnvoi) { resolve({ erreur: 'Autorisation d\'envoi absente.' }); return; }
+
+    _convAppelerFonctionVideo('autoriser', {
+      jeton: _convJetonEnvoi,
+      mime: _convVideo.mime,
+      taille_octets: _convVideo.taille,
+      duree_secondes: _convVideo.duree
+    }).then(function (autorisation) {
+      if (autorisation.erreur) { resolve({ erreur: autorisation.erreur }); return; }
+      if (!autorisation.chemin || !autorisation.token) {
+        resolve({ erreur: 'Autorisation d\'envoi incomplète.' }); return;
+      }
+      _convEnvoyerVersUrlSignee(autorisation.chemin, autorisation.token).then(function (depot) {
+        if (depot.erreur) { resolve({ erreur: depot.erreur }); return; }
+        // La confirmation est indispensable : c'est elle qui vérifie
+        // côté serveur que le fichier est réellement arrivé, supprime
+        // une éventuelle vidéo remplacée et consomme le jeton.
+        _convAppelerFonctionVideo('confirmer', { jeton: _convJetonEnvoi }).then(function (fin) {
+          if (fin.erreur) { resolve({ erreur: fin.erreur }); return; }
+          _convJetonEnvoi = null;   // usage unique, cote navigateur aussi
+          resolve({ ok: true, chemin: autorisation.chemin });
+        });
+      });
+    });
+  });
+}
+
+function _convIdentifiantAleatoire() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    if (window.crypto && window.crypto.getRandomValues) {
+      var t = new Uint8Array(16);
+      window.crypto.getRandomValues(t);
+      return Array.prototype.map.call(t, function (o) { return ('0' + o.toString(16)).slice(-2); }).join('');
+    }
+  } catch (e) {}
+  return String(Date.now()) + Math.random().toString(36).slice(2, 10);
+}
+
+// Les deux entrees (enregistrement et fichier existant) alimentent la
+// MEME logique : un seul chemin de validation, une seule video.
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el && (el.id === 'conv-video-capture' || el.id === 'conv-video-fichier')) convOnVideoChoisie(el);
+}, true);
 // Efface l'erreur d'une zone dès qu'un fichier y est déposé : pas
 // d'erreur fantôme sur une zone désormais remplie.
 document.addEventListener('change', function (e) {
@@ -11820,6 +13905,12 @@ function onChoixActivitesPartenaire() {
   // bloquer la progression (pas de validation invisible).
   if (!conv && typeof _clearFieldError === 'function') _clearFieldError('conv-experience');
   if (typeof _clearGroupError === 'function') _clearGroupError('conv-activites-group');
+  // L'exigence de vidéo ET sa durée maximale dépendent des activités :
+  // elles sont donc réévaluées à CHAQUE changement. Retirer le renfort
+  // en gardant le convoyage fait repasser une vidéo de plus d'une
+  // minute à l'état « à remplacer », sans la supprimer en silence.
+  if (typeof _convVideoAppliquerRegleDuree === 'function') _convVideoAppliquerRegleDuree();
+  if (typeof convMajAffichageVideo === 'function') convMajAffichageVideo();
 }
 
 // Point 5-6 (V57) — validation par étape du formulaire convoyeur,
@@ -11872,6 +13963,20 @@ function _validateConvStep(n) {
     // validation ne doit s'y appliquer (pas de blocage invisible).
     if (_partenaireAvecConvoyage()) {
       mark(_checkSelect('conv-experience', true), 'conv-experience');
+    }
+    // Vidéo de présentation : exigée uniquement quand une activité la
+    // rend réellement nécessaire. Le message reste factuel — il ne
+    // révèle jamais la règle interne du nombre de vidéos.
+    if (_convVideoRequise() && !_convVideoUtilisable()) {
+      ok = false;
+      if (typeof _showGroupError === 'function') {
+        _showGroupError('conv-zone-video', _convVideoMsg && _convVideoEtat === 'invalide'
+          ? _convVideoMsg
+          : 'Ajoutez votre vidéo de présentation (' + _convVideoDureeMaxTexte() + ').');
+      }
+      if (!firstInvalid) firstInvalid = document.getElementById('conv-zone-video');
+    } else if (typeof _clearGroupError === 'function') {
+      _clearGroupError('conv-zone-video');
     }
   }
   if (firstInvalid) { try { firstInvalid.focus(); firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
@@ -12214,15 +14319,35 @@ function generateParrainageCode(clientNum) {
 
 
 
-function submitClientForm() {
-  // Lot 2 (V72) — garde-fou socle (deuxième niveau de sécurité, en plus du
-  // bouton Continuer désactivé) : empêche toute soumission Nettoyage /
-  // Professionnel tant que les lots 3/4 n'ont pas construit ces parcours,
-  // même en cas d'appel direct de cette fonction contournant l'étapeur.
-  if (_avecProfessionnel()) {
-    alert("Ce parcours n'est pas encore disponible. Il sera bientôt activé par HelixCar.");
-    return;
+// Verrou de ré-entrée : une demande, un envoi. Sans lui, deux clics
+// rapprochés — ou deux appels avant le premier await — créaient DEUX
+// demandes distinctes, chacune avec sa propre référence HelixCar.
+var _envoiClientEnCours = false;
+
+async function submitClientForm() {
+  if (_envoiClientEnCours) return;
+  _envoiClientEnCours = true;
+  var _relacherEnvoiClient = function () { _envoiClientEnCours = false; };
+  // Le verrou est relâché dès que le parcours se termine, quel qu'en
+  // soit l'issue : succès, refus de validation, erreur réseau.
+  try {
+    return await _submitClientFormInterne();
+  } finally {
+    _relacherEnvoiClient();
   }
+}
+
+async function _submitClientFormInterne() {
+  // GARDE-FOU SOCLE V72 — RETIRÉ ICI.
+  // Il empêchait TOUTE soumission « Trouver un professionnel », alors
+  // que ce parcours a depuis été réellement construit : validation,
+  // récapitulatif et branche de payload (professionnel_details) sont en
+  // place, et la navigation avait déjà été débloquée — le message
+  // « parcours en préparation » (#client-socle-msg) est d'ailleurs
+  // masqué en permanence. Seule cette garde subsistait : elle rendait
+  // le service impossible à commander, y compris depuis l'espace
+  // client. La validation propre au parcours, elle, est CONSERVÉE
+  // telle quelle un peu plus bas.
   // V76 - VALIDATION FINALE COMPLETE DU NETTOYAGE.
   // La V75 ne revalidait que l'eligibilite. Insuffisant : depuis le
   // recapitulatif, le client peut revenir en arriere, effacer une
@@ -12248,6 +14373,22 @@ function submitClientForm() {
       _etapeMax = Math.max(_etapeMax, _etapeKO);
       _renderFormStep('client');
       _validateClientStep(_etapeKO);
+      return;   // aucun payload, aucun Supabase, aucun email
+    }
+  }
+
+  // Meme garde-fou final pour Trouver un professionnel : tout le
+  // parcours tenant dans l'etape 2, seules les etapes 1 et 2 sont
+  // rejouees, avec les MEMES validateurs que la navigation.
+  if (_avecProfessionnel()) {
+    var _etapeKOPro = null;
+    if (!_validateClientStep(1)) _etapeKOPro = 1;
+    if (!_etapeKOPro && !_validateClientStep(2)) _etapeKOPro = 2;
+    if (_etapeKOPro) {
+      _formStepState.client = _etapeKOPro;
+      _etapeMax = Math.max(_etapeMax, _etapeKOPro);
+      _renderFormStep('client');
+      _validateClientStep(_etapeKOPro);
       return;   // aucun payload, aucun Supabase, aucun email
     }
   }
@@ -12340,6 +14481,32 @@ function submitClientForm() {
       statut:            'nouveau'
     };
     console.log('Payload nettoyage (liste blanche):', payload);
+  } else if (_avecProfessionnel()) {
+    // MEME PRINCIPE que le nettoyage : liste blanche stricte, aucune
+    // lecture d'un champ Convoyage/Stockage, aucun bloc trajet /
+    // vehicule / livraison / restitution / stockage.
+    payload = {
+      numero_client:   clientNum,
+      code_parrainage: parrCode,
+      parraine_par:    codeUtilise || null,
+      prenom:          prenom_val,
+      nom:             nom_val,
+      email:           email_val,
+      telephone:       tel_val,
+      type_client:     type_val,
+      societe:         societe_val || null,
+      siret:           siret_val || null,
+      disponibilite:   'planifie',
+      source_acquisition:        source_val || null,
+      source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
+      utm_source:      _utmCapture.utm_source || null,
+      utm_medium:      _utmCapture.utm_medium || null,
+      utm_campaign:    _utmCapture.utm_campaign || null,
+      type_service:          'professionnel',
+      professionnel_details: _construireDetailsProfessionnel(),
+      statut:                'nouveau'
+    };
+    console.log('Payload professionnel (liste blanche):', payload);
   } else {
   // Infos mission
   var from_val    = (document.getElementById('client-from') || {}).value || '';
@@ -12549,11 +14716,57 @@ function submitClientForm() {
   }
 
 
+  // ── IDENTIFIANT GÉNÉRÉ ICI, ET NON RELU APRÈS COUP ──
+  // L'ancienne version insérait avec `Prefer: return=representation`
+  // puis RELISAIT la ligne pour récupérer son id (indispensable à
+  // l'enregistrement des véhicules). Sous RLS, un dépôt anonyme n'a
+  // aucun droit de lecture : cette relecture échoue avec
+  // « new row violates row-level security policy » et LA DEMANDE DU
+  // CLIENT SERAIT PERDUE (vérifié sur PostgreSQL 16, cf. tests/t_rls.sh).
+  // On fournit donc l'identifiant nous-mêmes : plus aucune relecture.
+  payload.id = _hcNouvelIdentifiant();
+
+  // Demande déposée depuis un compte connecté : elle lui est rattachée
+  // dès l'insertion. C'est ce lien que lisent l'espace client et les
+  // politiques RLS ; il n'est jamais deviné après coup par e-mail.
+  var _idCompteDepot = _hcIdCompteConnecte();
+  if (_idCompteDepot) payload.auth_user_id = _idCompteDepot;
+
+  // ── CRÉATION DU COMPTE HELIXCAR ──
+  // Le formulaire demandait déjà un mot de passe, mais il n'était
+  // envoyé nulle part : aucun compte n'était créé et la connexion à
+  // l'espace client était impossible. On crée donc réellement le compte
+  // Supabase Auth ici, et on relie la demande à ce compte.
+  //
+  // Un échec de création NE DOIT JAMAIS faire perdre la demande : si
+  // l'adresse est déjà utilisée (client de retour) ou si le service est
+  // indisponible, la demande est enregistrée sans rattachement. On ne
+  // rattache jamais une demande à un compte sur la seule foi d'une
+  // adresse e-mail : cela exposerait la demande d'un tiers.
+  if (!_idCompteDepot && _sb && _sb.auth && email_val) {
+    var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
+    if (mdpSaisi) {
+      try {
+        var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
+        var utilisateur = rCompte && rCompte.data && rCompte.data.user;
+        if (!rCompte.error && utilisateur && utilisateur.id) {
+          payload.auth_user_id = utilisateur.id;
+        }
+      } catch (e) {
+        console.warn('Création du compte impossible, la demande est conservée :', e);
+      }
+    }
+  }
+
   console.log('Payload complet:', payload);
 
   function inserer(tentativesRestantes) {
-    return supabaseInsertReturning('clients', payload)
-      .then(function (row) { return { ok: true, row: row }; })
+    return supabaseInsert('clients', payload)
+      .then(function (r) {
+        if (r && r.error) return { error: String(r.error) };
+        if (!r) return { error: 'Echec de connexion.' };
+        return { ok: true, row: { id: payload.id } };
+      })
       .catch(function (e) { return { error: String(e.message || e) }; })
       .then(function(r) {
       var collisionNumero = r && r.error && typeof r.error === 'string'
@@ -12794,6 +15007,10 @@ function openModal(type) {
 
   document.getElementById('modal-' + type).classList.add('open');
 
+  // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
+  // l'état laissé lors de la fermeture précédente.
+  reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
+
   document.body.style.overflow = 'hidden';
   document.body.classList.add('hc-modal-open');
 
@@ -12813,6 +15030,8 @@ function closeModal(type) {
   // V77.3 - ORDRE STRICT : le brouillon est finalise AVANT tout retrait
   // de la classe open, pour ne dependre d'aucun effet de bord du DOM.
   if (type === 'client') _finaliserBrouillonClientAvantFermeture();
+
+  reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
 
   document.getElementById('modal-' + type).classList.remove('open');
 
@@ -12858,13 +15077,123 @@ function hero2ChangeScenario(direction) {
 // Supabase Auth, ni session, ni Dashboard client). Cette modale
 // prépare uniquement l'interface visuelle demandée ; elle ne simule
 // aucune connexion réussie et ne crée aucune session.
-function submitConnexionForm() {
+// ============================================================
+// MOT DE PASSE OUBLIÉ
+// ============================================================
+// Ce lien tentait auparavant une CONNEXION : il appelait
+// submitConnexionForm(). Corrigé — il déclenche désormais la vraie
+// réinitialisation de Supabase Auth.
+//
+// Aucun second système : c'est la même fonction Supabase
+// (resetPasswordForEmail) et la même page d'atterrissage
+// (dashboard.html) que le parcours déjà en place pour les partenaires
+// et les administrateurs. Le mot de passe lui-même n'est jamais saisi
+// ici : il l'est sur la page d'arrivée, après le clic sur le lien reçu.
+
+var _reinitEnvoiEnCours = false;
+
+// Même URL de retour que le Dashboard, construite depuis l'origine
+// réellement servie. Chaque origine utilisée doit être autorisée dans
+// Supabase (voir le dossier de recette).
+function _hcUrlRetourReinitialisation() {
+  try {
+    var o = window.location.origin;
+    if (o && /^https?:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+}
+
+// Message TOUJOURS identique, que l'adresse existe ou non.
+var HC_REINIT_MESSAGE_NEUTRE =
+  'Si un compte correspond à cette adresse, un lien de réinitialisation vient d\'être envoyé. Pensez à vérifier vos courriers indésirables.';
+
+async function demanderReinitialisationMotDePasse() {
+  if (event) event.preventDefault();
+  var msg = document.getElementById('connexion-message');
+  var afficher = function (texte) {
+    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
+  };
+
+  // Double clic : le second appel ne renvoie pas un deuxième e-mail.
+  if (_reinitEnvoiEnCours) return;
+
+  // L'adresse est reprise du champ de connexion déjà rempli ; on ne la
+  // demande que si elle est absente.
+  var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
+  if (!email) {
+    afficher('Renseignez votre adresse e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié ? ».');
+    var champ = document.getElementById('connexion-email');
+    if (champ) champ.focus();
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    afficher('Cette adresse e-mail n\'est pas valide.');
+    return;
+  }
+  if (!_sb || !_sb.auth) {
+    afficher('Service momentanément indisponible. Réessayez dans quelques instants.');
+    return;
+  }
+
+  _reinitEnvoiEnCours = true;
+  afficher('Envoi en cours…');
+  try {
+    var res = await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: _hcUrlRetourReinitialisation()
+    });
+    var erreur = res && res.error;
+    // Limitation temporaire des envois : on le dit, sans jamais
+    // indiquer si un compte existe.
+    var trop = erreur && (erreur.status === 429
+      || /rate limit|too many requests|seconds/i.test(String(erreur.message || '')));
+    if (trop) {
+      afficher('Trop de demandes en peu de temps. Patientez quelques minutes avant de réessayer.');
+      return;
+    }
+    // Toute autre erreur reste silencieuse : la distinguer d'un succès
+    // révélerait l'existence du compte.
+    if (erreur) console.error('resetPasswordForEmail:', erreur);
+    afficher(HC_REINIT_MESSAGE_NEUTRE);
+  } catch (e) {
+    afficher('L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.');
+  } finally {
+    _reinitEnvoiEnCours = false;
+  }
+}
+
+async function submitConnexionForm() {
   event && event.preventDefault();
   var msg = document.getElementById('connexion-message');
-  if (msg) {
-    msg.style.display = 'block';
-    msg.textContent = "La connexion à l'espace client n'est pas encore disponible. Cette fonctionnalité arrive bientôt. En attendant, contactez-nous ou créez votre compte via « Devenir client ».";
+  var afficher = function (texte) {
+    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
+  };
+  var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
+  var mdp   = ((document.getElementById('connexion-password') || {}).value || '');
+  if (!email || !mdp) {
+    afficher('Renseignez votre adresse e-mail et votre mot de passe.');
+    return;
   }
+  if (!_sb || !_sb.auth) {
+    afficher('La connexion est momentanément indisponible. Réessayez dans quelques instants.');
+    return;
+  }
+  afficher('Connexion en cours…');
+  var res = null;
+  try {
+    res = await _sb.auth.signInWithPassword({ email: email, password: mdp });
+  } catch (e) {
+    afficher('La connexion a échoué. Vérifiez votre connexion internet et réessayez.');
+    return;
+  }
+  if (!res || res.error || !res.data || !res.data.session) {
+    // Message volontairement identique quelle que soit la cause : ne pas
+    // révéler si une adresse existe ou non.
+    afficher('Adresse e-mail ou mot de passe incorrect.');
+    return;
+  }
+  // La session est ouverte : l'espace client la retrouve tel quel,
+  // puisque les deux pages partagent la même origine.
+  window.location.href = 'dashboard.html';
 }
 
 
@@ -14170,6 +16499,23 @@ async function submitConvoyeurForm() {
     return;
   }
 
+  // GARDE-FOU FINAL VIDÉO — même principe que pour les 3 documents :
+  // vérifié AVANT tout envoi, pour qu'une soumission directe ou
+  // détournée ne puisse jamais enregistrer une candidature sans la
+  // vidéo pourtant exigée par ses activités.
+  if (_convVideoRequise() && !_convVideoUtilisable()) {
+    _formStepState.convoyeur = 3;
+    _renderFormStep('convoyeur');
+    if (typeof _showGroupError === 'function') {
+      _showGroupError('conv-zone-video', _convVideoMsg && _convVideoEtat === 'invalide'
+        ? _convVideoMsg
+        : 'Ajoutez votre vidéo de présentation (' + _convVideoDureeMaxTexte() + ').');
+    }
+    var zoneV = document.getElementById('conv-zone-video');
+    if (zoneV) { try { zoneV.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+    return;
+  }
+
   // Indiquer le chargement
   var btn = document.querySelector('#modal-convoyeur-form button.btn-primary');
   var btnTxt = btn ? btn.textContent : '';
@@ -14198,6 +16544,7 @@ async function submitConvoyeurForm() {
     );
     return;
   }
+
   // Point 4 (V58) — le RIB n'est plus demandé à la candidature (sera
   // redemandé plus tard, une fois le convoyeur accepté). La colonne
   // rib_iban est conservée côté DB pour cet usage futur — envoyée ici
@@ -14205,7 +16552,7 @@ async function submitConvoyeurForm() {
   // déjà null dès qu'aucun fichier n'était sélectionné).
   var rib_iban   = null;
 
-  supabaseInsert('convoyeurs', {
+  var payloadCandidature = {
     prenom: prenom,
     nom: nom,
     email: email,
@@ -14217,12 +16564,74 @@ async function submitConvoyeurForm() {
     rc_pro_url: rc_pro_url,
     rib_iban: rib_iban,
     statut: 'en_attente'
-  }).then(function(r) {
-    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    if (!r || r.error) {
-      alert('Erreur lors de envoi. ' + (r && r.error ? JSON.stringify(r.error) : 'Reessayez.'));
+  };
+
+  // ── VIDÉO : ORDRE IMPOSÉ PAR LA SÉCURITÉ ──
+  // Le navigateur n'a AUCUN droit d'écriture sur le bucket. Il doit
+  // obtenir une autorisation d'envoi du serveur, et cette autorisation
+  // est liée à une candidature qui existe déjà. La candidature est donc
+  // créée d'abord, avec le statut 'video_attendue' : elle n'est
+  // considérée reçue qu'une fois la vidéo réellement confirmée côté
+  // serveur. Aucune métadonnée vidéo n'est écrite par le navigateur —
+  // c'est la fonction serveur qui les renseigne.
+  var videoAEnvoyer = _convVideoRequise() && _convVideo;
+  if (videoAEnvoyer) {
+    _convJetonEnvoi = _convGenererJetonEnvoi();
+    var empreinteJeton = null;
+    try { empreinteJeton = await _convEmpreinteJeton(_convJetonEnvoi); }
+    catch (e) { empreinteJeton = null; }
+    if (!empreinteJeton) {
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      alert("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n\n"
+        + "Votre candidature n'a pas été enregistrée. Essayez depuis un navigateur à jour.");
       return;
     }
+    payloadCandidature.statut = 'video_attendue';
+    payloadCandidature.video_upload_jeton_hash = empreinteJeton;
+  }
+
+  var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
+  if (!rInsert || rInsert.error) {
+    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+    alert('Erreur lors de envoi. ' + (rInsert && rInsert.error ? JSON.stringify(rInsert.error) : 'Reessayez.'));
+    return;
+  }
+
+  if (videoAEnvoyer) {
+    _convVideoEtat = 'envoi';
+    _convVideoMsg = 'Envoi de la vidéo en cours…';
+    convMajProgressionVideo(0);
+    convMajAffichageVideo();
+
+    var rVideo = await uploadVideoCandidature();
+
+    if (!rVideo || rVideo.erreur) {
+      // La candidature reste au statut 'video_attendue' : elle n'est
+      // pas présentée comme reçue et la vidéo peut être renvoyée.
+      _convVideoEtat = 'erreur';
+      _convVideoMsg = (rVideo && rVideo.erreur) ? rVideo.erreur : "L'envoi de la vidéo a échoué.";
+      convMajAffichageVideo();
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      _formStepState.convoyeur = 3;
+      _renderFormStep('convoyeur');
+      var zoneErr = document.getElementById('conv-zone-video');
+      if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+      alert(
+        "L'envoi de votre vidéo a échoué.\n\n" +
+        "Votre candidature n'est pas finalisée. Vérifiez votre connexion, puis réessayez."
+      );
+      return;
+    }
+
+    _convVideoChemin = rVideo.chemin;
+    _convVideoEtat   = 'envoyee';
+    _convVideoMsg    = 'Vidéo envoyée.';
+    convMajProgressionVideo(100);
+    convMajAffichageVideo();
+  }
+
+  (function (r) {
+    if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
     showSuccess('convoyeur');
 
       // Envoi email candidature recue via EmailJS
@@ -14246,7 +16655,7 @@ async function submitConvoyeurForm() {
           });
         }
       } catch(e) { console.error('EmailJS exception:', e); }
-  });
+  })(rInsert);
 }
 
 function submitParrainage() {
@@ -15234,6 +17643,11 @@ function _hcContexteChamp(id) {
   // globalement au rendu, subsiste : aujourd'hui et le futur sont
   // acceptes, le passe est refuse. C'est exactement la regle demandee.
   if (id === 'nett-date') return { type: 'nettoyage', prefixe: 'nett-date' };
+  // Trouver un professionnel : periode reelle debut -> fin, colorable
+  // comme celle du Convoyage/Stockage, avec la seule borne metier qui
+  // existe vraiment ici (la fin ne precede jamais le debut).
+  if (id === 'pro-date-debut') return { type: 'professionnel', prefixe: 'pro-date-debut' };
+  if (id === 'pro-date-fin') return { type: 'professionnel', prefixe: 'pro-date-fin' };
   return null;
 }
 
@@ -15295,6 +17709,18 @@ function _hcPeriodePourChamp(id) {
   // V76 — le nettoyage n'a aucune periode a colorer : ni stockage, ni
   // convoyage, ni restitution.
   if (ctx.type === 'nettoyage') return { debut: null, finLiv: null, finRestit: null };
+  // Periode d'intervention du professionnel : memes bornes visuelles que
+  // Convoyage/Stockage (debut et fin en rouge, jours intermediaires en
+  // teinte plus legere, demi-teintes si debut et fin le meme jour) —
+  // aucune regle de coloration dupliquee, seule la source des 2 dates
+  // change.
+  if (ctx.type === 'professionnel') {
+    return {
+      debut: _hcParserYMD((document.getElementById('pro-date-debut') || {}).value),
+      finLiv: _hcParserYMD((document.getElementById('pro-date-fin') || {}).value),
+      finRestit: null
+    };
+  }
   return ctx.type === 'vehicule' ? _hcPeriodeVehicule(ctx.i) : _hcPeriodeGlobale();
 }
 
@@ -15317,6 +17743,10 @@ function _hcDateMinimaleChamp(id) {
   if (!ctx) return null;
   if (ctx.prefixe === 'stock-fin') {
     return _hcParserYMD((document.getElementById('stock-debut') || {}).value);
+  }
+  // La fin d'intervention ne precede jamais son debut.
+  if (ctx.prefixe === 'pro-date-fin') {
+    return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
   }
   if (ctx.prefixe === 'liv') {
     if (_avecStockage()) {
@@ -15474,11 +17904,49 @@ function _hcOuvrirCalendrier(champ) {
   }
   var overlay = _hcConstruireOverlay();
   var auj = _hcAujourdhui();
-  var reference = dateReference && dateReference >= auj ? dateReference : auj;
+  var reference = _hcMoisOuvertureReference(champ.id, dateReference, auj);
   _hcCalAnneeAffichee = reference.getFullYear();
   _hcCalMoisAffiche = reference.getMonth();
   _hcRendreCalendrier();
   overlay.classList.add('open');
+}
+
+// ── MOIS D'OUVERTURE D'UN CALENDRIER DEPENDANT ──────────────
+// CORRECTIF DE REGRESSION - un calendrier dependant s'ouvrait toujours
+// sur le MOIS ACTUEL tant qu'il ne portait pas lui-meme de date :
+// une prise en charge / un debut de stockage choisi en decembre
+// rouvrait la livraison sur le mois courant, obligeant a renaviguer
+// mois par mois (et exposant a un clic sur une date desactivee).
+// L'ordre demande est applique strictement, sans jamais ecrire de date
+// ni en deduire une :
+//   1. sa propre date deja selectionnee ;
+//   2. sinon la premiere date minimale valide liee (ex. debut/fin de
+//      stockage, livraison pour une restitution) ;
+//   3. sinon la date de debut / prise en charge deja choisie ;
+//   4. le mois actuel seulement si aucune date liee n'existe.
+// Un candidat anterieur a aujourd'hui n'est jamais retenu : le
+// calendrier n'ouvre jamais sur un mois entierement desactive.
+function _hcMoisOuvertureReference(id, dateChamp, auj) {
+  var candidats = [dateChamp, _hcDateMinimaleChamp(id), _hcDateDebutLiee(id)];
+  for (var k = 0; k < candidats.length; k++) {
+    var d = candidats[k];
+    if (d && d >= auj) return d;
+  }
+  return auj;
+}
+
+// Date de debut REELLEMENT liee a ce champ. Lit exclusivement les
+// fonctions de periode deja existantes : aucune regle de scenario
+// recopiee, aucune date inventee.
+function _hcDateDebutLiee(id) {
+  var ctx = _hcContexteChamp(id);
+  if (!ctx) return null;
+  if (ctx.type === 'vehicule') return _hcPeriodeVehicule(ctx.i).debut || null;
+  if (ctx.type === 'mono') return _hcPeriodeGlobale().debut || null;
+  if (ctx.type === 'professionnel') {
+    return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
+  }
+  return null;   // nettoyage : aucune date liee
 }
 
 // V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
@@ -16204,6 +18672,22 @@ document.addEventListener('click', function (e) {
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
 /* Sous-accordéons véhicule : deux actions équilibrées. */
+/* Cartes véhicule du parcours « Trouver un professionnel ».
+   Classes DÉDIÉES volontairement : ces cartes sont imbriquées dans une
+   rubrique .veh-sous-accordeon, et la règle existante
+   « .veh-sous-accordeon.ouvert .veh-sous-contenu » est un sélecteur
+   DESCENDANT — réutiliser littéralement ces classes aurait ouvert
+   toutes les cartes dès l'ouverture de la rubrique. Le rendu visuel
+   reste strictement celui des sous-accordéons existants. */
+#modal-client .pro-veh-acc { border:1px solid rgba(16,24,32,.11); border-radius:12px; margin:10px 0; overflow:hidden; background:#fff; }
+#modal-client .pro-veh-barre { width:100%; border:0; background:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; text-align:left; font-family:var(--font-body); }
+#modal-client .pro-veh-num { width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#f4eeee;color:var(--accent);font-size:.7rem;font-weight:700;flex:0 0 25px; }
+#modal-client .pro-veh-titre { flex:1; color:var(--ink); font-size:.88rem; font-weight:660; }
+#modal-client .pro-veh-chevron { color:#8A8F93; font-size:1.15rem; transform:rotate(90deg); transition:transform .18s ease; }
+#modal-client .pro-veh-acc.ouvert .pro-veh-chevron { transform:rotate(-90deg); }
+#modal-client .pro-veh-contenu { display:none; padding:0 16px 14px; }
+#modal-client .pro-veh-acc.ouvert > .pro-veh-contenu { display:block; }
+
 #modal-client .veh-sous-ok { gap:9px; align-items:center; }
 #modal-client .veh-sous-ok .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
 #modal-client .veh-sous-ok .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
