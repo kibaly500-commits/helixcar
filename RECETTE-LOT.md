@@ -367,10 +367,19 @@ Pull Request.
 | Suites navigateur et sécurité serveur | ❌ **rouge** — 813 PASS / 44 FAIL |
 
 Ce que l'onglet *Checks* montrait donc, c'était un workflow **rouge**, pas
-un workflow absent. La cause est le point nº 4 ci-dessus, et elle est
-corrigée. **L'état des exécutions postérieures est à lire dans l'onglet
-*Checks* de la Pull Request** : il n'est pas annoncé ici, parce qu'un
-résultat de CI ne se prédit pas.
+un workflow absent. La cause est le point nº 4 ci-dessus.
+
+**Après correction, sur le commit `c4af4e6`** — exécution nº 4, observée
+et terminée, non prédite :
+
+| Tâche | Résultat |
+|---|---|
+| Politiques RLS sur PostgreSQL 16 | ✅ **success** — 16:03:26 |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 213 PASS / 0 FAIL en 142 s** |
+
+L'écart entre 1 213 (CI) et 1 454 (local) est attendu et connu : la tâche
+navigateur tourne avec `--sans-sql`, sans les 241 contrôles de `t_rls`,
+qui sont l'objet de la seconde tâche. 1 213 + 241 = 1 454.
 
 ---
 
