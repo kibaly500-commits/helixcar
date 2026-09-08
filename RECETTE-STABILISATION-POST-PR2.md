@@ -448,6 +448,19 @@ git status --short                   →  arbre de travail propre
 (`tests/env.js` coupe toute requête sortante), aucune donnée réelle,
 aucun e-mail réel, aucun paiement.
 
+### GitHub Actions — observé, jamais prédit
+
+Exécutions nº 20 (poussée) et nº 21 (Pull Request) sur le commit de tête
+**`34b74aa`**, terminées et relues :
+
+| Tâche | Résultat |
+|---|---|
+| Politiques RLS sur PostgreSQL 16 | ✅ **success** |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 345 PASS / 0 FAIL en 163 s** |
+
+1 345 (CI, avec `--sans-sql`) + 360 (`t_rls`, seconde tâche) = **1 705**,
+exactement le chiffre mesuré en local.
+
 ---
 
 ## 8. Limites des tests, et contrôles manuels restants
