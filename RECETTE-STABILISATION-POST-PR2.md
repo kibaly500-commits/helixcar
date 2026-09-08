@@ -390,6 +390,66 @@ modifié de ce côté.
 
 ---
 
+## 7 bis. Tests réellement exécutés
+
+### Avant correction — chaque anomalie a d'abord été reproduite
+
+| Suite | Commande | Contre le `main` `8b86148` | Après correction |
+|---|---|---|---|
+| `t_rls.sh` | `bash tests/t_rls.sh` | **22 FAIL** (sans les migrations `100` et `101`) | **360 PASS / 0 FAIL** |
+| `t_stabilisation.js` | `node tests/t_stabilisation.js` | **28 FAIL** | **71 PASS / 0 FAIL** |
+
+Les échecs les plus parlants, tels qu'ils sont sortis :
+
+| Contrôle | Ce qu'il a obtenu contre le `main` |
+|---|---|
+| `X3 bis` — se déclarer technicien | refusé, `23514` |
+| `T1` — lire les informations de mission | `COALESCE types date and text cannot be matched` |
+| `Dbis1 bis` — un bloc Mode de transport par véhicule | `[{titres:1}, {titres:0}, {titres:0}]` |
+| `Dbis1 quater` — un mode envoyé pour chacun | `["standard", "", ""]` |
+| `F6` — ouvrir « Devenir client » efface l'erreur précédente | `{"affiche":"block","texte":"Erreur 400 [convoyeurs]: 23514"}` |
+| `H-nettoyage3` — titres non collés | écart de `3.20 mm` |
+
+### Après correction — la campagne complète, depuis zéro
+
+```
+npm test
+```
+
+**31 suites, 1 705 contrôles, 1 705 PASS, 0 FAIL — en 300 secondes.**
+
+| Suite | PASS | Ce qu'elle couvre ici |
+|---|---|---|
+| `t_rls` | **360** | migrations réelles sur PostgreSQL 16 jetable — sections S (activités), T (types et règles métier), U (période et mission unique) |
+| `t_rattachement` | 73 | rattachement après confirmation, inchangé |
+| `t_mission_nettoyage` | 73 | cycle devis → mission, désormais piloté par le serveur |
+| `t_stabilisation` | **71** | la suite créée pour ce chantier |
+| `t_nonreg` | 44 | périmètre de fichiers et validations métier |
+| `t_nettoyage` | 33 | période, disponibilité retirée, horaire libre |
+| *(24 autres suites)* | | non-régression |
+
+**Portabilité des dates**, vérifiée dans les deux fuseaux :
+
+```
+TZ=UTC           node tests/t_dates.js    →  19 PASS / 0 FAIL
+TZ=Europe/Paris  node tests/t_dates.js    →  19 PASS / 0 FAIL
+TZ=UTC           node tests/t_periode.js  →  40 PASS / 0 FAIL
+TZ=Europe/Paris  node tests/t_periode.js  →  40 PASS / 0 FAIL
+```
+
+**Hygiène du dépôt** :
+
+```
+git diff --check origin/main..HEAD   →  aucune anomalie
+git status --short                   →  arbre de travail propre
+```
+
+**Ce qui n'a été touché à aucun moment** : aucune connexion à Supabase
+(`tests/env.js` coupe toute requête sortante), aucune donnée réelle,
+aucun e-mail réel, aucun paiement.
+
+---
+
 ## 8. Limites des tests, et contrôles manuels restants
 
 Ce que ces tests **ne** couvrent **pas** :
