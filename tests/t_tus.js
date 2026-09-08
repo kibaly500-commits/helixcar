@@ -211,10 +211,10 @@ function redirection(port) {
 // Construit un faux fichier vidéo de la taille voulue, dans la page.
 async function preparerVideo(page, octets) {
   await page.evaluate(n => {
-    // La vidéo n'est exigée que pour certaines activités : on coche
-    // réellement la case, comme le ferait un candidat.
-    const c = document.getElementById('conv-act-convoyage');
-    if (c) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }
+    // La vidéo n'est exigée que pour certaines activités. Celles-ci se
+    // déduisent des métiers : on ajoute donc réellement le métier, comme
+    // le ferait un candidat.
+    if (typeof convAjouterMetier === 'function') convAjouterMetier('convoyage');
     const buf = new Uint8Array(n);
     for (let i = 0; i < n; i++) buf[i] = i % 251;
     const f = new File([buf], 'TEST-QA.mp4', { type: 'video/mp4', lastModified: 1767225600000 });

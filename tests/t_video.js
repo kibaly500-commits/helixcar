@@ -14,13 +14,15 @@ async function ouvrirPartenaire(page) {
   await page.evaluate(() => { try { openModal('convoyeur'); } catch (e) {} });
   await page.waitForTimeout(60);
 }
+// Les activités ne se cochent plus : depuis le chantier « métiers »,
+// elles sont DÉDUITES des métiers retenus. On passe donc par le vrai
+// chemin du candidat — ajouter puis retirer des métiers — au lieu de
+// forcer un état que l'interface ne produit plus.
 async function activites(page, liste) {
   await page.evaluate(ls => {
-    ['convoyage', 'nettoyage', 'renfort'].forEach(v => {
-      const el = document.getElementById('conv-act-' + v);
-      if (el) el.checked = ls.indexOf(v) !== -1;
-    });
-    onChoixActivitesPartenaire();
+    const metierDe = { convoyage: 'convoyage', nettoyage: 'nettoyage', renfort: 'jockey' };
+    _convMetiersRetenus.slice().forEach(c => convRetirerMetier(c));
+    ls.forEach(a => { if (metierDe[a]) convAjouterMetier(metierDe[a]); });
   }, liste);
   await page.waitForTimeout(80);
 }

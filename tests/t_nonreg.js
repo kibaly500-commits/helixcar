@@ -87,7 +87,19 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     try { openModal('convoyeur'); } catch (e) {}
     return {
       ouvert: document.getElementById('modal-convoyeur').classList.contains('open'),
-      activites: ['convoyage', 'nettoyage', 'renfort'].every(v => !!document.getElementById('conv-act-' + v)),
+      // Les trois activités historiques ne sont plus cochées directement :
+      // depuis le chantier « métiers », elles sont DÉDUITES des métiers
+      // choisis. Ce qui doit rester vrai, ce n'est donc pas la présence
+      // des anciennes cases, c'est qu'un candidat puisse toujours les
+      // déclarer toutes les trois — et que la liste soit bien affichée.
+      activites: (function () {
+        if (typeof METIERS_PARTENAIRE === 'undefined') return false;
+        const dispo = METIERS_PARTENAIRE.map(m => m.activite);
+        if (typeof convRendreMetiers === 'function') convRendreMetiers();
+        const listeAffichee = !!document.querySelector('#conv-metiers-liste .conv-metier-ligne');
+        return listeAffichee
+          && ['convoyage', 'nettoyage', 'renfort'].every(a => dispo.indexOf(a) !== -1);
+      })(),
       docs: ['identite', 'permis', 'rcpro'].every(v => !!document.getElementById('conv-doc-' + v)),
       etapes: typeof _validateConvStep === 'function',
       videoChamp: !!document.querySelector('[id*="conv-video"]'),
@@ -97,7 +109,7 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     };
   });
   L.check('D1 : Partenaire — modale toujours fonctionnelle', part.ouvert);
-  L.check('D2 : Partenaire — 3 activités toujours présentes', part.activites);
+  L.check('D2 : Partenaire — les 3 activités historiques restent déclarables', part.activites);
   L.check('D3 : Partenaire — 3 documents toujours présents', part.docs);
   L.check('D4 : Partenaire — validation par étape intacte', part.etapes);
   // La vidéo fait désormais partie du parcours partenaire : ce qui doit
