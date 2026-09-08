@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HelixCar</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Mêmes familles que le site public (index.html) : Fraunces pour les
+     titres, Instrument Sans pour le texte courant. -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -15,26 +17,55 @@
 </script>
 <style>
 :root {
-  --yellow: #F5C518;
-  --yellow-light: #FFD94A;
-  --black: #0D0D0D;
-  --navy: #0A1628;
-  --blue: #1A3A6B;
-  --blue-mid: #2556A8;
-  --white: #FAFAF7;
-  --gray: #8A8A8A;
-  --gray-light: #F0EFE9;
-  --green: #22C55E;
-  --red: #EF4444;
-  --orange: #F97316;
+  /* ── IDENTITÉ HELIXCAR ──────────────────────────────────────
+     Reprise À L'IDENTIQUE de index.html : mêmes noms, mêmes valeurs.
+     Le Dashboard portait encore l'ancienne charte (jaune #F5C518,
+     bleu marine #0A1628, fond beige) — deux univers visuels pour un
+     même service.
+
+     AUCUNE règle de mise en page n'est réécrite : comme sur le site,
+     les anciens noms de variables sont conservés et simplement
+     reliés à la nouvelle palette. Le design du Dashboard, sa
+     structure et ses composants restent exactement les mêmes. */
+  --ink: #101820;        /* bleu nuit profond */
+  --paper: #F5F2EA;      /* ivoire chaud */
+  --silver: #A7ADB4;     /* gris argent */
+  --accent: #B5444B;     /* rouge HelixCar assourdi */
+  --accent-light: #C9686D;
+  --charcoal: #3A4149;   /* anthracite */
+
+  --yellow: var(--accent);
+  --yellow-light: var(--accent-light);
+  --black: var(--ink);
+  --navy: var(--ink);
+  --blue: var(--charcoal);
+  --blue-mid: var(--charcoal);
+  --white: #FFFFFF;
+  --gray: var(--silver);
+  --gray-light: #ECE8DC;
+  /* Couleurs D'ÉTAT — elles ne sont pas décoratives : elles disent
+     « validé », « en attente », « refusé ». Accordées à la palette,
+     jamais confondues entre elles ni avec l'accent de marque. */
+  --green: #1F7A4D;
+  --red: #B5444B;
+  --orange: #C97B2E;
   --sidebar-w: 260px;
   --radius: 12px;
-  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow: 0 4px 20px rgba(16,24,32,0.06);
   --t: 0.25s ease;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3EE; color: var(--black); font-size: 15px; }
+/* FOND BLANC — exigence explicite. Le fond beige #F4F3EE disparaît. */
+html, body { height: 100%; font-family: 'Instrument Sans', system-ui, sans-serif; background: #FFFFFF; color: var(--black); font-size: 15px; }
+
+/* Sur fond blanc, une carte blanche ne se distingue plus par sa seule
+   teinte : un filet discret prend le relais de l'ancien contraste
+   beige/ivoire. Aucune couleur de fond n'est réintroduite. */
+.card, .stat-card, .mission-card, .topbar, .table-wrap { border: 1px solid var(--gray-light); }
+.topbar { border-width: 0 0 1px 0; }
+.table-wrap { border-radius: var(--radius); }
+.card .table-wrap, .card .card { border: 0; }
 
 /* ── LOGIN SCREEN ── */
 #login-screen {
@@ -51,7 +82,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 
 .login-logo {
   display: flex; align-items: center; gap: 10px;
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.5rem;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.5rem;
   margin-bottom: 32px;
 }
 
@@ -62,7 +93,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 }
 
 .login-box h2 {
-  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.3rem;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 1.3rem;
   margin-bottom: 6px;
 }
 
@@ -86,7 +117,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 .form-group label { display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 6px; }
 .form-group input, .form-group select {
   width: 100%; padding: 11px 14px; border: 1.5px solid #ddd; border-radius: 8px;
-  font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none;
+  font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 0.9rem; outline: none;
   transition: border-color var(--t); background: var(--white); color: var(--black);
 }
 .form-group input:focus, .form-group select:focus { border-color: var(--blue-mid); }
@@ -94,7 +125,10 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 11px 22px; border-radius: 8px; cursor: pointer; border: none;
-  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.85rem;
+  /* Comme sur le site : Instrument Sans pour les commandes, Fraunces
+     réservé aux titres. Une police de titres sur un bouton de tableau
+     élargit le libellé et le fait passer à la ligne. */
+  font-family: 'Instrument Sans', system-ui, sans-serif; font-weight: 600; font-size: 0.85rem;
   transition: all var(--t); text-decoration: none; letter-spacing: 0.02em;
 }
 .btn-primary { background: var(--yellow); color: var(--black); }
@@ -122,7 +156,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 
 .sidebar-logo {
   display: flex; align-items: center; gap: 10px;
-  padding: 24px 20px; font-family: 'Syne', sans-serif;
+  padding: 24px 20px; font-family: 'Fraunces', Georgia, serif;
   font-weight: 800; font-size: 1.2rem; color: var(--white);
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
@@ -146,8 +180,8 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
   display: inline-block; font-weight: 600;
 }
 .role-admin { background: var(--yellow); color: var(--black); }
-.role-convoyeur { background: rgba(34,197,94,0.2); color: var(--green); }
-.role-client { background: rgba(37,86,168,0.3); color: #7EB3FF; }
+.role-convoyeur { background: rgba(31,122,77,0.2); color: var(--green); }
+.role-client { background: rgba(58,65,73,0.3); color: #C9CDD2; }
 
 .sidebar-nav { padding: 8px 12px; flex: 1; }
 
@@ -217,7 +251,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
   flex-shrink: 0;
 }
 
-.topbar-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; }
+.topbar-title { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 1.1rem; }
 .topbar-sub { font-size: 0.8rem; color: var(--gray); margin-top: 2px; }
 
 .topbar-actions { display: flex; gap: 10px; align-items: center; }
@@ -257,7 +291,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
 .stat-card.orange { border-left-color: var(--orange); }
 
 .stat-label { font-size: 0.75rem; color: var(--gray); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-.stat-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; line-height: 1; }
+.stat-value { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.8rem; line-height: 1; }
 .stat-sub { font-size: 0.75rem; color: var(--green); margin-top: 4px; font-weight: 600; }
 
 /* ── CARD ── */
@@ -271,7 +305,7 @@ html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: #F4F3
   margin-bottom: 20px;
 }
 
-.card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; }
+.card-title { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 1rem; }
 .card-sub { font-size: 0.8rem; color: var(--gray); margin-top: 2px; }
 
 /* ── TABLE ── */
@@ -295,11 +329,11 @@ tbody tr:last-child { border-bottom: none; }
   padding: 3px 10px; border-radius: 100px;
   font-size: 0.72rem; font-weight: 700;
 }
-.badge-pending { background: rgba(249,115,22,0.12); color: var(--orange); }
-.badge-active { background: rgba(34,197,94,0.12); color: var(--green); }
-.badge-refused { background: rgba(239,68,68,0.12); color: var(--red); }
-.badge-progress { background: rgba(37,86,168,0.1); color: var(--blue-mid); }
-.badge-done { background: rgba(34,197,94,0.12); color: var(--green); }
+.badge-pending { background: rgba(201,123,46,0.12); color: var(--orange); }
+.badge-active { background: rgba(31,122,77,0.12); color: var(--green); }
+.badge-refused { background: rgba(181,68,75,0.12); color: var(--red); }
+.badge-progress { background: rgba(58,65,73,0.10); color: var(--blue-mid); }
+.badge-done { background: rgba(31,122,77,0.12); color: var(--green); }
 
 /* ── MISSION CARD ── */
 .mission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
@@ -315,7 +349,7 @@ tbody tr:last-child { border-bottom: none; }
 
 .mission-route {
   display: flex; align-items: center; gap: 8px;
-  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 1rem;
   margin-bottom: 12px;
 }
 
@@ -330,7 +364,7 @@ tbody tr:last-child { border-bottom: none; }
 }
 
 .mission-price {
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--black);
+  font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.3rem; color: var(--black);
 }
 
 .mission-footer {
@@ -355,7 +389,7 @@ tbody tr:last-child { border-bottom: none; }
 /* ── HISTORIQUE ── */
 .historique-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
 .hstat { background: var(--gray-light); border-radius: 10px; padding: 14px; text-align: center; }
-.hstat-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; }
+.hstat-val { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.2rem; }
 .hstat-label { font-size: 0.72rem; color: var(--gray); margin-top: 4px; }
 
 /* ── EMPTY STATE ── */
@@ -363,7 +397,7 @@ tbody tr:last-child { border-bottom: none; }
   text-align: center; padding: 60px 20px; color: var(--gray);
 }
 .empty-icon { font-size: 3rem; margin-bottom: 12px; }
-.empty-state h3 { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--black); margin-bottom: 8px; }
+.empty-state h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 700; color: var(--black); margin-bottom: 8px; }
 .empty-state p { font-size: 0.88rem; }
 
 /* ── MODAL ── */
@@ -386,7 +420,7 @@ body.scroll-verrouille { overflow: hidden; }
   transform: translateY(16px); transition: transform 0.3s;
 }
 .modal-overlay.open .modal { transform: translateY(0); }
-.modal h3 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 6px; }
+.modal h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 6px; }
 .modal p { font-size: 0.88rem; color: #555; margin-bottom: 20px; }
 .modal-close { position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border-radius: 50%; background: var(--gray-light); border: none; cursor: pointer; font-size: 1rem; }
 
@@ -401,9 +435,9 @@ body.scroll-verrouille { overflow: hidden; }
   padding: 12px 16px; border-radius: 8px; font-size: 0.85rem;
   margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
 }
-.alert-info { background: rgba(37,86,168,0.08); color: var(--blue-mid); border: 1px solid rgba(37,86,168,0.2); }
-.alert-success { background: rgba(34,197,94,0.08); color: #16A34A; border: 1px solid rgba(34,197,94,0.2); }
-.alert-warning { background: rgba(249,115,22,0.08); color: #C2410C; border: 1px solid rgba(249,115,22,0.2); }
+.alert-info { background: rgba(58,65,73,0.08); color: var(--blue-mid); border: 1px solid rgba(58,65,73,0.2); }
+.alert-success { background: rgba(31,122,77,0.08); color: #1F7A4D; border: 1px solid rgba(31,122,77,0.2); }
+.alert-warning { background: rgba(201,123,46,0.08); color: #A65E22; border: 1px solid rgba(201,123,46,0.2); }
 
 /* ── FRAIS UPLOAD ── */
 .upload-zone {
@@ -416,17 +450,17 @@ body.scroll-verrouille { overflow: hidden; }
 /* ── NOTATION ── */
 .note-global {
   display: inline-flex; align-items: center; gap: 8px;
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.6rem;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.6rem;
 }
 .note-badge {
   padding: 4px 12px; border-radius: 8px; font-size: 0.8rem;
-  font-weight: 700; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-family: 'Fraunces', Georgia, serif;
 }
-.note-excellent { background: rgba(34,197,94,0.12); color: #16A34A; }
-.note-bon       { background: rgba(245,197,24,0.2);  color: #92700A; }
-.note-warning   { background: rgba(249,115,22,0.12); color: #C2410C; }
-.note-danger    { background: rgba(239,68,68,0.12);  color: var(--red); }
-.note-blocked   { background: rgba(239,68,68,1);     color: white; }
+.note-excellent { background: rgba(31,122,77,0.12); color: #1F7A4D; }
+.note-bon       { background: rgba(181,68,75,0.2);  color: #8C3238; }
+.note-warning   { background: rgba(201,123,46,0.12); color: #A65E22; }
+.note-danger    { background: rgba(181,68,75,0.12);  color: var(--red); }
+.note-blocked   { background: rgba(181,68,75,1);     color: white; }
 
 .critere-row {
   display: flex; align-items: center; gap: 12px;
@@ -450,17 +484,17 @@ body.scroll-verrouille { overflow: hidden; }
   transition: all var(--t); margin-bottom: 8px;
 }
 .convoyeur-note-row:hover { border-color: var(--yellow); background: #FAFAF0; }
-.convoyeur-note-row.blocked { background: rgba(239,68,68,0.04); border-color: rgba(239,68,68,0.3); }
+.convoyeur-note-row.blocked { background: rgba(181,68,75,0.04); border-color: rgba(181,68,75,0.3); }
 
 .note-circle {
   width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 0.95rem;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 0.95rem;
   border: 3px solid;
 }
-.nc-excellent { border-color: var(--green);  color: var(--green);  background: rgba(34,197,94,0.08); }
-.nc-bon       { border-color: var(--yellow); color: #92700A;       background: rgba(245,197,24,0.1); }
-.nc-warning   { border-color: var(--orange); color: var(--orange); background: rgba(249,115,22,0.08); }
+.nc-excellent { border-color: var(--green);  color: var(--green);  background: rgba(31,122,77,0.08); }
+.nc-bon       { border-color: var(--yellow); color: #8C3238;       background: rgba(181,68,75,0.1); }
+.nc-warning   { border-color: var(--orange); color: var(--orange); background: rgba(201,123,46,0.08); }
 .nc-blocked   { border-color: var(--red);    color: white;         background: var(--red); }
 
 .hn-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; margin-bottom: 6px; }
@@ -816,7 +850,7 @@ body.scroll-verrouille { overflow: hidden; }
 <!-- MOBILE FULL MENU OVERLAY -->
 <div id="mobile-menu-overlay" style="display:none;position:fixed;inset:0;z-index:200;background:var(--navy);overflow-y:auto;padding:20px 16px 40px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-    <div style="font-family:'Syne',sans-serif;font-weight:800;color:#fff;font-size:1.1rem">Menu</div>
+    <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;color:#fff;font-size:1.1rem">Menu</div>
     <button onclick="_fermerMenuMobile()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer">✕</button>
   </div>
   <div id="mobile-menu-items" style="display:flex;flex-direction:column;gap:4px"></div>
@@ -968,7 +1002,7 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="alert alert-warning"><span>⚠️ <strong>3 candidatures convoyeurs</strong> sont en attente de validation.</span></div>
-        <div class="alert" style="background:rgba(245,197,24,.1);border:1.5px solid rgba(245,197,24,.4);border-radius:10px;padding:12px 16px;color:#92400E;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div class="alert" style="background:rgba(181,68,75,.1);border:1.5px solid rgba(181,68,75,.4);border-radius:10px;padding:12px 16px;color:#8C3238;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span>🏁 <strong>Challenge mai terminé</strong> — 3 convoyeurs éligibles à récompenser</span>
           <button class="btn btn-sm" style="background:var(--yellow);color:var(--navy);border:none;font-weight:700" onclick="showPage('admin-challenge')">Voir le classement →</button>
         </div>
@@ -1021,8 +1055,8 @@ body.scroll-verrouille { overflow: hidden; }
   <td style="color:#888;font-size:.82rem">174 €</td>
   <td><strong style="color:var(--green)">175 €</strong></td>
   <td>
-    <span class="badge" style="background:rgba(239,68,68,.15);color:#C2410C">🔧 Panne signalée</span>
-    <div style="font-size:.7rem;color:#C2410C;margin-top:2px">A7 · km 312 · 14h32</div>
+    <span class="badge" style="background:rgba(181,68,75,.15);color:#A65E22">🔧 Panne signalée</span>
+    <div style="font-size:.7rem;color:#A65E22;margin-top:2px">A7 · km 312 · 14h32</div>
   </td>
   <td><button class="btn btn-sm btn-outline" style="border-color:var(--red);color:var(--red)" onclick="showMission(1)">Détail</button></td>
 </tr>
@@ -1265,14 +1299,14 @@ body.scroll-verrouille { overflow: hidden; }
             <table>
               <thead><tr><th>Date</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Je suis</th><th>Motif</th><th>Statut</th><th>Action</th></tr></thead>
               <tbody>
-                <tr style="background:rgba(245,197,24,.04)">
+                <tr style="background:rgba(181,68,75,.04)">
                   <td>30/05 · 21h43</td>
                   <td><strong>Jean Dupont</strong></td>
                   <td>📞 06 11 22 33 44</td>
                   <td>j.dupont@email.com</td>
                   <td><span class="badge badge-active">👤 Client</span></td>
                   <td>Demande de devis</td>
-                  <td><span class="badge" style="background:rgba(239,68,68,.1);color:#C2410C">🔴 À traiter</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.1);color:#A65E22">🔴 À traiter</span></td>
                   <td>
                     <a href="tel:0611223344" class="btn btn-sm btn-dark" style="text-decoration:none">📞 Rappeler</a>
                   </td>
@@ -1284,7 +1318,7 @@ body.scroll-verrouille { overflow: hidden; }
                   <td>m.lambert@email.com</td>
                   <td><span class="badge badge-active">👤 Client</span></td>
                   <td>Gestion de flotte</td>
-                  <td><span class="badge" style="background:rgba(239,68,68,.1);color:#C2410C">🔴 À traiter</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.1);color:#A65E22">🔴 À traiter</span></td>
                   <td><a href="tel:0722334455" class="btn btn-sm btn-dark" style="text-decoration:none">📞 Rappeler</a></td>
                 </tr>
                 <tr style="opacity:.6">
@@ -1346,11 +1380,11 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-admin-challenge">
 
         <!-- Alerte récompenses à attribuer -->
-        <div class="alert" style="background:rgba(245,197,24,.12);border:2px solid rgba(245,197,24,.5);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px">
+        <div class="alert" style="background:rgba(181,68,75,.12);border:2px solid rgba(181,68,75,.5);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px">
           <span style="font-size:1.4rem">🏆</span>
           <div>
-            <div style="font-weight:700;font-size:.92rem;color:#92400E;margin-bottom:3px">3 convoyeurs à récompenser ce mois-ci</div>
-            <div style="font-size:.82rem;color:#92400E;line-height:1.6">Le mois de mai est terminé. Attribuez les récompenses aux 3 premiers du classement. Les convoyeurs éligibles ont déjà reçu une notification.</div>
+            <div style="font-weight:700;font-size:.92rem;color:#8C3238;margin-bottom:3px">3 convoyeurs à récompenser ce mois-ci</div>
+            <div style="font-size:.82rem;color:#8C3238;line-height:1.6">Le mois de mai est terminé. Attribuez les récompenses aux 3 premiers du classement. Les convoyeurs éligibles ont déjà reçu une notification.</div>
             <button class="btn btn-sm" style="background:var(--yellow);color:var(--navy);border:none;margin-top:10px;font-weight:700" onclick="envoyerRecompenses()">🎁 Attribuer les récompenses et notifier</button>
           </div>
         </div>
@@ -1367,7 +1401,7 @@ body.scroll-verrouille { overflow: hidden; }
             <table>
               <thead><tr><th>Rang</th><th>Convoyeur</th><th>Ancienneté</th><th>Km ce mois</th><th>Missions</th><th>Éligible</th><th>Récompense</th><th>Statut</th></tr></thead>
               <tbody>
-                <tr style="background:rgba(245,197,24,.08)">
+                <tr style="background:rgba(181,68,75,.08)">
                   <td><span style="font-size:1.2rem">🥇</span></td>
                   <td><strong>Antoine Arcelin</strong><br><span style="font-size:.72rem;color:#888">CNV-0001</span></td>
                   <td>4 mois ✅</td>
@@ -1375,9 +1409,9 @@ body.scroll-verrouille { overflow: hidden; }
                   <td>12</td>
                   <td><span class="badge badge-active">✅ Éligible</span></td>
                   <td><strong style="color:var(--yellow)">150 €</strong></td>
-                  <td><span class="badge" style="background:rgba(245,197,24,.15);color:#92400E">⏳ À verser</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
                 </tr>
-                <tr style="background:rgba(34,197,94,.04)">
+                <tr style="background:rgba(31,122,77,.04)">
                   <td><span style="font-size:1.2rem">🥈</span></td>
                   <td><strong>Jean Pellerin</strong><br><span style="font-size:.72rem;color:#888">CNV-0002</span></td>
                   <td>3 mois ✅</td>
@@ -1385,7 +1419,7 @@ body.scroll-verrouille { overflow: hidden; }
                   <td>9</td>
                   <td><span class="badge badge-active">✅ Éligible</span></td>
                   <td><strong style="color:#888">100 €</strong></td>
-                  <td><span class="badge" style="background:rgba(245,197,24,.15);color:#92400E">⏳ À verser</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
                 </tr>
                 <tr>
                   <td><span style="font-size:1.2rem">🥉</span></td>
@@ -1395,7 +1429,7 @@ body.scroll-verrouille { overflow: hidden; }
                   <td>7</td>
                   <td><span class="badge badge-active">✅ Éligible</span></td>
                   <td><strong style="color:#888">50 €</strong></td>
-                  <td><span class="badge" style="background:rgba(245,197,24,.15);color:#92400E">⏳ À verser</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
                 </tr>
                 <tr style="opacity:.5">
                   <td>4</td>
@@ -1430,7 +1464,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Pannes -->
       <div class="page" id="page-admin-pannes">
-        <div class="alert" style="background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;padding:12px 16px;color:#C2410C;margin-bottom:14px">
+        <div class="alert" style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.25);border-radius:10px;padding:12px 16px;color:#A65E22;margin-bottom:14px">
           🔧 <strong>1 panne active en ce moment.</strong> Le client a été informé automatiquement.
         </div>
         <div class="card">
@@ -1439,7 +1473,7 @@ body.scroll-verrouille { overflow: hidden; }
             <table>
               <thead><tr><th>Mission</th><th>Convoyeur</th><th>Trajet</th><th>Type incident</th><th>Localisation</th><th>Heure signalement</th><th>Client informé</th><th>Statut</th></tr></thead>
               <tbody>
-                <tr style="background:rgba(239,68,68,.04)">
+                <tr style="background:rgba(181,68,75,.04)">
                   <td><strong>HC-2024-0531</strong></td>
                   <td>Sara Bouali</td>
                   <td>Marseille → Nice</td>
@@ -1447,7 +1481,7 @@ body.scroll-verrouille { overflow: hidden; }
                   <td>A8 · km 42</td>
                   <td>14h32</td>
                   <td><span class="badge badge-active">✅ SMS + Email</span></td>
-                  <td><span class="badge" style="background:rgba(239,68,68,.15);color:#C2410C">🔴 En cours</span></td>
+                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#A65E22">🔴 En cours</span></td>
                 </tr>
                 <tr>
                   <td>HC-2024-0518</td>
@@ -1546,7 +1580,7 @@ body.scroll-verrouille { overflow: hidden; }
                 <span class="note-badge note-blocked">🔒 BLOQUÉ DÉFINITIVEMENT</span>
               </div>
               <div style="font-size:0.78rem;color:var(--gray);margin-bottom:8px">5 missions · 1 840 km · 4 évaluations · Bloqué le 20/05/2024</div>
-              <div style="font-size:0.82rem;color:var(--red);background:rgba(239,68,68,0.06);padding:10px;border-radius:8px;line-height:1.6">
+              <div style="font-size:0.82rem;color:var(--red);background:rgba(181,68,75,0.06);padding:10px;border-radius:8px;line-height:1.6">
                 Note moyenne de 8.2/20 — sous le seuil de 10/20. Compte bloqué automatiquement. Email envoyé le 20/05/2024.
               </div>
             </div>
@@ -1721,7 +1755,7 @@ body.scroll-verrouille { overflow: hidden; }
 
             <div class="form-group" style="margin-top:16px">
               <label>Commentaire (optionnel)</label>
-              <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical" placeholder="Décrivez votre expérience avec ce convoyeur..."></textarea>
+              <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical" placeholder="Décrivez votre expérience avec ce convoyeur..."></textarea>
             </div>
 
             <button class="btn btn-primary" style="margin-top:8px" onclick="soumettreNotation()">Soumettre mon évaluation →</button>
@@ -1729,7 +1763,7 @@ body.scroll-verrouille { overflow: hidden; }
 
           <div id="notation-success" style="display:none;text-align:center;padding:32px 0">
             <div style="font-size:3rem;margin-bottom:12px">✅</div>
-            <h3 style="font-family:'Syne',sans-serif;font-weight:800;margin-bottom:8px">Évaluation envoyée !</h3>
+            <h3 style="font-family:'Fraunces',Georgia,serif;font-weight:800;margin-bottom:8px">Évaluation envoyée !</h3>
             <p style="color:#555;font-size:0.88rem">Merci pour votre retour. Il contribue à maintenir la qualité du service HelixCar.</p>
             <button class="btn btn-primary" style="margin-top:20px" onclick="showPage('client-dashboard')">Retour au tableau de bord</button>
           </div>
@@ -1753,7 +1787,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">🔔 Notifications push convoyeurs</div><div class="card-sub">Via OneSignal — gratuit jusqu'à 10 000 abonnés</div></div>
           <div class="alert alert-info">📱 Les convoyeurs acceptent les notifications lors de leur première connexion. Vous pouvez ensuite leur envoyer des alertes instantanées sur leur téléphone.</div>
           <div class="form-group"><label>Titre de la notification</label><input type="text" placeholder="🚗 Nouvelle mission disponible !"></div>
-          <div class="form-group"><label>Message</label><textarea style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;min-height:70px;outline:none" placeholder="Paris → Lyon · 200 € · Départ 29/05 · Cliquez pour voir"></textarea></div>
+          <div class="form-group"><label>Message</label><textarea style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:.88rem;min-height:70px;outline:none" placeholder="Paris → Lyon · 200 € · Départ 29/05 · Cliquez pour voir"></textarea></div>
           <div class="form-group"><label>Envoyer à</label>
             <select><option>Tous les convoyeurs actifs</option><option>Convoyeurs zone Paris</option><option>Convoyeurs zone Lyon</option><option>Convoyeurs zone Marseille</option></select>
           </div>
@@ -1788,7 +1822,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="form-group"><label>Numéro expéditeur</label><input type="text" placeholder="+33 X XX XX XX XX"></div>
           <div class="form-group">
             <label>Message automatique à l'arrivée</label>
-            <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical">Bonjour, votre convoyeur HelixCar vient d'arriver à destination avec votre véhicule. Merci de votre confiance ! — L'équipe HelixCar</textarea>
+            <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical">Bonjour, votre convoyeur HelixCar vient d'arriver à destination avec votre véhicule. Merci de votre confiance ! — L'équipe HelixCar</textarea>
           </div>
           <button class="btn btn-primary" onclick="alert('Configuration SMS enregistrée ✓')">Enregistrer la configuration</button>
         </div>
@@ -1836,7 +1870,7 @@ body.scroll-verrouille { overflow: hidden; }
         <div class="card">
           <div class="card-header"><div class="card-title">✅ Missions terminées — prêtes à facturer</div></div>
           <div id="fc-conv-missions-list" style="padding:4px 0"><p style="color:#888;font-size:.85rem">Chargement…</p></div>
-          <div id="fc-conv-blocage-msg" style="display:none;background:rgba(249,115,22,.08);color:#C2410C;border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:10px 12px;font-size:.8rem;margin-top:8px"></div>
+          <div id="fc-conv-blocage-msg" style="display:none;background:rgba(201,123,46,.08);color:#A65E22;border:1px solid rgba(201,123,46,.2);border-radius:8px;padding:10px 12px;font-size:.8rem;margin-top:8px"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:2px solid #eee">
             <div style="font-weight:700">Total : <span style="color:var(--green);font-size:1.1rem" id="fc-conv-total">0 €</span></div>
             <button class="btn btn-primary" id="fc-conv-generer-btn" onclick="genererFactureConvoyeur()" disabled>🧾 Générer la facture</button>
@@ -1853,7 +1887,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CONVOYEUR: Panne -->
       <div class="page" id="page-convoyeur-panne">
-        <div class="alert" style="background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;color:#C2410C;margin-bottom:14px">
+        <div class="alert" style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.3);border-radius:10px;padding:12px 16px;color:#A65E22;margin-bottom:14px">
           🔧 Signalez tout incident immédiatement. <strong>Le client sera prévenu automatiquement par SMS et email.</strong>
         </div>
         <div class="card">
@@ -1865,7 +1899,7 @@ body.scroll-verrouille { overflow: hidden; }
             <select><option value="">Sélectionnez…</option><option>🚗 Panne moteur</option><option>💥 Accident</option><option>🔧 Crevaison</option><option>⛽ Panne de carburant</option><option>🚦 Retard important</option><option>🔑 Autre problème</option></select>
           </div>
           <div class="form-group"><label>Localisation</label><input type="text" placeholder="Ex : A6 direction Lyon, km 245"></div>
-          <div class="form-group"><label>Détails</label><textarea placeholder="Décrivez la situation…" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;min-height:80px;outline:none;resize:vertical"></textarea></div>
+          <div class="form-group"><label>Détails</label><textarea placeholder="Décrivez la situation…" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:.88rem;min-height:80px;outline:none;resize:vertical"></textarea></div>
           <div class="form-group"><label>Retard estimé</label>
             <select><option>Non estimé</option><option>+30 min</option><option>+1h</option><option>+2h</option><option>+3h ou plus</option><option>Mission compromise</option></select>
           </div>
@@ -1896,7 +1930,7 @@ body.scroll-verrouille { overflow: hidden; }
             <div class="hn-row"><span class="hn-label">👔 Tenue /2</span><div class="hn-bar"><div class="hn-fill" style="width:100%;background:var(--green)"></div></div><span class="hn-val">2.0</span></div>
           </div>
 
-          <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:14px;font-size:0.85rem;color:#16A34A;line-height:1.6">
+          <div style="background:rgba(31,122,77,0.06);border:1px solid rgba(31,122,77,0.2);border-radius:10px;padding:14px;font-size:0.85rem;color:#1F7A4D;line-height:1.6">
             ✅ Votre note est au-dessus du seuil minimum de <strong>10/20</strong>. Continuez ainsi pour maintenir votre accès aux missions et vos récompenses du programme d'excellence.
           </div>
         </div>
@@ -1946,19 +1980,19 @@ body.scroll-verrouille { overflow: hidden; }
           <div style="display:flex;gap:16px;flex-wrap:wrap">
             <div style="flex:1;min-width:200px;background:var(--yellow);border-radius:12px;padding:24px;text-align:center">
               <div style="font-size:2rem">🥇</div>
-              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem">150 €</div>
+              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem">150 €</div>
               <div style="font-size:0.8rem;opacity:0.7">1ère place · 4 210 km</div>
               <div style="font-size:0.75rem;margin-top:4px">Jean Pellerin</div>
             </div>
             <div style="flex:1;min-width:200px;background:var(--navy);color:white;border-radius:12px;padding:24px;text-align:center;border:3px solid var(--yellow)">
               <div style="font-size:2rem">🥈</div>
-              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;color:var(--yellow)">100 €</div>
+              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem;color:var(--yellow)">100 €</div>
               <div style="font-size:0.8rem;opacity:0.7">2ème place · 3 840 km</div>
               <div style="font-size:0.75rem;margin-top:4px;color:var(--yellow)">Vous ← </div>
             </div>
             <div style="flex:1;min-width:200px;background:var(--gray-light);border-radius:12px;padding:24px;text-align:center">
               <div style="font-size:2rem">🥉</div>
-              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem">50 €</div>
+              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem">50 €</div>
               <div style="font-size:0.8rem;opacity:0.7">3ème place · 3 120 km</div>
               <div style="font-size:0.75rem;margin-top:4px">Sara Bouali</div>
             </div>
@@ -2085,29 +2119,29 @@ body.scroll-verrouille { overflow: hidden; }
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
           <div style="background:var(--yellow);border-radius:14px;padding:24px">
             <div style="font-size:1.5rem;margin-bottom:8px">🎁</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:6px">Palier 1 — 1 000 km ✅</div>
+            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 1 — 1 000 km ✅</div>
             <div style="font-size:0.83rem;line-height:1.6">Réduction 10% · Box surprise auto (10-15 €)</div>
             <span class="badge badge-active" style="margin-top:10px;display:inline-flex">Débloqué</span>
           </div>
           <div style="background:var(--white);border-radius:14px;padding:24px;border:2px solid var(--yellow)">
             <div style="font-size:1.5rem;margin-bottom:8px">⭐</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:6px">Palier 2 — 2 500 km</div>
+            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 2 — 2 500 km</div>
             <div style="font-size:0.83rem;line-height:1.6;color:#555">Réduction 15% · Nettoyage extérieur gratuit · Service client prioritaire</div>
             <span class="badge badge-pending" style="margin-top:10px;display:inline-flex">1 220 km restants</span>
           </div>
           <div style="background:var(--gray-light);border-radius:14px;padding:24px;opacity:0.7">
             <div style="font-size:1.5rem;margin-bottom:8px">🔒</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:6px">Palier 3 — 5 000 km</div>
+            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 3 — 5 000 km</div>
             <div style="font-size:0.83rem;color:#888">Récompenses mystère…</div>
           </div>
           <div style="background:var(--gray-light);border-radius:14px;padding:24px;opacity:0.6">
             <div style="font-size:1.5rem;margin-bottom:8px">🔒</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:6px">Palier 4 — 10 000 km</div>
+            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 4 — 10 000 km</div>
             <div style="font-size:0.83rem;color:#888">Récompenses mystère…</div>
           </div>
           <div style="background:var(--navy);color:white;border-radius:14px;padding:24px;opacity:0.6">
             <div style="font-size:1.5rem;margin-bottom:8px">🏆</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:6px">Palier Entreprises — 20 000 km</div>
+            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier Entreprises — 20 000 km</div>
             <div style="font-size:0.83rem;opacity:0.7">Récompenses mystère…</div>
           </div>
         </div>
@@ -2153,10 +2187,10 @@ body.scroll-verrouille { overflow: hidden; }
               </div>
               <a href="helixcar-lettre-voiture.html" target="_blank" class="btn btn-sm btn-outline">Ouvrir</a>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:#FFF8E1;border-radius:8px;border:1px solid rgba(245,197,24,.3)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:#FFF8E1;border-radius:8px;border:1px solid rgba(181,68,75,.3)">
               <div>
                 <div style="font-weight:700;font-size:.88rem">🔄 Lettre de voiture — Restitution HC-2024-0529-RESTIT</div>
-                <div style="font-size:.75rem;color:#92400E;margin-top:2px">À utiliser pour l'état des lieux retour · Même procédure que l'aller</div>
+                <div style="font-size:.75rem;color:#8C3238;margin-top:2px">À utiliser pour l'état des lieux retour · Même procédure que l'aller</div>
               </div>
               <a href="helixcar-lettre-voiture-restit.html" target="_blank" class="btn btn-sm" style="background:var(--yellow);color:var(--navy);font-weight:700;padding:6px 12px;font-size:.78rem;border-radius:6px;text-decoration:none">Ouvrir</a>
             </div>
@@ -3751,6 +3785,18 @@ function escapeHtml(str) {
 // candidature date d'avant ce lot, elle est donc par définition une
 // candidature de convoyage. Aucune ligne réelle n'est modifiée : la
 // normalisation se fait uniquement à l'affichage.
+// Activités et métiers reconnus. Mêmes clés qu'index.html : le
+// Dashboard ne réinvente aucune nomenclature.
+var CONV_ACTIVITES_CONNUES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
+var CONV_LIB_METIER = {
+  jockey: 'Jockey automobile',
+  accueil_preparation: 'Accueil en concession',
+  soutien_administratif: 'Soutien administratif',
+  mecanique: 'Mécanique',
+  carrosserie: 'Carrosserie',
+  diagnostic: 'Diagnostic'
+};
+
 function normaliserActivites(activites) {
   var out = [];
   if (Array.isArray(activites)) out = activites.slice();
@@ -3760,12 +3806,32 @@ function normaliserActivites(activites) {
       return s.replace(/^"|"$/g, '').trim();
     });
   }
-  out = out.filter(function (v) { return v === 'convoyage' || v === 'nettoyage' || v === 'renfort'; });
+  out = out.filter(function (v) { return CONV_ACTIVITES_CONNUES.indexOf(v) !== -1; });
   return out.length ? out : ['convoyage'];
 }
 
+// Métiers déclarés par un partenaire (convoyeurs.metiers), tolérants au
+// même double format que les activités. Les libellés viennent des mêmes
+// tables que le formulaire client : aucune correspondance parallèle.
+function normaliserMetiers(metiers) {
+  var out = [];
+  if (Array.isArray(metiers)) out = metiers.slice();
+  else if (typeof metiers === 'string' && metiers.trim()) {
+    out = metiers.replace(/^\{|\}$/g, '').split(',').map(function (s) {
+      return s.replace(/^"|"$/g, '').trim();
+    });
+  }
+  return out.filter(function (v) { return !!CONV_LIB_METIER[v]; });
+}
+
+function libellesMetiers(metiers) {
+  var m = normaliserMetiers(metiers);
+  return m.length ? m.map(function (v) { return CONV_LIB_METIER[v]; }).join(', ') : '';
+}
+
 function badgesActivites(activites) {
-  var LIB = { convoyage: 'CONVOYAGE', nettoyage: 'NETTOYAGE', renfort: 'RENFORT AUTOMOBILE' };
+  var LIB = { convoyage: 'CONVOYAGE', nettoyage: 'NETTOYAGE',
+              renfort: 'RENFORT AUTOMOBILE', technicien: 'TECHNICIEN' };
   var actes = normaliserActivites(activites);
   var html = actes.map(function (a) {
     return '<span class="badge badge-active" style="font-size:.62rem;padding:2px 7px">' + LIB[a] + '</span>';
@@ -3777,7 +3843,8 @@ function badgesActivites(activites) {
 }
 
 function libellesActivites(activites) {
-  var LIB = { convoyage: 'Convoyage automobile', nettoyage: 'Nettoyage automobile', renfort: 'Renfort automobile' };
+  var LIB = { convoyage: 'Convoyage automobile', nettoyage: 'Nettoyage automobile',
+              renfort: 'Renfort automobile sur site', technicien: 'Technicien automobile' };
   return normaliserActivites(activites).map(function (a) { return LIB[a]; }).join(', ');
 }
 
@@ -4939,6 +5006,9 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
     <div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-val">${escapeHtml(c.telephone)}</span></div>
     <div class="detail-row"><span class="detail-label">Activités</span><span class="detail-val">${escapeHtml(libellesActivites(c.activites))}</span></div>
+    ${libellesMetiers(c.metiers)
+      ? `<div class="detail-row"><span class="detail-label">Métiers déclarés</span><span class="detail-val">${escapeHtml(libellesMetiers(c.metiers))}</span></div>`
+      : ''}
     ${normaliserActivites(c.activites).indexOf('convoyage') !== -1
       ? `<div class="detail-row"><span class="detail-label">Expérience</span><span class="detail-val">${escapeHtml(c.experience) || '—'}</span></div>`
       : ''}
@@ -4971,7 +5041,8 @@ var LIB_DECISION = { oui: 'Oui', non: 'Non', en_attente: 'En attente' };
 var LIB_ACTIVITE_DECISION = {
   convoyage: 'Convoyage automobile',
   nettoyage: 'Nettoyage automobile',
-  renfort: 'Renfort automobile sur site'
+  renfort: 'Renfort automobile sur site',
+  technicien: 'Technicien automobile'
 };
 
 // Fiche actuellement ouverte : identifiant, nom, décisions chargées.
@@ -6039,12 +6110,12 @@ const CONV_MISSION_ACTIONS = {
   },
   fini: function(id, reference, m) {
     const btnLettre = '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
-    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(34,197,94,.12);color:#16A34A;border:1px solid rgba(34,197,94,.3)">✅ Lettre signée envoyée</a>' : '';
+    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;border:1px solid rgba(31,122,77,.3)">✅ Lettre signée envoyée</a>' : '';
     return btnLettre + lienLettreSignee + '<span class="badge badge-progress" style="font-size:.72rem">🔵 En attente de confirmation HelixCar</span>';
   },
   terminee: function(id, reference, m) {
     const btnLettre = '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
-    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(34,197,94,.12);color:#16A34A;border:1px solid rgba(34,197,94,.3)">✅ Lettre signée envoyée</a>' : '';
+    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;border:1px solid rgba(31,122,77,.3)">✅ Lettre signée envoyée</a>' : '';
     return btnLettre + lienLettreSignee;
   }
 };
@@ -6161,7 +6232,7 @@ function compterJoursOuvresEntre(dateDebut, dateFin) {
 
 const FACTURE_STATUT_BADGE = {
   en_attente: '<span class="badge badge-pending">⏳ En attente</span>',
-  validee:    '<span class="badge" style="background:rgba(245,197,24,.2);color:#92400E">💰 À payer</span>',
+  validee:    '<span class="badge" style="background:rgba(181,68,75,.2);color:#8C3238">💰 À payer</span>',
   payee:      '<span class="badge badge-active">✅ Payée</span>'
 };
 
@@ -6218,7 +6289,7 @@ function loadFacturationConvoyeur() {
         if (!m.lettre_voiture_signee_url) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
             + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
-            + '<br><span style="font-size:.78rem;color:#C2410C">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Historique)</span></div>'
+            + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Historique)</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
@@ -6435,10 +6506,10 @@ function acceptMission() {
     <div style="display:flex;flex-direction:column;gap:6px;font-size:.84rem">
       <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee"><span style="color:#888">Mission</span><span style="font-weight:700;font-family:monospace">${code}</span></div>
       <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee"><span style="color:#888">Trajet</span><span style="font-weight:600">${title}</span></div>
-      <div style="padding:10px;background:rgba(245,197,24,.1);border:1.5px solid rgba(245,197,24,.4);border-radius:8px;margin-top:4px">
-        <div style="font-weight:700;color:#92400E;font-size:.83rem;margin-bottom:4px">🔄 Code de restitution</div>
+      <div style="padding:10px;background:rgba(181,68,75,.1);border:1.5px solid rgba(181,68,75,.4);border-radius:8px;margin-top:4px">
+        <div style="font-weight:700;color:#8C3238;font-size:.83rem;margin-bottom:4px">🔄 Code de restitution</div>
         <div style="font-family:monospace;font-size:1rem;font-weight:900;letter-spacing:.1em;color:#1a1a1a">${restitCode}</div>
-        <div style="font-size:.75rem;color:#92400E;margin-top:4px">Conservez ce code. Il vous sera renvoyé par email dès la livraison.</div>
+        <div style="font-size:.75rem;color:#8C3238;margin-top:4px">Conservez ce code. Il vous sera renvoyé par email dès la livraison.</div>
       </div>
     </div>
   `;
@@ -6455,10 +6526,10 @@ function handleDashVideo(input) {
   const file = input.files[0];
   const sizeMb = (file.size / 1024 / 1024).toFixed(1);
   if (file.size > 200 * 1024 * 1024) {
-    div.style.color = '#EF4444';
+    div.style.color = 'var(--red)';
     div.textContent = '⚠️ Fichier trop volumineux (max 200 Mo). Compressez votre vidéo.';
   } else {
-    div.style.color = '#2556A8';
+    div.style.color = 'var(--green)';
     div.textContent = '✅ Vidéo sélectionnée : ' + file.name + ' (' + sizeMb + ' Mo)';
   }
   div.style.display = 'block';
@@ -6567,19 +6638,19 @@ function showMissionDetail(code, from, to, km, client, clientTel, convoyeur, con
   conv = r.conv; frais = r.frais; marge = r.marge;
 
   const statusMap = {
-    'en-cours':       { badge: '🚗 En cours',        color: 'var(--blue-mid)',  bg: 'rgba(37,86,168,.08)' },
-    'panne':          { badge: '🔧 Panne signalée',  color: '#C2410C',          bg: 'rgba(239,68,68,.08)' },
-    'terminee':       { badge: '✅ Terminée',         color: '#16A34A',          bg: 'rgba(34,197,94,.08)' },
-    'sans-convoyeur': { badge: '⏳ Sans convoyeur',  color: '#92400E',          bg: 'rgba(245,197,24,.1)'  },
+    'en-cours':       { badge: '🚗 En cours',        color: 'var(--blue-mid)',  bg: 'rgba(58,65,73,.08)' },
+    'panne':          { badge: '🔧 Panne signalée',  color: '#A65E22',          bg: 'rgba(181,68,75,.08)' },
+    'terminee':       { badge: '✅ Terminée',         color: '#1F7A4D',          bg: 'rgba(31,122,77,.08)' },
+    'sans-convoyeur': { badge: '⏳ Sans convoyeur',  color: '#8C3238',          bg: 'rgba(181,68,75,.1)'  },
   };
   const s = statusMap[statut] || statusMap['en-cours'];
 
   const incidentHtml = incident ? `
-    <div style="background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-weight:700;color:#C2410C;font-size:.88rem;margin-bottom:8px">🔧 Incident en cours</div>
+    <div style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.25);border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:700;color:#A65E22;font-size:.88rem;margin-bottom:8px">🔧 Incident en cours</div>
       <p style="font-size:.83rem;color:#555;line-height:1.6">${incident}</p>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-sm" style="background:#C2410C;color:#fff;border:none" onclick="alert('📱 SMS envoyé au client.')">📱 Prévenir le client</button>
+        <button class="btn btn-sm" style="background:#A65E22;color:#fff;border:none" onclick="alert('📱 SMS envoyé au client.')">📱 Prévenir le client</button>
         <button class="btn btn-sm btn-outline" onclick="alert('✅ Incident marqué comme résolu.')">✅ Marquer résolu</button>
       </div>
     </div>
@@ -6590,7 +6661,7 @@ function showMissionDetail(code, from, to, km, client, clientTel, convoyeur, con
        <div style="font-size:.8rem;color:#666;margin-top:2px">${convId} · Certifié HelixCar</div>
        <div style="font-size:.8rem;color:#666;margin-top:1px">📞 ${convTel}</div>
        <a href="tel:${convTel.replace(/\\s/g,'')}" style="display:inline-block;margin-top:6px;background:var(--navy);color:#fff;padding:4px 10px;border-radius:5px;font-size:.72rem;font-weight:700;text-decoration:none">📞 Appeler</a>`
-    : `<div style="font-weight:700;font-size:.88rem;color:#C2410C">⚠️ Non assigné</div>`;
+    : `<div style="font-weight:700;font-size:.88rem;color:#A65E22">⚠️ Non assigné</div>`;
 
   document.getElementById('split-content').innerHTML = `
     <div style="background:${s.bg};border-radius:8px;padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
@@ -6626,14 +6697,14 @@ function showMissionDetail(code, from, to, km, client, clientTel, convoyeur, con
         <span style="color:#666">💚 Convoyeur (50%)</span><span style="font-weight:700;color:var(--green)">${conv} €</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#FEF2F2;border-bottom:1px solid #eee;font-size:.83rem">
-        <span style="color:#666">⛽ Frais de route (25%)</span><span style="font-weight:700;color:#C2410C">${frais} €</span>
+        <span style="color:#666">⛽ Frais de route (25%)</span><span style="font-weight:700;color:#A65E22">${frais} €</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#EFF6FF;font-size:.83rem">
         <span style="color:#666">📊 Marge HelixCar (25%)</span><span style="font-weight:700;color:var(--blue-mid)">${marge} €</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--navy)">
         <span style="color:rgba(255,255,255,.7);font-size:.88rem">Total payé par le client</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:900;font-size:1.2rem;color:var(--yellow)">${total} €</span>
+        <span style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.2rem;color:var(--yellow)">${total} €</span>
       </div>
     </div>
   `;
@@ -6665,20 +6736,20 @@ function showSplit(km) {
     <div style="display:flex;flex-direction:column;gap:0;border-radius:10px;overflow:hidden;border:1px solid #eee">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#F0FDF4;border-bottom:1px solid #eee">
         <div><div style="font-weight:700;font-size:.88rem">💚 Part convoyeur</div><div style="font-size:.75rem;color:#888">50% du prix client</div></div>
-        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:1.2rem;color:var(--green)">${conv} €</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.2rem;color:var(--green)">${conv} €</div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#FEF2F2;border-bottom:1px solid #eee">
         <div><div style="font-weight:700;font-size:.88rem">⛽ Frais de route</div><div style="font-size:.75rem;color:#888">25% du prix client</div></div>
-        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:1.2rem;color:#C2410C">${frais} €</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.2rem;color:#A65E22">${frais} €</div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#EFF6FF">
         <div><div style="font-weight:700;font-size:.88rem">📊 Marge HelixCar</div><div style="font-size:.75rem;color:#888">25% du prix client</div></div>
-        <div style="font-family:'Syne',sans-serif;font-weight:900;font-size:1.2rem;color:var(--blue-mid)">${marge} €</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.2rem;color:var(--blue-mid)">${marge} €</div>
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy);border-radius:8px;margin-top:10px">
       <span style="color:rgba(255,255,255,.7);font-size:.85rem">Total payé par le client</span>
-      <span style="font-family:'Syne',sans-serif;font-weight:900;font-size:1.3rem;color:var(--yellow)">${total} €</span>
+      <span style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.3rem;color:var(--yellow)">${total} €</span>
     </div>
   `;
   openModal('split');
