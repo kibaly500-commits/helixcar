@@ -7471,6 +7471,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div id="conv-recap"></div>
 
+        <div id="conv-erreur-envoi" style="display:none;white-space:pre-line;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-top:16px;font-size:.8rem;color:#991B1B"></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:16px 24px;font-size:.92rem" onclick="submitConvoyeurForm()">Envoyer ma candidature →</button>
 
       </div>
@@ -7680,9 +7681,24 @@ function supabaseInsert(table, data) {
     .then(function(r) {
       if (!r.ok) {
         return r.text().then(function(txt) {
+          // LE DETAIL TECHNIQUE RESTE DANS LA CONSOLE, JAMAIS A L'ECRAN.
+          //
+          // Cette fonction ecrivait la reponse brute de PostgREST dans
+          // #supabase-debug. Deux consequences, toutes deux constatees :
+          //
+          //   * le client lisait « code 23514 — new row for relation
+          //     "convoyeurs" violates check constraint », qui ne lui dit
+          //     rien et expose le schema ;
+          //   * ce bandeau vit DANS la fenetre « Devenir client », juste
+          //     au-dessus de « Creer mon compte ». Une candidature
+          //     partenaire en echec y laissait donc son erreur, et la
+          //     personne qui passait ensuite a la creation de compte
+          //     voyait une erreur [convoyeurs] sans aucun rapport avec
+          //     ce qu'elle etait en train de faire.
+          //
+          // C'est desormais a l'appelant d'afficher une phrase
+          // comprehensible, au bon endroit.
           console.error('Supabase [' + table + '] erreur ' + r.status + ':', txt);
-          var dbg = document.getElementById('supabase-debug');
-          if (dbg) { dbg.style.display='block'; dbg.innerHTML = '<b>Erreur ' + r.status + ' [' + table + ']:</b> ' + txt; }
           resolve({ error: txt, status: r.status });
         });
       }
@@ -7691,8 +7707,6 @@ function supabaseInsert(table, data) {
     })
     .catch(function(e) {
       console.error('Supabase network error:', e);
-      var dbg = document.getElementById('supabase-debug');
-      if (dbg) { dbg.style.display='block'; dbg.innerHTML = '<b>Erreur reseau:</b> ' + e.message; }
       resolve(null);
     });
   });
@@ -15944,26 +15958,71 @@ async function _submitClientFormInterne() {
   // indisponible, la demande est enregistrée sans rattachement. On ne
   // rattache jamais une demande à un compte sur la seule foi d'une
   // adresse e-mail : cela exposerait la demande d'un tiers.
-  var _compteCree = false;
+  // ── L'ISSUE RÉELLE DE LA CRÉATION DE COMPTE ──
+  //
+  // Ce bloc ne renvoyait qu'un booléen, et l'écran de succès ne le
+  // regardait même pas : il annonçait « Votre compte HelixCar est
+  // maintenant créé » dès que la DEMANDE était écrite. Un signUp en
+  // échec — adresse déjà prise, mot de passe refusé, coupure réseau —
+  // produisait donc un succès affiché pour un compte inexistant, et la
+  // connexion échouait ensuite.
+  //
+  // On distingue désormais quatre issues, et l'écran dit chacune telle
+  // qu'elle est :
+  //
+  //   'non_demande' : aucun mot de passe saisi, ou dépôt depuis un
+  //                   compte déjà connecté — il n'y a rien à créer ;
+  //   'cree'        : le serveur a bien créé le compte ;
+  //   'existe_deja' : l'adresse est déjà inscrite. Ce n'est pas un
+  //                   échec : le nouvel essai avec la même adresse doit
+  //                   rester possible et sans effet de bord ;
+  //   'echec'       : le serveur a refusé, ou n'a pas répondu.
+  var _compteEtat = 'non_demande';
+  var _compteSession = false;
   if (!_idCompteDepot && _sb && _sb.auth && email_val) {
     var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
     if (mdpSaisi) {
+      _compteEtat = 'echec';
       try {
         var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
-        _compteCree = !rCompte.error && !!(utilisateur && utilisateur.id);
-        var sessionCreation = rCompte && rCompte.data && rCompte.data.session;
-        if (_compteCree && !sessionCreation) {
+        var msgErr = String((rCompte && rCompte.error && rCompte.error.message) || '');
+        // Supabase signale une adresse déjà inscrite de deux façons
+        // selon la configuration du projet : par une erreur explicite,
+        // ou par un utilisateur SANS identité rattachée.
+        var dejaInscrit = /already\s*registered|already\s*exists|user\s*already/i.test(msgErr)
+          || !!(utilisateur && Array.isArray(utilisateur.identities)
+                && utilisateur.identities.length === 0);
+        if (dejaInscrit) {
+          _compteEtat = 'existe_deja';
+        } else if (!rCompte.error && utilisateur && utilisateur.id) {
+          _compteEtat = 'cree';
+        } else if (rCompte && rCompte.error) {
+          console.error('Création du compte refusée par le serveur :', msgErr);
+          _compteEtat = 'echec';
+        }
+        _compteSession = !!(rCompte && rCompte.data && rCompte.data.session);
+        if (!_compteSession && (_compteEtat === 'cree' || _compteEtat === 'existe_deja')) {
           // Pas de session : on tente d'en ouvrir une. Elle n'aboutira
-          // que si la confirmation d'e-mail est désactivée.
-          try { await _sb.auth.signInWithPassword({ email: email_val, password: mdpSaisi }); }
+          // que si la confirmation d'e-mail est désactivée. C'est aussi
+          // ce qui rend le NOUVEL ESSAI utile avec la même adresse :
+          // le compte existe déjà, la session s'ouvre, et la demande
+          // part alors rattachée.
+          try {
+            var rConn = await _sb.auth.signInWithPassword({ email: email_val, password: mdpSaisi });
+            _compteSession = !!(rConn && rConn.data && rConn.data.session);
+          }
           catch (e2) { /* confirmation requise : on reste anonyme */ }
         }
       } catch (e) {
-        console.warn('Création du compte impossible, la demande est conservée :', e);
+        console.error('Création du compte impossible, la demande est conservée :', e);
+        _compteEtat = 'echec';
       }
     }
   }
+  // Conservé pour la lisibilité du reste de la fonction : « un compte a
+  // réellement été créé à l'instant ».
+  var _compteCree = (_compteEtat === 'cree');
 
   // ── ÉCRITURE ATOMIQUE : LA DEMANDE ET SES VÉHICULES ENSEMBLE ──
   // L'ancienne version écrivait la demande, PUIS les véhicules, en deux
@@ -16049,32 +16108,43 @@ async function _submitClientFormInterne() {
 
   inserer(5)
     .then(function(r) {
-      var dbg = document.getElementById('supabase-debug');
       if (!r || r.error) {
         // Le détail technique reste dans la console du navigateur, à
         // l'usage du développeur. Le client, lui, lit une phrase qu'il
         // peut comprendre et suivre.
         console.error('Echec de creation de la demande :', r && r.error);
-        if (dbg) {
-          dbg.style.display = 'block';
-          dbg.textContent = 'Votre demande n\'a pas pu être enregistrée. '
-            + 'Rien n\'a été validé et vos informations sont conservées : '
-            + 'vérifiez votre connexion internet puis réessayez. '
-            + 'Si le problème persiste, contactez HelixCar.';
-        }
+        _hcAfficherBandeauErreur(
+          'Votre demande n\'a pas pu être enregistrée. '
+          + 'Rien n\'a été validé et vos informations sont conservées : '
+          + 'vérifiez votre connexion internet puis réessayez. '
+          + 'Si le problème persiste, contactez HelixCar.');
         return;
       }
       // Succes
+      // Le bandeau d'erreur d'un essai précédent n'a plus lieu d'être.
+      _hcEffacerBandeauErreur();
+
       // Une simple création de compte n'est pas une demande de devis.
       var missionReelle = (type_service_val !== 'compte')
         && ((val !== 'pas-maintenant') || (_clientSkipMission === false) || aDuStockage);
 
-      // Numéro client dominant, parrainage en retrait, puis filet fin.
+      // ── LE NUMÉRO AFFICHÉ EST CELUI QUE LE SERVEUR A ENREGISTRÉ ──
+      //
+      // clientNum et parrCode sont tirés par le navigateur AVANT
+      // l'écriture. Le serveur peut en imposer d'autres — c'est lui qui
+      // détient la contrainte d'unicité. On affiche donc ce qu'il
+      // renvoie, et on ne montre le code de parrainage que s'il existe
+      // réellement : promettre une réduction sur un code qui n'a pas
+      // été enregistré serait un mensonge de plus.
+      var _retourSrv = (r && r.retour) || {};
+      var _numeroReel = _retourSrv.numero_client || clientNum;
       var html = '<div class="hc-succes-numlabel">Votre numéro client</div>' +
-        '<div class="hc-succes-num">' + clientNum + '</div>' +
-        '<div class="hc-succes-parr">Code de parrainage : <b>' + parrCode + '</b>' +
-        '<span>Votre filleul bénéficie de 10 % de réduction.</span></div>' +
-        '<div class="hc-succes-filet"></div>';
+        '<div class="hc-succes-num">' + _attr(_numeroReel) + '</div>';
+      if (parrCode) {
+        html += '<div class="hc-succes-parr">Code de parrainage : <b>' + _attr(parrCode) + '</b>' +
+          '<span>Votre filleul bénéficie de 10 % de réduction.</span></div>';
+      }
+      html += '<div class="hc-succes-filet"></div>';
 
       if (missionReelle) {
         html += '<div class="hc-succes-txt">' +
@@ -16083,8 +16153,33 @@ async function _submitClientFormInterne() {
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
           '</div>' +
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
-      } else {
+      } else if (_compteEtat === 'cree' || _compteEtat === 'existe_deja' || _compteEtat === 'non_demande') {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
+      }
+
+      // ── CE QUI EST ANNONCÉ EST CE QUI S'EST RÉELLEMENT PASSÉ ──
+      //
+      // La phrase « Votre compte HelixCar est maintenant créé » était
+      // écrite sans jamais regarder l'issue du signUp. Un refus du
+      // serveur — adresse déjà prise, mot de passe trop court, coupure —
+      // affichait donc un succès pour un compte qui n'existait pas, et
+      // la connexion échouait ensuite. C'est le défaut signalé.
+      if (_compteEtat === 'echec') {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + '<strong>Votre compte n\'a pas pu être créé.</strong> '
+          + (missionReelle
+             ? 'Votre demande, elle, est bien enregistrée et notre équipe la traite. '
+             : '')
+          + 'Reprenez la création de compte avec la même adresse depuis la page '
+          + 'de connexion : rien ne sera enregistré en double.'
+          + '</div>';
+      } else if (_compteEtat === 'existe_deja') {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + 'Un compte existait déjà avec cette adresse : '
+          + (_compteSession
+             ? 'vous y êtes connecté, rien n\'a été créé en double.'
+             : 'connectez-vous avec votre mot de passe habituel. Rien n\'a été créé en double.')
+          + '</div>';
       }
 
       // ── CE QU'ON ANNONCE DOIT ÊTRE CE QUI S'EST PASSÉ ──
@@ -16096,15 +16191,14 @@ async function _submitClientFormInterne() {
       //
       // Sans ce contrôle, un client dont la confirmation d'e-mail est
       // requise lisait « votre espace client » et n'y trouvait rien.
-      var _retour = (r && r.retour) || {};
-      var _rattachee = _retour.rattachee === true;
+      var _rattachee = _retourSrv.rattachee === true;
       // Demande enregistrée SANS propriétaire : on garde de quoi la
       // réclamer une fois l'adresse confirmée. C'est ce qui rend vraie
       // la phrase affichée juste en dessous.
       // On ne garde JAMAIS le secret de création : seulement celui de
       // réclamation, qui ne vaut rien sans le compte confirmé.
       if (!_rattachee) _hcMemoriserReclamation(payload.id, cleReclamation, email_val);
-      if (_compteCree && !_rattachee) {
+      if ((_compteEtat === 'cree') && !_rattachee) {
         html += '<div class="hc-succes-note" style="margin-top:10px">'
           + '<strong>Confirmez votre adresse e-mail</strong> pour activer votre '
           + 'espace client : un message vient de vous être envoyé. '
@@ -16289,9 +16383,31 @@ function setLang(lang) {
 
 
 
+// Le bandeau d'erreur de la fenetre client. Il ne doit JAMAIS survivre
+// a la tentative qui l'a produit : ni d'une fenetre a l'autre, ni d'un
+// essai au suivant, ni apres un rechargement.
+function _hcEffacerBandeauErreur() {
+  var dbg = document.getElementById('supabase-debug');
+  if (!dbg) return;
+  dbg.style.display = 'none';
+  dbg.textContent = '';
+}
+
+// Message lisible par le client. Le detail technique n'y figure jamais.
+function _hcAfficherBandeauErreur(texte) {
+  var dbg = document.getElementById('supabase-debug');
+  if (!dbg) return;
+  dbg.style.display = 'block';
+  dbg.textContent = texte;
+}
+
 function openModal(type) {
 
   event && event.preventDefault();
+
+  // Aucune erreur d'une tentative precedente ne doit accueillir la
+  // suivante — surtout pas celle d'une AUTRE fenetre.
+  _hcEffacerBandeauErreur();
 
   document.getElementById('modal-' + type).classList.add('open');
 
@@ -17738,6 +17854,55 @@ async function uploadFichier(inputId, prefixe) {
   }
 }
 
+// Message d'echec de la candidature. Il vit DANS la fenetre partenaire,
+// jamais dans celle du client : une erreur ne doit pas suivre
+// l'utilisateur d'un formulaire a l'autre.
+function _convAfficherEchecCandidature(texte) {
+  var zone = document.getElementById('conv-erreur-envoi');
+  if (zone) {
+    zone.textContent = texte;
+    zone.style.display = 'block';
+    try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    return;
+  }
+  alert(texte);
+}
+function _convEffacerEchecCandidature() {
+  var zone = document.getElementById('conv-erreur-envoi');
+  if (zone) { zone.style.display = 'none'; zone.textContent = ''; }
+}
+
+// SUPPRESSION D'UN FICHIER DEVENU ORPHELIN.
+//
+// Les trois documents partent AVANT l'ecriture de la candidature. Si
+// cette ecriture echoue — c'est exactement ce qui arrivait avec la
+// contrainte des activites — les fichiers restent dans le bucket sans
+// qu'aucune ligne ne les reference : personne ne saura jamais qu'ils
+// sont la, ni a qui ils appartiennent.
+//
+// Best effort assume : si la suppression echoue a son tour, on n'en
+// fait pas une erreur visible pour le candidat, dont la candidature n'a
+// de toute facon pas ete enregistree. La trace reste dans la console.
+async function _supprimerFichierTeleverse(url) {
+  if (!url || typeof url !== 'string') return false;
+  var marqueur = '/storage/v1/object/public/document/';
+  var i = url.indexOf(marqueur);
+  if (i === -1) return false;
+  var chemin = url.slice(i + marqueur.length);
+  if (!chemin) return false;
+  try {
+    var resp = await fetch(SUPABASE_URL + '/storage/v1/object/document/' + chemin, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!resp.ok) { console.warn('Fichier orphelin non supprime :', chemin, resp.status); return false; }
+    return true;
+  } catch (e) {
+    console.warn('Fichier orphelin non supprime :', chemin, e && e.message);
+    return false;
+  }
+}
+
 async function submitConvoyeurForm() {
   var prenom = (document.getElementById('conv-prenom') || {}).value || '';
   var nom    = (document.getElementById('conv-nom') || {}).value || '';
@@ -17806,6 +17971,10 @@ async function submitConvoyeurForm() {
     if (zoneV) { try { zoneV.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
     return;
   }
+
+  // Un nouvel essai commence : l'echec du precedent n'a plus lieu d'etre
+  // affiche.
+  _convEffacerEchecCandidature();
 
   // Indiquer le chargement
   var btn = document.querySelector('#modal-convoyeur-form button.btn-primary');
@@ -17885,7 +18054,18 @@ async function submitConvoyeurForm() {
   var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
   if (!rInsert || rInsert.error) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    alert('Erreur lors de envoi. ' + (rInsert && rInsert.error ? JSON.stringify(rInsert.error) : 'Reessayez.'));
+    // Les trois documents sont deja partis : sans candidature pour les
+    // referencer, ce sont des orphelins. On les retire.
+    await Promise.all([id_url, permis_url, rc_pro_url].map(_supprimerFichierTeleverse));
+    // Le detail technique est deja dans la console (supabaseInsert).
+    // Le candidat, lui, lit une phrase qu'il peut comprendre et suivre —
+    // jamais un code SQL ni un nom de table.
+    _convAfficherEchecCandidature(
+      "Votre candidature n'a pas pu etre enregistree.\n\n"
+      + "Rien n'a ete valide et vos informations sont conservees : "
+      + "verifiez votre connexion internet puis reessayez.\n"
+      + "Si le probleme persiste, contactez HelixCar."
+    );
     return;
   }
 
