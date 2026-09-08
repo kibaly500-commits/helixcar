@@ -413,6 +413,222 @@ async function modesParVehicule(page, n) {
   check('G5 : le succès n\'est plus déduit d\'un bloc finally',
     !/finally\s*\{[^}]*succes/i.test(idx));
 
+  // ══ I. LE COMPTEUR « DEMANDES DE DEVIS » ══
+  //
+  // Il ne s'actualisait plus. Deux causes, toutes deux dans le code :
+  // le comptage partait avec la CLÉ ANONYME — or la RLS est active sur
+  // clients depuis les migrations 90 et 91, donc le serveur répond 200
+  // avec un total de zéro, sans la moindre erreur — et un délai
+  // d'anti-rafale de cinq minutes gelait le badge, y compris au retour
+  // sur l'onglet.
+  {
+    const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+    check('I1 : le comptage part avec le JETON DE SESSION, pas la clé anonyme',
+      /_jetonSessionSupabase\(\)\.then\(function \(jetonSession\) \{[\s\S]{0,400}?'Authorization': 'Bearer ' \+ \(jetonSession \|\| SUPABASE_KEY\)/.test(dash));
+    check('I2 : le délai d\'anti-rafale n\'est plus de cinq minutes',
+      /var DELAI_MIN_RECOMPTAGE_MS = 30000;/.test(dash)
+      && !/DELAI_MIN_RECOMPTAGE_MS = 300000/.test(dash));
+    check('I3 : le retour sur l\'onglet FORCE un comptage',
+      /if \(!document\.hidden\) \{\s*\n\s*majBadgeDemandes\(true\);/.test(dash));
+
+    // Comportement réel : le badge suit les données chargées.
+    const pageC = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    const errsC = [];
+    pageC.on('pageerror', e => errsC.push(e.message));
+    await pageC.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
+    // Le badge vit dans la navigation, qui n'existe qu'une fois connecté.
+    await pageC.evaluate(() => {
+      currentRole = 'admin';
+      var l = document.getElementById('login-screen'); if (l) l.style.display = 'none';
+      var a = document.getElementById('app'); if (a) a.style.display = 'flex';
+      if (typeof buildNav === 'function') buildNav('admin');
+    });
+    await pageC.waitForTimeout(150);
+    const compteur = await pageC.evaluate(() => {
+      const lu = { id: 'c1', type_service: 'convoyage', statut: 'nouveau', vue_admin_at: '2026-01-01' };
+      const neuve1 = { id: 'c2', type_service: 'convoyage', statut: 'nouveau', vue_admin_at: null };
+      const neuve2 = { id: 'c3', type_service: 'nettoyage', statut: 'nouveau', vue_admin_at: null };
+      const etat = {};
+      _demandesDevisListe = [lu, neuve1];
+      _appliquerCompteurDemandes(_compterNonLues());
+      etat.depart = (document.getElementById('badge-admin-devis') || {}).textContent;
+      // Une nouvelle demande arrive.
+      _demandesDevisListe = [lu, neuve1, neuve2];
+      _appliquerCompteurDemandes(_compterNonLues());
+      etat.apresNouvelle = (document.getElementById('badge-admin-devis') || {}).textContent;
+      // L'administrateur en lit une.
+      neuve1.vue_admin_at = '2026-09-08T10:00:00Z';
+      _rafraichirEtatLecture();
+      etat.apresLecture = (document.getElementById('badge-admin-devis') || {}).textContent;
+      // Deux rafraîchissements de suite ne comptent pas deux fois.
+      _rafraichirEtatLecture();
+      _rafraichirEtatLecture();
+      etat.apresDeuxRafraichissements = (document.getElementById('badge-admin-devis') || {}).textContent;
+      return etat;
+    });
+    check('I4 : le badge part du nombre réel de demandes non lues',
+      compteur.depart === '1', JSON.stringify(compteur));
+    check('I5 : il s\'incrémente dès qu\'une demande arrive',
+      compteur.apresNouvelle === '2', JSON.stringify(compteur));
+    check('I6 : il décroît quand l\'administrateur en lit une',
+      compteur.apresLecture === '1', JSON.stringify(compteur));
+    check('I7 : et deux rafraîchissements ne comptent jamais deux fois',
+      compteur.apresDeuxRafraichissements === '1', JSON.stringify(compteur));
+    check('I8 : aucune erreur JavaScript', errsC.length === 0, errsC.slice(0, 2).join(' | '));
+    await pageC.close();
+  }
+
+  // ══ J. LE DÉLAI COMMERCIAL ANNONCÉ AU PUBLIC ══
+  {
+    const publiques = idx
+      // Les commentaires techniques et les instructions de retour arrière
+      // ne sont pas du texte lu par un client : ils sont écartés.
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    check('J1 : plus aucune promesse publique « 2h » ou « 2 heures »',
+      !/(moins de|sous)\s*2\s*(h|heures)/i.test(publiques),
+      (publiques.match(/.{0,60}(moins de|sous)\s*2\s*(h|heures).{0,40}/i) || [''])[0]);
+    check('J2 : la formulation validée est bien présente',
+      /réponse garantie sous 1 heure/i.test(idx));
+  }
+
+  // ══ H. LES DEVIS PDF : UNE RESPIRATION, PAS UNE REFONTE ══
+  //
+  // Certains titres arrivaient collés à la carte grise qui les précède.
+  // On ne juge pas cela à l'œil : on MESURE. Le stub jsPDF enregistre
+  // les coordonnées réelles de chaque titre et de chaque carte, et on
+  // vérifie l'écart entre le bas d'une carte et le titre suivant.
+  //
+  // Ce que ce test ne fait PAS : rendre un vrai PDF. jsPDF vient d'un
+  // CDN, coupé par principe pendant les tests. La relecture visuelle
+  // d'un PDF réel reste un contrôle manuel, décrit dans le dossier de
+  // recette.
+  {
+    const STUB = `
+window.__pdf = { titres: [], cartes: [], pages: 1, bas: 0 };
+window.jspdf = { jsPDF: function () {
+  var self = this;
+  var courant = 1;
+  this.internal = { pageSize: { getWidth: function(){return 210;}, getHeight: function(){return 297;} } };
+  this.text = function (s, x, y) {
+    window.__pdf.titres.push({ t: String(s), x: x, y: y, page: courant });
+    if (typeof y === 'number' && y > window.__pdf.bas) window.__pdf.bas = y;
+    return self;
+  };
+  this.roundedRect = function (x, y, w, h) {
+    window.__pdf.cartes.push({ y: y, h: h, bas: y + h, page: courant });
+    if (y + h > window.__pdf.bas) window.__pdf.bas = y + h;
+    return self;
+  };
+  this.rect = this.roundedRect;
+  this.setFont = function(){return self;}; this.setFontSize = function(){return self;};
+  this.setTextColor = function(){return self;}; this.setFillColor = function(){return self;};
+  this.setDrawColor = function(){return self;}; this.setLineWidth = function(){return self;};
+  this.setLineDashPattern = function(){return self;};
+  this.circle = function(){return self;}; this.line = function(){return self;};
+  this.addImage = function(){return self;};
+  this.addPage = function(){ courant++; window.__pdf.pages = Math.max(window.__pdf.pages, courant); return self; };
+  this.setPage = function(n){ courant = n; return self; };
+  this.getNumberOfPages = function(){ return window.__pdf.pages; };
+  this.getTextWidth = function (s) { return String(s).length * 1.9; };
+  this.splitTextToSize = function (s, w) {
+    s = String(s); var max = Math.max(8, Math.floor(w / 1.9));
+    var mots = s.split(' '), out = [], cur = '';
+    mots.forEach(function (m) {
+      if ((cur + ' ' + m).trim().length > max) { if (cur) out.push(cur); cur = m; }
+      else cur = (cur ? cur + ' ' : '') + m;
+    });
+    if (cur) out.push(cur);
+    return out.length ? out : [''];
+  };
+  this.output = function(){ return 'data:application/pdf;base64,STUB'; };
+  this.save = function(){ return self; };
+}};
+`;
+    const DOSSIERS = {
+      nettoyage: {
+        id: 'q-nett', prenom: 'TEST-QA', nom: 'Nettoyage', email: 'nett@example.invalid',
+        type_service: 'nettoyage', statut: 'nouveau', created_at: '2026-09-01T09:00:00Z',
+        nettoyage_details: {
+          schema_version: 2, type_nettoyage: 'interieur_exterieur', lieu: 'parc_client',
+          nombre_vehicules_approx: 12,
+          date_souhaitee: '2026-11-02', date_fin: '2026-11-04',
+          creneau_debut: '09:00', creneau_fin: '17:00',
+          adresse_rue: '3 rue des Lilas', adresse_cp: '69003', adresse_ville: 'Lyon',
+          repartition_categories: [{ categorie: 'citadine', quantite: 12, precision: null }],
+          contact_sur_place: { type: 'autre', nom: 'TEST-QA Martin', telephone: '+33600000020' }
+        }
+      },
+      professionnel: {
+        id: 'q-pro', prenom: 'TEST-QA', nom: 'Professionnel', email: 'pro@example.invalid',
+        type_service: 'professionnel', statut: 'nouveau', created_at: '2026-09-01T09:00:00Z',
+        professionnel_details: {
+          schema_version: 1, categorie: 'renfort', mission: 'jockey', conseil: false,
+          nombre_professionnels: 2, nombre_vehicules: 5, adresse_rue: '9 rue Neuf',
+          adresse_cp: '44000', adresse_ville: 'Nantes', date_debut: '2026-11-10',
+          date_fin: '2026-11-12', duree_jours: 3, heure_debut: '08:00', heure_fin: '17:00',
+          description: 'TEST-QA remise en etat complete du parc, avec un suivi quotidien.',
+          informations_complementaires: 'TEST-QA acces par le portail arriere, badge a retirer a l accueil.',
+          vehicules: [],
+          contact_sur_place: { type: 'autre', nom: 'TEST-QA Durand', telephone: '+33600000050' }
+        }
+      }
+    };
+
+    const pagePdf = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+    const errsPdf = [];
+    pagePdf.on('pageerror', e => errsPdf.push(e.message));
+    pagePdf.on('dialog', d => d.dismiss());
+    await pagePdf.addInitScript(STUB);
+    await pagePdf.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
+
+    for (const [nom, dossier] of Object.entries(DOSSIERS)) {
+      const mesures = await pagePdf.evaluate((d) => {
+        window.__pdf = { titres: [], cartes: [], pages: 1, bas: 0 };
+        _demandesDevisListe = [d];
+        _devisParClient = {};
+        try {
+          _construirePdfDevis(d, { reference: 'DEV-QA-0001', client_id: d.id, prix: 480,
+                                   statut: 'genere', date_generation: '2026-09-08T10:00:00Z' });
+        } catch (e) { return { erreur: e.message }; }
+        return window.__pdf;
+      }, dossier);
+
+      check('H-' + nom + '1 : le devis se construit sans erreur',
+        !mesures.erreur, mesures.erreur);
+      if (mesures.erreur) continue;
+
+      // Écart réel entre le bas de la carte précédente et le titre.
+      // Les titres sont dessinés en capitales dans le PDF : on compare
+      // sur une forme normalisée, jamais sur la casse.
+      const AERES = ['mission sur site', 'intervention', 'informations complémentaires',
+                     'prestation', 'prestations', "lieu d'intervention", 'véhicules à nettoyer'];
+      const ecarts = [];
+      mesures.titres.forEach(t => {
+        if (AERES.indexOf(String(t.t).toLowerCase()) === -1) return;
+        const avant = mesures.cartes
+          .filter(c => c.page === t.page && c.bas <= t.y)
+          .sort((a, b) => b.bas - a.bas)[0];
+        if (avant) ecarts.push({ titre: t.t, ecart: +(t.y - avant.bas).toFixed(2) });
+      });
+      check('H-' + nom + '2 : les titres visés sont bien précédés d\'une carte mesurable',
+        ecarts.length > 0, JSON.stringify(mesures.titres.map(t => t.t).slice(0, 20)));
+      check('H-' + nom + '3 : aucun n\'est collé à la carte précédente (≥ 5 mm)',
+        ecarts.every(e => e.ecart >= 5), JSON.stringify(ecarts));
+      // Marges et pagination : rien ne déborde de la page A4.
+      // 297 mm est la hauteur physique d'une A4. Le pied de page est
+      // dessiné volontairement tout en bas : ce qui doit être vrai, c'est
+      // que RIEN ne sorte de la page.
+      check('H-' + nom + '4 : rien n\'est dessiné au-delà de la page A4',
+        mesures.bas <= 297, 'point le plus bas : ' + mesures.bas + ' mm');
+      check('H-' + nom + '5 : la pagination reste raisonnable',
+        mesures.pages >= 1 && mesures.pages <= 3, 'pages : ' + mesures.pages);
+    }
+    check('H0 : aucune erreur JavaScript pendant la construction des devis',
+      errsPdf.length === 0, errsPdf.slice(0, 2).join(' | '));
+    await pagePdf.close();
+  }
+
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));

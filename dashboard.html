@@ -9770,14 +9770,37 @@ function _construirePdfDevis(c, d) {
   var _nbVehPdfRespiration = Number(c.nb_vehicules || (c._vehicules && c._vehicules.length) || 1);
   var _pdfMultiRespiration = _nbVehPdfRespiration > 1;
   var ESPACE_AVANT_TITRE_GLOBAL = _pdfMultiRespiration ? 3.4 : 3.2;
+
+  // AÉRATION LOCALE DE QUELQUES TITRES.
+  //
+  // Le design du devis n'est pas retouché : ni la charte, ni les
+  // contenus, ni les alignements. Seuls quelques titres arrivaient trop
+  // près de la carte grise qui les précède, ce qui les faisait paraître
+  // collés. Ils reçoivent 2,6 mm de respiration supplémentaire — et eux
+  // seuls.
+  //
+  // La valeur est utilisée AUSSI pour mesurer la place nécessaire avant
+  // un saut de page : sans cela, la pagination se déciderait sur une
+  // hauteur qui n'est plus la bonne.
+  var TITRES_A_AERER = [
+    'Mission sur site', 'Intervention',
+    'Informations complémentaires',
+    'Prestation', 'Prestations',
+    "Lieu d'intervention", 'Véhicules à nettoyer'
+  ];
+  function _espaceAvantTitre(titre) {
+    return ESPACE_AVANT_TITRE_GLOBAL
+      + (TITRES_A_AERER.indexOf(String(titre)) !== -1 ? 2.6 : 0);
+  }
   // Hauteur totale titre = 2 (avant, Objectif 1) + 2.3 (soulignement) + 1.5
   // (après, V50.4I) = 5.8mm — jamais dessiner avant de mesurer, jamais
   // mesurer avec une valeur obsolète.
   var HAUTEUR_TITRE_SECTION = ESPACE_AVANT_TITRE_GLOBAL + 7.2;
   function sectionAvecBloc(titre, contenu) {
     var h = contenu(false);
-    if (y + HAUTEUR_TITRE_SECTION + h > BAS_PAGE) { doc.addPage(); y = M; }
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    var espace = _espaceAvantTitre(titre);
+    if (y + (espace + 7.2) + h > BAS_PAGE) { doc.addPage(); y = M; }
+    y += espace;
     sectionTitre(titre);
     var y0 = y;
     // ══ V50.6 PREMIUM ══ Carte gris très clair et froid (au lieu de
@@ -11230,13 +11253,14 @@ function _construirePdfDevis(c, d) {
   var _hauteurTarifFinal = 18;
   var _margeTarifFinal = 2;
   var _limitePhysiqueFinale = 291;
-  var _besoinPaquetFinal = HAUTEUR_TITRE_SECTION + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
+  var _espacePrestations = _espaceAvantTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
+  var _besoinPaquetFinal = (_espacePrestations + 7.2) + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
 
   if (y + _besoinPaquetFinal <= _limitePhysiqueFinale) {
     // Dessin direct sur la page courante : même design que sectionAvecBloc,
     // mais sans son ancien seuil générique à 270 mm trop conservateur pour
     // ce paquet final court.
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    y += _espacePrestations;
     sectionTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
     var _yPrest0 = y;
     doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
@@ -11252,7 +11276,7 @@ function _construirePdfDevis(c, d) {
     // espacement, style ou contenu du devis n'est modifié.
     doc.addPage();
     y = M;
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    y += _espacePrestations;
     sectionTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
     var _yPrestNouvellePage = y;
     doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
@@ -12146,7 +12170,18 @@ function _acqCarte(titre, valeur, note) {
 // re-rendu, donc tout scintillement).
 var _badgeDemandesAffiche = null;
 var _dernierComptageMs = 0;
-var DELAI_MIN_RECOMPTAGE_MS = 300000; // 5 min entre deux comptages serveur
+// DÉLAI ENTRE DEUX COMPTAGES SERVEUR.
+//
+// Il était de 5 minutes. Ce n'est pas un détail de confort : une
+// nouvelle demande n'apparaissait pas avant l'expiration de ce délai,
+// alors même que l'administrateur venait de changer d'onglet ou
+// d'actualiser la page. C'est ce qui donnait l'impression d'un compteur
+// « qui ne s'actualise plus ».
+//
+// Le comptage est pourtant gratuit : limit=0 + Prefer: count=exact ne
+// renvoie AUCUNE ligne, seulement un total dans un en-tête. Trente
+// secondes suffisent largement à protéger d'une rafale de clics.
+var DELAI_MIN_RECOMPTAGE_MS = 30000;
 
 // Même définition que la liste des demandes.
 // Critère UNIQUE d'une vraie demande de devis.
@@ -12204,13 +12239,23 @@ function majBadgeDemandes(forcer) {
     + 'or(type_service.not.is.null,ville_depart.not.is.null,ville_arrivee.not.is.null,marque_modele.not.is.null))'
     + '&limit=0';
 
-  return fetch(SUPABASE_URL + '/rest/v1/' + filtre, {
-    method: 'GET',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Prefer': 'count=exact'
-    }
+  // LE JETON DE LA SESSION, JAMAIS LA CLÉ ANONYME.
+  //
+  // Ce comptage partait avec la clé anonyme. Depuis que la RLS est
+  // active sur `clients` (migrations 90 et 91), un appel anonyme ne voit
+  // AUCUNE ligne : le serveur répond 200, l'en-tête annonce 0, et le
+  // badge affichait donc zéro — sans la moindre erreur visible. C'est le
+  // même défaut que celui déjà corrigé sur _compterLignes ; il restait
+  // ici.
+  return _jetonSessionSupabase().then(function (jetonSession) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + filtre, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + (jetonSession || SUPABASE_KEY),
+        'Prefer': 'count=exact'
+      }
+    });
   }).then(function (r) {
     if (!r.ok) throw new Error('Comptage HTTP ' + r.status);
     var plage = r.headers.get('content-range') || '';
@@ -12288,7 +12333,10 @@ function marquerDemandeNonLue(clientId) {
 //   • une fois à la connexion admin
 //   • à chaque ouverture de la page "Demandes de devis" (données déjà chargées, gratuit)
 //   • localement à la consultation d'une demande
-//   • au retour sur l'onglet, au maximum une fois toutes les 5 minutes
+//   • au RETOUR SUR L'ONGLET, en forçant le comptage : c'est
+//     précisément le moment où l'administrateur s'attend à voir le
+//     chiffre à jour. Le laisser passer par le délai d'anti-rafale
+//     donnait un badge figé pendant plusieurs minutes.
 var _surveillanceDemarree = false;
 function demarrerSurveillanceDemandes() {
   if (_surveillanceDemarree) return;         // garde contre un double branchement
@@ -12299,7 +12347,7 @@ function demarrerSurveillanceDemandes() {
 
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) {
-      majBadgeDemandes(false);
+      majBadgeDemandes(true);
       if (typeof majBadgeCandidatures === 'function') majBadgeCandidatures();
     }
   });
