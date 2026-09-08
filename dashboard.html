@@ -1534,7 +1534,6 @@ body.scroll-verrouille { overflow: hidden; }
             </div>
             <div style="display:flex;flex-direction:column;gap:8px">
               <button class="btn btn-sm btn-outline" onclick="openNotationAdmin('Sara Bouali',11.4)">Historique</button>
-              <button class="btn btn-sm btn-red" onclick="bloquerConvoyeur('sara')">🔒 Bloquer</button>
             </div>
           </div>
 
@@ -1551,9 +1550,7 @@ body.scroll-verrouille { overflow: hidden; }
                 Note moyenne de 8.2/20 — sous le seuil de 10/20. Compte bloqué automatiquement. Email envoyé le 20/05/2024.
               </div>
             </div>
-            <div>
-              <button class="btn btn-sm btn-outline" onclick="debloquerConvoyeur('nadia')">↩ Débloquer</button>
-            </div>
+            <div></div>
           </div>
 
         </div>
@@ -5149,6 +5146,7 @@ async function toggleBlockConvoyeur() {
     catch (e) { alert('Le déblocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
     window._currentConvBlocked = false;
     _majBoutonBlocage(false);
+    _memoriserEtatBlocage(id, false, null);
     alert('Accès rétabli pour ' + nom + '.');
   } else {
     const groupeMotif = document.getElementById('block-reason-group');
@@ -5167,6 +5165,7 @@ async function toggleBlockConvoyeur() {
     catch (e) { alert('Le blocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
     window._currentConvBlocked = true;
     _majBoutonBlocage(true);
+    _memoriserEtatBlocage(id, true, motif);
     if (groupeMotif) groupeMotif.style.display = 'none';
     alert('Accès bloqué pour ' + nom + '.');
   }
@@ -5176,7 +5175,28 @@ async function toggleBlockConvoyeur() {
   if (typeof loadConvoyeursActifs === 'function') loadConvoyeursActifs();
 }
 
+// La ligne gardée en mémoire par la liste suit l'écriture réellement
+// effectuée : rouvrir la fiche sans recharger la page ne peut plus
+// afficher l'état d'avant. La source de vérité reste la base — cette
+// copie n'est qu'un cache d'affichage, réalignée sur elle.
+function _memoriserEtatBlocage(id, bloque, motif) {
+  const cache = window._convoyeursActifsData || {};
+  if (cache[id]) {
+    cache[id].bloque = !!bloque;
+    cache[id].bloque_motif = bloque ? (motif || null) : null;
+    if (!bloque) { cache[id].bloque_le = null; cache[id].bloque_par = null; }
+  }
+  const liste = window._convoyeursActifsListe || [];
+  for (let i = 0; i < liste.length; i++) {
+    if (liste[i] && liste[i].id === id) { liste[i].bloque = !!bloque; }
+  }
+}
+
 function _majBoutonBlocage(bloque) {
+  // Le badge de la fiche suit le bouton : après un blocage, la fiche
+  // ouverte ne peut pas continuer d'annoncer « Actif ».
+  const badge = document.getElementById('dossier-statut-partenaire');
+  if (badge) badge.innerHTML = _badgeEtatPartenaire({ bloque: !!bloque });
   const btn = document.getElementById('dossier-btn-block');
   if (!btn) return;
   btn.textContent = bloque ? '🔓 Débloquer l\'accès' : '🚫 Bloquer l\'accès';
@@ -5374,6 +5394,21 @@ function loadConvoyeursActifs() {
     });
 }
 
+// ── ÉTAT RÉEL D'UN PARTENAIRE ───────────────────────────────
+// Un seul endroit décide de ce qui est affiché, à partir de la SEULE
+// source de vérité : la colonne convoyeurs.bloque, celle-là même que
+// lit le contrôle d'accès (finaliserSessionConvoyeur) et la
+// revérification de session. Aucun état déduit, aucun état mémorisé.
+function _partenaireEstBloque(c) {
+  return !!(c && c.bloque === true);
+}
+
+function _badgeEtatPartenaire(c) {
+  return _partenaireEstBloque(c)
+    ? '<span class="badge badge-refused">🚫 Bloqué</span>'
+    : '<span class="badge badge-active">Actif</span>';
+}
+
 function afficherConvoyeursActifs(rows) {
   const tbody = document.getElementById('convoyeurs-actifs-table');
   if (!tbody) return;
@@ -5383,10 +5418,17 @@ function afficherConvoyeursActifs(rows) {
   }
   tbody.innerHTML = rows.map(function(c) {
     const nom = escapeHtml((c.prenom || '') + ' ' + (c.nom || ''));
-    return '<tr><td><strong>' + nom + '</strong></td><td>' + escapeHtml(c.email) + '</td>'
+    // L'état affiché est celui RÉELLEMENT enregistré : un partenaire
+    // bloqué ne peut plus apparaître « Actif » après un rechargement.
+    const bloque = _partenaireEstBloque(c);
+    const actionBlocage = bloque
+      ? '<button class="btn btn-sm btn-outline" onclick="debloquerConvoyeur(\'' + c.id + '\')">↩ Débloquer</button>'
+      : '<button class="btn btn-sm btn-red" onclick="bloquerConvoyeur(\'' + c.id + '\')">🚫 Bloquer</button>';
+    return '<tr' + (bloque ? ' class="blocked"' : '') + '><td><strong>' + nom + '</strong></td><td>' + escapeHtml(c.email) + '</td>'
       + '<td>' + (c.nb_missions || 0) + '</td><td>' + (c.km_total || 0) + ' km</td>'
-      + '<td><span class="badge badge-active">Actif</span></td>'
-      + '<td><button class="btn btn-sm btn-outline" onclick="voirConvoyeurSb(\'' + c.id + '\')">Voir</button></td>'
+      + '<td>' + _badgeEtatPartenaire(c) + '</td>'
+      + '<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="voirConvoyeurSb(\'' + c.id + '\')">Voir</button>'
+      + actionBlocage + '</td>'
       + '<td><button class="btn btn-sm btn-red" onclick="supprimerConvoyeur(\'' + c.id + '\')" title="Supprimer">🗑️</button></td></tr>';
   }).join('');
 }
@@ -5443,7 +5485,9 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">Missions</span><span class="detail-val">${c.nb_missions || 0}</span></div>
     <div class="detail-row"><span class="detail-label">Km total</span><span class="detail-val">${c.km_total || 0} km</span></div>
     <div class="detail-row"><span class="detail-label">Note</span><span class="detail-val" style="color:${noteColor};font-weight:700;font-size:1rem">${note}</span></div>
-    <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val"><span class="badge badge-active">Actif</span></span></div>
+    <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val" id="dossier-statut-partenaire">${_badgeEtatPartenaire(c)}</span></div>
+    ${_partenaireEstBloque(c) ? `<div class="detail-row"><span class="detail-label">Motif du blocage</span><span class="detail-val">${escapeHtml(c.bloque_motif || 'Non précisé')}</span></div>
+    <div class="detail-row"><span class="detail-label">Bloqué le</span><span class="detail-val">${escapeHtml((typeof _dateHeureFr === 'function' ? _dateHeureFr(c.bloque_le) : c.bloque_le) || '—')}</span></div>` : ''}
     <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
@@ -6792,22 +6836,24 @@ function openNotationAdmin(name, note) {
   alert(`Historique des évaluations de ${name}\nNote moyenne : ${note}/20\n\n(Dans la version connectée à Supabase, vous verrez ici toutes les évaluations détaillées mission par mission.)`);
 }
 
+// ── BLOCAGE DEPUIS LA LISTE ─────────────────────────────────
+// ANCIENNES VERSIONS SUPPRIMÉES. Elles n'écrivaient RIEN : elles
+// changeaient une classe CSS, annonçaient un email qui n'était jamais
+// envoyé, et l'état revenait à « actif » au premier rechargement.
+//
+// Il n'existe désormais qu'UN SEUL chemin de blocage : la fiche du
+// partenaire, où le motif est demandé et où definirBlocagePartenaire()
+// écrit réellement convoyeurs.bloque avec la trace de qui et quand.
+// Les boutons de la liste ouvrent cette fiche — ils ne dupliquent pas
+// le mécanisme, et n'envoient aucun email.
 function bloquerConvoyeur(id) {
-  if (!confirm('Confirmer le blocage définitif de ce convoyeur ? Un email lui sera envoyé automatiquement.')) return;
-  const row = document.getElementById('conv-' + id + '-row');
-  const circle = document.getElementById(id + '-circle');
-  const badge = document.getElementById(id + '-badge');
-  if (row) { row.classList.add('blocked'); }
-  if (circle) { circle.className = 'note-circle nc-blocked'; }
-  if (badge) { badge.className = 'note-badge note-blocked'; badge.textContent = '🔒 BLOQUÉ DÉFINITIVEMENT'; }
-  alert('✅ Convoyeur bloqué. Email de notification envoyé automatiquement.');
+  voirConvoyeurSb(id);
+  const groupeMotif = document.getElementById('block-reason-group');
+  if (groupeMotif) groupeMotif.style.display = 'block';
 }
 
 function debloquerConvoyeur(id) {
-  if (!confirm('Débloquer ce convoyeur ? Il retrouvera accès à son espace.')) return;
-  const row = document.getElementById('conv-' + id + '-row');
-  if (row) row.classList.remove('blocked');
-  alert('✅ Convoyeur débloqué. Email de notification envoyé.');
+  voirConvoyeurSb(id);
 }
 // ══════════════════════════════════════════════════════════════
 // MODULE DEMANDES DE DEVIS (ajout — ne modifie rien d'existant)
