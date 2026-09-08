@@ -514,7 +514,7 @@ async function deposerCompteSeul(browser, avecSession) {
 
   // ══ D. LE MESSAGE VIENT DU SERVEUR, PAS D'UNE DEVINETTE ══
   check('D1 : l\'écran lit la réponse du serveur',
-    /_retour\.rattachee === true/.test(idx));
+    /_retourSrv\.rattachee === true/.test(idx));
   check('D2 : il ne se fie pas à la seule présence d\'un utilisateur',
     !/utilisateur && utilisateur\.id[\s\S]{0,80}espace client/i.test(idx));
   check('D3 : le titre n\'affirme plus un compte créé avant de le savoir',
