@@ -142,6 +142,18 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
   }));
   check('A5 : attribut minlength harmonisé', attributs.minlength === '8', String(attributs.minlength));
   check('A6 : texte d\'aide cohérent', /8 caractères/.test(attributs.aide), attributs.aide);
+  const positionAide = await page.evaluate(() => {
+    const champ = document.getElementById('client-password');
+    const aide = document.getElementById('client-password-aide');
+    const label = champ.closest('.modal-form-group').querySelector('label');
+    if (!champ || !aide || !label) return null;
+    const c = champ.getBoundingClientRect(), a = aide.getBoundingClientRect(), l = label.getBoundingClientRect();
+    return { aideSousChamp: a.top >= c.bottom - 1, aideApresLabel: a.top > l.top,
+             champJusteSousLabel: c.top < a.top };
+  });
+  check('A6b : l\'aide est SOUS l\'encadré, pas entre le libellé et le champ',
+    positionAide && positionAide.aideSousChamp === true && positionAide.champJusteSousLabel === true,
+    JSON.stringify(positionAide));
 
   // ══ B. LA CONNEXION NE JUGE PAS LA LONGUEUR ══
   const connexionCourte = await page.evaluate(async () => {

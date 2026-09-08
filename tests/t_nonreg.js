@@ -195,6 +195,15 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   L.check('E6c : dans l\'inscription partenaire, seuls les mots de passe changent',
     ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)),
     ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)).slice(0, 3).join(' | '));
+  // Le délai annoncé au client doit être le même partout.
+  const fichiersDelai = ['index.html', 'dashboard.html', 'devis.html', 'helixcar-emails.html']
+    .filter(f => fs.existsSync('/home/user/helixcar/' + f))
+    .map(f => fs.readFileSync('/home/user/helixcar/' + f, 'utf8'));
+  L.check('E8 : plus aucun délai « sous 2 heures » annoncé',
+    fichiersDelai.every(t => !/sous 2\s*h(eures)?/i.test(t)));
+  L.check('E9 : le délai annoncé est bien « sous 1 heure »',
+    /sous 1 heure/.test(fichiersDelai[0]));
+
   L.check('E7 : aucun fichier SQL exécuté (dossier migrations livré tel quel)',
     fichiers.some(f => f.startsWith('migrations/')));
 

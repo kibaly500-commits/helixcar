@@ -2782,6 +2782,7 @@
     box-shadow: 0 1px 0 rgba(16,24,32,.02);
   }
   #modal-client .radio-opt:hover { border-color: rgba(181,68,75,.38); background:#fdfafa; }
+
   #modal-client .radio-opt input[type="radio"] {
     appearance:none; -webkit-appearance:none;
     width:16px !important; height:16px !important; min-width:16px;
@@ -3874,6 +3875,37 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   box-shadow:0 1px 2px rgba(17,22,27,.018);
   transition:border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
 }
+/* ALIGNEMENT DES CARTES PORTANT UNE DESCRIPTION.
+   La règle ci-dessus centre verticalement le contenu de la grille. Dès
+   qu'une carte a une description sur deux lignes et sa voisine sur une
+   seule, le bouton radio ne démarre plus au même endroit que celui de
+   sa voisine — le titre et la description, eux, étaient déjà alignés.
+   Les cartes AVEC description s'alignent donc en HAUT : le rendu reste
+   identique quelle que soit la longueur du texte, sur ordinateur comme
+   sur mobile. Les options sans description (Mécanique, Carrosserie,
+   Diagnostic…) gardent leur centrage et restent alignées entre elles. */
+/* ALIGNEMENT DES CARTES PORTANT UNE DESCRIPTION.
+   Deux corrections, portées uniquement par ces cartes-là :
+   1. le bloc de texte est un flex EN LIGNE (règle ci-dessous), donc la
+      description se plaçait À DROITE du titre au lieu de passer
+      dessous — d'où des largeurs et des retours à la ligne différents
+      d'une carte à l'autre ;
+   2. le contenu était centré verticalement, donc le bouton radio et le
+      titre ne démarraient pas au même endroit dès que les descriptions
+      n'avaient pas le même nombre de lignes.
+   Les options sans description (Mécanique, Carrosserie, Diagnostic…)
+   gardent exactement leur rendu actuel. */
+#modal-client label.radio-opt:has(.hc-opt-desc) > input[type="radio"] {
+  align-self: start !important;
+  margin-top: 3px !important;
+}
+#modal-client label.radio-opt:has(.hc-opt-desc) > span {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  align-self: start;
+}
+
 #modal-client label.radio-opt:hover {
   border-color:rgba(158,63,70,.34); background:#fff;
   box-shadow:0 8px 24px rgba(17,22,27,.045);
@@ -6227,8 +6259,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <label>Mot de passe <span class="field-required">*</span></label>
 
-        <div id="client-password-aide" style="font-size:.75rem;color:#6B7280;margin-bottom:6px">8 caractères minimum.</div>
-
         <div style="position:relative">
           <input type="password" id="client-password" required minlength="8" data-mdp="1"
                  autocomplete="new-password" aria-describedby="client-password-aide" style="padding-right:44px">
@@ -6237,6 +6267,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
+
+        <!-- L'aide se lit SOUS l'encadré, jamais entre le libellé et le
+             champ : elle ne doit pas repousser la saisie. -->
+        <div id="client-password-aide" style="font-size:.75rem;color:#6B7280;margin-top:6px">8 caractères minimum.</div>
 
       </div>
 
@@ -6390,7 +6424,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               <label>De quel professionnel avez-vous besoin ? <span class="field-required">*</span></label>
               <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
                 <label class="radio-opt"><input type="radio" name="pro-categorie" value="technicien" onclick="proOnCategorieChange()"><span>Technicien automobile<span class="hc-opt-desc">Mécanique, carrosserie, diagnostic et autres spécialités</span></span></label>
-                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Jockey automobile, accueil et préparation des véhicules, et d'autres missions</span></span></label>
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Jockey automobile, accueil en concession, soutien administratif, et d'autres missions</span></span></label>
               </div>
             </div>
 
@@ -6409,7 +6443,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               <label>Quelle mission souhaitez-vous confier ? <span class="field-required">*</span></label>
               <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="jockey" onclick="proOnMetierChange()"><span>Jockey automobile</span></label>
-                <label class="radio-opt"><input type="radio" name="pro-mission" value="accueil_preparation" onclick="proOnMetierChange()"><span>Accueil et préparation des véhicules</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="accueil_preparation" onclick="proOnMetierChange()"><span>Accueil en concession</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="soutien_administratif" onclick="proOnMetierChange()"><span>Soutien administratif</span></label>
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="autre" onclick="proOnMetierChange()"><span>Une autre mission</span></label>
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="conseil" onclick="proOnMetierChange()"><span>Je souhaite être conseillé</span></label>
               </div>
@@ -6417,7 +6452,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
             <div class="modal-form-group" id="pro-metier-precision-group" style="display:none">
               <label>Précisez <span class="field-required">*</span></label>
-              <input type="text" id="pro-metier-precision" placeholder="Ex : électricité automobile" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              <input type="text" id="pro-metier-precision" placeholder="Ex : Technicien vitrage automobile" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
             </div>
 
             <div class="modal-form-group" id="pro-nb-pros-group" style="display:none">
@@ -6470,16 +6505,16 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
             <div class="modal-form-group">
               <label>Adresse postale <span class="field-required">*</span></label>
-              <input type="text" id="pro-adresse-rue" placeholder="Ex : 18 rue de Paris" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              <input type="text" id="pro-adresse-rue" placeholder="25 avenue Victor-Hugo" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
             </div>
             <div class="modal-row">
               <div class="modal-form-group">
                 <label>Code postal <span class="field-required">*</span></label>
-                <input type="text" id="pro-adresse-cp" placeholder="93160" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                <input type="text" id="pro-adresse-cp" placeholder="75016" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
                 <label>Ville <span class="field-required">*</span></label>
-                <input type="text" id="pro-adresse-ville" placeholder="Noisy-le-Grand" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                <input type="text" id="pro-adresse-ville" placeholder="Paris" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
 
@@ -6781,16 +6816,16 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div id="nett-adresse-bloc" style="display:none">
             <div class="modal-form-group">
               <label>Adresse postale <span class="field-required">*</span></label>
-              <input type="text" id="nett-adresse-rue" placeholder="Ex : 12 rue des Ateliers" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+              <input type="text" id="nett-adresse-rue" placeholder="25 avenue Victor-Hugo" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
             </div>
             <div class="modal-row">
               <div class="modal-form-group">
                 <label>Code postal <span class="field-required">*</span></label>
-                <input type="text" id="nett-adresse-cp" placeholder="93160" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                <input type="text" id="nett-adresse-cp" placeholder="75016" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
                 <label>Ville <span class="field-required">*</span></label>
-                <input type="text" id="nett-adresse-ville" placeholder="Noisy-le-Grand" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+                <input type="text" id="nett-adresse-ville" placeholder="Paris" autocomplete="off" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
           </div>
@@ -9007,7 +9042,13 @@ var PRO_LIB_SPECIALITE = {
   autre: 'Autre spécialité', conseil: 'Client à conseiller'
 };
 var PRO_LIB_MISSION = {
-  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  jockey: 'Jockey automobile',
+  // Renommé : « Accueil et préparation des véhicules » devient
+  // « Accueil en concession ». La CLÉ accueil_preparation est
+  // conservée pour que les demandes déjà enregistrées continuent de
+  // s'afficher correctement.
+  accueil_preparation: 'Accueil en concession',
+  soutien_administratif: 'Soutien administratif',
   autre: 'Autre mission', conseil: 'Client à conseiller'
 };
 var PRO_MAX_VEHICULES = 3;
@@ -9085,6 +9126,9 @@ function _proMemoriserVehicule(i) {
   _formulaireClientSale = true;
   if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
   if (typeof _masquerNoticeBrouillonDesReprise === 'function') _masquerNoticeBrouillonDesReprise();
+  // Une modification peut rendre ce véhicule incomplet : son numéro
+  // doit alors repasser au rouge immédiatement.
+  if (typeof _proMajEtatVehicules === 'function') _proMajEtatVehicules();
   _proMajBoutonContinuer();
 }
 
@@ -9152,10 +9196,76 @@ function proRendreVehicules() {
         '<select id="pro-veh-' + i + '-type" onchange="_proMemoriserVehicule(' + i + ');_clearFieldError(\'pro-veh-' + i + '-type\')">' + options + '</select></div>' +
         '<div class="modal-form-group"><label>Marque et modèle <span class="field-required">*</span></label>' +
         '<input type="text" id="pro-veh-' + i + '-marque" value="' + _attr(mem.marque_modele || '') + '" placeholder="Ex : BMW Série 3" autocomplete="off" oninput="_proMemoriserVehicule(' + i + ')" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box"></div>' +
+        // Chaque véhicule porte SES propres actions. Elles ne touchent
+        // jamais un autre véhicule : l'index est passé explicitement.
+        '<div class="veh-sous-actions">' +
+          '<button type="button" class="veh-sous-effacer" onclick="proEffacerVehicule(' + i + ')">Effacer</button>' +
+          '<button type="button" class="veh-sous-valider" onclick="proOkVehicule(' + i + ')">OK</button>' +
+        '</div>' +
       '</div></div>';
   }
   zone.innerHTML = html;
   _proMajLibelleVehicules();
+  _proMajEtatVehicules();
+}
+
+// ── UN VÉHICULE EST-IL COMPLET ? ──
+// Mêmes champs obligatoires que la validation de la rubrique, lus
+// depuis la mémoire : aucune règle recopiée.
+function _proVehiculeComplet(i) {
+  var m = _proMemoireVehicules[i] || {};
+  return !!(String(m.type_vehicule || '').trim() && String(m.marque_modele || '').trim());
+}
+
+// Effacer : vide UNIQUEMENT ce véhicule.
+function proEffacerVehicule(i) {
+  var t = document.getElementById('pro-veh-' + i + '-type');
+  var mq = document.getElementById('pro-veh-' + i + '-marque');
+  if (t) t.value = '';
+  if (mq) mq.value = '';
+  _clearFieldError('pro-veh-' + i + '-type');
+  _clearFieldError('pro-veh-' + i + '-marque');
+  _proMemoriserVehicule(i);
+  var carte = document.getElementById('pro-veh-acc-' + i);
+  if (carte) { carte.classList.remove('termine'); delete carte.dataset.proValide; }
+  _proMajEtatVehicules();
+  _proMajBoutonContinuer();
+}
+
+// OK : valide UNIQUEMENT ce véhicule. Le numéro ne passe au vert que si
+// ses informations obligatoires sont réellement renseignées.
+function proOkVehicule(i) {
+  var carte = document.getElementById('pro-veh-acc-' + i);
+  if (!carte) return;
+  if (!_proVehiculeComplet(i)) {
+    if (!String((_proMemoireVehicules[i] || {}).type_vehicule || '').trim()) {
+      _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.');
+    }
+    if (!String((_proMemoireVehicules[i] || {}).marque_modele || '').trim()) {
+      _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.');
+    }
+    delete carte.dataset.proValide;
+    _proMajEtatVehicules();
+    return;
+  }
+  carte.dataset.proValide = '1';
+  carte.classList.remove('ouvert');
+  _proMajEtatVehicules();
+  _proMajBoutonContinuer();
+}
+
+// Recalcule le vert/rouge de CHAQUE véhicule. Un numéro n'est vert que
+// si l'utilisateur a validé ce véhicule ET qu'il est encore complet :
+// ouvrir une carte ne suffit jamais, et modifier une valeur jusqu'à la
+// rendre incomplète le fait repasser au rouge.
+function _proMajEtatVehicules() {
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (!zone) return;
+  Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
+    var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
+    var vert = carte.dataset.proValide === '1' && _proVehiculeComplet(i);
+    carte.classList.toggle('termine', vert);
+  });
 }
 
 function proBasculerVehicule(i) {
@@ -9223,15 +9333,32 @@ function proBasculerRubrique(cle) {
 // d'une autre rubrique.
 function proOkRubrique(cle) {
   var ok = _proValiderRubrique(cle, function () {});
-  if (ok) {
-    var el = document.getElementById('pro-acc-' + cle);
-    if (el) el.classList.remove('ouvert');
+  var el = document.getElementById('pro-acc-' + cle);
+  if (el) {
+    if (ok) { el.dataset.proValide = '1'; el.classList.remove('ouvert'); }
+    else { delete el.dataset.proValide; }
   }
+  _proMajEtatRubriques();
   _proMajBoutonContinuer();
+}
+
+// Recalcule le vert/rouge de CHAQUE rubrique. Une rubrique n'est verte
+// que si l'utilisateur a cliqué OK ET qu'elle est encore complète :
+// l'ouvrir ne suffit jamais, et la rendre incomplète la repasse au
+// rouge sans qu'il ait à recliquer.
+function _proMajEtatRubriques() {
+  PRO_RUBRIQUES.forEach(function (cle) {
+    var acc = document.getElementById('pro-acc-' + cle);
+    if (!acc) return;
+    var vert = acc.dataset.proValide === '1' && _proRubriqueComplete(cle);
+    acc.classList.toggle('termine', vert);
+  });
 }
 
 // Effacer : ne nettoie QUE cette rubrique.
 function proEffacerRubrique(cle) {
+  var accEff = document.getElementById('pro-acc-' + cle);
+  if (accEff) { delete accEff.dataset.proValide; accEff.classList.remove('termine'); }
   function viderChamps(ids) {
     ids.forEach(function (id) {
       var e = document.getElementById(id);
@@ -9512,6 +9639,7 @@ function _proRubriqueComplete(cle) {
 // l'etat reel, et l'etapeur ne peut pas etre contourne tant que
 // l'etape 2 n'est pas reellement complete.
 function _proMajBoutonContinuer() {
+  if (typeof _proMajEtatRubriques === 'function') _proMajEtatRubriques();
   if (!_avecProfessionnel()) return;
   var btn = document.getElementById('client-step-next-btn');
   var complet = _proPeutContinuerEtape2();
@@ -15084,7 +15212,7 @@ async function _submitClientFormInterne() {
       if (missionReelle) {
         html += '<div class="hc-succes-txt">' +
           '<strong>Votre demande de devis a bien été enregistrée.</strong><br>' +
-          'Votre devis personnalisé vous sera envoyé par e-mail <span class="hc-succes-delai">sous 2 heures</span>. ' +
+          'Votre devis personnalisé vous sera envoyé par e-mail <span class="hc-succes-delai">sous 1 heure</span>. ' +
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
           '</div>' +
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
@@ -18947,6 +19075,9 @@ document.addEventListener('click', function (e) {
 #modal-client .pro-veh-titre { flex:1; color:var(--ink); font-size:.88rem; font-weight:660; }
 #modal-client .pro-veh-chevron { color:#8A8F93; font-size:1.15rem; transform:rotate(90deg); transition:transform .18s ease; }
 #modal-client .pro-veh-acc.ouvert .pro-veh-chevron { transform:rotate(-90deg); }
+/* Numéro vert UNIQUEMENT quand le véhicule a été validé et reste
+   complet. Le rouge (fond rosé) est l'état par défaut ci-dessus. */
+#modal-client .pro-veh-acc.termine .pro-veh-num { background:#edf5ef; color:#247443; }
 #modal-client .pro-veh-contenu { display:none; padding:0 16px 14px; }
 #modal-client .pro-veh-acc.ouvert > .pro-veh-contenu { display:block; }
 

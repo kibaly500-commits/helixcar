@@ -6868,7 +6868,13 @@ var PRO_LIB_SPECIALITE = {
   autre: 'Autre spécialité', conseil: 'Client à conseiller'
 };
 var PRO_LIB_MISSION = {
-  jockey: 'Jockey automobile', accueil_preparation: 'Accueil et préparation des véhicules',
+  jockey: 'Jockey automobile',
+  // Renommé : « Accueil et préparation des véhicules » devient
+  // « Accueil en concession ». La CLÉ accueil_preparation est
+  // conservée pour que les demandes déjà enregistrées continuent de
+  // s'afficher correctement.
+  accueil_preparation: 'Accueil en concession',
+  soutien_administratif: 'Soutien administratif',
   autre: 'Autre mission', conseil: 'Client à conseiller'
 };
 // Gabarits véhicules — identiques à TYPES_VEHICULE dans index.html.

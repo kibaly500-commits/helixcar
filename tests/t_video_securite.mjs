@@ -197,8 +197,10 @@ const JETON_B = 'b'.repeat(64);
     let r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/x-msvideo', taille_octets: 1000, duree_secondes: 30 });
     check('4.1 Format refusé côté SERVEUR', r.statut === 400 && r.json.code === 'FORMAT_REFUSE', JSON.stringify(r.json));
 
-    r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 60 * 1024 * 1024, duree_secondes: 30 });
-    check('4.2 Taille refusée côté SERVEUR', r.statut === 400 && r.json.code === 'TAILLE_REFUSEE', JSON.stringify(r.json));
+    // La limite est passée à 300 Mo : le refus se teste au-dessus.
+    r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 301 * 1024 * 1024, duree_secondes: 30 });
+    check('4.2 Taille refusée côté SERVEUR au-delà de 300 Mo', r.statut === 400 && r.json.code === 'TAILLE_REFUSEE', JSON.stringify(r.json));
+
 
     r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 1000, duree_secondes: 90 });
     check('4.3 90 s refusées pour un candidat convoyage (max 60 s)',
@@ -216,6 +218,11 @@ const JETON_B = 'b'.repeat(64);
 
     check('4.7 Aucune signature émise pour les demandes refusées',
       journal.signatures.length === 1, 'signatures=' + journal.signatures.length);
+
+    // Contrôle inverse, APRÈS le comptage des refus : une taille
+    // désormais légitime doit bien être acceptée.
+    r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 214 * 1024 * 1024, duree_secondes: 30 });
+    check('4.9 Une vidéo réaliste de 214 Mo est acceptée', r.statut === 200 && !!r.json.chemin, JSON.stringify(r.json));
   }
   {
     // Le serveur relit les ACTIVITÉS EN BASE, pas ce que dit le client.
