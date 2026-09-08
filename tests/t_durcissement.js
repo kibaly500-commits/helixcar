@@ -489,6 +489,27 @@ window.fetch = function(u, o){
   check('F4 : et il s\'applique aussi à l\'administrateur',
     /Règles qui valent AUSSI pour l'administrateur/.test(mig97));
 
+  // ══ G. LES TESTS NE PEUVENT PAS ATTEINDRE L'EXTÉRIEUR ══
+  // Le double Supabase ne tient que si la vraie bibliotheque ne se
+  // charge pas. Sur une machine sans acces sortant, cela se verifie
+  // tout seul ; sur une machine qui a du reseau, non. On le verifie
+  // donc explicitement, ici, quelle que soit la machine.
+  const sortant = await page.evaluate(async () => {
+    const essais = {};
+    for (const u of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+                     'https://exemple-externe.invalid/x.js']) {
+      try { await fetch(u, { mode: 'no-cors' }); essais[u] = 'JOINT'; }
+      catch (e) { essais[u] = 'coupé'; }
+    }
+    return essais;
+  });
+  check('G1 : aucune requête sortante n\'aboutit depuis la page de test',
+    Object.values(sortant).every(v => v === 'coupé'), JSON.stringify(sortant));
+  check('G2 : le double Supabase est bien celui du test, pas la vraie bibliothèque',
+    await page.evaluate(() => typeof supabase === 'object'
+      && typeof supabase.createClient === 'function'
+      && String(supabase.createClient).indexOf('onAuthStateChange') !== -1));
+
   check('Z1 : aucun e-mail envoyé pendant tout ce parcours',
     await page.evaluate(() => window.__emails.length) === 0);
 

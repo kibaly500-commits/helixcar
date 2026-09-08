@@ -56,8 +56,64 @@ function optionsLancement(extra) {
   return o;
 }
 
-function lancerNavigateur(extra) {
-  return chromium.launch(optionsLancement(extra));
+// ── ISOLEMENT RÉSEAU — non négociable ───────────────────────
+// Les suites remplacent Supabase par un double, injecté avant le
+// chargement de la page. Ce double ne tient QUE si la vraie
+// bibliothèque ne se charge pas : `index.html` et `dashboard.html`
+// chargent supabase-js depuis un CDN, et
+//
+//     const sbAuth = window.supabase ? window.supabase.createClient(...) : null
+//
+// prend la DERNIÈRE valeur de window.supabase. Si le CDN répond, la
+// vraie bibliothèque écrase le double, et les tests parlent au VRAI
+// projet Supabase.
+//
+// Sur un poste sans accès sortant, cela ne se voit pas : le CDN est
+// injoignable, le double gagne. Sur GitHub Actions, le CDN répond — et
+// 44 contrôles sont tombés d'un coup, tous pour cette raison. Le pire
+// n'était pas l'échec : c'est que les tests auraient pu ATTEINDRE la
+// base réelle.
+//
+// On ne laisse donc plus cela au hasard du réseau. Toute requête
+// sortante est coupée, partout, sur toutes les machines. Seuls
+// subsistent les fichiers locaux et les serveurs de test lancés sur la
+// machine elle-même (t_tus).
+const RESEAU_AUTORISE =
+  /^(file:|data:|blob:|about:|chrome-|https?:\/\/(localhost|127\.0\.0\.1)([:/]|$))/i;
+
+async function isolerPage(page) {
+  await page.route('**/*', (route) => {
+    const url = route.request().url();
+    if (RESEAU_AUTORISE.test(url)) return route.continue();
+    return route.abort();
+  });
+  return page;
+}
+
+function _isolerNavigateur(navigateur) {
+  const newPageReel = navigateur.newPage.bind(navigateur);
+  navigateur.newPage = async function (...args) {
+    const page = await newPageReel(...args);
+    await isolerPage(page);
+    return page;
+  };
+  const newContextReel = navigateur.newContext.bind(navigateur);
+  navigateur.newContext = async function (...args) {
+    const contexte = await newContextReel(...args);
+    // Au niveau du contexte : toutes ses pages en héritent, y compris
+    // celles ouvertes plus tard.
+    await contexte.route('**/*', (route) => {
+      const url = route.request().url();
+      if (RESEAU_AUTORISE.test(url)) return route.continue();
+      return route.abort();
+    });
+    return contexte;
+  };
+  return navigateur;
+}
+
+async function lancerNavigateur(extra) {
+  return _isolerNavigateur(await chromium.launch(optionsLancement(extra)));
 }
 
 // DATE CIVILE — jamais UTC.
@@ -86,4 +142,4 @@ function fichier(rel) { return path.join(RACINE, rel); }
 function urlFichier(rel) { return 'file://' + fichier(rel); }
 
 module.exports = { RACINE, chromium, lancerNavigateur, optionsLancement, fichier, urlFichier,
-                   jourCivil, dansNJours };
+                   jourCivil, dansNJours, isolerPage };
