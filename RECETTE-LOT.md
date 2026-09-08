@@ -175,14 +175,14 @@ migrations/README.md
 
 ## 4. Tous les tests exécutés, avec leur résultat réel
 
-**Résultat global : 1 454 contrôles, 1 454 PASS, 0 FAIL — en une commande.**
+**Résultat global : 1 508 contrôles, 1 508 PASS, 0 FAIL — en une commande.**
 
 ```
 npm test
 ```
 
 30 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
-depuis zéro, en 254 secondes. Aucun chiffre de ce document n'est estimé ou
+depuis zéro, en 265 secondes. Aucun chiffre de ce document n'est estimé ou
 reporté d'une exécution antérieure.
 
 Les suites sensibles aux dates ont en outre été passées dans **deux
@@ -194,9 +194,9 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 ```
 
 > Le lot livrait 1 276 contrôles. Le premier audit (§ 4 bis) en a ajouté
-> 127, le second (§ 4 ter) 51 de plus : les tests offensifs sur les fausses
-> photos, l'injection au clic sur la page des candidatures, le rattachement
-> après `signUp`, et l'isolement réseau.
+> 127, le second (§ 4 ter) 51, le troisième (§ 4 quater) 54 : les 30
+> contrôles offensifs de la réclamation sur PostgreSQL, et le parcours
+> complet — confirmation, session, visibilité réelle — côté navigateur.
 
 ### 4.1 Trois familles de preuves, volontairement séparées
 
@@ -218,7 +218,7 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 
 | Suite | PASS | FAIL | Ce qu'elle couvre |
 |---|---|---|---|
-| `t_rls` | **241** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 16 sections, dont V bis, W bis, Z et Z bis, toutes offensives |
+| `t_rls` | **272** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 17 sections, dont V bis, W bis, Z, Z bis et R, toutes offensives |
 | `t_mdp_ui` | **88** | 0 | Longueur minimale et bouton œil sur les six champs |
 | `t_mission_nettoyage` | **72** | 0 | **§ 14** — fiche, création de mission, cloisonnement par métier, photos et leur relecture signée |
 | `t_video` | **70** | 0 | **§ 4** — exigence et durée selon les métiers, formats, taille, remplacement, envoi, erreurs réseau |
@@ -230,6 +230,7 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 | `t_devis_commun` | **52** | 0 | **§ 9** — devis réellement disponible pour les 4 services, un seul moteur |
 | `t_multivehicules` | **48** | 0 | **§ 15** — la même demande de la saisie au PDF et à la fiche admin |
 | `t_infos` | **45** | 0 | **§ 10** — rubriques manquantes uniquement, transmission, validation, garde-fous |
+| `t_rattachement` | **44** | 0 | **Audits 2 et 3** — `signUp` avec et sans session ; puis le PARCOURS COMPLET : confirmation, ouverture de session, réclamation, visibilité réelle, secret consommé |
 | `t_nettoyage_dashboard` | **43** | 0 | **§ 14** — contournement de connexion, chiffres réellement lus, plus rien de fictif |
 | `t_nonreg` | **41** | 0 | **Non-régression** : convoyage, stockage, compte seul, partenaire, textes, **périmètre de fichiers** |
 | `t_devis` | **40** | 0 | Devis PDF des 3 services + non-régression du devis convoyage |
@@ -243,16 +244,15 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 | `t_nettoyage` | **28** | 0 | Parcours Nettoyage complet, du service au récapitulatif |
 | `t_video_admin` | **27** | 0 | Dashboard : états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
 | `t_enregistreur` | **26** | 0 | **§ 4** — véritable enregistreur dans la page (caméra, chronomètre, relecture) |
-| `t_rattachement` | **21** | 0 | **Audit 2 nº 5** — `signUp` avec et sans session : le navigateur ne désigne pas le propriétaire, et l'écran n'annonce jamais un espace client vide |
 | `t_brouillon` | **20** | 0 | Effacer / OK par rubrique, brouillon restauré après F5 |
 | `t_contact` | **20** | 0 | Contact sur place : moi-même / une autre personne |
 | `t_dates` | **19** | 0 | Calendriers liés, bornes, horaires même jour et multi-jours |
 | `t_etapes` | **14** | 0 | **§ 6** — le bouton Continuer ne se grise jamais |
-| **TOTAL** | **1 454** | **0** | 28 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
+| **TOTAL** | **1 508** | **0** | 28 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
 
-`t_rls` applique les **vrais** fichiers de `migrations/00` → `98` sans les
+`t_rls` applique les **vrais** fichiers de `migrations/00` → `99` sans les
 modifier, sur un PostgreSQL 16 local jetable, puis observe le comportement
-effectif. Ses 16 sections, dont les quatre ajoutées par les audits :
+effectif. Ses 17 sections, dont les cinq ajoutées par les audits :
 
 | Section | Ce qu'elle prouve |
 |---|---|
@@ -268,6 +268,7 @@ effectif. Ses 16 sections, dont les quatre ajoutées par les audits :
 | **Y** | **Chantier nº 14** — missions de nettoyage, photos, bucket privé |
 | **Z** | **Audit 1 nº 7** — écritures **hostiles directes** sur les missions : prix, client, paiement, statut, attribution |
 | **Z bis** | **Audit 2 nº 2** — de fausses photos ne justifient plus rien : fichier inexistant, mauvaise mission, mauvais bucket, `ajoutee_par` forcé |
+| **R** | **Audit 3** — le rattachement après confirmation : reproduction du défaut, puis 26 contrôles offensifs sur la réclamation |
 | **F** | **Idempotence** : toute la chaîne rejouée — aucune erreur, aucune politique ni trigger en double |
 
 ### 4.3 Ce que la campagne a rattrapé
@@ -380,6 +381,79 @@ et terminée, non prédite :
 L'écart entre 1 213 (CI) et 1 454 (local) est attendu et connu : la tâche
 navigateur tourne avec `--sans-sql`, sans les 241 contrôles de `t_rls`,
 qui sont l'objet de la seconde tâche. 1 213 + 241 = 1 454.
+
+---
+
+## 4 quater. Troisième audit — une promesse non tenue
+
+Un troisième audit a relu la branche au commit `f73c413`. Il confirme les
+correctifs XSS, la migration `98`, l'isolement réseau et la CI. Il trouve
+**un défaut fonctionnel**, et il a raison.
+
+L'écran affirmait, après une inscription avec confirmation d'e-mail
+requise :
+
+> « elle apparaîtra dans votre espace une fois votre adresse confirmée »
+
+**Ce comportement n'existait pas.** Aucune fonction, aucun trigger, aucun
+RPC ne rattachait la demande après confirmation. Et mon propre test ne le
+voyait pas : il lisait le message affiché, puis s'arrêtait — il ne
+simulait jamais la confirmation, ni l'ouverture de session, ni la
+visibilité réelle de la demande.
+
+C'est exactement le défaut que les deux audits précédents m'avaient fait
+corriger ailleurs — une annonce que le code ne tient pas — cette fois de
+ma main.
+
+### Reproduit d'abord, sur les vraies migrations
+
+`tests/t_rls.sh` section **R**, contrôles R1 à R4 :
+
+| Étape | Constat |
+|---|---|
+| `signUp()` sans session | la demande est écrite avec `auth_user_id = NULL` |
+| le client confirme son adresse | — |
+| il ouvre une session | `v_mes_demandes` renvoie **zéro ligne** |
+| | `auth_user_id` vaut toujours **NULL** |
+
+### Pourquoi pas un rattachement par e-mail
+
+C'est la solution évidente, et c'est celle que
+`06_informations_manquantes.sql` refuse déjà. Une adresse se ressaisit, se
+partage en famille ou en entreprise, se trompe. Rattacher sur ce seul
+critère donnerait à quelqu'un les demandes d'un autre.
+
+**L'adresse reste une condition, jamais une preuve.**
+
+### Ce qu'exige la migration `99`
+
+Six conditions, toutes nécessaires, aucune suffisante :
+
+| # | Condition |
+|---|---|
+| 1 | une session authentifiée |
+| 2 | une adresse **réellement** confirmée (`auth.users.email_confirmed_at`) |
+| 3 | cette adresse **égale** celle portée par la demande |
+| 4 | l'**identifiant exact** de la demande |
+| 5 | un **secret aléatoire**, dont seule l'empreinte SHA-256 est en base |
+| 6 | ce secret **encore valide** — il expire au bout de 30 jours |
+
+Après réussite, le secret est **consommé** : l'empreinte est effacée. Un
+rejeu par le même compte est idempotent ; par un tiers, refusé. La
+fonction n'est **pas** accordée à `anon`.
+
+### Un secret persisté ici, refusé pour la vidéo — pourquoi ce n'est pas contradictoire
+
+| | Envoi vidéo (§ 4 bis nº 3) | Réclamation d'une demande |
+|---|---|---|
+| Ce que le secret permet seul | **confirmer** la candidature | **rien** — il faut en plus une session et une adresse confirmée identique |
+| Ce que sa persistance apporte | **rien** : le fichier a disparu du navigateur | la seule façon de tenir la promesse |
+| Durée | indéfinie | 30 jours, puis effacé |
+| Après usage | réutilisable | **consommé** |
+
+Le persister pour la vidéo aurait ajouté un risque pour un gain nul. Ici,
+il est inutile sans le compte, et il rend vraie une phrase qui ne l'était
+pas.
 
 ---
 
@@ -524,7 +598,7 @@ select count(*) from pg_proc
 
 ---
 
-### Étape 2 — Migrations `93` à `98` (15 minutes)
+### Étape 2 — Migrations `93` à `99` (17 minutes)
 
 **Un fichier à la fois, dans cet ordre, en vérifiant chaque fois.**
 
@@ -536,6 +610,7 @@ select count(*) from pg_proc
 | 2.4 | `96_missions_nettoyage.sql` | les missions de nettoyage et leurs photos avant/après | `select count(*) from storage.buckets where id = 'missions-photos';` → **1** |
 | 2.5 | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ferme ce qu'un partenaire peut changer sur une mission | `select count(*) from pg_trigger where tgrelid='public.missions'::regclass and not tgisinternal;` → **au moins 2** |
 | 2.6 | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo justificative doit exister vraiment | `select count(*) from pg_trigger where tgrelid='public.mission_photos'::regclass and not tgisinternal;` → **au moins 1** |
+| 2.7 | `99_reclamation_demande.sql` | **correctif fonctionnel** : le client rattache sa demande après avoir confirmé son adresse | `select count(*) from pg_proc where proname='reclamer_demande';` → **1** |
 
 *Contrôle global de fin d'étape* :
 ```sql
@@ -1100,6 +1175,7 @@ qu'il faut faire — et surtout ce qu'il ne faut **pas** faire.
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `99` | `drop function if exists public.reclamer_demande(uuid, text);` et les deux fonctions listées en fin de fichier. Laisser les colonnes `reclamation_*`. | **Aucune** — mais la phrase promettant que la demande apparaîtra après confirmation **redevient fausse**. La retirer alors d'`index.html`. |
 | `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;`, puis réappliquer `97`. | **Aucune** — mais revenir dessus permet de nouveau de **justifier une prestation avec des photos qui n'existent pas**. |
 | `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` et `drop trigger if exists trg_verrou_creation_mission on public.missions;` (les fonctions à retirer sont listées en fin de fichier). | **Aucune** — mais revenir dessus **rouvre le défaut de sécurité** : un partenaire pourrait de nouveau changer le prix d'une mission ou la valider lui-même. |
 | `96` | **Laisser en place** les colonnes de `public.missions` et la table `mission_photos` : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (SQL en fin de fichier). | Supprimer la table **effacerait les photos d'état des véhicules**. |
