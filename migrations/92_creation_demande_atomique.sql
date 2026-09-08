@@ -89,6 +89,36 @@ create index if not exists clients_creation_cle_hash_idx
   where creation_cle_hash is not null;
 
 -- ------------------------------------------------------------
+-- 1 bis. Une empreinte PAR USAGE — la séparation est structurelle
+-- ------------------------------------------------------------
+-- Le secret de création et le secret de réclamation (migration 99) ne
+-- doivent jamais être interchangeables. Les tirer au hasard rend la
+-- collision improbable ; la préfixer par son USAGE la rend IMPOSSIBLE.
+--
+-- Même si le même texte était présenté aux deux mécanismes, il ne
+-- produirait pas la même empreinte : un secret qui satisfait
+-- reclamation_cle_hash ne peut donc pas satisfaire creation_cle_hash.
+-- Ce n'est plus une question de probabilité, mais de construction.
+create or replace function public.empreinte_secret(
+  p_usage text,
+  p_cle   text
+) returns text
+language sql
+immutable
+as $$
+  select encode(
+           sha256(convert_to(coalesce(p_usage, '') || ':' || coalesce(p_cle, ''),
+                             'UTF8')),
+           'hex')
+$$;
+
+comment on function public.empreinte_secret(text, text) is
+  'Empreinte SHA-256 d''un secret, préfixée par son usage. La préfixation '
+  'garantit qu''un secret valable pour un usage ne vaut rien pour un autre.';
+
+revoke all on function public.empreinte_secret(text, text) from public;
+
+-- ------------------------------------------------------------
 -- 2. Listes blanches des colonnes publiques
 -- ------------------------------------------------------------
 -- Ce que le NAVIGATEUR a le droit d'écrire, et rien d'autre. Ces
@@ -182,10 +212,21 @@ comment on function public.champs_publics_vehicule() is
 -- laisserait une porte ouverte sans preuve d'idempotence.
 drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb);
 
+-- UNE SEULE SIGNATURE, JAMAIS DEUX.
+--
+-- Ajouter un paramètre à une fonction PostgreSQL ne remplace pas
+-- l'ancienne : elle en crée une seconde. PostgREST se retrouverait alors
+-- devant deux candidates pour le même appel et refuserait de choisir
+-- (« Could not choose the best candidate function »). On retire donc
+-- explicitement la signature à trois arguments avant de créer celle à
+-- quatre. Sans effet si elle n'a jamais existé.
+drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb, text);
+
 create or replace function public.creer_demande_avec_vehicules(
   p_demande         jsonb,
   p_vehicules       jsonb default '[]'::jsonb,
-  p_cle_creation    text  default null
+  p_cle_creation    text  default null,
+  p_cle_reclamation text  default null
 )
 returns jsonb
 language plpgsql
@@ -224,7 +265,9 @@ begin
     -- sha256() est natif depuis PostgreSQL 11 : pas de dépendance à
     -- pgcrypto, dont le schéma varie d'un projet Supabase à l'autre et
     -- serait invisible avec search_path = public, pg_temp.
-    v_hash := encode(sha256(convert_to(p_cle_creation, 'UTF8')), 'hex');
+    -- L'empreinte est préfixée par son usage (voir § 1 bis) : le secret
+    -- de réclamation, même identique, ne produirait pas cette valeur.
+    v_hash := public.empreinte_secret('creation', p_cle_creation);
   end if;
 
   begin
@@ -337,9 +380,15 @@ begin
   -- avoir confirmé son adresse (migration 99). L'appel est conditionnel
   -- et silencieux : tant que 99 n'est pas appliquée, rien ne se passe et
   -- la création fonctionne exactement comme avant.
-  if v_uid is null and v_hash is not null and not v_rejeu then
+  --
+  -- LE SECRET ARMÉ ICI EST UN AUTRE SECRET. Celui de création ne quitte
+  -- jamais la page ; celui de réclamation est le seul que le navigateur
+  -- conserve, et il ne sert qu'à reclamer_demande(). Les deux empreintes
+  -- sont préfixées par des usages différents (§ 1 bis) : l'un ne peut
+  -- pas tenir lieu de l'autre.
+  if v_uid is null and not v_rejeu then
     begin
-      perform public.armer_reclamation(v_id, p_cle_creation);
+      perform public.armer_reclamation(v_id, p_cle_reclamation);
     exception when undefined_function then
       null;   -- migration 99 pas encore appliquée
     end;
@@ -362,17 +411,19 @@ begin
   );
 end $$;
 
-comment on function public.creer_demande_avec_vehicules(jsonb, jsonb, text) is
+comment on function public.creer_demande_avec_vehicules(jsonb, jsonb, text, text) is
   'Crée une demande et ses véhicules dans une seule transaction. '
   'Colonnes écrites : listes BLANCHES champs_publics_demande() et '
   'champs_publics_vehicule() ; toute autre clé est ignorée. Le '
   'propriétaire vient de auth.uid(), jamais du navigateur ; le statut '
   'est imposé. Un rejeu n''est reconnu que sur PREUVE : secret de '
   'création correspondant, ou propriétaire authentifié. Connaître '
-  'l''identifiant d''une demande ne donne aucun droit sur elle.';
+  'l''identifiant d''une demande ne donne aucun droit sur elle. '
+  'p_cle_reclamation est un SECOND secret, distinct du premier : il ne '
+  'sert qu''à reclamer_demande() et ne permet jamais un rejeu.';
 
-revoke all on function public.creer_demande_avec_vehicules(jsonb, jsonb, text) from public;
-grant execute on function public.creer_demande_avec_vehicules(jsonb, jsonb, text) to anon, authenticated;
+revoke all on function public.creer_demande_avec_vehicules(jsonb, jsonb, text, text) from public;
+grant execute on function public.creer_demande_avec_vehicules(jsonb, jsonb, text, text) to anon, authenticated;
 
 -- ------------------------------------------------------------
 -- VÉRIFICATION APRÈS APPLICATION
@@ -383,8 +434,16 @@ grant execute on function public.creer_demande_avec_vehicules(jsonb, jsonb, text
 --     jsonb_build_object('numero_client','TEST-QA-92','email','qa@helixcar.test',
 --                        'type_service','convoyage'),
 --     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA')),
---     repeat('q', 48)
+--     repeat('q', 48),
+--     repeat('r', 48)
 --   );
+--
+-- Et vérifier qu'il n'existe QU'UNE signature, sans quoi PostgREST
+-- refuserait de choisir :
+--
+--   select count(*) from pg_proc
+--    where proname = 'creer_demande_avec_vehicules';
+--   -- attendu : 1
 --
 -- Puis supprimer la ligne d'essai :
 --   delete from public.clients where numero_client = 'TEST-QA-92';
@@ -392,9 +451,10 @@ grant execute on function public.creer_demande_avec_vehicules(jsonb, jsonb, text
 -- ------------------------------------------------------------
 -- RETOUR ARRIÈRE
 -- ------------------------------------------------------------
---   drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb, text);
+--   drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb, text, text);
 --   drop function if exists public.champs_publics_demande();
 --   drop function if exists public.champs_publics_vehicule();
+--   drop function if exists public.empreinte_secret(text, text);
 --
 -- Laisser clients.creation_cle_hash en place : la colonne est vide de
 -- toute donnée personnelle et son retrait casserait les rejeux en cours.

@@ -269,6 +269,7 @@ effectif. Ses 17 sections, dont les cinq ajoutées par les audits :
 | **Z** | **Audit 1 nº 7** — écritures **hostiles directes** sur les missions : prix, client, paiement, statut, attribution |
 | **Z bis** | **Audit 2 nº 2** — de fausses photos ne justifient plus rien : fichier inexistant, mauvaise mission, mauvais bucket, `ajoutee_par` forcé |
 | **R** | **Audit 3** — le rattachement après confirmation : reproduction du défaut, puis 26 contrôles offensifs sur la réclamation |
+| **R bis** | **Audit 4** — le secret gardé n'ouvre RIEN d'autre : pas de rejeu de création, pas de numéro client, pas de véhicule greffé, et une seule signature |
 | **F** | **Idempotence** : toute la chaîne rejouée — aucune erreur, aucune politique ni trigger en double |
 
 ### 4.3 Ce que la campagne a rattrapé
@@ -499,6 +500,117 @@ prédites :
 
 1 236 (CI, avec `--sans-sql`) + 272 (`t_rls`, seconde tâche) = **1 508**,
 le chiffre mesuré localement.
+
+---
+
+## 4 quinquies. Quatrième audit — deux défauts dans le mécanisme lui-même
+
+Le mécanisme de réclamation corrigeait bien le défaut de fond. Un
+quatrième audit y a trouvé **deux défauts propres**, et il a raison sur
+les deux.
+
+### Défaut nº 1 — le secret gardé donnait un droit à lui seul
+
+Ce document affirmait : « le secret ne donne **aucun** droit à lui
+seul ». C'était **faux**. Le navigateur conservait trente jours
+exactement la valeur envoyée comme `p_cle_creation` — c'est-à-dire la
+**preuve de rejeu** de `creer_demande_avec_vehicules()`.
+
+Reproduit sur PostgreSQL 16, contre les migrations de `bddd810` :
+
+```
+-- ce que le navigateur gardait : repeat('S',48)
+   empreinte de création posée en base    : 1
+   empreinte de réclamation posée en base : 1   ← la MÊME
+
+-- rejeu ANONYME, sans aucune session, avec ce seul secret :
+{"id": "dddddddd-…-000000000001", "vehicules": 1,
+ "numero_client": "TEST-QA-VOL1", "deja_existante": true}
+   véhicules greffés sur la demande de la victime : 1
+   numéro client livré                            : TEST-QA-VOL1
+```
+
+Et `reclamer_demande()` n'effaçait que `reclamation_cle_hash` : l'usage
+de création survivait au rattachement. « Le secret est consommé » était
+donc incomplet.
+
+**Correction — deux secrets, séparés par construction.**
+
+| | Secret de création | Secret de réclamation |
+|---|---|---|
+| Tiré par | le navigateur | le navigateur, **indépendamment** |
+| Persisté | **jamais** — il meurt avec la page | oui, 30 jours |
+| Paramètre | `p_cle_creation` | `p_cle_reclamation` (nouveau) |
+| Ce qu'il ouvre | le rejeu de la création | `reclamer_demande()` et rien d'autre |
+| Empreinte | `empreinte_secret('creation', …)` | `empreinte_secret('reclamation', …)` |
+
+La séparation ne repose pas sur le hasard des tirages. Chaque empreinte
+est **préfixée par son usage** : même présentée à l'autre vérification,
+la même chaîne ne produit pas la même valeur. C'est structurel.
+
+Au rattachement, `creation_cle_hash` est effacée elle aussi : la demande
+a désormais un propriétaire, qui prouve son droit par sa session.
+
+Enfin, l'ajout d'un paramètre créerait une **seconde signature** et
+PostgREST refuserait de choisir. La migration `92` retire donc
+explicitement la signature à trois arguments avant de créer celle à
+quatre — et deux contrôles (`R45`, `F8`) vérifient qu'il n'en existe
+jamais qu'une, y compris après rejeu des migrations.
+
+*La même attaque, contre le correctif :*
+
+```
+   correspond-il à l'empreinte de création ?    0
+   correspond-il à l'empreinte de réclamation ? 1
+
+{"id": "e8da3295-… (identifiant NEUF)", "numero_client": null,
+ "deja_existante": false}
+   véhicules greffés sur la demande de la victime : 0
+   la demande visée a-t-elle bougé ?  numéro = TEST-QA-VOL2
+```
+
+### Défaut nº 2 — une session pouvait détruire la réclamation d'une autre
+
+`_hcReclamerDemandesEnAttente()` présentait **toutes** les réclamations
+du navigateur à la session ouverte. Le serveur refusait celles d'autrui
+— adresse différente — et le navigateur prenait ce refus pour définitif :
+il effaçait le secret.
+
+Sur un poste partagé, une famille, un ordinateur d'entreprise :
+
+| Étape | Ce qui se passait |
+|---|---|
+| A et B déposent chacun une demande, sans confirmer | deux réclamations en attente |
+| A confirme et ouvre sa session | le navigateur présente **aussi** celle de B |
+| le serveur refuse B (adresse différente) | `RECLAMATION_REFUSEE` |
+| le navigateur efface le secret de B | **la demande de B devient irrécupérable** |
+| B confirme ensuite son adresse | il n'y a plus rien à réclamer |
+
+L'adresse était pourtant déjà enregistrée dans chaque entrée locale ;
+elle n'était simplement jamais lue.
+
+**Correction.** Avant tout appel, le navigateur demande au serveur
+d'authentification l'adresse de la session (`auth.getUser()`), la
+normalise comme le fait PostgreSQL (`lower(btrim(…))`), et ne présente
+que les réclamations portant cette adresse. Les autres ne sont **ni
+tentées, ni touchées**. Une entrée sans adresse n'est même pas
+enregistrée : elle ne pourrait jamais aboutir.
+
+### Les preuves, mesurées avant et après
+
+| Preuve | Contre `bddd810` | Après correctif |
+|---|---|---|
+| `tests/t_rls.sh` (sections R et R bis) | **24 FAIL** | 291 PASS / 0 FAIL |
+| `tests/t_rattachement.js` | **28 FAIL** | 73 PASS / 0 FAIL |
+
+Parmi les échecs contre `bddd810`, les quatre qui disent tout :
+
+| Contrôle | Ce qu'il a obtenu sur `bddd810` |
+|---|---|
+| `C14 bis` — le secret de création n'est écrit nulle part | `{"local": true, …}` |
+| `E1` — la session A ne présente que ses réclamations | elle présentait A **et B** |
+| `E4` — la réclamation de B reste intacte | elle avait **disparu** |
+| `R34` — le secret gardé ne rejoue pas la création | il la **rejouait** |
 
 ---
 
@@ -1220,7 +1332,7 @@ qu'il faut faire — et surtout ce qu'il ne faut **pas** faire.
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
-| `99` | `drop function if exists public.reclamer_demande(uuid, text);` et les deux fonctions listées en fin de fichier. Laisser les colonnes `reclamation_*`. | **Aucune** — mais la phrase promettant que la demande apparaîtra après confirmation **redevient fausse**. La retirer alors d'`index.html`. |
+| `99` | `drop function if exists public.reclamer_demande(uuid, text);` et les deux fonctions listées en fin de fichier. Laisser les colonnes `reclamation_*`. | **Aucune** — mais la phrase promettant que la demande apparaîtra après confirmation **redevient fausse**. La retirer alors d'`index.html`. Les demandes déjà rattachées le restent : leurs empreintes ont été effacées au rattachement. |
 | `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;`, puis réappliquer `97`. | **Aucune** — mais revenir dessus permet de nouveau de **justifier une prestation avec des photos qui n'existent pas**. |
 | `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` et `drop trigger if exists trg_verrou_creation_mission on public.missions;` (les fonctions à retirer sont listées en fin de fichier). | **Aucune** — mais revenir dessus **rouvre le défaut de sécurité** : un partenaire pourrait de nouveau changer le prix d'une mission ou la valider lui-même. |
 | `96` | **Laisser en place** les colonnes de `public.missions` et la table `mission_photos` : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (SQL en fin de fichier). | Supprimer la table **effacerait les photos d'état des véhicules**. |

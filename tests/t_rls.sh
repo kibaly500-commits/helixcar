@@ -1253,14 +1253,17 @@ sql "begin; select public.devenir_anon();
      jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000002',
                         'numero_client','TEST-QA-R2','email','tardif@helixcar.test',
                         'prenom','TEST-QA','nom','Tardif','type_service','convoyage'),
-     '[]'::jsonb, repeat('k',48)); commit;" >/dev/null
+     '[]'::jsonb, repeat('c',48), repeat('k',48)); commit;" >/dev/null
 
 check "R6 : le secret n'est JAMAIS stocké — seule son empreinte l'est" "1|0" \
   "$(sql "select (reclamation_cle_hash is not null)::int||'|'||
                  (reclamation_cle_hash = repeat('k',48))::int
             from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
-check "R7 : l'empreinte est bien celle du secret fourni" "1" \
-  "$(sql "select (reclamation_cle_hash = encode(sha256(convert_to(repeat('k',48),'UTF8')),'hex'))::int
+check "R7 : l'empreinte est bien celle du secret de RÉCLAMATION fourni" "1" \
+  "$(sql "select (reclamation_cle_hash = public.empreinte_secret('reclamation', repeat('k',48)))::int
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+check "R7 bis : et surtout PAS celle du secret de création" "0" \
+  "$(sql "select (reclamation_cle_hash = public.empreinte_secret('creation', repeat('c',48)))::int
             from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
 check "R8 : et elle a une date d'expiration" "1" \
   "$(sql "select (reclamation_expire_le > now())::int
@@ -1311,7 +1314,7 @@ sql "begin; select public.devenir_anon();
      jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000003',
                         'numero_client','TEST-QA-R3','email','quelquun.dautre@helixcar.test',
                         'type_service','convoyage'),
-     '[]'::jsonb, repeat('m',48)); commit;" >/dev/null
+     '[]'::jsonb, repeat('n',48), repeat('m',48)); commit;" >/dev/null
 check "R16 : bon secret mais adresse de la demande DIFFÉRENTE — refusé" "RECLAMATION_REFUSEE" \
   "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
    select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000003', repeat('m',48)) ->> 'code'; commit;" | tail -1)"
@@ -1365,6 +1368,104 @@ check "R30 : armer_reclamation n'est appelable par personne de l'extérieur" "0"
   "$(sql "select count(*) from information_schema.role_routine_grants
      where routine_name='armer_reclamation' and grantee in ('anon','authenticated');")"
 
+
+echo
+echo "── R bis. LE SECRET DE RÉCLAMATION NE DOIT RIEN OUVRIR D'AUTRE ──"
+# Un audit a montré que la première version se contentait d'un SEUL
+# secret : celui de création servait aussi de secret de réclamation, et
+# le navigateur le gardait trente jours. Or ce secret-là est une PREUVE
+# DE REJEU pour creer_demande_avec_vehicules(). Le conserver revenait à
+# laisser sur l'appareil, sans aucune session, de quoi rejouer la
+# création, en relire le numéro client, et greffer des véhicules sur une
+# demande qui n'en avait pas.
+#
+# La séparation est maintenant STRUCTURELLE : chaque empreinte est
+# préfixée par son usage. Ce n'est pas une question de probabilité.
+
+check "R31 : la même chaîne ne produit PAS la même empreinte selon l'usage" "1" \
+  "$(sql "select (public.empreinte_secret('creation', repeat('K',48))
+                <> public.empreinte_secret('reclamation', repeat('K',48)))::int;")"
+
+# Une demande anonyme toute neuve, sans véhicule, avec DEUX secrets.
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000004',
+                        'numero_client','TEST-QA-R4','email','tardif@helixcar.test',
+                        'prenom','TEST-QA','nom','Separation','type_service','convoyage'),
+     '[]'::jsonb, repeat('C',48), repeat('K',48)); commit;" >/dev/null
+
+check "R32 : la demande part sans aucun véhicule" "0" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='aaaaaaaa-1111-4111-8111-000000000004';")"
+check "R33 : seule l'empreinte de RÉCLAMATION correspond au secret gardé" "1|0" \
+  "$(sql "select (reclamation_cle_hash = public.empreinte_secret('reclamation', repeat('K',48)))::int
+              ||'|'||
+                 (creation_cle_hash    = public.empreinte_secret('creation',    repeat('K',48)))::int
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000004';")"
+
+# ── L'ATTAQUE : le secret gardé par le navigateur, présenté comme
+#    secret de création, par un visiteur SANS session. ──
+ATTAQUE=$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000004',
+                        'numero_client','TEST-QA-VOL','email','voleur@helixcar.test'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA-GREFFE')),
+     repeat('K',48)); commit;" | tail -1)
+
+check "R34 : le secret de réclamation ne REJOUE PAS la création" "0" \
+  "$(echo "$ATTAQUE" | grep -c 'aaaaaaaa-1111-4111-8111-000000000004')"
+check "R35 : ... il ne livre donc pas le numéro client visé" "0" \
+  "$(echo "$ATTAQUE" | grep -c 'TEST-QA-R4')"
+check "R36 : ... et il n'a greffé AUCUN véhicule sur la demande visée" "0" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='aaaaaaaa-1111-4111-8111-000000000004';")"
+check "R37 : ... la demande visée n'a pas bougé d'un pouce" "TEST-QA-R4|NULL" \
+  "$(sql "select numero_client||'|'||coalesce(auth_user_id::text,'NULL')
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000004';")"
+check "R38 : ... et il ne réclame rien non plus par la mauvaise porte" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000004', repeat('C',48)) ->> 'code'; commit;" | tail -1)"
+
+# ── NON-RÉGRESSION : le VRAI secret de création, lui, rejoue bien ──
+LEGITIME=$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000004',
+                        'numero_client','TEST-QA-R4','email','tardif@helixcar.test'),
+     '[]'::jsonb, repeat('C',48)); commit;" | tail -1)
+check "R39 : le VRAI secret de création rejoue toujours, lui" "1" \
+  "$(echo "$LEGITIME" | grep -c 'aaaaaaaa-1111-4111-8111-000000000004')"
+check "R40 : et le serveur le dit : demande déjà existante" "1" \
+  "$(echo "$LEGITIME" | grep -c '"deja_existante" *: *true')"
+
+# ── APRÈS RATTACHEMENT : plus aucune empreinte ne subsiste ──
+check "R41 : le rattachement légitime aboutit" "RATTACHEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000004', repeat('K',48)) ->> 'code'; commit;" | tail -1)"
+check "R42 : les DEUX empreintes sont effacées, pas seulement celle de réclamation" "NULL|NULL" \
+  "$(sql "select coalesce(reclamation_cle_hash,'NULL')||'|'||coalesce(creation_cle_hash,'NULL')
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000004';")"
+APRES=$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000004',
+                        'numero_client','TEST-QA-APRES','email','voleur@helixcar.test'),
+     '[]'::jsonb, repeat('C',48)); commit;" | tail -1)
+check "R43 : l'ancien secret de création ne rejoue plus rien" "0" \
+  "$(echo "$APRES" | grep -c 'aaaaaaaa-1111-4111-8111-000000000004')"
+PROPRIO=$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000004',
+                        'numero_client','TEST-QA-R4','email','tardif@helixcar.test'),
+     '[]'::jsonb); commit;" | tail -1)
+check "R44 : mais le PROPRIÉTAIRE, lui, reprend toujours sa demande" "1" \
+  "$(echo "$PROPRIO" | grep -c 'aaaaaaaa-1111-4111-8111-000000000004')"
+
+# ── UNE SEULE SIGNATURE : sans quoi PostgREST refuserait de choisir ──
+check "R45 : creer_demande_avec_vehicules n'existe qu'en UNE signature" "1" \
+  "$(sql "select count(*) from pg_proc where proname='creer_demande_avec_vehicules';")"
+check "R46 : et elle prend bien quatre arguments" "4" \
+  "$(sql "select pronargs from pg_proc where proname='creer_demande_avec_vehicules';")"
+check "R47 : empreinte_secret n'est offerte à personne de l'extérieur" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='empreinte_secret' and grantee in ('anon','authenticated');")"
+
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
@@ -1396,6 +1497,11 @@ check "F6 : aucune politique en double" "0" \
   "$(sql "select count(*) from (select schemaname, tablename, policyname from pg_policies group by 1,2,3 having count(*) > 1) d;")"
 check "F7 : aucun trigger en double sur convoyeurs" "0" \
   "$(sql "select count(*) from (select tgname from pg_trigger t join pg_class c on c.oid=t.tgrelid where c.relname='convoyeurs' and not t.tgisinternal group by tgname having count(*) > 1) d;")"
+# Rejouer 92 ne doit pas ressusciter l'ancienne signature à trois
+# arguments : PostgREST se retrouverait devant deux candidates et
+# refuserait de choisir, ce qui casserait TOUTES les créations.
+check "F8 : aucune signature en double pour creer_demande_avec_vehicules" "1" \
+  "$(sql "select count(*) from pg_proc where proname='creer_demande_avec_vehicules';")"
 
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="

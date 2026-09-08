@@ -56,6 +56,37 @@
 --
 -- L'UUID seul ne suffit pas. L'adresse seule ne suffit pas. Le secret
 -- seul ne suffit pas.
+--
+-- ------------------------------------------------------------
+-- DEUX SECRETS, ET NON UN SEUL
+-- ------------------------------------------------------------
+-- Une première version réutilisait ici le secret de CRÉATION de la
+-- migration 92. C'était une faute, et un audit l'a relevée : ce secret
+-- est une preuve de rejeu pour creer_demande_avec_vehicules(). Le
+-- persister trente jours dans le navigateur revenait donc à laisser sur
+-- l'appareil, à lui seul et sans aucune session, de quoi :
+--
+--   * rejouer la création de la demande ;
+--   * en relire le numéro client ;
+--   * et, si elle n'avait pas encore de véhicule, lui en greffer.
+--
+-- « Le secret ne donne aucun droit à lui seul » était donc faux.
+--
+-- Désormais le navigateur tire DEUX secrets sans rapport :
+--
+--   * celui de création ne quitte jamais la page — il n'est écrit nulle
+--     part et meurt avec elle ;
+--   * celui de réclamation est le seul conservé, et n'ouvre que
+--     reclamer_demande().
+--
+-- La séparation ne repose pas sur le hasard : les deux empreintes sont
+-- préfixées par leur usage (public.empreinte_secret, migration 92).
+-- Présenter le secret de réclamation à la vérification de création ne
+-- produit pas la bonne empreinte — c'est structurel, pas probabiliste.
+--
+-- Et au rattachement, creation_cle_hash est effacée elle aussi : la
+-- demande a désormais un propriétaire, qui prouve son droit par sa
+-- session. Plus aucune empreinte n'a de raison de subsister.
 
 -- ------------------------------------------------------------
 -- 1. Le secret de réclamation
@@ -83,10 +114,11 @@ returns interval language sql immutable as $$ select interval '30 days' $$;
 -- ------------------------------------------------------------
 -- 2. La création dépose le secret — uniquement si nécessaire
 -- ------------------------------------------------------------
--- creer_demande_avec_vehicules() reçoit déjà un secret de création. Le
--- même sert de secret de réclamation, mais SEULEMENT quand la demande
--- part sans propriétaire : une demande déjà rattachée n'a rien à
--- réclamer, et n'a donc aucune raison de porter un secret réclamable.
+-- creer_demande_avec_vehicules() reçoit un SECOND secret, distinct de
+-- celui de création (paramètre p_cle_reclamation). Il n'est armé que
+-- lorsque la demande part sans propriétaire : une demande déjà rattachée
+-- n'a rien à réclamer, et n'a donc aucune raison de porter un secret
+-- réclamable.
 create or replace function public.armer_reclamation(
   p_client_id uuid,
   p_cle       text
@@ -100,7 +132,7 @@ begin
     return;
   end if;
   update public.clients c
-     set reclamation_cle_hash  = encode(sha256(convert_to(p_cle, 'UTF8')), 'hex'),
+     set reclamation_cle_hash  = public.empreinte_secret('reclamation', p_cle),
          reclamation_expire_le = now() + public.duree_reclamation()
    where c.id = p_client_id
      and c.auth_user_id is null;      -- rien à réclamer si déjà rattachée
@@ -156,7 +188,9 @@ begin
   if p_cle is null or length(p_cle) < 32 then
     return jsonb_build_object('ok', false, 'code', 'CLE_INVALIDE');
   end if;
-  v_hash := encode(sha256(convert_to(p_cle, 'UTF8')), 'hex');
+  -- Empreinte préfixée par son usage : ce calcul ne peut pas produire
+  -- une valeur acceptée par la vérification de creation_cle_hash.
+  v_hash := public.empreinte_secret('reclamation', p_cle);
 
   -- 4. L'identifiant exact.
   select * into v_ligne from public.clients c where c.id = p_client_id;
@@ -196,11 +230,19 @@ begin
     return jsonb_build_object('ok', false, 'code', 'RECLAMATION_REFUSEE');
   end if;
 
-  -- Tout est réuni : on rattache, et on CONSOMME le secret.
+  -- Tout est réuni : on rattache, et on CONSOMME les secrets.
+  --
+  -- creation_cle_hash part avec le reste. Elle ne servait qu'à prouver
+  -- un rejeu de création avant qu'un compte ne soit connu ; la demande a
+  -- maintenant un propriétaire, qui prouve son droit par sa session
+  -- (branche « v_uid is not null and auth_user_id = v_uid » de la
+  -- migration 92). La garder n'apporterait rien et laisserait traîner
+  -- une preuve utilisable sans session.
   update public.clients c
      set auth_user_id          = v_uid,
          reclamation_cle_hash  = null,
-         reclamation_expire_le = null
+         reclamation_expire_le = null,
+         creation_cle_hash     = null
    where c.id = p_client_id
      and c.auth_user_id is null;      -- garde-fou contre une course
 
@@ -212,8 +254,10 @@ comment on function public.reclamer_demande(uuid, text) is
   'confirmer son adresse. Exige TOUTES ces conditions : session, adresse '
   'confirmée, adresse identique à celle de la demande, identifiant exact, '
   'secret correspondant à l''empreinte stockée, secret non expiré. Le '
-  'secret est consommé après réussite. Ni l''UUID seul, ni l''adresse '
-  'seule ne suffisent jamais.';
+  'secret est consommé après réussite, de même que l''empreinte de '
+  'création devenue inutile. Ni l''UUID seul, ni l''adresse seule, ni le '
+  'secret seul ne suffisent jamais. Ce secret est DISTINCT de celui de '
+  'création : il ne permet aucun rejeu.';
 
 revoke all on function public.reclamer_demande(uuid, text) from public;
 grant execute on function public.reclamer_demande(uuid, text) to authenticated;

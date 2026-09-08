@@ -71,7 +71,41 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 14 | D | `96_missions_nettoyage.sql` | missions de nettoyage (`missions.type_mission` + colonnes d'intervention), photos avant/après, bucket privé `missions-photos` et ses politiques |
 | 15 | **D** | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ce qu'un partenaire a le droit de changer sur une mission — colonnes, transitions de statut, attribution, photos exigées |
 | 16 | **D** | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo n'est acceptée que si son fichier existe réellement dans le bucket privé et appartient à la mission ; `ajoutee_par` imposé par le serveur |
-| 17 | **D** | `99_reclamation_demande.sql` | **correctif fonctionnel** : rattacher sa demande après confirmation d'adresse — session, adresse confirmée et identique, identifiant exact, secret dont seule l'empreinte est stockée, expiration, consommation |
+| 17 | **D** | `99_reclamation_demande.sql` | **correctif fonctionnel** : rattacher sa demande après confirmation d'adresse — session, adresse confirmée et identique, identifiant exact, secret dont seule l'empreinte est stockée, expiration, consommation. Le secret de réclamation est **distinct** de celui de création (§ *Deux secrets*, ci-dessous) |
+
+### Deux secrets, et pourquoi `92` retire une signature
+
+La migration `92` publie désormais `creer_demande_avec_vehicules` avec
+**quatre** arguments : `p_cle_reclamation` s'ajoute à `p_cle_creation`.
+
+* le **secret de création** prouve un rejeu ; il ne quitte jamais la
+  page et n'est écrit nulle part ;
+* le **secret de réclamation** est le seul que le navigateur conserve,
+  et il n'ouvre que `reclamer_demande()`.
+
+Les deux empreintes sont préfixées par leur usage
+(`public.empreinte_secret`) : la même chaîne ne produit pas la même
+valeur selon le mécanisme auquel on la présente. Un secret de
+réclamation ne peut donc **jamais** satisfaire la vérification de
+création.
+
+Ajouter un paramètre ne remplace pas une fonction PostgreSQL : cela en
+crée une seconde. PostgREST se retrouverait devant deux candidates et
+refuserait de choisir — **toutes** les créations de demande
+échoueraient. La migration `92` retire donc explicitement la signature à
+trois arguments avant de créer celle à quatre :
+
+```sql
+drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb, text);
+```
+
+Contrôle après application :
+
+```sql
+select count(*), min(pronargs) from pg_proc
+ where proname = 'creer_demande_avec_vehicules';
+-- attendu : 1 | 4
+```
 
 ### Pourquoi `97` ne peut pas attendre
 
@@ -276,7 +310,7 @@ update public.convoyeurs c
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
-| `99` | `drop function if exists public.reclamer_demande(uuid, text);`, `drop function if exists public.armer_reclamation(uuid, text);`, `drop function if exists public.duree_reclamation();`. Laisser les deux colonnes `reclamation_*` en place. | **Aucune** — mais la phrase « elle apparaîtra dans votre espace une fois votre adresse confirmée » redevient FAUSSE. La retirer alors d'`index.html`. |
+| `99` | `drop function if exists public.reclamer_demande(uuid, text);`, `drop function if exists public.armer_reclamation(uuid, text);`, `drop function if exists public.duree_reclamation();`. Laisser les deux colonnes `reclamation_*` en place. NE PAS retirer `public.empreinte_secret` : `92` s'en sert. | **Aucune** — mais la phrase « elle apparaîtra dans votre espace une fois votre adresse confirmée » redevient FAUSSE. La retirer alors d'`index.html`. Les demandes déjà rattachées le restent. |
 | `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;` puis `drop function if exists public.verrou_photo_mission();`, et réappliquer `97` pour retrouver l'ancienne `mission_photos_completes()`. | **Aucune** — mais revenir dessus permet de nouveau de justifier une prestation avec des photos qui n'existent pas. |
 | `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` puis `drop trigger if exists trg_verrou_creation_mission on public.missions;` et les cinq fonctions listées en fin de fichier. | **Aucune** : ces objets ne font que contrôler. Mais les revenir rouvre le défaut de sécurité qu'ils ferment. |
 | `96` | Laisser les colonnes de `public.missions` et la table `mission_photos` EN PLACE : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (voir la fin du fichier). | Retirer la table supprimerait les photos d'état des véhicules. |

@@ -3750,19 +3750,39 @@ async function sbAuthPatchDevisParReference(reference, corps) {
 //     cette adresse soit celle de la demande. Volé sans le compte, il
 //     ne sert à rien ; et il est consommé au premier rattachement.
 //
+// CE N'EST PAS LE SECRET DE CRÉATION. Une première version conservait
+// celui-ci, ce qui rendait la phrase précédente fausse : le secret de
+// création est une preuve de rejeu, et suffisait à lui seul, sans
+// session, à rejouer creer_demande_avec_vehicules(), à en relire le
+// numéro client et à greffer des véhicules sur une demande qui n'en
+// avait pas encore. Un audit l'a relevé. Le navigateur tire désormais
+// DEUX secrets sans rapport : celui de création meurt avec la page,
+// celui de réclamation est le seul conservé. Côté serveur, les deux
+// empreintes sont préfixées par leur usage : l'un ne peut pas tenir
+// lieu de l'autre.
+//
 // Il expire, et il est effacé dès qu'il a servi ou qu'il est périmé.
 var HC_CLE_RECLAMATION = 'helixcar_reclamation';
 var HC_RECLAMATION_JOURS = 30;
+
+// Une adresse ne se compare jamais telle quelle : le serveur applique
+// lower(btrim(...)), le navigateur doit appliquer la même règle, sans
+// quoi « A@Example.com  » et « a@example.com » seraient deux personnes.
+function _hcNormaliserAdresse(x) {
+  return String(x === null || x === undefined ? '' : x).trim().toLowerCase();
+}
 
 function _hcLireReclamations() {
   try {
     var brut = localStorage.getItem(HC_CLE_RECLAMATION);
     var liste = brut ? JSON.parse(brut) : [];
     if (!Array.isArray(liste)) return [];
-    // Le ménage se fait à la lecture : rien de périmé ne survit.
+    // Le ménage se fait à la lecture : rien de périmé ne survit. Une
+    // entrée sans adresse ne survit pas non plus — elle ne pourrait
+    // jamais être rattachée, l'adresse étant une condition du serveur.
     var maintenant = Date.now();
     var vivantes = liste.filter(function (r) {
-      return r && r.id && r.cle && r.expire && r.expire > maintenant;
+      return r && r.id && r.cle && r.email && r.expire && r.expire > maintenant;
     });
     if (vivantes.length !== liste.length) _hcEcrireReclamations(vivantes);
     return vivantes;
@@ -3775,10 +3795,11 @@ function _hcEcrireReclamations(liste) {
   } catch (e) {}
 }
 function _hcMemoriserReclamation(id, cle, email) {
-  if (!id || !cle) return;
+  var adresse = _hcNormaliserAdresse(email);
+  if (!id || !cle || !adresse) return;
   var liste = _hcLireReclamations().filter(function (r) { return r.id !== id; });
   liste.push({
-    id: id, cle: cle, email: email || null,
+    id: id, cle: cle, email: adresse,
     expire: Date.now() + HC_RECLAMATION_JOURS * 24 * 3600 * 1000
   });
   _hcEcrireReclamations(liste);
@@ -3787,29 +3808,71 @@ function _hcOublierReclamation(id) {
   _hcEcrireReclamations(_hcLireReclamations().filter(function (r) { return r.id !== id; }));
 }
 
+// L'adresse de la session, telle que le SERVEUR d'authentification la
+// connaît — jamais celle qui traîne dans le stockage local.
+function _hcAdresseSession(client) {
+  if (!client || !client.auth) return Promise.resolve('');
+  try {
+    if (typeof client.auth.getUser === 'function') {
+      return Promise.resolve(client.auth.getUser()).then(function (r) {
+        var u = r && r.data && r.data.user;
+        return _hcNormaliserAdresse(u && u.email);
+      }).catch(function () { return ''; });
+    }
+  } catch (e) {}
+  try {
+    if (typeof client.auth.getSession === 'function') {
+      return Promise.resolve(client.auth.getSession()).then(function (r) {
+        var se = r && r.data && r.data.session;
+        return _hcNormaliserAdresse(se && se.user && se.user.email);
+      }).catch(function () { return ''; });
+    }
+  } catch (e) {}
+  return Promise.resolve('');
+}
+
 // Appelée au chargement, et après toute ouverture de session. Le serveur
 // tranche : le navigateur ne fait que présenter ce qu'il a gardé.
+//
+// UNE SESSION NE TOUCHE QUE SES PROPRES RÉCLAMATIONS.
+//
+// Un appareil peut porter les demandes de plusieurs personnes — un
+// conjoint, un collègue, un poste partagé. La version précédente
+// présentait TOUTES les réclamations à la session ouverte ; le serveur
+// refusait celles d'autrui (adresse différente), et le navigateur prenait
+// ce refus pour définitif et effaçait le secret. La demande de l'autre
+// devenait alors irrécupérable, avant même qu'il ait confirmé son
+// adresse. On ne tente donc que les réclamations portant l'adresse de la
+// session, et les autres sont laissées STRICTEMENT intactes.
 function _hcReclamerDemandesEnAttente(client) {
   var liste = _hcLireReclamations();
   if (!liste.length || !client || !client.rpc) return Promise.resolve([]);
-  return Promise.all(liste.map(function (r) {
-    return client.rpc('reclamer_demande', { p_client_id: r.id, p_cle: r.cle })
-      .then(function (res) {
-        var d = res && res.data;
-        var code = d && d.code;
-        // Réussite, ou refus définitif : dans les deux cas, ce secret
-        // n'a plus de raison d'être conservé. On ne le garde que pour
-        // les refus qui peuvent encore changer — adresse pas encore
-        // confirmée, session absente.
-        if (d && d.ok) { _hcOublierReclamation(r.id); return { id: r.id, ok: true, code: code }; }
-        if (code === 'RECLAMATION_REFUSEE' || code === 'RECLAMATION_EXPIREE'
-            || code === 'CLE_INVALIDE') {
-          _hcOublierReclamation(r.id);
-        }
-        return { id: r.id, ok: false, code: code || 'ERREUR' };
-      })
-      .catch(function () { return { id: r.id, ok: false, code: 'RESEAU' }; });
-  }));
+  return _hcAdresseSession(client).then(function (adresse) {
+    if (!adresse) return [];
+    var miennes = liste.filter(function (r) {
+      return _hcNormaliserAdresse(r.email) === adresse;
+    });
+    if (!miennes.length) return [];
+    return Promise.all(miennes.map(function (r) {
+      return client.rpc('reclamer_demande', { p_client_id: r.id, p_cle: r.cle })
+        .then(function (res) {
+          var d = res && res.data;
+          var code = d && d.code;
+          // Réussite, ou refus définitif : dans les deux cas, ce secret
+          // n'a plus de raison d'être conservé. On ne le garde que pour
+          // les refus qui peuvent encore changer — adresse pas encore
+          // confirmée, session absente. Et cet effacement ne peut viser
+          // que MES réclamations : les autres n'ont pas été présentées.
+          if (d && d.ok) { _hcOublierReclamation(r.id); return { id: r.id, ok: true, code: code }; }
+          if (code === 'RECLAMATION_REFUSEE' || code === 'RECLAMATION_EXPIREE'
+              || code === 'CLE_INVALIDE') {
+            _hcOublierReclamation(r.id);
+          }
+          return { id: r.id, ok: false, code: code || 'ERREUR' };
+        })
+        .catch(function () { return { id: r.id, ok: false, code: 'RESEAU' }; });
+    }));
+  });
 }
 
 function escapeHtml(str) {

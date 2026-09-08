@@ -237,27 +237,70 @@ async function deposerCompteSeul(browser, avecSession) {
     JSON.stringify(enAttente[0] && Object.keys(enAttente[0])));
   check('C12 : avec une date d\'expiration',
     enAttente[0] && enAttente[0].expire > Date.now(), String(enAttente[0] && enAttente[0].expire));
-  check('C13 : le secret conservé est celui envoyé à la création',
-    enAttente[0] && c.etat.appels[0]
-      && enAttente[0].cle === c.etat.appels[0].params.p_cle_creation,
-    'mémorisé ≠ envoyé');
+  // DEUX SECRETS, ET LE NAVIGATEUR NE GARDE QUE LE BON.
+  //
+  // Une première version n'en tirait qu'un seul : celui de création,
+  // qui est une PREUVE DE REJEU. Le conserver trente jours suffisait,
+  // sans aucune session, à rejouer creer_demande_avec_vehicules(), à en
+  // relire le numéro client et à greffer des véhicules sur une demande
+  // qui n'en avait pas. Ces trois contrôles interdisent le retour en
+  // arrière.
+  const parametres = (c.etat.appels[0] && c.etat.appels[0].params) || {};
+  check('C13 : le secret conservé N\'EST PAS celui de création',
+    !!parametres.p_cle_creation && enAttente[0]
+      && enAttente[0].cle !== parametres.p_cle_creation,
+    'conservé = ' + (enAttente[0] && enAttente[0].cle));
+  check('C13 bis : c\'est bien le secret de RÉCLAMATION, envoyé à part',
+    !!parametres.p_cle_reclamation && enAttente[0]
+      && enAttente[0].cle === parametres.p_cle_reclamation,
+    JSON.stringify(Object.keys(parametres)));
+  check('C13 ter : les deux secrets sont réellement différents',
+    !!parametres.p_cle_creation && !!parametres.p_cle_reclamation
+      && parametres.p_cle_creation !== parametres.p_cle_reclamation);
   check('C14 : et l\'identifiant est celui de la demande écrite',
     enAttente[0] && c.etat.appels[0]
       && enAttente[0].id === c.etat.appels[0].params.p_demande.id);
+
+  // Le secret de création ne doit se trouver NULLE PART dans le
+  // navigateur — ni stockage local, ni stockage de session, ni cookie.
+  const traces = await c.page.evaluate((cle) => {
+    function tout(st) {
+      var s = '';
+      try { for (var i = 0; i < st.length; i++) s += st.key(i) + '=' + st.getItem(st.key(i)) + '\n'; }
+      catch (e) {}
+      return s;
+    }
+    return {
+      local: tout(localStorage).indexOf(cle) !== -1,
+      session: tout(sessionStorage).indexOf(cle) !== -1,
+      cookie: String(document.cookie || '').indexOf(cle) !== -1
+    };
+  }, parametres.p_cle_creation || '\u0000introuvable');
+  check('C14 bis : le secret de création n\'est écrit NULLE PART dans le navigateur',
+    traces.local === false && traces.session === false && traces.cookie === false,
+    JSON.stringify(traces));
 
   // Le client confirme son adresse, puis revient. Un double serveur qui
   // se comporte comme la migration 99 : il n'accepte que sur preuve.
   const apresConfirmation = await c.page.evaluate(async () => {
     const journal = [];
-    const DEMANDE = { id: null, email: 'test-qa@example.invalid', proprietaire: null,
-                      hash: null };
+    const DEMANDE = { id: null, email: null, proprietaire: null, hash: null };
     let liste = [];
     try { liste = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
     DEMANDE.id = liste[0] && liste[0].id;
+    DEMANDE.email = liste[0] && liste[0].email;
     DEMANDE.hash = liste[0] && liste[0].cle;   // le double compare en clair
 
-    // Session ouverte, adresse CONFIRMÉE.
+    // Session ouverte, adresse CONFIRMÉE. Le navigateur demande cette
+    // adresse au serveur d'authentification avant toute réclamation :
+    // le double doit donc la fournir, comme le vrai client Supabase.
     const client = {
+      auth: {
+        getUser: async function () {
+          return { data: { user: { email: DEMANDE.email,
+                                   email_confirmed_at: '2026-01-01T00:00:00Z' } } };
+        }
+      },
       rpc: async function (nom, params) {
         journal.push({ nom, params });
         if (nom !== 'reclamer_demande') return { data: null, error: null };
@@ -299,7 +342,8 @@ async function deposerCompteSeul(browser, avecSession) {
   // Un refus définitif efface aussi le secret : il ne sert plus à rien.
   const refusDefinitif = await c.page.evaluate(async () => {
     _hcMemoriserReclamation('id-refuse', 'k'.repeat(48), 'x@example.invalid');
-    const client = { rpc: async () => ({ data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null }) };
+    const client = { auth: { getUser: async () => ({ data: { user: { email: 'x@example.invalid' } } }) },
+                     rpc: async () => ({ data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null }) };
     await _hcReclamerDemandesEnAttente(client);
     try { return JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) { return 'illisible'; }
   });
@@ -311,7 +355,8 @@ async function deposerCompteSeul(browser, avecSession) {
   // confirmée, mais elle peut l'être demain.
   const refusTemporaire = await c.page.evaluate(async () => {
     _hcMemoriserReclamation('id-attente', 'k'.repeat(48), 'x@example.invalid');
-    const client = { rpc: async () => ({ data: { ok: false, code: 'ADRESSE_NON_CONFIRMEE' }, error: null }) };
+    const client = { auth: { getUser: async () => ({ data: { user: { email: 'x@example.invalid' } } }) },
+                     rpc: async () => ({ data: { ok: false, code: 'ADRESSE_NON_CONFIRMEE' }, error: null }) };
     await _hcReclamerDemandesEnAttente(client);
     let l = [];
     try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
@@ -328,7 +373,8 @@ async function deposerCompteSeul(browser, avecSession) {
       { id: 'vieux', cle: 'k'.repeat(48), email: 'x@example.invalid', expire: Date.now() - 1000 }
     ]));
     let appels = 0;
-    const client = { rpc: async () => { appels++; return { data: { ok: true }, error: null }; } };
+    const client = { auth: { getUser: async () => ({ data: { user: { email: 'x@example.invalid' } } }) },
+                     rpc: async () => { appels++; return { data: { ok: true }, error: null }; } };
     await _hcReclamerDemandesEnAttente(client);
     let l = [];
     try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
@@ -336,6 +382,133 @@ async function deposerCompteSeul(browser, avecSession) {
   });
   check('C23 : un secret périmé est oublié sans même interroger le serveur',
     perime.appels === 0 && perime.restant.length === 0, JSON.stringify(perime));
+
+  // ══ E. DEUX PERSONNES SUR LE MÊME APPAREIL ══
+  //
+  // Un ordinateur familial, un poste d'entreprise, un téléphone prêté :
+  // deux demandes peuvent attendre côte à côte dans le même navigateur.
+  //
+  // La version précédente présentait TOUTES les réclamations à la
+  // session ouverte. Le serveur refusait celle de l'autre — adresse
+  // différente — et le navigateur prenait ce refus pour définitif : il
+  // effaçait le secret. La demande du second devenait irrécupérable
+  // AVANT MÊME qu'il ait confirmé son adresse.
+  //
+  // On rejoue ici le scénario exact, de bout en bout.
+  const deuxComptes = await c.page.evaluate(async () => {
+    localStorage.removeItem('helixcar_reclamation');
+    const A = { id: 'demande-A', cle: 'A'.repeat(48), email: 'a@example.invalid' };
+    const B = { id: 'demande-B', cle: 'B'.repeat(48), email: 'b@example.invalid' };
+    _hcMemoriserReclamation(A.id, A.cle, A.email);
+    // Volontairement saisie avec majuscules et espaces : le serveur
+    // compare en lower(btrim(...)), le navigateur doit faire de même.
+    _hcMemoriserReclamation(B.id, B.cle, '  B@Example.INVALID ');
+
+    const base = {
+      'demande-A': { email: 'a@example.invalid', cle: A.cle, proprietaire: null },
+      'demande-B': { email: 'b@example.invalid', cle: B.cle, proprietaire: null }
+    };
+    const journal = [];
+
+    // Un double qui se comporte comme la migration 99.
+    function clientPour(adresse) {
+      return {
+        auth: { getUser: async () => ({ data: { user: {
+          email: adresse, email_confirmed_at: '2026-01-01T00:00:00Z' } } }) },
+        rpc: async (nom, p) => {
+          journal.push({ session: adresse, nom: nom, id: p && p.p_client_id });
+          if (nom !== 'reclamer_demande') return { data: null, error: null };
+          const l = base[p.p_client_id];
+          const normale = String(adresse).trim().toLowerCase();
+          if (!l || l.proprietaire || l.email !== normale || l.cle !== p.p_cle) {
+            return { data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null };
+          }
+          l.proprietaire = normale;
+          l.cle = null;                       // consommé
+          return { data: { ok: true, code: 'RATTACHEE', id: p.p_client_id }, error: null };
+        }
+      };
+    }
+
+    const rA = await _hcReclamerDemandesEnAttente(clientPour('a@example.invalid'));
+    let apresA = [];
+    try { apresA = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+
+    const rB = await _hcReclamerDemandesEnAttente(clientPour('B@Example.INVALID'));
+    let apresB = [];
+    try { apresB = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+
+    localStorage.removeItem('helixcar_reclamation');
+    return { journal, rA, rB, apresA, apresB, base, secretB: B.cle };
+  });
+
+  const appelsA = deuxComptes.journal.filter(j => j.session === 'a@example.invalid');
+  const appelsB = deuxComptes.journal.filter(j => j.session === 'B@Example.INVALID');
+
+  check('E1 : la session A ne présente QUE la réclamation de A',
+    appelsA.length === 1 && appelsA[0].id === 'demande-A',
+    JSON.stringify(deuxComptes.journal));
+  check('E2 : la demande de A lui est bien rattachée',
+    deuxComptes.base['demande-A'].proprietaire === 'a@example.invalid',
+    String(deuxComptes.base['demande-A'].proprietaire));
+  check('E3 : et son secret disparaît du navigateur',
+    !deuxComptes.apresA.some(r => r.id === 'demande-A'),
+    JSON.stringify(deuxComptes.apresA));
+  // LE POINT DE L'AUDIT.
+  check('E4 : la réclamation de B est laissée STRICTEMENT intacte',
+    deuxComptes.apresA.length === 1
+      && deuxComptes.apresA[0].id === 'demande-B'
+      && deuxComptes.apresA[0].cle === deuxComptes.secretB,
+    JSON.stringify(deuxComptes.apresA));
+  check('E5 : B n\'a même jamais été présentée au serveur de A',
+    !appelsA.some(j => j.id === 'demande-B'),
+    JSON.stringify(appelsA));
+  check('E6 : puis B ouvre sa session et réclame la sienne — et elle seule',
+    appelsB.length === 1 && appelsB[0].id === 'demande-B',
+    JSON.stringify(appelsB));
+  check('E7 : la demande de B lui est rattachée à son tour',
+    deuxComptes.base['demande-B'].proprietaire === 'b@example.invalid',
+    String(deuxComptes.base['demande-B'].proprietaire));
+  check('E8 : plus rien n\'attend dans le navigateur',
+    deuxComptes.apresB.length === 0, JSON.stringify(deuxComptes.apresB));
+  check('E9 : chaque demande n\'a qu\'un seul propriétaire, le bon',
+    deuxComptes.base['demande-A'].proprietaire === 'a@example.invalid'
+      && deuxComptes.base['demande-B'].proprietaire === 'b@example.invalid');
+  check('E10 : les deux secrets ont été consommés côté serveur',
+    deuxComptes.base['demande-A'].cle === null
+      && deuxComptes.base['demande-B'].cle === null);
+  check('E11 : une adresse saisie avec majuscules et espaces reste la bonne',
+    deuxComptes.rB.length === 1 && deuxComptes.rB[0].ok === true,
+    JSON.stringify(deuxComptes.rB));
+
+  // Sans session lisible, on ne touche à RIEN : ni appel, ni effacement.
+  const sansSession = await c.page.evaluate(async () => {
+    _hcMemoriserReclamation('intacte', 'z'.repeat(48), 'z@example.invalid');
+    let appels = 0;
+    const client = { auth: { getUser: async () => ({ data: { user: null } }) },
+                     rpc: async () => { appels++; return { data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null }; } };
+    await _hcReclamerDemandesEnAttente(client);
+    let l = [];
+    try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    localStorage.removeItem('helixcar_reclamation');
+    return { appels, restant: l };
+  });
+  check('E12 : sans adresse de session, aucun appel et aucun effacement',
+    sansSession.appels === 0 && sansSession.restant.length === 1,
+    JSON.stringify(sansSession));
+
+  // Une entrée sans adresse ne pourrait jamais aboutir : elle n'est
+  // même pas conservée.
+  const sansAdresse = await c.page.evaluate(async () => {
+    localStorage.removeItem('helixcar_reclamation');
+    _hcMemoriserReclamation('sans-adresse', 'y'.repeat(48), '');
+    let l = [];
+    try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    localStorage.removeItem('helixcar_reclamation');
+    return l;
+  });
+  check('E13 : une réclamation sans adresse n\'est pas même enregistrée',
+    sansAdresse.length === 0, JSON.stringify(sansAdresse));
 
   await c.page.close();
 
@@ -356,8 +529,16 @@ async function deposerCompteSeul(browser, avecSession) {
     /email_confirmed_at/.test(mig99) && /ADRESSE_NON_CONFIRMEE/.test(mig99));
   check('D6 : il exige que l\'adresse du compte soit celle de la demande',
     /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig99));
+  // Le calcul de l'empreinte a été déplacé dans public.empreinte_secret
+  // (migration 92) pour que la séparation des usages soit faite en UN
+  // seul endroit. Ce qui doit rester vrai : aucune colonne ne garde le
+  // secret en clair, et 99 ne hache jamais à sa façon.
+  const migEmpreinte = fs.readFileSync(
+    fichier('migrations/92_creation_demande_atomique.sql'), 'utf8');
   check('D7 : il n\'accepte qu\'une empreinte, jamais un secret en clair',
-    /encode\(sha256/.test(mig99) && !/reclamation_cle\s+text/.test(mig99));
+    /empreinte_secret\('reclamation'/.test(mig99)
+    && /encode\(\s*\n?\s*sha256/.test(migEmpreinte)
+    && !/reclamation_cle\s+text/.test(mig99));
   check('D8 : le secret expire',
     /reclamation_expire_le <= now\(\)/.test(mig99) && /RECLAMATION_EXPIREE/.test(mig99));
   check('D9 : et il est consommé après réussite',
@@ -370,6 +551,39 @@ async function deposerCompteSeul(browser, avecSession) {
     /_hcReclamerDemandesEnAttente\(sbAuth\)/.test(dash));
   check('D12 : et le site public aussi, au retour de confirmation',
     /_hcReclamerDemandesEnAttente\(_sb\)/.test(idx));
+
+  // ── D bis. LES DEUX SECRETS, VUS DEPUIS LES FICHIERS ──
+  const mig92 = fs.readFileSync(fichier('migrations/92_creation_demande_atomique.sql'), 'utf8');
+  check('D13 : la création reçoit un SECOND secret, distinct du premier',
+    /p_cle_reclamation\s+text\s+default null/.test(mig92));
+  check('D14 : et c\'est CELUI-LÀ qui arme la réclamation',
+    /armer_reclamation\(v_id, p_cle_reclamation\)/.test(mig92)
+    && !/armer_reclamation\(v_id, p_cle_creation\)/.test(mig92));
+  check('D15 : les empreintes sont séparées par leur usage, pas par le hasard',
+    /empreinte_secret\(\s*\n?\s*p_usage/.test(mig92)
+    && /empreinte_secret\('creation', p_cle_creation\)/.test(mig92)
+    && /empreinte_secret\('reclamation', p_cle\)/.test(mig99));
+  check('D16 : une seule signature est publiée — pas d\'ambiguïté PostgREST',
+    /drop function if exists public\.creer_demande_avec_vehicules\(jsonb, jsonb, text\);/.test(mig92)
+    && /grant execute on function public\.creer_demande_avec_vehicules\(jsonb, jsonb, text, text\)/.test(mig92));
+  check('D17 : au rattachement, l\'empreinte de création est effacée elle aussi',
+    /creation_cle_hash\s*=\s*null/.test(mig99));
+  check('D18 : le navigateur envoie bien les deux secrets, séparément',
+    /p_cle_creation: cleCreation/.test(idx) && /p_cle_reclamation: cleReclamation/.test(idx));
+  check('D19 : et il ne mémorise QUE celui de réclamation',
+    /_hcMemoriserReclamation\(payload\.id, cleReclamation, email_val\)/.test(idx)
+    && !/_hcMemoriserReclamation\([^)]*cleCreation/.test(idx));
+
+  // ── D ter. UNE SESSION NE TOUCHE QUE SES PROPRES RÉCLAMATIONS ──
+  [['index.html', idx], ['dashboard.html', dash]].forEach(function (paire) {
+    const nom = paire[0], src = paire[1];
+    check('D20 (' + nom + ') : l\'adresse de la session vient du serveur d\'authentification',
+      /function _hcAdresseSession\(client\)/.test(src) && /auth\.getUser/.test(src));
+    check('D21 (' + nom + ') : seules les réclamations de cette adresse sont tentées',
+      /_hcNormaliserAdresse\(r\.email\) === adresse/.test(src));
+    check('D22 (' + nom + ') : et l\'adresse est normalisée des deux côtés',
+      /function _hcNormaliserAdresse\(x\)/.test(src) && /toLowerCase\(\)/.test(src));
+  });
 
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
