@@ -385,8 +385,17 @@ window.fetch = function (url, options) {
   const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
   check('E2 : le dashboard ne contient AUCUNE copie du formulaire',
     !/name="type-service"/.test(dash) && /name="type-service"/.test(idx));
-  check('E3 : aucune mission créée par ce parcours',
-    !/from\('missions'\)\s*\.insert|rest\/v1\/missions.*POST/.test(dash.slice(dash.indexOf('ESPACE CLIENT —'))));
+  // La règle vérifiée est bien « l'espace CLIENT ne crée aucune
+  // mission ». La version précédente examinait TOUT ce qui suit la
+  // bannière « ESPACE CLIENT », y compris le code d'administration écrit
+  // plus bas : la création d'une mission de nettoyage par
+  // l'administrateur la faisait échouer alors que l'espace client n'y
+  // est pour rien. On borne donc la lecture au bloc lui-même.
+  const debutClient = dash.indexOf('ESPACE CLIENT —');
+  const finClient = dash.indexOf('RÉINITIALISATION DU MOT DE PASSE', debutClient);
+  const blocClient = dash.slice(debutClient, finClient > debutClient ? finClient : dash.length);
+  check('E3 : aucune mission créée par le parcours CLIENT',
+    !/from\('missions'\)\s*\.insert|rest\/v1\/missions[^']*POST/.test(blocClient));
   check('E4 : le mot de passe client n\'est plus collecté en pure perte',
     /auth\.signUp/.test(idx));
 

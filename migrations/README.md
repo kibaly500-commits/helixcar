@@ -68,6 +68,7 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 11 | D | `93_bucket_video_300mo.sql` | limite du bucket vidéo portée à 300 Mo |
 | 12 | D | `94_informations_selon_scenario.sql` | `informations_demande()` selon le scénario réel + `vehicules.livraison_apres_stockage` |
 | 13 | D | `95_metiers_partenaires.sql` | `convoyeurs.metiers` + activité `technicien` acceptée |
+| 14 | D | `96_missions_nettoyage.sql` | missions de nettoyage (`missions.type_mission` + colonnes d'intervention), photos avant/après, bucket privé `missions-photos` et ses politiques |
 
 ### Pourquoi la phase D vient APRÈS la phase C
 
@@ -200,6 +201,12 @@ select column_name from information_schema.columns
  where table_name = 'convoyeurs' and column_name = 'metiers';
 select pg_get_constraintdef(oid) from pg_constraint
  where conname = 'convoyeur_decisions_activite_check';   -- doit inclure 'technicien'
+
+-- 96 : les missions de nettoyage et leurs photos
+select count(*) from public.missions where type_mission <> 'convoyage';  -- 0 juste après
+select id, public from storage.buckets where id = 'missions-photos';     -- public = false
+select policyname from pg_policies
+ where tablename = 'mission_photos';                     -- 6 politiques attendues
 ```
 
 Puis, depuis le site :
@@ -208,7 +215,11 @@ Puis, depuis le site :
 2. ouvrir la fiche d'une demande de nettoyage dont le contact sur place
    est renseigné — il ne doit **plus** figurer dans « Encore manquantes » ;
 3. déposer une candidature **technicien** — l'activité doit être
-   acceptée et apparaître avec ses spécialités dans le Dashboard.
+   acceptée et apparaître avec ses spécialités dans le Dashboard ;
+4. ouvrir une demande de **nettoyage** complète, établir son devis, puis
+   cliquer sur « Créer la mission de nettoyage » — la mission doit
+   apparaître dans l'onglet Missions avec le badge 🧼 Nettoyage, et
+   n'être proposée qu'aux partenaires ayant déclaré ce métier.
 
 ## Retour arrière
 
@@ -243,6 +254,7 @@ update public.convoyeurs c
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `96` | Laisser les colonnes de `public.missions` et la table `mission_photos` EN PLACE : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (voir la fin du fichier). | Retirer la table supprimerait les photos d'état des véhicules. |
 | `95` | Laisser `convoyeurs.metiers` en place (nullable, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie 0. | Retirer la colonne supprimerait des métiers réellement déclarés. |
 | `94` | Réappliquer `06_informations_manquantes.sql` : il contient la version précédente de `informations_demande(uuid)`, même signature. Laisser `vehicules.livraison_apres_stockage` en place. | Aucune : `94` ne touche qu'une fonction de lecture et ajoute une colonne vide. |
 | `93` | `update storage.buckets set file_size_limit = 52428800 where id = 'candidatures-videos';` | Les vidéos déjà déposées au-delà de la limite restent lisibles. |
@@ -273,6 +285,10 @@ et **ne bloquer aucun partenaire avant la phase C**.
 
 1. **Storage → `candidatures-videos`** : vérifier que le bucket apparaît
    bien comme **Private**. C'est le point de sécurité central des vidéos.
+1 bis. **Storage → `missions-photos`** : créé par la migration `96`.
+   Vérifier lui aussi qu'il apparaît comme **Private** — les photos
+   d'état des véhicules sont des pièces, jamais des illustrations
+   publiques.
 2. **Aucune clé `service_role` côté navigateur.** La lecture d'une vidéo
    passe par une **URL signée temporaire** (`createSignedUrl`, 60–300 s),
    générée depuis une session authentifiée, après le contrôle

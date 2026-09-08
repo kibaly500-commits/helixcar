@@ -624,6 +624,88 @@ check "X12 : les décisions déjà prises ne sont pas réinitialisées" "oui" \
   "$(sql "select decision from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and activite='convoyage';")"
 
 echo
+echo "── Y. MISSIONS DE NETTOYAGE ET PHOTOS D'INTERVENTION (§14) ──"
+check "Y1 : REPRODUCTION — public.missions ne sait pas décrire un nettoyage" "0" \
+  "$(sql "select count(*) from information_schema.columns where table_schema='public' and table_name='missions' and column_name='type_mission';")"
+check "Y2 : REPRODUCTION — aucune table de photos d'intervention" "0" \
+  "$(sql "select count(*) from information_schema.tables where table_schema='public' and table_name='mission_photos';")"
+
+errY=$(appliquer migrations/96_missions_nettoyage.sql)
+check "Y3 : migrations/96 s'applique sans erreur" "" "$errY"
+
+check "Y4 : toute mission existante reste un convoyage" "3|3" \
+  "$(sql "select count(*)||'|'||count(*) filter (where type_mission='convoyage') from public.missions;")"
+check "Y5 : une mission de nettoyage peut être créée" "INSERT 0 1" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); insert into public.missions (id,reference,statut,type_mission,client_id,prestation,adresse_intervention,ville_intervention,contact_nom,contact_tel,date_intervention,prix_ttc) values ('bbbbbbbb-0000-0000-0000-0000000000c1','TEST-QA-NET-1','en_attente','nettoyage','dddddddd-0000-0000-0000-0000000000a1','Nettoyage intérieur et extérieur','3 rue des Lilas','Lyon','TEST-QA Martin','+33600000020','2026-11-02',400); commit;\"" 2>&1 | grep -E '^INSERT')"
+check "Y6 : un type de mission INVENTÉ est refusé" "refuse" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   insert into public.missions (reference,statut,type_mission) values ('TEST-QA-PIRATE','en_attente','pirate'); commit;" \
+   | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
+
+# Le partenaire de la mission, et lui seul.
+sql "update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001'
+      where id='bbbbbbbb-0000-0000-0000-0000000000c1';" >/dev/null
+check "Y7 : le partenaire affecté est reconnu comme tel" "t" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select public.est_partenaire_de_mission('bbbbbbbb-0000-0000-0000-0000000000c1'); commit;" | tail -1)"
+check "Y8 : un AUTRE partenaire ne l'est pas" "f" \
+  "$(sql "begin; select public.devenir('44444444-4444-4444-4444-444444444444','ancien@helixcar.test');
+   select public.est_partenaire_de_mission('bbbbbbbb-0000-0000-0000-0000000000c1'); commit;" | tail -1)"
+
+check "Y9 : le partenaire dépose une photo de SA mission" "INSERT 0 1" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into public.mission_photos (mission_id,etape,chemin) values ('bbbbbbbb-0000-0000-0000-0000000000c1','avant','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
+check "Y10 : et il la relit" "1" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
+check "Y11 : un AUTRE partenaire ne voit AUCUNE de ces photos" "0" \
+  "$(sql "begin; select public.devenir('44444444-4444-4444-4444-444444444444','ancien@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
+check "Y12 : et ne peut pas en déposer sur cette mission" "refuse" \
+  "$(sql "begin; select public.devenir('44444444-4444-4444-4444-444444444444','ancien@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000c1','apres','missions/bbbbbbbb-0000-0000-0000-0000000000c1/pirate.jpg'); commit;" \
+   | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
+check "Y13 : un visiteur anonyme ne voit RIEN" "0" \
+  "$(sql "begin; select public.devenir_anon(); select count(*) from public.mission_photos; commit;" | tail -1)"
+check "Y14 : une étape inventée est refusée" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000c1','pendant','missions/x/y.jpg'); commit;" \
+   | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
+check "Y15 : un partenaire ne peut PAS supprimer une photo déjà déposée" "DELETE 0" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); delete from public.mission_photos; commit;\"" 2>&1 | grep -E '^DELETE')"
+check "Y16 : l'administrateur les voit toutes" "1" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
+
+# Un partenaire BLOQUÉ perd l'accès, ici comme ailleurs.
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.convoyeurs set bloque=true where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null
+check "Y17 : un partenaire BLOQUÉ ne voit plus les photos de sa mission" "0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
+check "Y18 : et ne peut plus en déposer" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000c1','apres','missions/bbbbbbbb-0000-0000-0000-0000000000c1/apres-1.jpg'); commit;" \
+   | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.convoyeurs set bloque=false where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null
+
+# Le bucket des photos.
+check "Y19 : le bucket des photos est PRIVÉ" "f" \
+  "$(sql "select public from storage.buckets where id='missions-photos';")"
+check "Y20 : il n'accepte que des images" "3" \
+  "$(sql "select array_length(allowed_mime_types,1) from storage.buckets where id='missions-photos';")"
+check "Y21 : le partenaire dépose un fichier dans le dossier de SA mission" "INSERT 0 1" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into storage.objects (bucket_id,name) values ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
+check "Y22 : mais PAS dans le dossier d'une autre mission" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into storage.objects (bucket_id,name)
+     values ('missions-photos','missions/bbbbbbbb-0000-0000-0000-000000000002/pirate.jpg'); commit;" \
+   | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
+check "Y23 : un visiteur anonyme ne lit AUCUN fichier de ce bucket" "0" \
+  "$(sql "begin; select public.devenir_anon(); select count(*) from storage.objects where bucket_id='missions-photos'; commit;" | tail -1)"
+check "Y24 : aucune politique de ce bucket n'est accordée à anon" "0" \
+  "$(sql "select count(*) from pg_policies where tablename='objects' and policyname like 'photos mission%' and 'anon' = any(roles);")"
+
+echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
 HIST_AVANT=$(sql "select count(*) from public.convoyeur_decisions_historique;")
@@ -633,12 +715,14 @@ err4=$(appliquer migrations/04_decisions_activites.sql)
 err92=$(appliquer migrations/92_creation_demande_atomique.sql)
 err94=$(appliquer migrations/94_informations_selon_scenario.sql)
 err95=$(appliquer migrations/95_metiers_partenaires.sql)
+err96=$(appliquer migrations/96_missions_nettoyage.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
 check "F3b : 92 se rejoue sans erreur" "" "$err92"
 check "F3c : 94 se rejoue sans erreur" "" "$err94"
 check "F3d : 95 se rejoue sans erreur" "" "$err95"
+check "F3e : 96 se rejoue sans erreur" "" "$err96"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"

@@ -79,10 +79,14 @@ create table if not exists public.convoyeurs (
 create table if not exists public.missions (
   id           uuid primary key default gen_random_uuid(),
   convoyeur_id uuid references public.convoyeurs(id),
+  -- Simple uuid : public.clients est déclarée plus bas dans ce socle,
+  -- et une contrainte croisée n'apporterait rien au test.
+  client_id    uuid,
   reference    text,
   statut       text not null default 'en_attente',
   ville_depart text,
   ville_arrivee text,
+  prix_ttc     numeric,
   created_at   timestamptz not null default now()
 );
 
@@ -209,9 +213,25 @@ create table if not exists storage.objects (
   owner    uuid
 );
 
+-- storage.foldername() : Supabase la fournit pour découper le chemin
+-- d'un objet en segments. Les politiques Storage s'appuient dessus, il
+-- faut donc la reproduire à l'identique pour les éprouver.
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+as $$
+  select string_to_array(name, '/');
+$$;
+
 grant usage on schema storage to anon, authenticated, service_role;
+grant execute on function storage.foldername(text) to anon, authenticated;
 grant select, insert, update, delete on storage.objects to anon, authenticated;
 grant select on storage.buckets to anon, authenticated;
+
+-- Comme en production : la RLS de storage.objects est active, et seules
+-- les politiques donnent accès.
+alter table storage.objects enable row level security;
 
 -- Supabase pose des privilèges PAR DÉFAUT sur le schéma public : toute
 -- table créée ensuite est automatiquement accessible aux rôles, la RLS

@@ -21,7 +21,7 @@ cd tests
 for f in t_nettoyage t_contact t_pro t_pro_ui t_etapes t_dates t_devis t_devis_commun \
          t_periode t_nonreg t_brouillon t_video t_enregistreur t_video_admin t_tus \
          t_decisions t_blocage t_client t_infos t_motdepasse t_mdp_ui t_charte \
-         t_metiers t_nettoyage_dashboard t_multivehicules; do
+         t_metiers t_nettoyage_dashboard t_multivehicules t_mission_nettoyage; do
   echo "== $f"; node $f.js || echo "ÉCHEC $f"
 done
 
@@ -67,6 +67,7 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_charte.js` | **Charte HelixCar et fond blanc** : palette comparée valeur par valeur à celle d'`index.html` sur les styles réellement calculés, fond blanc, lisibilité des cartes, polices, absence totale de l'ancienne charte |
 | `t_metiers.js` | **Multi-métiers des candidats** : quatre activités cumulables, sous-métiers affichés à bon escient, aucun métier fantôme, validations, vidéo selon le métier, nomenclature partagée avec le formulaire client et le Dashboard |
 | `t_nettoyage_dashboard.js` | **Nettoyage du Dashboard** : tentative réelle de contournement de la connexion, chiffres et listes réellement lus dans Supabase, base clients réelle, promesses d'e-mails et de SMS supprimées, bannières sur les pages encore fictives |
+| `t_mission_nettoyage.js` | **Nettoyage dans le Dashboard et missions** : fiche complète (prestation, options, parc, date, lieu, partenaire nécessaire, prix client, rémunération, statut), création de la mission depuis la demande, visibilité limitée aux partenaires du métier, photos avant/après dans un bucket privé, fin d'intervention et validation par HelixCar |
 | `t_multivehicules.js` | **Audit mono / multi-véhicules** : la même demande suivie de la saisie au PDF et à la fiche administrateur — aucune donnée d'un véhicule sur un autre, à aucune étape |
 | `t_tus.js` | **Envoi vidéo reprenable (TUS)** : le vrai code d'envoi contre un vrai serveur TUS local — découpage, reprise après coupure à l'octet exact, signature renouvelée en cours de route, reprise après rechargement de page, secours si la route reprenable est absente, aucune clé privilégiée |
 

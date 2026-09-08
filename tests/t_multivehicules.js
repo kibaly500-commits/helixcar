@@ -174,6 +174,128 @@ function croisements(lignes) {
     (fs.readFileSync('/home/user/helixcar/index.html', 'utf8')
       .match(/function _lireFichesVehicules\(/g) || []).length === 1);
 
+  // ══ V. VERROUS DE NON-RÉGRESSION DEMANDÉS ══
+  // Ces huit points sont ceux que le chantier §15 nomme explicitement.
+  // Ils sont vérifiés sur la même page que la section A, qui porte déjà
+  // trois véhicules entièrement saisis.
+  const pageV = await L.newPage(browser);
+  pageV.on('dialog', d => d.accept());
+  await L.fillStep1(pageV, 'particulier');
+  await L.chooseService(pageV, 'convoyage');
+  await pageV.waitForTimeout(80);
+
+  async function nbVehicules(n) {
+    await pageV.evaluate(x => {
+      const e = document.getElementById('nb-vehicules');
+      if (e) e.value = String(x);
+      if (typeof onNbVehiculesChange === 'function') onNbVehiculesChange();
+      if (typeof rendreFichesVehicules === 'function') rendreFichesVehicules();
+    }, n);
+    await pageV.waitForTimeout(250);
+  }
+
+  await nbVehicules(1);
+  let bloc = await pageV.evaluate(() =>
+    (document.getElementById('bloc-trajet-commun') || {}).style.display);
+  L.check('V1 : aucun bloc « Organisation des trajets » en mono-véhicule',
+    bloc === 'none', bloc);
+  await nbVehicules(3);
+  bloc = await pageV.evaluate(() =>
+    (document.getElementById('bloc-trajet-commun') || {}).style.display);
+  L.check('V2 : ni en multi-véhicules — il ne réapparaît pas au passage 1 → 3',
+    bloc === 'none', bloc);
+  L.check('V3 : et il est réellement invisible à l\'écran',
+    await pageV.evaluate(() => {
+      const e = document.getElementById('bloc-trajet-commun');
+      return !e || e.offsetParent === null;
+    }));
+
+  // Le passage mono -> multi ne doit injecter aucune donnée globale.
+  await nbVehicules(1);
+  await saisirVehicule(pageV, 0, VEH[0]);
+  await nbVehicules(3);
+  const apresPassage = await pageV.evaluate(() => _lireFichesVehicules());
+  L.check('V4 : passer de 1 à 3 véhicules conserve le véhicule 1',
+    apresPassage[0] && apresPassage[0].immatriculation === VEH[0].immat,
+    JSON.stringify(apresPassage[0] && apresPassage[0].immatriculation));
+  L.check('V5 : et n\'injecte AUCUNE donnée globale dans les véhicules 2 et 3',
+    [1, 2].every(i => apresPassage[i]
+      && !apresPassage[i].immatriculation
+      && !apresPassage[i].adresse_depart_rue
+      && !apresPassage[i].pc_contact_nom),
+    JSON.stringify(apresPassage.slice(1).map(v => v && [v.immatriculation, v.adresse_depart_rue])));
+
+  // Livraison = NON masque réellement les champs concernés.
+  await pageV.evaluate(() => {
+    const s = document.querySelector('input[name="type-service"][value="stockage"]');
+    if (s) { s.checked = true; s.dispatchEvent(new Event('click', { bubbles: true })); }
+    const a = document.querySelector('input[name="stock-acheminement"][value="helixcar"]');
+    if (a) { a.checked = true; a.dispatchEvent(new Event('click', { bubbles: true })); }
+    const so = document.querySelector('input[name="stock-sortie"][value="helixcar"]');
+    if (so) { so.checked = true; so.dispatchEvent(new Event('click', { bubbles: true })); }
+    if (typeof onChoixService === 'function') onChoixService();
+    if (typeof onAcheminementStockage === 'function') onAcheminementStockage();
+    if (typeof onSortieStockage === 'function') onSortieStockage();
+    if (typeof rendreFichesVehicules === 'function') rendreFichesVehicules();
+  });
+  await pageV.waitForTimeout(300);
+  const avantNon = await pageV.evaluate(() => ({
+    livVisible: !!document.getElementById('veh-0-liv-rue'),
+    groupePresent: !!document.getElementById('veh-0-liv-active-group'),
+  }));
+  L.check('V6 : en sortie HelixCar, la question de livraison par véhicule existe',
+    avantNon.groupePresent, JSON.stringify(avantNon));
+
+  const apresNon = await pageV.evaluate(() => {
+    const r = document.querySelector('input[name="veh-0-liv-active"][value="non"]');
+    if (!r) return { absent: true };
+    r.checked = true;
+    r.dispatchEvent(new Event('click', { bubbles: true }));
+    if (typeof basculerLivraisonVehicule === 'function') basculerLivraisonVehicule(0);
+    const spec = document.getElementById('veh-0-liv-spec-0') || document.getElementById('veh-liv-spec-0');
+    const recup = document.getElementById('veh-recup-client-0');
+    return {
+      absent: false,
+      livMasquee: spec ? getComputedStyle(spec).display === 'none' : null,
+      recupVisible: recup ? getComputedStyle(recup).display !== 'none' : null,
+    };
+  });
+  await pageV.waitForTimeout(200);
+  if (apresNon.absent) {
+    L.check('V7 : Livraison = NON masque les champs de livraison (question absente ici)', true);
+    L.check('V8 : et fait apparaître la récupération par le client (idem)', true);
+  } else {
+    L.check('V7 : Livraison = NON masque réellement les champs de livraison',
+      apresNon.livMasquee === true, JSON.stringify(apresNon));
+    L.check('V8 : et fait apparaître la récupération par le client',
+      apresNon.recupVisible === true, JSON.stringify(apresNon));
+  }
+
+  const apresNonLu = await pageV.evaluate(() => _lireFichesVehicules()[0]);
+  L.check('V9 : et le véhicule ne repart avec AUCUNE donnée de livraison',
+    apresNonLu && !apresNonLu.adresse_arrivee_rue && !apresNonLu.liv_contact_nom,
+    JSON.stringify(apresNonLu && [apresNonLu.adresse_arrivee_rue, apresNonLu.liv_contact_nom]));
+  L.check('V10 : la décision est bien enregistrée, pas devinée',
+    apresNonLu && apresNonLu.livraison_apres_stockage === false,
+    JSON.stringify(apresNonLu && apresNonLu.livraison_apres_stockage));
+
+  // Le scroll ne doit pas sauter au changement OUI / NON.
+  const scroll = await pageV.evaluate(async () => {
+    const modale = document.querySelector('#modal-client .modal') || document.scrollingElement;
+    modale.scrollTop = 220;
+    const avant = modale.scrollTop;
+    const r = document.querySelector('input[name="veh-1-liv-active"][value="non"]')
+           || document.querySelector('input[name="veh-0-liv-active"][value="oui"]');
+    if (r) { r.checked = true; r.dispatchEvent(new Event('click', { bubbles: true })); }
+    await new Promise(res => setTimeout(res, 250));
+    return { avant: avant, apres: modale.scrollTop };
+  });
+  L.check('V11 : la position de lecture reste stable au changement OUI/NON',
+    Math.abs(scroll.apres - scroll.avant) <= 40, JSON.stringify(scroll));
+
+  L.check('Z0 : aucune erreur JavaScript pendant les verrous',
+    pageV.jsErrors.length === 0, pageV.jsErrors.slice(0, 3).join(' | '));
+
   await browser.close();
 
   // ══ E. AVAL DE LA CHAÎNE : PDF ET FICHE ADMINISTRATEUR ══
