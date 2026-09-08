@@ -199,6 +199,78 @@ async function remplirVehicule(page, i, type, marque) {
 
   L.check('D7 : aucune erreur JS', page.jsErrors.length === 0, page.jsErrors.join(' | '));
 
+  // ── F. ACTIONS SOUS MISSION ──
+  await ouvrirRubrique(page, 'mission');
+  const libelleMission = await page.evaluate(() =>
+    (document.getElementById('pro-description-label') || {}).textContent.trim());
+  L.check('F1 : le libellé est « Décrivez la mission brièvement »',
+    /Décrivez la mission brièvement/.test(libelleMission), libelleMission);
+
+  const zones = await page.evaluate(() => ({
+    description: !!document.getElementById('pro-description'),
+    infos: !!document.getElementById('pro-infos'),
+    distinctes: document.getElementById('pro-description') !== document.getElementById('pro-infos')
+  }));
+  L.check('F2 : « Informations complémentaires » reste une zone séparée',
+    zones.description && zones.infos && zones.distinctes, JSON.stringify(zones));
+
+  // Effacer global : refus de confirmation -> rien n'est touché.
+  // On renseigne sans dépendre de la section ouverte : ce qui est
+  // vérifié ici est l'effacement, pas la saisie.
+  await page.evaluate(() => {
+    document.getElementById('pro-description').value = 'TEST-QA mission décrite';
+    document.getElementById('pro-adresse-rue').value = '25 avenue Victor-Hugo';
+    document.getElementById('pro-adresse-ville').value = 'Paris';
+  });
+  page.removeAllListeners('dialog');
+  page.on('dialog', d => d.dismiss());
+  await page.evaluate(() => proEffacerToutLeFormulaire());
+  await page.waitForTimeout(150);
+  const apresRefus = await page.evaluate(() => ({
+    description: (document.getElementById('pro-description') || {}).value,
+    rue: (document.getElementById('pro-adresse-rue') || {}).value
+  }));
+  L.check('F3 : annuler la confirmation n\'efface RIEN',
+    apresRefus.description === 'TEST-QA mission décrite'
+    && apresRefus.rue === '25 avenue Victor-Hugo', JSON.stringify(apresRefus));
+
+  // Effacer global : confirmation -> toute la demande est vidée.
+  page.removeAllListeners('dialog');
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => proEffacerToutLeFormulaire());
+  await page.waitForTimeout(200);
+  const apresEffacement = await page.evaluate(() => ({
+    description: (document.getElementById('pro-description') || {}).value,
+    rue: (document.getElementById('pro-adresse-rue') || {}).value,
+    ville: (document.getElementById('pro-adresse-ville') || {}).value,
+    specialite: !!document.querySelector('input[name="pro-specialite"]:checked'),
+    veh0: (document.getElementById('pro-veh-0-marque') || {}).value,
+    rubriquesVertes: PRO_RUBRIQUES.filter(c => {
+      const a = document.getElementById('pro-acc-' + c);
+      return a && a.classList.contains('termine');
+    }).length
+  }));
+  L.check('F4 : confirmer vide TOUTE la demande, pas seulement Mission',
+    apresEffacement.description === '' && apresEffacement.rue === ''
+    && apresEffacement.ville === '' && apresEffacement.specialite === false
+    && apresEffacement.veh0 === '', JSON.stringify(apresEffacement));
+  L.check('F5 : plus aucune section ne reste marquée validée',
+    apresEffacement.rubriquesVertes === 0, String(apresEffacement.rubriquesVertes));
+
+  // OK sous Mission ne valide QUE Mission.
+  await page.evaluate(() => {
+    proBasculerRubrique('mission');
+    document.getElementById('pro-description').value = 'TEST-QA autre mission';
+    proOkRubrique('mission');
+  });
+  await page.waitForTimeout(150);
+  const okMission = await page.evaluate(() => PRO_RUBRIQUES.map(c => {
+    const a = document.getElementById('pro-acc-' + c);
+    return { cle: c, verte: !!(a && a.classList.contains('termine')) };
+  }));
+  L.check('F6 : OK sous Mission ne valide QUE la section Mission',
+    okMission.filter(x => x.verte).every(x => x.cle === 'mission'), JSON.stringify(okMission));
+
   // ── E. EXEMPLES D'ADRESSE ──
   await ouvrirRubrique(page, 'lieu');
   const adresses = await page.evaluate(() => ({

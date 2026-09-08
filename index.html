@@ -6595,7 +6595,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div class="veh-sous-contenu">
 
             <div class="modal-form-group">
-              <label id="pro-description-label">Décrivez la mission <span class="field-required">*</span></label>
+              <label id="pro-description-label">Décrivez la mission brièvement <span class="field-required">*</span></label>
               <textarea id="pro-description" rows="3" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
             </div>
 
@@ -6605,7 +6605,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
 
             <div class="veh-sous-ok">
-              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('mission')">Effacer</button>
+              <!-- Dernière section du parcours : Effacer y remet TOUTE la
+                   demande à zéro, jamais la seule section Mission. Une
+                   confirmation explicite précède l'effacement. -->
+              <button type="button" class="veh-sous-effacer" onclick="proEffacerToutLeFormulaire()">Effacer</button>
               <button type="button" class="veh-sous-valider" onclick="proOkRubrique('mission')">OK</button>
             </div>
           </div>
@@ -9317,6 +9320,36 @@ var PRO_RUBRIQUES = ['besoin', 'vehicules', 'lieu', 'periode', 'mission'];
 
 // Accordeons fermes par defaut : AUCUN ne s'ouvre automatiquement, et
 // un clic n'ouvre que celui qui a ete choisi.
+// Effacement GLOBAL de la demande, déclenché depuis la section Mission.
+// Il vide toutes les rubriques d'un coup — pas seulement la dernière —
+// et n'agit qu'après une confirmation explicite.
+function proEffacerToutLeFormulaire() {
+  if (!confirm('Effacer toute votre demande ?\n\n'
+      + 'Toutes les sections seront vidées : votre besoin, les véhicules, '
+      + 'le lieu, la période et la mission. Cette action est irréversible.')) {
+    return;
+  }
+  // Réutilise l'effacement rubrique par rubrique déjà en place : aucune
+  // règle de nettoyage n'est recopiée ici.
+  PRO_RUBRIQUES.forEach(function (cle) {
+    try { proEffacerRubrique(cle); } catch (e) {}
+  });
+  // Les véhicules ont leur propre effacement, individuel par carte.
+  var zone = document.getElementById('pro-vehicules-liste');
+  if (zone) {
+    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
+      var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
+      if (!isNaN(i)) { try { proEffacerVehicule(i); } catch (e) {} }
+    });
+  }
+  _proMajEtatRubriques();
+  _proMajEtatVehicules();
+  _proMajBoutonContinuer();
+  if (typeof construireRecapProfessionnel === 'function') {
+    try { construireRecapProfessionnel(); } catch (e) {}
+  }
+}
+
 function proBasculerRubrique(cle) {
   var el = document.getElementById('pro-acc-' + cle);
   if (!el) return;
@@ -9442,7 +9475,8 @@ function proOnCategorieChange() {
   if (titreMission) titreMission.textContent = (c === 'renfort') ? 'Type de mission' : 'Mission';
   var labelDesc = document.getElementById('pro-description-label');
   if (labelDesc) {
-    labelDesc.innerHTML = (c === 'renfort' ? 'Décrivez le type de mission' : 'Décrivez la mission') +
+    labelDesc.innerHTML = (c === 'renfort' ? 'Décrivez le type de mission brièvement'
+                                          : 'Décrivez la mission brièvement') +
       ' <span class="field-required">*</span>';
   }
 
