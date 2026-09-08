@@ -87,6 +87,13 @@ create table if not exists public.missions (
   ville_depart text,
   ville_arrivee text,
   prix_ttc     numeric,
+  -- Colonnes administratives réellement présentes en production : la
+  -- migration 97 doit les protéger, le test doit donc pouvoir les viser.
+  validee_paiement boolean default false,
+  remuneration_convoyeur numeric,
+  lettre_voiture_signee_url  text,
+  lettre_voiture_signee_date timestamptz,
+  distance_km  numeric,
   created_at   timestamptz not null default now()
 );
 

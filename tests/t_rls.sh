@@ -28,6 +28,19 @@ sql() { # exécute du SQL et renvoie la sortie brute
   su postgres -c "psql -U postgres -d verif -qAt -f $BASE/req.sql" 2>&1
 }
 
+# Exécute du SQL EN TANT QU'ADMINISTRATEUR. Depuis que
+# informations_demande() vérifie elle-même l'autorisation de son
+# appelant, lire un rapport « à nu » (rôle postgres, auth.uid() nul) ne
+# renvoie plus rien — et c'est voulu. Les contrôles de CONTENU passent
+# donc par un administrateur, comme le Dashboard réel.
+sqlAdmin() {
+  # La première ligne est le retour de devenir() : on la retire pour que
+  # l'appelant retrouve EXACTEMENT la sortie de sa propre requête.
+  sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+$1
+commit;" | tail -n +2
+}
+
 appliquer() { # applique un fichier de migration
   cp "$REPO/$1" "$BASE/mig.sql"; chown postgres:postgres "$BASE/mig.sql"
   su postgres -c "psql -U postgres -d verif -v ON_ERROR_STOP=1 -q -f $BASE/mig.sql" 2>&1 | grep -iE '^psql.*error' | head -2
@@ -291,15 +304,30 @@ check "V5 : un seul véhicule fonctionne aussi" "1" \
    select public.creer_demande_avec_vehicules(
      jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-V5',
                         'email','v5@helixcar.test','type_service','convoyage'),
-     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul'))); commit;
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul')),
+     repeat('5',48)); commit;
    select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B';" | tail -1)"
-check "V6 : REJEU — aucune duplication" "1|1" \
+# Le rejeu doit être PROUVÉ : un secret de création, dont seule
+# l'empreinte est stockée. On rejoue la demande V5 en le fournissant.
+check "V6 : REJEU PROUVÉ (bon secret) — aucune duplication" "1|1" \
   "$(sql "begin; select public.devenir_anon();
    select public.creer_demande_avec_vehicules(
      jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-V5',
                         'email','v5@helixcar.test','type_service','convoyage'),
-     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul'))); commit;
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul')),
+     repeat('5',48)); commit;
    select (select count(*) from public.clients where numero_client='TEST-QA-V5')||'|'||(select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B');" | tail -1)"
+check "V6b : le rejeu prouvé se déclare bien comme un rejeu" "true" \
+  "$(sql "begin; select public.devenir_anon();
+   select (public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-V5',
+                        'email','v5@helixcar.test','type_service','convoyage'),
+     '[]'::jsonb, repeat('5',48)) ->> 'deja_existante'); commit;" | tail -1)"
+check "V6c : le secret n'est JAMAIS renvoyé au navigateur" "0" \
+  "$(sql "begin; select public.devenir_anon();
+   select (public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B'),
+     '[]'::jsonb, repeat('5',48))::text ~ '(creation_cle|55555)')::int; commit;" | tail -1)"
 check "V7 : un dépôt anonyme ne peut PAS se déclarer propriétaire" "NULL" \
   "$(sql "begin; select public.devenir_anon();
    select public.creer_demande_avec_vehicules(
@@ -325,6 +353,124 @@ check "V10 : une colonne administrative envoyée est IGNORÉE" "0" \
      jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000F','numero_client','TEST-QA-V10',
                         'email','v10@helixcar.test','type_service','convoyage','prix_interne',999),'[]'::jsonb); commit;
    select count(*) from public.clients where id='ffffffff-0000-0000-0000-00000000000F' and prix_interne is not null;" | tail -1)"
+
+# ── V bis. TESTS OFFENSIFS SUR creer_demande_avec_vehicules ──
+# Cette fonction est SECURITY DEFINER et exécutable par `anon`. Tout ce
+# qui suit tente de s'en servir contre son propriétaire légitime.
+#
+# La demande cible : celle du client A (V8), qui existe, appartient à
+# un compte, et n'a AUCUN véhicule. C'est le pire cas — l'ancienne
+# version s'y greffait sans rien demander.
+sql "insert into auth.users (id,email) values
+  ('66666666-6666-6666-6666-666666666666','clientB@helixcar.test')
+  on conflict do nothing;" >/dev/null
+
+# 1. Client B connaît l'UUID de la demande du client A.
+sqlV="begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test');
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000D','numero_client','TEST-QA-PIRATE-B',
+                        'email','pirate@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',9,'marque_modele','TEST-QA VOL B'))); commit;"
+resV=$(sql "$sqlV")
+check "V13 : le client B ne peut PAS greffer ses véhicules sur la demande du client A" "0" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+check "V14 : la demande du client A n'a pas changé de propriétaire" "55555555-5555-5555-5555-555555555555" \
+  "$(sql "select auth_user_id::text from public.clients where id='ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+check "V15 : le numéro client d'autrui ne lui est PAS révélé" "0" \
+  "$(echo "$resV" | grep -c 'TEST-QA-V8')"
+check "V16 : sa propre demande a bien été créée, sous un identifiant NEUF" "1" \
+  "$(sql "select count(*) from public.clients where numero_client='TEST-QA-PIRATE-B' and id<>'ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+
+# 2. Un partenaire connaît une demande via une mission qui lui est
+#    attribuée : il tente d'y rattacher un véhicule.
+sql "insert into public.missions (reference,statut,client_id,convoyeur_id)
+  values ('TEST-QA-MV','acceptee','ffffffff-0000-0000-0000-00000000000D',
+          'aaaaaaaa-0000-0000-0000-000000000001') on conflict do nothing;" >/dev/null
+sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000D','numero_client','TEST-QA-PIRATE-P',
+                        'email','p@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',8,'marque_modele','TEST-QA VOL P'))); commit;" >/dev/null
+check "V17 : un partenaire ne greffe rien sur la demande d'un client" "0" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+
+# 3. Visiteur anonyme visant une demande existante sans véhicules.
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000D','numero_client','TEST-QA-PIRATE-A',
+                        'email','a@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',7,'marque_modele','TEST-QA VOL A'))); commit;" >/dev/null
+check "V18 : un visiteur anonyme non plus" "0" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+
+# 4. Mauvais secret : ce n'est pas un rejeu, c'est une tentative.
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-PIRATE-S',
+                        'email','s@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',6,'marque_modele','TEST-QA VOL S')),
+     repeat('9',48)); commit;" >/dev/null
+check "V19 : un MAUVAIS secret ne vaut pas rejeu" "1" \
+  "$(sql "select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B';" | tail -1)"
+check "V20 : un secret trop court est refusé comme preuve" "1" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B'),'[]'::jsonb,'court'); commit;
+   select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B';" | tail -1)"
+
+# 5. Le propriétaire authentifié, lui, rejoue légitimement SA demande.
+check "V21 : le propriétaire authentifié rejoue SA demande sans doublon" "true" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select (public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000D','numero_client','TEST-QA-V8',
+                        'email','clientA@helixcar.test','type_service','nettoyage'),
+     '[]'::jsonb) ->> 'deja_existante'); commit;" | tail -1)"
+
+# 6. Colonnes administratives — celles d'aujourd'hui ET une ajoutée
+#    APRÈS la migration : une liste blanche doit la refuser d'office.
+sql "alter table public.clients add column if not exists remise_exceptionnelle numeric;" >/dev/null
+check "V22 : une colonne administrative FUTURE est ignorée d'office" "0" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-0000000000AA','numero_client','TEST-QA-V22',
+                        'email','v22@helixcar.test','type_service','convoyage',
+                        'remise_exceptionnelle',999,'prix_interne',888),'[]'::jsonb,repeat('a',48)); commit;
+   select count(*) from public.clients where id='ffffffff-0000-0000-0000-0000000000AA'
+     and (remise_exceptionnelle is not null or prix_interne is not null);" | tail -1)"
+check "V23 : mais les colonnes légitimes de la même demande sont bien écrites" "v22@helixcar.test" \
+  "$(sql "select email from public.clients where id='ffffffff-0000-0000-0000-0000000000AA';" | tail -1)"
+
+# 7. Colonnes inattendues DANS les véhicules — l'ancienne version
+#    n'avait aucune liste blanche ici.
+sql "alter table public.vehicules add column if not exists cout_interne numeric;" >/dev/null
+check "V24 : une colonne inattendue d'un véhicule est ignorée" "0" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-0000000000BB','numero_client','TEST-QA-V24',
+                        'email','v24@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA V24',
+                                          'cout_interne',777)),repeat('b',48)); commit;
+   select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-0000000000BB'
+     and cout_interne is not null;" | tail -1)"
+check "V25 : et le véhicule est bien créé avec ses champs légitimes" "TEST-QA V24" \
+  "$(sql "select marque_modele from public.vehicules where dossier_id='ffffffff-0000-0000-0000-0000000000BB';" | tail -1)"
+check "V26 : une clé totalement inventée ne fait pas échouer l'appel" "1" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-0000000000CC','numero_client','TEST-QA-V26',
+                        'email','v26@helixcar.test','type_service','convoyage',
+                        'colonne_qui_nexiste_pas','x'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA V26',
+                                          'champ_invente','y')),repeat('c',48)); commit;
+   select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-0000000000CC';" | tail -1)"
+
+# 8. L'ancienne signature à deux arguments ne doit plus exister seule :
+#    la laisser ouverte laisserait une porte sans preuve d'idempotence.
+check "V27 : une seule signature de la fonction est exposée" "1" \
+  "$(sql "select count(*) from pg_proc where proname='creer_demande_avec_vehicules';" | tail -1)"
+check "V28 : les listes blanches sont bien des fonctions du schéma public" "2" \
+  "$(sql "select count(*) from pg_proc where proname in ('champs_publics_demande','champs_publics_vehicule');" | tail -1)"
+
 check "V11 : la RLS de vehicules reste ACTIVE" "t" \
   "$(sql "select relrowsecurity from pg_class where relname='vehicules';")"
 check "V12 : aucune écriture anonyme directe n'a été ouverte" "refuse" \
@@ -458,64 +604,64 @@ insert into public.clients (id, auth_user_id, numero_client, email, type_service
 
 # ── REPRODUCTION DU DÉFAUT (fonction livrée avec 06, 94 non appliquée) ──
 check "W1 : REPRODUCTION — le contact sur place imbriqué est réclamé à tort" "attendue" \
-  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='contact_pc_nom';")"
+  "$(sqlAdmin "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='contact_pc_nom';")"
 check "W2 : REPRODUCTION — l'immatriculation portée par la fiche véhicule est réclamée à tort" "attendue" \
-  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='immatriculation';")"
+  "$(sqlAdmin "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='immatriculation';")"
 check "W3 : REPRODUCTION — une seule rubrique immatriculation pour DEUX véhicules" "1" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like '%immatriculation%';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like '%immatriculation%';")"
 check "W4 : REPRODUCTION — un dépôt par le client réclame quand même une prise en charge" "1" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle='immatriculation' and statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle='immatriculation' and statut='attendue';")"
 
 # ── CORRECTIF ──
 errW=$(appliquer migrations/94_informations_selon_scenario.sql)
 check "W5 : migrations/94 s'applique sans erreur" "" "$errW"
 
 check "W6 : le contact sur place imbriqué est reconnu (nettoyage)" "fournie|fournie" \
-  "$(sql "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle like 'contact_sur_place%';")"
+  "$(sqlAdmin "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle like 'contact_sur_place%';")"
 check "W7 : plus AUCUNE information manquante sur ce nettoyage complet" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where statut='attendue';")"
 check "W8 : l'adresse est demandée quand l'intervention a lieu chez le client" "1" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='nettoyage_adresse';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='nettoyage_adresse';")"
 check "W9 : elle ne l'est PAS dans les locaux HelixCar" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where cle like 'nettoyage_adresse%' or cle like 'nettoyage_ville%';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where cle like 'nettoyage_adresse%' or cle like 'nettoyage_ville%';")"
 check "W10 : et ce nettoyage-là n'a lui non plus rien de manquant" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where statut='attendue';")"
 
 check "W11 : dépôt par le client — AUCUNE prise en charge n'est réclamée" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%prise_en_charge%' or cle like '%adresse_depart%' or cle like '%contact_pc%';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%prise_en_charge%' or cle like '%adresse_depart%' or cle like '%contact_pc%';")"
 check "W12 : récupération par le client — AUCUNE livraison n'est réclamée" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%adresse_arrivee%' or cle like '%contact_liv%';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%adresse_arrivee%' or cle like '%contact_liv%';")"
 check "W13 : ce stockage-là ne réclame plus rien" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where statut='attendue';")"
 check "W14 : acheminement ET sortie HelixCar — les deux extrémités sont réclamées" "4|3" \
-  "$(sql "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 check "W15 : la ville et la date de stockage restent demandées dans les deux cas" "2|2" \
-  "$(sql "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like 'stockage_%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like 'stockage_%');")"
+  "$(sqlAdmin "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like 'stockage_%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like 'stockage_%');")"
 
 check "W16 : multi-véhicules — le véhicule concerné est nommé" "Véhicule 2 — immatriculation" \
-  "$(sql "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
+  "$(sqlAdmin "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
 check "W17 : le véhicule 1 est reconnu comme fourni" "fournie" \
-  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation';")"
+  "$(sqlAdmin "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation';")"
 check "W18 : les véhicules ne sont JAMAIS mélangés (une rubrique par véhicule)" "2" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like 'vehicule_%_immatriculation';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like 'vehicule_%_immatriculation';")"
 check "W19 : et une seule information manque au total" "1" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
 check "W20 : mono-véhicule — le libellé ne préfixe PAS inutilement un rang" "Immatriculation du véhicule" \
-  "$(sql "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where cle='vehicule_1_immatriculation';")"
+  "$(sqlAdmin "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where cle='vehicule_1_immatriculation';")"
 check "W21 : et ce convoyage mono-véhicule complet ne réclame plus rien" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where statut='attendue';")"
 
 check "W22 : véhicule récupéré par le client — aucune livraison pour LUI" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 check "W23 : mais son voisin, livré par HelixCar, garde les siennes" "3" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 
 check "W24 : professionnel — le contact sur place imbriqué est reconnu" "fournie|fournie" \
-  "$(sql "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where cle like 'contact_sur_place%';")"
+  "$(sqlAdmin "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where cle like 'contact_sur_place%';")"
 check "W25 : et cette demande professionnelle complète ne réclame rien" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where statut='attendue';")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where statut='attendue';")"
 check "W26 : création de compte seule — aucune rubrique inventée" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a9');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a9');")"
 
 # ── Le parcours de réponse continue de fonctionner avec les clés du scénario ──
 check "W27 : le client répond sur la clé nommée de SON véhicule" "1" \
@@ -523,7 +669,7 @@ check "W27 : le client répond sur la clé nommée de SON véhicule" "1" \
    select public.repondre_informations_demande('dddddddd-0000-0000-0000-0000000000a5',
      '{\"vehicule_2_immatriculation\":\"MM-222-MM\"}'::jsonb); commit;" | tail -1)"
 check "W28 : la réponse est bien portée par le véhicule 2, jamais par le 1" "transmise|fournie" \
-  "$(sql "select (select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_2_immatriculation')||'|'||(select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation');")"
+  "$(sqlAdmin "select (select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_2_immatriculation')||'|'||(select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation');")"
 check "W29 : une clé NON REQUISE par le scénario reste ignorée" "0" \
   "$(sql "begin; select public.devenir('77777777-7777-7777-7777-777777777777','clientW@helixcar.test');
    select public.repondre_informations_demande('dddddddd-0000-0000-0000-0000000000a3',
@@ -556,24 +702,60 @@ insert into public.vehicules (dossier_id, position, immatriculation, marque_mode
  ('dddddddd-0000-0000-0000-0000000000b1',2,'BB-222-BB','Audi A4', false, null, null, null, null),
  ('dddddddd-0000-0000-0000-0000000000b1',3,'BB-333-BB','Audi A5', null, '15:30', null, null, null);" >/dev/null
 check "W33 : décision « HelixCar livre » — les rubriques de livraison existent" "3" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 check "W34 : décision « le client récupère » — AUCUNE, même sans heure de passage" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 check "W35 : décision inconnue (ligne ancienne) — le repli par l'heure s'applique" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_3_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_3_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 # Le véhicule 1 a sa livraison entièrement renseignée, mais AUCUNE
 # information de prise en charge : l'acheminement étant confié à
 # HelixCar, ces quatre-là manquent réellement et doivent être signalées.
 check "W36 : la livraison du véhicule 1, renseignée, n'est pas réclamée" "0" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
 check "W36b : sa prise en charge, elle, manque bel et bien" "4" \
-  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%');")"
+  "$(sqlAdmin "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%');")"
 check "W36c : et elle est réclamée pour CHAQUE véhicule, sans mélange" "4|4|4" \
-  "$(sql "select string_agg(n::text,'|' order by v) from (select split_part(cle,'_',2) as v, count(*) as n from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%' group by 1) t;")"
+  "$(sqlAdmin "select string_agg(n::text,'|' order by v) from (select split_part(cle,'_',2) as v, count(*) as n from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%' group by 1) t;")"
 check "W37 : mode conseil — aucun métier n'est réclamé au client" "fournie" \
-  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b2') where cle='professionnel_besoin';")"
+  "$(sqlAdmin "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b2') where cle='professionnel_besoin';")"
 check "W38 : hors conseil, un métier non choisi EST réclamé" "attendue" \
-  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b3') where cle='professionnel_besoin';")"
+  "$(sqlAdmin "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b3') where cle='professionnel_besoin';")"
+
+
+# ── W bis. QUI A LE DROIT DE LIRE UN RAPPORT D'INFORMATIONS ? ──
+# informations_demande() est SECURITY DEFINER : elle lit clients et
+# vehicules en passant OUTRE la RLS, et elle est accordée à tout
+# utilisateur `authenticated`. Sans autorisation interne, connaître un
+# identifiant suffisait à obtenir les coordonnées du contact, les
+# adresses et les dates d'une demande. Un partenaire lit précisément
+# cet identifiant sur chaque mission qui lui est attribuée.
+check "W39 : le PROPRIÉTAIRE lit bien le rapport de SA demande" "true" \
+  "$(sql "begin; select public.devenir('77777777-7777-7777-7777-777777777777','clientW@helixcar.test');
+   select (count(*) > 0)::text from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'); commit;" | tail -1)"
+check "W40 : l'ADMINISTRATEUR aussi" "true" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   select (count(*) > 0)::text from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'); commit;" | tail -1)"
+check "W41 : un AUTRE client n'obtient RIEN, même en connaissant l'identifiant" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'); commit;" | tail -1)"
+check "W42 : ... et n'obtient pas davantage une erreur qui confirmerait l'existence" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'); commit;" \
+   | grep -ciE 'error|exception' )"
+# Le partenaire connaît le client_id : il le lit sur sa propre mission.
+sql "insert into public.missions (reference,statut,client_id,convoyeur_id)
+  values ('TEST-QA-MW','acceptee','dddddddd-0000-0000-0000-0000000000a1',
+          'aaaaaaaa-0000-0000-0000-000000000001') on conflict do nothing;" >/dev/null
+check "W43 : le partenaire lit bien le client_id sur SA mission" "1" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select count(*) from public.missions where reference='TEST-QA-MW' and client_id is not null; commit;" | tail -1)"
+check "W44 : mais ce client_id ne lui ouvre AUCUN rapport d'informations" "0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'); commit;" | tail -1)"
+check "W45 : un identifiant inexistant ne distingue pas d'un identifiant interdit" "0|0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1'))||'|'||
+          (select count(*) from public.informations_demande('00000000-0000-0000-0000-000000000000')); commit;" | tail -1)"
 
 echo
 echo "── X. MÉTIERS DÉCLARÉS PAR LES PARTENAIRES (§13) ──"
@@ -595,6 +777,16 @@ check "X2 : REPRODUCTION — l'activité technicien est refusée par la base" "r
    | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
 check "X2b : REPRODUCTION — sa candidature reste donc sans décision technicien" "0" \
   "$(sql "select count(*) from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-00000000000e' and activite='technicien';")"
+
+# Une contrainte SANS RAPPORT, mais dont la définition contient le mot
+# « activite » : la version précédente de 95 la supprimait au passage.
+sql "alter table public.convoyeur_decisions
+       add column if not exists activite_libelle text;
+     alter table public.convoyeur_decisions
+       drop constraint if exists tq_activite_libelle_court;
+     alter table public.convoyeur_decisions
+       add constraint tq_activite_libelle_court
+       check (activite_libelle is null or char_length(activite_libelle) < 60);" >/dev/null
 
 errX=$(appliquer migrations/95_metiers_partenaires.sql)
 check "X3 : migrations/95 s'applique sans erreur" "" "$errX"
@@ -623,6 +815,20 @@ check "X11 : une décision par métier déclaré n'est PAS créée — la décis
 check "X12 : les décisions déjà prises ne sont pas réinitialisées" "oui" \
   "$(sql "select decision from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and activite='convoyage';")"
 
+check "X20 : une contrainte SANS RAPPORT n'est pas emportée" "1" \
+  "$(sql "select count(*) from pg_constraint where conrelid='public.convoyeur_decisions'::regclass and conname='tq_activite_libelle_court';")"
+check "X21 : et elle protège toujours réellement" "refuse" \
+  "$(sql "insert into public.convoyeur_decisions (convoyeur_id,activite,decision,activite_libelle)
+     values ('aaaaaaaa-0000-0000-0000-000000000002','technicien','en_attente',repeat('x',80));" \
+   | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
+check "X22 : une seule contrainte d'énumération sur activite" "1" \
+  "$(sql "select count(*) from pg_constraint con
+     join lateral unnest(con.conkey) as k(attnum) on true
+     join pg_attribute a on a.attrelid=con.conrelid and a.attnum=k.attnum
+    where con.conrelid='public.convoyeur_decisions'::regclass and con.contype='c'
+      and array_length(con.conkey,1)=1 and a.attname='activite'
+      and pg_get_constraintdef(con.oid) ilike '%convoyage%';")"
+
 echo
 echo "── Y. MISSIONS DE NETTOYAGE ET PHOTOS D'INTERVENTION (§14) ──"
 check "Y1 : REPRODUCTION — public.missions ne sait pas décrire un nettoyage" "0" \
@@ -633,8 +839,14 @@ check "Y2 : REPRODUCTION — aucune table de photos d'intervention" "0" \
 errY=$(appliquer migrations/96_missions_nettoyage.sql)
 check "Y3 : migrations/96 s'applique sans erreur" "" "$errY"
 
-check "Y4 : toute mission existante reste un convoyage" "3|3" \
-  "$(sql "select count(*)||'|'||count(*) filter (where type_mission='convoyage') from public.missions;")"
+# Ce qui compte n'est pas COMBIEN de missions préexistaient, mais
+# qu'AUCUNE n'ait changé de nature : la valeur par défaut de 96 les
+# laisse toutes en convoyage. Compter en dur rendait ce contrôle
+# dépendant des jeux d'essai créés plus haut.
+check "Y4 : toute mission existante reste un convoyage" "0" \
+  "$(sql "select count(*) from public.missions where type_mission is distinct from 'convoyage';")"
+check "Y4b : et il y en a bien" "true" \
+  "$(sql "select (count(*) > 0)::text from public.missions;")"
 check "Y5 : une mission de nettoyage peut être créée" "INSERT 0 1" \
   "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); insert into public.missions (id,reference,statut,type_mission,client_id,prestation,adresse_intervention,ville_intervention,contact_nom,contact_tel,date_intervention,prix_ttc) values ('bbbbbbbb-0000-0000-0000-0000000000c1','TEST-QA-NET-1','en_attente','nettoyage','dddddddd-0000-0000-0000-0000000000a1','Nettoyage intérieur et extérieur','3 rue des Lilas','Lyon','TEST-QA Martin','+33600000020','2026-11-02',400); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "Y6 : un type de mission INVENTÉ est refusé" "refuse" \
@@ -705,6 +917,185 @@ check "Y23 : un visiteur anonyme ne lit AUCUN fichier de ce bucket" "0" \
 check "Y24 : aucune politique de ce bucket n'est accordée à anon" "0" \
   "$(sql "select count(*) from pg_policies where tablename='objects' and policyname like 'photos mission%' and 'anon' = any(roles);")"
 
+
+echo
+echo "── Z. CE QU'UN PARTENAIRE PEUT VRAIMENT CHANGER SUR UNE MISSION ──"
+# On n'appuie sur aucun bouton : on écrit DIRECTEMENT en base, comme le
+# ferait un PATCH sur l'API REST avec le jeton de session du partenaire.
+# C'est le seul niveau où la question se pose.
+
+# REPRODUCTION, avant la migration 97 : la policy de 90 laisse passer.
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ insert into public.missions (id,reference,statut,type_mission,client_id,prix_ttc,convoyeur_id)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d1','TEST-QA-Z1','acceptee','convoyage',
+           'dddddddd-0000-0000-0000-0000000000a1',500,'aaaaaaaa-0000-0000-0000-000000000001')
+   on conflict do nothing;
+ insert into public.missions (id,reference,statut,type_mission,prix_ttc)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d2','TEST-QA-Z2','en_attente','convoyage',600)
+   on conflict do nothing;
+ commit;" >/dev/null
+
+check "Z1 : REPRODUCTION — le partenaire peut changer le PRIX de sa mission" "500|900" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set prix_ttc=900 where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select '500|'||prix_ttc::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z2 : REPRODUCTION — il peut aussi se déclarer « terminee » tout seul" "terminee" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='terminee' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+
+# Remise en état, puis application du verrou.
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.missions set prix_ttc=500, statut='acceptee'
+  where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;" >/dev/null
+
+errZ=$(appliquer migrations/97_missions_verrou_serveur.sql)
+check "Z3 : migrations/97 s'applique sans erreur" "" "$errZ"
+
+# ── Colonnes administratives ──
+check "Z4 : le prix devient intouchable pour le partenaire" "500" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set prix_ttc=900 where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select prix_ttc::int from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z5 : ... et le refus est explicite, pas silencieux" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set prix_ttc=900 where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;" \
+   | grep -qiE 'réservé à HelixCar' && echo refuse || echo passe)"
+check "Z6 : il ne peut pas rattacher la mission à un autre client" "dddddddd-0000-0000-0000-0000000000a1" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set client_id='cccccccc-0000-0000-0000-00000000000A'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select client_id::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z7 : il ne peut pas cocher la validation de paiement" "false" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set validee_paiement=true where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select coalesce(validee_paiement,false)::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z8 : il ne peut pas se fixer sa propre rémunération" "" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set remuneration_convoyeur=9999 where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select remuneration_convoyeur::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z9 : une colonne administrative FUTURE lui est fermée d'office" "" \
+  "$(sql "alter table public.missions add column if not exists prime_exceptionnelle numeric;
+   begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set prime_exceptionnelle=500 where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select prime_exceptionnelle::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+
+# ── Transitions de statut ──
+check "Z10 : « terminee » lui est refusé" "acceptee" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='terminee' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z11 : « annulee » aussi" "acceptee" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='annulee' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z12 : mais la transition légitime acceptee -> en_cours passe" "en_cours" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='en_cours' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z13 : et en_cours -> fini aussi" "fini" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+check "Z14 : un saut de statut inventé est refusé" "fini" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='en_attente' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+
+# ── Attribution ──
+check "Z15 : il PREND bien une mission libre" "aaaaaaaa-0000-0000-0000-000000000001" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001', statut='acceptee'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;
+   select convoyeur_id::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d2';" | tail -1)"
+check "Z16 : il ne peut PAS l'attribuer à quelqu'un d'autre" "refuse" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   update public.missions set convoyeur_id=null, statut='en_attente' where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;
+   begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000002'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;" \
+   | grep -qiE 'attribuée qu.à soi-même|insufficient' && echo refuse || echo passe)"
+# Ici, la mission appartient déjà à un collègue : la policy de 90 la
+# rend INVISIBLE en écriture, donc l'UPDATE ne touche aucune ligne et
+# PostgreSQL ne lève pas d'erreur. Ce qui compte n'est pas le message,
+# c'est que la mission n'ait pas changé de mains.
+check "Z17 : il ne peut pas s'arracher la mission d'un collègue" "aaaaaaaa-0000-0000-0000-000000000002" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000002', statut='acceptee'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;
+   begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;
+   select convoyeur_id::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d2';" | tail -1)"
+check "Z17b : ... et l'écriture ne touche RIEN plutôt que de réussir à moitié" "UPDATE 0" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "Z18 : la création d'une mission lui est interdite" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.missions (reference,statut,prix_ttc,convoyeur_id)
+     values ('TEST-QA-Z-PIRATE','acceptee',9999,'aaaaaaaa-0000-0000-0000-000000000001'); commit;" \
+   | grep -qiE 'réservée à HelixCar|insufficient|row-level' && echo refuse || echo passe)"
+
+# ── Photos : la preuve se vérifie en base, pas à l'œil ──
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ insert into public.missions (id,reference,statut,type_mission,convoyeur_id,prix_ttc)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d3','TEST-QA-Z3','acceptee','nettoyage',
+           'aaaaaaaa-0000-0000-0000-000000000001',300) on conflict do nothing; commit;" >/dev/null
+check "Z19 : un nettoyage SANS photo ne peut pas être déclaré fini" "acceptee" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+ insert into public.mission_photos (mission_id,etape,chemin)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d3/avant-1.jpg'); commit;" >/dev/null
+check "Z20 : avec la seule photo AVANT, toujours pas" "acceptee" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+ insert into public.mission_photos (mission_id,etape,chemin)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d3','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg'); commit;" >/dev/null
+check "Z21 : avec les DEUX, la mission peut être déclarée finie" "fini" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+
+# ── L'administrateur, lui, valide — mais sur pièces ──
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ insert into public.missions (id,reference,statut,type_mission,convoyeur_id,prix_ttc)
+   values ('bbbbbbbb-0000-0000-0000-0000000000d4','TEST-QA-Z4','fini','nettoyage',
+           'aaaaaaaa-0000-0000-0000-000000000001',300) on conflict do nothing; commit;" >/dev/null
+check "Z22 : l'ADMINISTRATEUR non plus ne valide pas un nettoyage sans photos" "fini" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   update public.missions set statut='terminee', prestation_validee_le=now()
+    where id='bbbbbbbb-0000-0000-0000-0000000000d4'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
+check "Z23 : avec les photos, il valide" "terminee" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin) values
+     ('bbbbbbbb-0000-0000-0000-0000000000d4','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d4/a.jpg'),
+     ('bbbbbbbb-0000-0000-0000-0000000000d4','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d4/b.jpg');
+   update public.missions set statut='terminee', prestation_validee_le=now()
+    where id='bbbbbbbb-0000-0000-0000-0000000000d4'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
+check "Z24 : le validateur est posé PAR LE SERVEUR, jamais déclaré" "11111111-1111-1111-1111-111111111111" \
+  "$(sql "select prestation_validee_par::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
+check "Z25 : un validateur envoyé par l'appelant est écrasé" "11111111-1111-1111-1111-111111111111" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   update public.missions set prestation_validee_le=now(),
+     prestation_validee_par='22222222-2222-2222-2222-222222222222'
+    where id='bbbbbbbb-0000-0000-0000-0000000000d4'; commit;
+   select prestation_validee_par::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
+# Un partenaire bloqué est écarté dès la policy de 90 : l'UPDATE ne voit
+# aucune ligne. Là encore, c'est l'effet qui se vérifie, pas le message.
+check "Z26 : un partenaire BLOQUÉ ne modifie plus rien du tout" "UPDATE 0" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   update public.convoyeurs set bloque=true where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null;
+   su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set statut='en_cours' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "Z26b : et la mission garde son statut" "fini" \
+  "$(sql "select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ update public.convoyeurs set bloque=false where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null
+
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
@@ -716,6 +1107,7 @@ err92=$(appliquer migrations/92_creation_demande_atomique.sql)
 err94=$(appliquer migrations/94_informations_selon_scenario.sql)
 err95=$(appliquer migrations/95_metiers_partenaires.sql)
 err96=$(appliquer migrations/96_missions_nettoyage.sql)
+err97=$(appliquer migrations/97_missions_verrou_serveur.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
@@ -723,6 +1115,7 @@ check "F3b : 92 se rejoue sans erreur" "" "$err92"
 check "F3c : 94 se rejoue sans erreur" "" "$err94"
 check "F3d : 95 se rejoue sans erreur" "" "$err95"
 check "F3e : 96 se rejoue sans erreur" "" "$err96"
+check "F3f : 97 se rejoue sans erreur" "" "$err97"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"

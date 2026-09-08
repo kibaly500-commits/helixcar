@@ -15787,10 +15787,24 @@ async function _submitClientFormInterne() {
     vehiculesAEnvoyer = _lireFichesVehicules().filter(Boolean).map(_normaliserVehiculePourEnvoi);
   }
 
+  // SECRET DE CRÉATION — preuve d'idempotence.
+  //
+  // La fonction serveur ne doit JAMAIS déduire d'un simple identifiant
+  // qu'un appel est un rejeu légitime : connaître l'UUID d'une demande
+  // permettrait alors d'y greffer ses propres véhicules et d'en lire le
+  // numéro client. Le navigateur tire donc un secret ; le serveur n'en
+  // conserve que l'empreinte. Seul celui qui a réellement créé la
+  // demande peut la reprendre.
+  //
+  // Ce secret ne vit que le temps de cette page : il n'est écrit nulle
+  // part et ne donne aucun droit de lecture.
+  var cleCreation = _convGenererJetonEnvoi();
+
   function inserer(tentativesRestantes) {
     return _sb.rpc('creer_demande_avec_vehicules', {
       p_demande: payload,
-      p_vehicules: vehiculesAEnvoyer
+      p_vehicules: vehiculesAEnvoyer,
+      p_cle_creation: cleCreation
     })
       .then(function (res) {
         if (res && res.error) return { error: res.error.message || String(res.error) };
@@ -15809,6 +15823,9 @@ async function _submitClientFormInterne() {
         payload.numero_client = clientNum;
         payload.code_parrainage = parrCode;
         payload.id = _hcNouvelIdentifiant();
+        // Nouvelle demande, nouveau secret : l'ancien ne doit pas
+        // pouvoir servir à reprendre la ligne partielle abandonnée.
+        cleCreation = _convGenererJetonEnvoi();
         return inserer(tentativesRestantes - 1);
       }
       return r;
