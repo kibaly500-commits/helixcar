@@ -98,7 +98,21 @@ Dans l'ordre chronologique, du plus ancien au plus récent.
 | 18 | `3b42afc` | tests | Tests : suivre les metiers la ou les activites etaient cochees |
 | 19 | `61082c6` | 14 | Photos d'intervention : les voir, et pas seulement les compter |
 | 20 | `7808976` | doc | Migrations : la phase D va bien jusqu'a 96 |
-| 21 | *(ce document)* | doc | Dossier de recette et de mise en production |
+| 21 | `eb1c898` | doc | Dossier de recette et de mise en production du lot |
+
+**Puis les correctifs de l'audit indépendant** (§ 4 bis) :
+
+| # | Empreinte | Point d'audit | Message |
+|---|---|---|---|
+| 22 | `60f3c0c` | 1 + 2 | Audit 1 et 2 : la fonction video ne pouvait pas etre appelee du tout |
+| 23 | `a9f83d1` | 3 | Audit 3 : la reprise apres rechargement etait une promesse intenable |
+| 24 | `dc0068f` | 5 | Audit 5 : connaitre un identifiant ne donne plus aucun droit |
+| 25 | `e92f821` | 6 | Audit 6 : un partenaire lisait les coordonnees des clients d'HelixCar |
+| 26 | `d0671c3` | 7 | Audit 7 : un partenaire pouvait changer le prix et se payer lui-meme |
+| 27 | `2f83459` | 8 | Audit 8 : la migration 95 detruisait ce qu'elle n'avait pas reconnu |
+| 28 | `0af092b` | 4 + 9 + 10 | Audit 4, 9 et 10 : le Dashboard, ce qu'il envoie et ce qu'il affiche |
+| 29 | `454b26f` | 11 | Audit 11 : une campagne de tests qui ne pouvait pas echouer |
+| 30 | `45545e3` | — | Non-regression : elargir le perimetre, en le nommant |
 
 Les deux derniers commits méritent une explication, parce qu'ils sont nés de
 la campagne de tests finale et non du cahier des charges :
@@ -150,10 +164,20 @@ migrations/README.md
 
 ## 4. Tous les tests exécutés, avec leur résultat réel
 
-**Résultat global : 1 276 contrôles, 1 276 PASS, 0 FAIL.**
-Tous exécutés le 8 septembre 2026, après le dernier commit de code, en une
-seule campagne. Aucun chiffre de ce document n'est estimé ou reporté d'une
+**Résultat global : 1 403 contrôles, 1 403 PASS, 0 FAIL — en une commande.**
+
+```
+npm test
+```
+
+29 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
+depuis zéro. Aucun chiffre de ce document n'est estimé ou reporté d'une
 exécution antérieure.
+
+> Le lot livrait 1 276 contrôles. L'audit indépendant (§ 4 bis) en a ajouté
+> **127** : 44 pour le durcissement du Dashboard, 58 nouveaux contrôles SQL
+> offensifs, 13 sur le preflight CORS et la configuration versionnée, et 12
+> sur ce qu'un vrai rechargement de page fait réellement.
 
 ### 4.1 Trois familles de preuves, volontairement séparées
 
@@ -162,7 +186,7 @@ exécution antérieure.
    comportement est observé pour de bon : ce que voit l'ancien Dashboard, ce
    que voit la nouvelle version, ce que voit un partenaire bloqué, ce que voit
    un client. **Jamais de connexion à Supabase.**
-2. **Navigateur réel** (Chromium, Playwright) — 26 suites qui pilotent
+2. **Navigateur réel** (Chromium, Playwright) — 27 suites qui pilotent
    `index.html` et `dashboard.html` comme un utilisateur : clics, saisies,
    changements d'étape, rechargements, coupures réseau.
 3. **Code serveur exécuté** (`t_video_securite.mjs`) — le vrai code de la
@@ -171,77 +195,109 @@ exécution antérieure.
 
 ### 4.2 Résultats réels, suite par suite
 
-#### Politiques RLS sur PostgreSQL 16 local
-
-| Suite | PASS | FAIL | Ce qu'elle applique et observe |
-|---|---|---|---|
-| `t_rls.sh` | **169** | 0 | Les **vrais** fichiers `migrations/00` → `96` appliqués sans modification sur une base jetable, puis 12 séries d'observations |
-
-Les 12 sections, dans l'ordre où elles s'exécutent :
-
-| Section | Ce qu'elle prouve |
-|---|---|
-| **A** | La phase préparatoire (`00`→`06`) reste compatible avec l'**ancien** Dashboard |
-| **B** | Effet réel du durcissement (`90`, `91`) : lecture vide et écriture silencieuse pour un appelant anonyme |
-| **C** | Ce que voit un partenaire **non bloqué** |
-| **D** | Ce que voit un partenaire **bloqué** : fiche visible, **zéro mission**, auto-déblocage impossible, décisions conservées |
-| **E** | Déblocage par l'administrateur, et retour à l'état normal |
-| **G** | Espace client : cloisonnement entre clients, informations réclamées |
-| **H** | Réponse du client, puis validation par l'administrateur |
-| **V** | **Chantier nº 3** — l'erreur 42501 sur `vehicules` reproduite, y compris la **création partielle**, puis corrigée par `92` |
-| **W** | **Chantier nº 10** — informations réellement manquantes, selon le scénario |
-| **X** | **Chantier nº 13** — métiers déclarés, activité `technicien` acceptée, décisions créées **en attente** |
-| **Y** | **Chantier nº 14** — missions de nettoyage, photos d'intervention, bucket privé et ses politiques |
-| **F** | **Idempotence** : la chaîne complète rejouée une seconde fois — aucune erreur, aucune politique en double, aucun trigger en double, aucune ligne d'historique inventée |
-
-#### Navigateur réel et code serveur
+#### Les 29 suites, du plus au moins fourni
 
 | Suite | PASS | FAIL | Ce qu'elle couvre |
 |---|---|---|---|
-| `t_nettoyage` | **28** | 0 | Parcours Nettoyage complet, du service au récapitulatif |
-| `t_contact` | **20** | 0 | Contact sur place : moi-même / une autre personne |
-| `t_pro` | **54** | 0 | Trouver un professionnel : catégories, compteurs, véhicules, récap, envoi |
-| `t_pro_ui` | **32** | 0 | Formulaire professionnel : métiers, alignement, effacement confirmé, validations |
-| `t_etapes` | **14** | 0 | **§ 6** — le bouton Continuer ne se grise jamais ; une branche inactive ne bloque rien |
-| `t_dates` | **19** | 0 | Calendriers liés, bornes, horaires même jour et multi-jours |
-| `t_periode` | **40** | 0 | **§ 7** — un seul calendrier début/fin, plage colorée, bornes, heures, Effacer limité |
-| `t_devis` | **40** | 0 | Devis PDF des 3 services + non-régression du devis convoyage |
-| `t_devis_commun` | **52** | 0 | **§ 9** — devis réellement disponible pour les 4 services, un seul moteur |
-| `t_brouillon` | **20** | 0 | Effacer / OK par rubrique, brouillon restauré après F5 |
-| `t_nonreg` | **40** | 0 | **Non-régression** : convoyage, stockage, compte seul, partenaire, textes, périmètre du diff |
-| `t_video` | **70** | 0 | **§ 4** — exigence et durée selon les métiers, formats, taille, remplacement, envoi, erreurs réseau |
-| `t_enregistreur` | **26** | 0 | **§ 4** — véritable enregistreur dans la page (caméra, chronomètre, relecture) |
-| `t_tus` | **48** | 0 | **§ 4** — envoi reprenable contre un vrai serveur TUS : découpage, reprise à l’octet, resignature, repli |
-| `t_video_admin` | **27** | 0 | Dashboard : états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
-| `t_video_securite` | **55** | 0 | **Sécurité serveur** : vrai code de `candidature-video` (jeton, chemin imposé, usage unique, cloisonnement) |
-| `t_decisions` | **53** | 0 | Décisions par activité, six transitions, historique, persistance, refus d’autorisation |
-| `t_blocage` | **35** | 0 | **§ 12** — état affiché = état enregistré, motif et date, persistance après rechargement dans les deux sens |
-| `t_client` | **34** | 0 | Espace client : session réelle, nouvelle demande, profil prérempli, F5, coupure réseau |
-| `t_infos` | **45** | 0 | **§ 10** — rubriques manquantes uniquement, transmission, validation administrateur, garde-fous |
-| `t_motdepasse` | **33** | 0 | Réinitialisation du mot de passe, de bout en bout |
+| `t_rls` | **227** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 15 sections, dont V bis, W bis et Z, toutes offensives |
 | `t_mdp_ui` | **88** | 0 | Longueur minimale et bouton œil sur les six champs |
-| `t_charte` | **34** | 0 | **§ 11** — palette comparée valeur par valeur sur les styles **réellement calculés**, fond blanc |
-| `t_metiers` | **37** | 0 | **§ 13** — métiers cumulables, badges retirables, aucun métier fantôme, nomenclature partagée |
-| `t_nettoyage_dashboard` | **43** | 0 | **§ 14** — tentative réelle de contournement de la connexion, chiffres réellement lus, plus rien de fictif |
-| `t_mission_nettoyage` | **72** | 0 | **§ 14** — fiche complète, création de la mission, cloisonnement par métier, photos avant/après **et leur relecture signée**, validation |
-| `t_multivehicules` | **48** | 0 | **§ 15** — la même demande de la saisie au PDF et à la fiche admin, aucun mélange entre véhicules |
-| **Total** | **1 107** | **0** | 26 suites navigateur + 1 suite serveur |
+| `t_mission_nettoyage` | **72** | 0 | **§ 14** — fiche, création de mission, cloisonnement par métier, photos et leur relecture signée |
+| `t_video` | **70** | 0 | **§ 4** — exigence et durée selon les métiers, formats, taille, remplacement, envoi, erreurs réseau |
+| `t_video_securite` | **68** | 0 | **Sécurité serveur** : vrai code de `candidature-video`, **preflight CORS réel**, configuration versionnée |
+| `t_tus` | **59** | 0 | **§ 4** — envoi reprenable contre un vrai serveur TUS ; **section D : rechargement réel**, section D bis : la reprise qui existe |
+| `t_pro` | **54** | 0 | Trouver un professionnel : catégories, compteurs, véhicules, récap, envoi |
+| `t_decisions` | **53** | 0 | Décisions par activité, six transitions, historique, persistance, refus d’autorisation |
+| `t_devis_commun` | **52** | 0 | **§ 9** — devis réellement disponible pour les 4 services, un seul moteur |
+| `t_multivehicules` | **48** | 0 | **§ 15** — la même demande de la saisie au PDF et à la fiche admin |
+| `t_infos` | **45** | 0 | **§ 10** — rubriques manquantes uniquement, transmission, validation, garde-fous |
+| `t_durcissement` | **44** | 0 | **Audit** : valeur réelle du header `Authorization`, injection HTML/JS avec charges hostiles, filtrage d’URL, photo orpheline |
+| `t_nettoyage_dashboard` | **43** | 0 | **§ 14** — contournement de connexion, chiffres réellement lus, plus rien de fictif |
+| `t_nonreg` | **41** | 0 | **Non-régression** : convoyage, stockage, compte seul, partenaire, textes, **périmètre de fichiers** |
+| `t_devis` | **40** | 0 | Devis PDF des 3 services + non-régression du devis convoyage |
+| `t_periode` | **40** | 0 | **§ 7** — un seul calendrier début/fin, plage colorée, bornes, heures |
+| `t_metiers` | **37** | 0 | **§ 13** — métiers cumulables, badges retirables, nomenclature partagée |
+| `t_blocage` | **35** | 0 | **§ 12** — état affiché = état enregistré, persistance après rechargement |
+| `t_charte` | **34** | 0 | **§ 11** — palette comparée sur les styles **réellement calculés**, fond blanc |
+| `t_client` | **34** | 0 | Espace client : session réelle, nouvelle demande, profil prérempli, F5, coupure réseau |
+| `t_motdepasse` | **33** | 0 | Réinitialisation du mot de passe, de bout en bout |
+| `t_pro_ui` | **32** | 0 | Formulaire professionnel : métiers, alignement, effacement confirmé, validations |
+| `t_nettoyage` | **28** | 0 | Parcours Nettoyage complet, du service au récapitulatif |
+| `t_video_admin` | **27** | 0 | Dashboard : états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
+| `t_enregistreur` | **26** | 0 | **§ 4** — véritable enregistreur dans la page (caméra, chronomètre, relecture) |
+| `t_brouillon` | **20** | 0 | Effacer / OK par rubrique, brouillon restauré après F5 |
+| `t_contact` | **20** | 0 | Contact sur place : moi-même / une autre personne |
+| `t_dates` | **19** | 0 | Calendriers liés, bornes, horaires même jour et multi-jours |
+| `t_etapes` | **14** | 0 | **§ 6** — le bouton Continuer ne se grise jamais |
+| **TOTAL** | **1 403** | **0** | 27 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
 
-#### Somme
+`t_rls` applique les **vrais** fichiers de `migrations/00` → `97` sans les
+modifier, sur un PostgreSQL 16 local jetable, puis observe le comportement
+effectif. Ses 15 sections, dont les trois ajoutées par l'audit :
 
-| Famille | PASS | FAIL |
-|---|---|---|
-| PostgreSQL 16 local (`t_rls.sh`) | 169 | 0 |
-| Navigateur réel + code serveur | 1 107 | 0 |
-| **Total** | **1 276** | **0** |
+| Section | Ce qu'elle prouve |
+|---|---|
+| **A** | La phase préparatoire reste compatible avec l'**ancien** Dashboard |
+| **B** | Effet réel du durcissement : lecture vide et écriture silencieuse pour un appelant anonyme |
+| **C** · **D** · **E** | Partenaire non bloqué, partenaire bloqué (zéro mission, auto-déblocage impossible), déblocage administrateur |
+| **G** · **H** | Espace client : cloisonnement, réponse du client, validation administrateur |
+| **V** | **Chantier nº 3** — l'erreur 42501 reproduite, création partielle comprise, puis corrigée |
+| **V bis** | **Audit nº 5** — client B visant la demande du client A, partenaire, anonyme, mauvais secret, colonnes administratives présentes et futures, rejeu prouvé |
+| **W** | **Chantier nº 10** — informations réellement manquantes selon le scénario |
+| **W bis** | **Audit nº 6** — qui a le droit de lire un rapport : propriétaire, administrateur, et personne d'autre |
+| **X** | **Chantier nº 13** — métiers, activité `technicien`, décisions créées **en attente** |
+| **Y** | **Chantier nº 14** — missions de nettoyage, photos, bucket privé |
+| **Z** | **Audit nº 7** — 28 écritures **hostiles directes** sur les missions : prix, client, paiement, statut, attribution, photos |
+| **F** | **Idempotence** : toute la chaîne rejouée — aucune erreur, aucune politique ni trigger en double |
 
 ### 4.3 Ce que la campagne a rattrapé
 
-Cette exécution complète n'était pas une formalité : **elle a trouvé deux
-défauts réels**, tous deux corrigés avant la remise (§ 3, commits `3b42afc` et
-`61082c6`). C'est la raison pour laquelle les chiffres ci-dessus proviennent
+Cette exécution complète n'était pas une formalité : **elle a trouvé trois
+défauts réels**, tous corrigés avant la remise — les commits `3b42afc` et
+`61082c6`, puis `45545e3` quand le garde-fou de périmètre a vu arriver les
+fichiers de l'audit. C'est la raison pour laquelle les chiffres ci-dessus proviennent
 d'une campagne lancée **après** le dernier commit de code, et non d'un cumul
 d'exécutions passées.
+
+---
+
+## 4 bis. Audit indépendant — onze défauts trouvés, onze corrigés
+
+Un audit indépendant a relu ce lot **après** la campagne des 1 276 contrôles
+et y a trouvé onze défauts que ces contrôles ne voyaient pas. Ils sont tous
+corrigés, et chacun a désormais un test qui **échoue si le défaut revient**.
+
+Le plus important à retenir : **quatre d'entre eux auraient empêché le lot de
+fonctionner ou ouvert un accès non autorisé en production.** Les tests
+existants ne les voyaient pas parce qu'ils vérifiaient l'intention du code,
+pas son effet réel sur le réseau et en base.
+
+| # | Défaut | Ce qu'il permettait ou empêchait | Preuve du défaut |
+|---|---|---|---|
+| 1 | La fonction `candidature-video` n'avait **aucune configuration versionnée** | Supabase exige un JWT par défaut : **toute candidature vidéo aurait été refusée avec un 401**, avant d'exécuter une ligne de code | `supabase/config.toml` créé ; `t_video_securite` 7.17 / 7.18 |
+| 2 | Le CORS n'autorisait pas l'en-tête `apikey`, **que le navigateur envoie pourtant** | Le preflight échouait : **la requête réelle n'était jamais émise**. Côté candidat : « connexion interrompue », et rien du tout dans les journaux serveur | `t_video_securite` 7.6 → 7.16 — **5 FAIL** contre l'ancien code |
+| 3 | La « reprise après rechargement » était **prouvée par un test qui réinjectait lui-même le secret** | La promesse ne tenait pas : après un F5, ni le fichier ni l'autorisation n'existent plus | `t_tus` section D, qui recharge **réellement** |
+| 4 | `_compterLignes()` envoyait la **clé anonyme** en `Authorization` | Après le durcissement RLS, les compteurs auraient affiché **zéro en HTTP 200** — sans la moindre erreur visible | `t_durcissement` A3 / A4 — **la clé anonyme partait sur 4 requêtes** |
+| 5 | La migration `92` acceptait **toute colonne sauf une liste d'exclusion**, et l'UUID seul valait preuve de rejeu | Connaître l'identifiant d'une demande suffisait à **y greffer ses véhicules** et à **lire le numéro client d'autrui** | `t_rls.sh` V13 → V28 — **15 FAIL** contre l'ancienne migration |
+| 6 | `informations_demande()` n'avait **aucun contrôle d'autorisation** | Un partenaire lit le `client_id` sur sa mission : il obtenait **8 rubriques** de la demande — contacts, adresses, dates | `t_rls.sh` W39 → W45 — **3 FAIL** contre l'ancienne migration |
+| 7 | La policy de mise à jour des missions ne regardait **jamais quelle colonne** était modifiée | Par `PATCH` direct sur l'API, un partenaire pouvait **changer le prix**, se déclarer **« terminée »**, cocher la **validation de paiement** | `t_rls.sh` Z1 / Z2 reproduisent, Z4 → Z26b prouvent la fermeture |
+| 8 | La migration `95` supprimait **toute contrainte contenant le mot « activite »** | Une contrainte sans rapport était détruite, et **jamais remise** | `t_rls.sh` X20 / X21 — **2 FAIL** contre l'ancienne migration |
+| 9 | Une photo envoyée restait **orpheline** si l'écriture en base échouait ensuite | Un fichier que personne ne référence, que personne ne supprime, et qui compte dans le quota | `t_durcissement` E4 → E9 |
+| 10 | Des valeurs de base finissaient dans du `innerHTML` **sans échappement** | **Injection JavaScript réelle** : nom de client, plaque, URL, référence dans un `onclick` | `t_durcissement` B1 — la charge s'est exécutée **5 fois** contre l'ancien code |
+| 11 | Le seul contrôle sur la Pull Request était Vercel, et le lanceur de tests **ne pouvait pas échouer** | `node "$f" || echo "ÉCHEC"` avale le code de retour : une suite en échec passait inaperçue | `.github/workflows/tests.yml` + `tests/lancer.js` |
+
+### 4 bis.1 Ce qui a changé dans la façon de tester
+
+Trois principes en sortent, appliqués à tous les nouveaux contrôles :
+
+1. **Mesurer ce qui part sur le réseau, pas ce que le code a l'air de faire.**
+   `t_durcissement` enregistre la **valeur** de l'en-tête `Authorization` de
+   chaque requête. Un double qui ignore les en-têtes ne prouve rien.
+2. **Attaquer pour de vrai.** Les charges de `t_durcissement` ne
+   « ressemblent » pas à une attaque : elles s'exécutent si l'échappement
+   manque, et un compteur le constate.
+3. **Prouver que le test voit le défaut.** Chaque correction a été rejouée
+   contre le code d'avant. Les chiffres de la colonne « Preuve » ci-dessus
+   sont ceux de ces exécutions.
 
 ---
 
@@ -386,7 +442,7 @@ select count(*) from pg_proc
 
 ---
 
-### Étape 2 — Migrations `93`, `94`, `95`, `96` (10 minutes)
+### Étape 2 — Migrations `93`, `94`, `95`, `96`, `97` (12 minutes)
 
 **Un fichier à la fois, dans cet ordre, en vérifiant chaque fois.**
 
@@ -396,6 +452,7 @@ select count(*) from pg_proc
 | 2.2 | `94_informations_selon_scenario.sql` | ne réclame au client que ce qui manque **vraiment**, selon son scénario | `select count(*) from pg_proc where proname = 'hc_texte';` → **1** |
 | 2.3 | `95_metiers_partenaires.sql` | les candidats peuvent déclarer plusieurs métiers ; l'activité « technicien » devient possible | `select count(*) from information_schema.columns where table_name='convoyeurs' and column_name='metiers';` → **1** |
 | 2.4 | `96_missions_nettoyage.sql` | les missions de nettoyage et leurs photos avant/après | `select count(*) from storage.buckets where id = 'missions-photos';` → **1** |
+| 2.5 | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ferme ce qu'un partenaire peut changer sur une mission | `select count(*) from pg_trigger where tgrelid='public.missions'::regclass and not tgisinternal;` → **au moins 2** |
 
 *Contrôle global de fin d'étape* :
 ```sql
@@ -430,11 +487,36 @@ permet à un envoi de 300 Mo de durer plus de 30 minutes sans jamais donner au
 navigateur le droit de choisir où il écrit.
 
 ```bash
+# DEPUIS LA RACINE DU DÉPÔT — c'est là que se trouve supabase/config.toml.
 supabase functions deploy candidature-video
 ```
 
+⚠️ **Lancez la commande depuis la racine du dépôt.** C'est là que se trouve
+`supabase/config.toml`, qui porte un réglage sans lequel **plus aucune
+candidature vidéo ne fonctionne** :
+
+```toml
+[functions.candidature-video]
+verify_jwt = false
+```
+
+Une candidature est déposée **avant** toute authentification — le candidat
+n'a pas encore de compte. Le navigateur n'a donc aucun jeton utilisateur à
+présenter, et Supabase refuserait la requête par défaut, avant même
+d'exécuter la fonction. Ce réglage ne diminue rien : c'est la fonction
+elle-même qui autorise, et plus strictement que le réglage général
+(jeton à usage unique, chemin imposé par le serveur, bucket privé, origine
+contrôlée).
+
+*Contrôle supplémentaire* : Supabase → **Edge Functions →
+candidature-video** → la vérification JWT doit apparaître **désactivée**.
+Si l'interface affiche l'inverse, le déploiement n'a pas lu le fichier :
+recommencez depuis la racine du dépôt.
+
 **À faire avant le déploiement Vercel** : sans cette version, un envoi long
-échouerait au bout de 30 minutes.
+échouerait au bout de 30 minutes, et le dépôt de vidéo serait bloqué par le
+navigateur (l'en-tête `apikey` n'était pas autorisé par l'ancienne
+configuration CORS).
 
 **La clé `service_role` reste dans l'environnement des Edge Functions et nulle
 part ailleurs.** Ne la copiez dans aucun fichier du dépôt.
@@ -740,21 +822,39 @@ Ces tests s'exécutent sur les fichiers du dépôt, **sans jamais joindre
 Supabase**. C'est le filet de sécurité avant de toucher à quoi que ce soit.
 
 ```bash
-# 1. Les politiques RLS, appliquées pour de vrai sur un PostgreSQL 16 jetable.
-#    Requiert postgresql-16 et les droits root. Ne joint JAMAIS Supabase.
-bash tests/t_rls.sh
+# Une seule fois, la première fois :
+npm ci
+npx playwright install --with-deps chromium
 
-# 2. Les 26 suites navigateur, depuis la racine du dépôt.
-for f in tests/t_*.js; do echo "== $f"; node "$f" || echo "ÉCHEC $f"; done
+# TOUTE la campagne, en une commande :
+npm test
+```
 
-# 3. La sécurité de la fonction serveur.
-node tests/t_video_securite.mjs
+`npm test` appelle `node tests/lancer.js`, qui exécute chaque suite dans son
+propre processus, **additionne les échecs réellement rapportés** et sort avec
+un code non nul dès qu'une seule chose ne va pas.
+
+> **Ce que la commande précédente ne faisait pas.** Elle était écrite
+> `for f in tests/t_*.js; do node "$f" || echo "ÉCHEC $f"; done` : le
+> `|| echo` avale le code de retour, et le statut final est celui du dernier
+> `echo`. **Cette boucle ne pouvait pas échouer.** Une suite en échec passait
+> inaperçue — y compris dans une intégration continue, qui aurait affiché un
+> vert rassurant.
+
+Pour ne relancer qu'une partie :
+
+```bash
+node tests/lancer.js --sans-sql              # sans PostgreSQL
+node tests/lancer.js --seulement video       # les suites dont le nom contient « video »
 ```
 
 C'est exactement la commande qui a produit les chiffres du § 4.2.
 
-**Attendu : `0 FAIL` partout.** Si une suite échoue, **n'appliquez aucune
-migration** et signalez-le.
+**Attendu : `0 FAIL` partout, et un code de sortie nul.** Si une suite
+échoue, **n'appliquez aucune migration** et signalez-le.
+
+Les mêmes tests tournent automatiquement sur GitHub à chaque poussée et sur
+chaque Pull Request (`.github/workflows/tests.yml`).
 
 Et sur Supabase, deux relevés **à noter avant de commencer** — ils servent de
 référence pour vérifier ensuite que rien n'a été perdu :
@@ -917,6 +1017,7 @@ qu'il faut faire — et surtout ce qu'il ne faut **pas** faire.
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` et `drop trigger if exists trg_verrou_creation_mission on public.missions;` (les fonctions à retirer sont listées en fin de fichier). | **Aucune** — mais revenir dessus **rouvre le défaut de sécurité** : un partenaire pourrait de nouveau changer le prix d'une mission ou la valider lui-même. |
 | `96` | **Laisser en place** les colonnes de `public.missions` et la table `mission_photos` : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (SQL en fin de fichier). | Supprimer la table **effacerait les photos d'état des véhicules**. |
 | `95` | **Laisser `convoyeurs.metiers` en place** (colonne facultative, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie **0**. | Supprimer la colonne **effacerait des métiers réellement déclarés**. |
 | `94` | Réappliquer `06_informations_manquantes.sql` : il contient la version précédente de `informations_demande(uuid)`, **même signature**. Laisser `vehicules.livraison_apres_stockage` en place. | **Aucune** : `94` ne touche qu'une fonction de lecture et ajoute une colonne vide. |

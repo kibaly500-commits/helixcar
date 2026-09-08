@@ -15,7 +15,7 @@ l'ordre ci-dessous est **impératif**.
 | **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
 | **B** | Déploiement de la nouvelle `dashboard.html` | — |
 | **C** | `90_durcissement_rls_partenaires.sql` puis `91_durcissement_rls_clients.sql` | ❌ **non** — exige la phase B |
-| **D** | `92` → `96` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
+| **D** | `92` → `97` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
 
 ### Pourquoi la phase C ne peut pas venir plus tôt
 
@@ -69,6 +69,26 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 12 | D | `94_informations_selon_scenario.sql` | `informations_demande()` selon le scénario réel + `vehicules.livraison_apres_stockage` |
 | 13 | D | `95_metiers_partenaires.sql` | `convoyeurs.metiers` + activité `technicien` acceptée |
 | 14 | D | `96_missions_nettoyage.sql` | missions de nettoyage (`missions.type_mission` + colonnes d'intervention), photos avant/après, bucket privé `missions-photos` et ses politiques |
+| 15 | **D** | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ce qu'un partenaire a le droit de changer sur une mission — colonnes, transitions de statut, attribution, photos exigées |
+
+### Pourquoi `97` ne peut pas attendre
+
+La policy de `90` autorise un partenaire actif à modifier une mission qui
+lui est attribuée — **sans jamais regarder QUELLE colonne** il modifie :
+
+```sql
+with check (public.partenaire_actif())
+```
+
+Le Dashboard ne propose que deux boutons, mais un partenaire n'est pas
+obligé de passer par le Dashboard. Une requête `PATCH` directe sur l'API
+REST, avec son propre jeton de session, suffit à changer le prix d'une
+mission, la rattacher à un autre client, la passer en « terminee » ou
+cocher la validation de paiement. **Reproduit sur PostgreSQL 16**
+(`tests/t_rls.sh`, section Z, contrôles Z1 et Z2).
+
+`97` ferme cela par un trigger, qui s'applique à **tout** chemin
+d'écriture — REST, RPC, SQL Editor — et pas seulement aux boutons.
 
 ### Pourquoi la phase D vient APRÈS la phase C
 
@@ -254,6 +274,7 @@ update public.convoyeurs c
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` puis `drop trigger if exists trg_verrou_creation_mission on public.missions;` et les cinq fonctions listées en fin de fichier. | **Aucune** : ces objets ne font que contrôler. Mais les revenir rouvre le défaut de sécurité qu'ils ferment. |
 | `96` | Laisser les colonnes de `public.missions` et la table `mission_photos` EN PLACE : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (voir la fin du fichier). | Retirer la table supprimerait les photos d'état des véhicules. |
 | `95` | Laisser `convoyeurs.metiers` en place (nullable, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie 0. | Retirer la colonne supprimerait des métiers réellement déclarés. |
 | `94` | Réappliquer `06_informations_manquantes.sql` : il contient la version précédente de `informations_demande(uuid)`, même signature. Laisser `vehicules.livraison_apres_stockage` en place. | Aucune : `94` ne touche qu'une fonction de lecture et ajoute une colonne vide. |
@@ -276,12 +297,44 @@ et **ne bloquer aucun partenaire avant la phase C**.
    peut pas envoyer sa vidéo.
 
    ```bash
+   # Depuis la racine du dépôt : supabase/config.toml y est lu.
    supabase functions deploy candidature-video
    ```
+
+   **Lancer la commande depuis la racine du dépôt**, et non depuis un
+   autre dossier : c'est là que se trouve `supabase/config.toml`, qui
+   porte le réglage sans lequel la fonction répondrait `401` à toute
+   candidature —
+
+   ```toml
+   [functions.candidature-video]
+   verify_jwt = false
+   ```
+
+   *Pourquoi ce réglage.* Une candidature est déposée **avant** toute
+   authentification : le candidat n'a pas encore de compte. Le navigateur
+   envoie donc `apikey`, mais **aucun JWT utilisateur**. Avec la
+   vérification JWT du gateway active — le défaut de Supabase — la
+   requête est refusée avant d'atteindre la moindre ligne de code.
+
+   Cela n'ouvre rien : l'autorisation réelle est assurée par la fonction
+   elle-même, et elle est plus stricte que ce que le gateway saurait
+   faire — jeton applicatif à usage unique haché en base, chemin de
+   destination généré par le serveur, URL d'envoi signée et temporaire
+   sur un bucket privé, origine HTTP contrôlée.
+
+   Le réglage est **versionné dans le dépôt**, pas coché à la main dans
+   une interface : il se relit, se relie à une revue de code, et survit
+   à une recréation du projet.
 
    Elle utilise `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`, déjà
    présentes dans l'environnement des Edge Functions. **Cette clé ne doit
    jamais être placée ailleurs que là.**
+
+0 bis. **Vérifier le réglage après déploiement.** Supabase → Edge
+   Functions → `candidature-video` : la vérification JWT doit apparaître
+   comme **désactivée**. Si l'interface affiche l'inverse, le déploiement
+   n'a pas lu `config.toml` — recommencer depuis la racine du dépôt.
 
 1. **Storage → `candidatures-videos`** : vérifier que le bucket apparaît
    bien comme **Private**. C'est le point de sécurité central des vidéos.
