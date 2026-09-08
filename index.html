@@ -7698,6 +7698,13 @@ function _renderFormStep(type) {
   var container = document.getElementById('modal-' + type + '-form');
   if (!container) return;
 
+  // Chaque étape repart avec un bouton Continuer actif : l'état laissé
+  // par une autre étape ou un autre service ne doit jamais la bloquer.
+  if (type === 'client' && typeof _clientLibererBoutonContinuer === 'function') {
+    _clientLibererBoutonContinuer();
+    if (typeof _clientPurgerBranchesInactives === 'function') _clientPurgerBranchesInactives();
+  }
+
   container.querySelectorAll('.form-step').forEach(function(el) {
     el.classList.toggle('active', parseInt(el.dataset.step, 10) === n);
   });
@@ -8281,13 +8288,63 @@ function _nettPeutContinuerEtape2() {
 // Ne touche au bouton que si le nettoyage est le service actif : les
 // parcours Convoyage/Stockage/Compte gardent leur propre logique,
 // inchangee.
+// LE BOUTON CONTINUER N'EST PLUS JAMAIS GRISÉ.
+//
+// Il l'était par service, et chaque fonction sortait sans le réactiver
+// quand SON service n'était pas actif : l'état grisé laissé par un
+// service survivait donc au changement de service, et même au retour à
+// l'étape 1. L'utilisateur se retrouvait bloqué sur une étape dont tous
+// les champs étaient pourtant remplis, parce que des champs CACHÉS d'un
+// autre parcours restaient incomplets.
+//
+// Le bouton reste désormais visible, actif et cliquable en permanence.
+// C'est le clic qui valide — uniquement les champs obligatoires
+// VISIBLES et APPLICABLES à l'étape courante — et qui signale les
+// manques champ par champ. Aucun champ caché, désactivé ou inapplicable
+// ne peut donc plus bloquer la suite.
 function _nettMajBoutonContinuer() {
+  _clientLibererBoutonContinuer();
+}
+
+// Remet le bouton dans son état normal : actif, opaque, cliquable.
+// Appelée à chaque changement d'étape et de service.
+// Efface les erreurs des branches devenues inapplicables.
+// Une erreur affichée sur un champ qu'on ne voit plus n'a plus de sens,
+// et surtout elle ne doit plus peser sur la navigation.
+var CLIENT_BRANCHES_SERVICE = {
+  nettoyage: ['nett-eligibilite-group', 'nett-repartition-group', 'nett-type-group',
+              'nett-lieu-group', 'nett-dispo-group', 'nett-delai-group'],
+  professionnel: ['pro-categorie-group', 'pro-specialite-group', 'pro-mission-group'],
+  convoyage: ['trajet-type-group', 'service-mode-group'],
+  stockage: ['stockage-group']
+};
+
+function _clientPurgerBranchesInactives() {
+  var actif = (typeof _typeServiceChoisi === 'function') ? _typeServiceChoisi() : '';
+  Object.keys(CLIENT_BRANCHES_SERVICE).forEach(function (service) {
+    if (service === actif) return;
+    CLIENT_BRANCHES_SERVICE[service].forEach(function (groupe) {
+      try { _clearGroupError(groupe); } catch (e) {}
+    });
+  });
+  // Tout champ en erreur qui n'est plus visible est également purgé :
+  // la règle vaut pour les champs individuels comme pour les groupes.
+  var enErreur = document.querySelectorAll('#modal-client .field-error-msg.visible');
+  Array.prototype.forEach.call(enErreur, function (msg) {
+    var groupe = msg.closest ? msg.closest('.modal-form-group, .veh-sous-contenu') : null;
+    if (groupe && groupe.offsetParent === null) {
+      msg.classList.remove('visible');
+      msg.textContent = '';
+    }
+  });
+}
+
+function _clientLibererBoutonContinuer() {
   var btn = document.getElementById('client-step-next-btn');
-  if (!btn || !_avecNettoyage()) return;
-  var bloque = !_nettPeutContinuerEtape2();
-  btn.disabled = bloque;
-  btn.style.opacity = bloque ? '.5' : '';
-  btn.style.cursor = bloque ? 'not-allowed' : '';
+  if (!btn) return;
+  btn.disabled = false;
+  btn.style.opacity = '';
+  btn.style.cursor = '';
 }
 
 function nettOnLieuChange() {
@@ -8831,8 +8888,8 @@ function _validateNettoyageEtape2() {
   // evalue et la progression est impossible.
   if (!_nettEligibiliteOk()) {
     // V77 - petite erreur compacte sous les deux cases, jamais un
-    // grand rectangle. Un particulier ne peut pas arriver ici : son
-    // bouton Continuer est deja desactive.
+    // grand rectangle. Le bouton Continuer n'etant plus jamais grise,
+    // c'est bien ce message qui explique le blocage a un particulier.
     _showGroupError('nett-eligibilite-group', 'Confirmez les deux conditions d\'intervention pour continuer.');
     return { ok: false, first: 'nett-eligibilite-group' };
   }
@@ -9674,15 +9731,14 @@ function _proRubriqueComplete(cle) {
 // l'etape 2 n'est pas reellement complete.
 function _proMajBoutonContinuer() {
   if (typeof _proMajEtatRubriques === 'function') _proMajEtatRubriques();
+  // Le bouton n'est plus grisé (voir _nettMajBoutonContinuer) : il reste
+  // cliquable et c'est la validation au clic qui tranche.
+  _clientLibererBoutonContinuer();
   if (!_avecProfessionnel()) return;
-  var btn = document.getElementById('client-step-next-btn');
-  var complet = _proPeutContinuerEtape2();
-  if (btn) {
-    btn.disabled = !complet;
-    btn.style.opacity = complet ? '' : '.5';
-    btn.style.cursor = complet ? '' : 'not-allowed';
-  }
-  if (!complet) {
+  // On empêche toujours de RESTER sur une étape plus lointaine que ce
+  // que l'étape 2 autorise : c'est un garde-fou de navigation, pas un
+  // grisage de bouton.
+  if (!_proPeutContinuerEtape2()) {
     _etapeMax = Math.min(_etapeMax, 2);
     if (_formStepState.client > 2) _formStepState.client = 2;
   }
@@ -9791,6 +9847,11 @@ function _libelleTypeVehicule(v) {
 // Affiche uniquement les blocs correspondant au service choisi.
 function onChoixService() {
   var t = _typeServiceChoisi();
+  // Changer de service rend inapplicables les erreurs et les blocages
+  // laissés par le service précédent : on les efface AVANT tout le
+  // reste, sans quoi un champ devenu caché continuerait de bloquer.
+  _clientPurgerBranchesInactives();
+  _clientLibererBoutonContinuer();
   var conv = _avecConvoyage(), stock = _avecStockage();
   // Lot 2 (V72) — nouveaux services socle. NB : les blocs convoyage/stockage
   // ci-dessous se masquent déjà automatiquement pour ces deux services,

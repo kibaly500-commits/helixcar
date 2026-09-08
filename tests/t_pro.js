@@ -50,7 +50,18 @@ async function remplirVehicule(page, i, type, marque) {
   L.check('A1 : bloc professionnel affiché après sélection du service', etat.visible);
   L.check('A2 : AUCUN accordéon ouvert automatiquement', etat.ouverts === 0, 'ouverts=' + etat.ouverts);
   L.check('A3 : aucun message socle « en préparation »', etat.socleMsg === 'none');
-  L.check('A4 : Continuer bloqué tant que rien n\'est saisi', etat.btnDisabled === true);
+  // Le bouton n'est plus jamais grisé (§6) : c'est le CLIC qui bloque et
+  // signale les manques. On vérifie donc la garantie utile — on ne
+  // franchit pas l'étape — et non plus l'état visuel du bouton.
+  L.check('A4 : le bouton Continuer reste actif et cliquable', etat.btnDisabled === false);
+  const blocage = await page.evaluate(() => {
+    const avant = _formStepState.client;
+    clientStepNext();
+    return { avant, apres: _formStepState.client,
+             erreurs: document.querySelectorAll('#modal-client .field-error-msg.visible').length };
+  });
+  L.check('A4b : mais cliquer ne franchit PAS l\'étape tant que rien n\'est saisi',
+    blocage.apres === blocage.avant && blocage.erreurs > 0, JSON.stringify(blocage));
 
   // Aucun message intermédiaire interdit
   const texte = await page.evaluate(() => (document.getElementById('bloc-socle-professionnel') || {}).textContent || '');
