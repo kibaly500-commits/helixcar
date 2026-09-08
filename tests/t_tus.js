@@ -368,6 +368,85 @@ async function preparerVideo(page, octets) {
     !!etat.uploads['secours'], JSON.stringify(Object.keys(etat.uploads)));
   await page.close();
 
+  // ══ G. ANNULATION, POURCENTAGE ET NOUVELLE TENTATIVE ══
+  etat.uploads = {}; etat.journal = []; etat.cheminAutorise = null;
+  etat.confirmations = 0; etat.prolongations = 0;
+  etat.couperApres = null; etat.coupureFaite = false;
+
+  page = await nouvellePage();
+  await preparerVideo(page, TAILLE);
+  await page.evaluate(() => {
+    // On rétablit la vraie fonction de progression pour observer
+    // l'affichage réellement présenté au candidat.
+    delete window.convMajProgressionVideo;
+    _convVideoEtat = 'envoi';
+    convMajAffichageVideo();
+  });
+  await page.waitForTimeout(150);
+  const pendant = await page.evaluate(() => ({
+    annulerVisible: (document.getElementById('conv-video-annuler') || {}).style.display,
+    reessayerVisible: (document.getElementById('conv-video-reessayer') || {}).style.display,
+    pourcent: (document.getElementById('conv-video-pourcent') || {}).textContent,
+  }));
+  check('G1 : pendant l\'envoi, le bouton « Annuler l\'envoi » est proposé',
+    pendant.annulerVisible === 'inline-flex', JSON.stringify(pendant));
+  check('G2 : et « Réessayer » ne l\'est pas', pendant.reessayerVisible === 'none', pendant.reessayerVisible);
+  check('G3 : un pourcentage lisible est affiché, pas seulement une barre',
+    /%/.test(pendant.pourcent || ''), pendant.pourcent);
+
+  await page.evaluate(() => { _convVideoEtat = 'erreur'; convMajAffichageVideo(); });
+  await page.waitForTimeout(100);
+  const apresEchec = await page.evaluate(() => ({
+    annulerVisible: (document.getElementById('conv-video-annuler') || {}).style.display,
+    reessayerVisible: (document.getElementById('conv-video-reessayer') || {}).style.display,
+  }));
+  check('G4 : après un échec, « Réessayer l\'envoi » apparaît',
+    apresEchec.reessayerVisible === 'inline-flex', JSON.stringify(apresEchec));
+  check('G5 : et « Annuler » disparaît', apresEchec.annulerVisible === 'none', apresEchec.annulerVisible);
+
+  // Annulation RÉELLE au milieu de l'envoi.
+  await page.evaluate(() => {
+    _convVideoEtat = 'envoi';
+    window.__progression = [];
+    const vrai = convMajProgressionVideo;
+    window.convMajProgressionVideo = function (p) {
+      window.__progression.push(p);
+      vrai(p);
+      // Dès qu'un morceau est passé, le candidat renonce.
+      if (p >= 30 && !window.__annule) { window.__annule = true; convAnnulerEnvoiVideo(); }
+    };
+  });
+  const rAnnule = await page.evaluate(() => uploadVideoCandidature());
+  const upG = Object.values(etat.uploads).filter(u => u.chemin)[0];
+  check('G6 : l\'annulation est rapportée comme telle, pas comme un échec',
+    rAnnule && rAnnule.annule === true, JSON.stringify(rAnnule));
+  check('G7 : l\'envoi s\'arrête réellement avant la fin',
+    upG && upG.recu < TAILLE && upG.recu > 0, upG && (upG.recu + '/' + TAILLE));
+  check('G8 : aucune confirmation n\'est envoyée après une annulation',
+    etat.confirmations === 0, String(etat.confirmations));
+  check('G9 : la trace de reprise est CONSERVÉE — relancer ne recommence pas tout',
+    await page.evaluate(() => !!localStorage.getItem('helixcar_video_reprise')));
+
+  // Relance : elle reprend là où l'annulation s'était arrêtée.
+  const recuApresAnnulation = upG.recu;
+  await page.evaluate(() => {
+    window.__annule = false;
+    window.convMajProgressionVideo = function (p) { window.__progression.push(p); };
+  });
+  const rRelance = await page.evaluate(() => uploadVideoCandidature());
+  const upG2 = Object.values(etat.uploads).filter(u => u.chemin)[0];
+  check('G10 : la relance aboutit', rRelance && rRelance.ok === true, JSON.stringify(rRelance));
+  check('G11 : elle a REPRIS l\'envoi annulé, sans en créer un second',
+    Object.keys(etat.uploads).filter(k => k.indexOf('up-') === 0).length === 1,
+    JSON.stringify(Object.keys(etat.uploads)));
+  check('G12 : et n\'a renvoyé que les octets manquants',
+    upG2 && upG2.recu === TAILLE
+    && upG2.morceaux.reduce((a, b) => a + b, 0) === TAILLE,
+    upG2 && (upG2.recu + ' / ' + upG2.morceaux.join('+')));
+  check('G13 : la progression a bien repris au-dessus de zéro',
+    recuApresAnnulation > 0);
+  await page.close();
+
   // ══ F. CE QUI NE DOIT JAMAIS ARRIVER ══
   const src = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
   const fn = fs.readFileSync('/home/user/helixcar/supabase/functions/candidature-video/index.ts', 'utf8');

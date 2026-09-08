@@ -7408,11 +7408,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <div id="conv-video-etat" style="display:none;background:#fff;border:1px solid rgba(21,27,33,.10);border-radius:12px;padding:14px 16px">
               <div id="conv-video-nom" style="font-size:.86rem;font-weight:600;color:var(--ink);word-break:break-all"></div>
               <div id="conv-video-meta" style="font-size:.78rem;color:#7A7F84;margin-top:3px"></div>
-              <div id="conv-video-piste" style="display:none;height:6px;border-radius:99px;background:#EDEDEA;margin-top:10px;overflow:hidden">
-                <div id="conv-video-barre" style="height:100%;width:0%;background:var(--accent);transition:width .18s ease"></div>
+              <div id="conv-video-piste" style="display:none;margin-top:10px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;height:6px;border-radius:99px;background:#EDEDEA;overflow:hidden">
+                    <div id="conv-video-barre" style="height:100%;width:0%;background:var(--accent);transition:width .18s ease"></div>
+                  </div>
+                  <!-- Un pourcentage lisible : une barre seule ne dit pas
+                       où en est un envoi de plusieurs centaines de Mo. -->
+                  <span id="conv-video-pourcent" style="font-size:.78rem;font-weight:700;color:var(--ink);min-width:38px;text-align:right">0 %</span>
+                </div>
+                <button type="button" id="conv-video-annuler" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger"
+                        style="display:none;margin-top:10px" onclick="convAnnulerEnvoiVideo()">Annuler l'envoi</button>
               </div>
               <div id="conv-video-message" style="display:none;font-size:.8rem;margin-top:9px;line-height:1.5"></div>
               <div id="conv-video-actions" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+                <button type="button" class="hc-video-btn hc-video-btn--mini" id="conv-video-reessayer"
+                        style="display:none" onclick="convReessayerEnvoiVideo()">Réessayer l'envoi</button>
                 <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirSelecteurVideo('fichier')">Remplacer par un fichier</button>
                 <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirEnregistreur()">Réenregistrer</button>
                 <button type="button" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger" onclick="convSupprimerVideo()">Supprimer</button>
@@ -14236,12 +14247,51 @@ function convMajAffichageVideo() {
   }
   if (_convVideoEtat !== 'invalide') _clearGroupError('conv-zone-video');
 
+  _convMajBoutonsEnvoi();
   _convVideoMajBouton();
 }
 
+// Annuler pendant l'envoi, reessayer apres un echec : les deux boutons
+// n'apparaissent que lorsqu'ils ont un sens. Une seule fonction en
+// decide, appelee aussi bien par la progression que par le rendu.
+function _convMajBoutonsEnvoi() {
+  var annuler = document.getElementById('conv-video-annuler');
+  if (annuler) annuler.style.display = (_convVideoEtat === 'envoi') ? 'inline-flex' : 'none';
+  var reessayer = document.getElementById('conv-video-reessayer');
+  if (reessayer) reessayer.style.display = (_convVideoEtat === 'erreur') ? 'inline-flex' : 'none';
+}
+
 function convMajProgressionVideo(pct) {
+  var valeur = Math.max(0, Math.min(100, Math.round(pct)));
   var barre = document.getElementById('conv-video-barre');
-  if (barre) barre.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  if (barre) barre.style.width = valeur + '%';
+  var txt = document.getElementById('conv-video-pourcent');
+  if (txt) txt.textContent = valeur + ' %';
+  _convMajBoutonsEnvoi();
+}
+
+// ── ANNULATION D'UN ENVOI EN COURS ──────────────────────────
+// Le candidat doit pouvoir renoncer : un envoi de 300 Mo sur un forfait
+// limite ne doit jamais etre subi. L'annulation interrompt reellement la
+// requete en cours et arrete la boucle des morceaux.
+var _convEnvoiAnnule = false;
+var _convRequeteEnCours = null;
+
+function convAnnulerEnvoiVideo() {
+  _convEnvoiAnnule = true;
+  if (_convRequeteEnCours) {
+    try { _convRequeteEnCours.abort(); } catch (e) {}
+  }
+}
+
+// Nouvelle tentative apres un echec ou une annulation. Elle REPREND
+// l'envoi en cours : le candidat ne recommence jamais ses 300 Mo.
+function convReessayerEnvoiVideo() {
+  // On repasse par le MEME chemin d'envoi que la premiere fois : aucune
+  // seconde procedure, aucun raccourci. L'envoi reprend a l'octet exact
+  // grace a la trace de reprise conservee.
+  _convEnvoiAnnule = false;
+  if (typeof submitConvoyeurForm === 'function') submitConvoyeurForm();
 }
 
 // Le bouton Continuer de l'etape 3 refletee en permanence l'etat reel.
@@ -14402,7 +14452,9 @@ function _tusEmpreinteEnvoi(chemin, fichier) {
 // fetch : lui seul rapporte la progression reelle d'un envoi.
 function _tusRequete(methode, url, entetes, corps, surProgres) {
   return new Promise(function (resolve) {
+    if (_convEnvoiAnnule) { resolve({ statut: 0, annule: true }); return; }
     var xhr = new XMLHttpRequest();
+    _convRequeteEnCours = xhr;
     xhr.open(methode, url, true);
     Object.keys(entetes || {}).forEach(function (k) {
       if (entetes[k] !== null && entetes[k] !== undefined) xhr.setRequestHeader(k, entetes[k]);
@@ -14420,7 +14472,7 @@ function _tusRequete(methode, url, entetes, corps, surProgres) {
     };
     xhr.onerror = function () { resolve({ statut: 0, reseau: true }); };
     xhr.ontimeout = function () { resolve({ statut: 0, reseau: true, expire: true }); };
-    xhr.onabort = function () { resolve({ statut: 0, reseau: true, interrompu: true }); };
+    xhr.onabort = function () { resolve({ statut: 0, annule: true }); };
     try { xhr.send(corps === undefined ? null : corps); }
     catch (e) { resolve({ statut: 0, reseau: true }); }
   });
@@ -14514,6 +14566,7 @@ function _convEnvoyerReprenable(chemin, token) {
 
   // 3) Envoyer morceau par morceau, en reprenant a l'octet exact.
   function envoyerDepuis(url, offset, reprisesRestantes) {
+    if (_convEnvoiAnnule) return Promise.resolve({ annule: true });
     if (offset >= fichier.size) return Promise.resolve({ ok: true });
     return assurerSignatureFraiche().then(function (ok) {
       if (!ok) return { erreur: 'Autorisation d\'envoi expirée. Réessayez.' };
@@ -14526,6 +14579,7 @@ function _convEnvoyerReprenable(chemin, token) {
       return _tusRequete('PATCH', url, entetes, morceau, function (envoyes) {
         convMajProgressionVideo(Math.round(((depart + envoyes) / fichier.size) * 100));
       }).then(function (r) {
+        if (r.annule || _convEnvoiAnnule) return { annule: true };
         if (r.statut === 204 || r.statut === 200) {
           var suivant = parseInt(r.entete('Upload-Offset'), 10);
           if (!isFinite(suivant) || suivant <= offset) suivant = fin;
@@ -14579,7 +14633,11 @@ function _convEnvoyerReprenable(chemin, token) {
     if (depart.erreur) return depart;
     return envoyerDepuis(depart.url, depart.offset, TUS_REPRISES_MAX);
   }).then(function (resultat) {
+    _convRequeteEnCours = null;
     if (resultat && resultat.ok) _tusOublierReprise();
+    // Apres une annulation, la trace de reprise est VOLONTAIREMENT
+    // conservee : le candidat qui relance repart de la ou il s'etait
+    // arrete, il ne recommence pas ses 300 Mo.
     return resultat;
   });
 }
@@ -14619,6 +14677,7 @@ function uploadVideoCandidature() {
   return new Promise(function (resolve) {
     if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
     if (!_convJetonEnvoi) { resolve({ erreur: 'Autorisation d\'envoi absente.' }); return; }
+    _convEnvoiAnnule = false;   // chaque tentative repart d'un etat propre
 
     _convAppelerFonctionVideo('autoriser', {
       jeton: _convJetonEnvoi,
@@ -14637,6 +14696,7 @@ function uploadVideoCandidature() {
           ? _convEnvoyerVersUrlSignee(autorisation.chemin, autorisation.token)
           : r1;
       }).then(function (depot) {
+        if (depot.annule) { resolve({ annule: true }); return; }
         if (depot.erreur) { resolve({ erreur: depot.erreur }); return; }
         // La confirmation est indispensable : c'est elle qui vérifie
         // côté serveur que le fichier est réellement arrivé, supprime
@@ -17523,6 +17583,21 @@ async function submitConvoyeurForm() {
     convMajAffichageVideo();
 
     var rVideo = await uploadVideoCandidature();
+
+    // ANNULATION VOLONTAIRE — ce n'est pas un échec : le candidat a
+    // choisi d'arrêter. Sa candidature reste en attente de vidéo, et
+    // relancer l'envoi reprendra là où il s'était arrêté.
+    if (rVideo && rVideo.annule) {
+      _convVideoEtat = 'erreur';
+      _convVideoMsg = 'Envoi annulé. Vous pouvez le relancer : il reprendra où il s\'est arrêté.';
+      convMajAffichageVideo();
+      if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
+      _formStepState.convoyeur = 3;
+      _renderFormStep('convoyeur');
+      var zoneAnn = document.getElementById('conv-zone-video');
+      if (zoneAnn) { try { zoneAnn.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
+      return;
+    }
 
     if (!rVideo || rVideo.erreur) {
       // La candidature reste au statut 'video_attendue' : elle n'est
