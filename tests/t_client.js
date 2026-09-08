@@ -91,7 +91,10 @@ window.supabase = { createClient: function () { return {
   },
   from: _table,
   rpc: async function (nom, params) {
-    window.__journal.push({ op: 'rpc', nom, params });
+    // La session AU MOMENT de l'appel : c'est elle qui rattache la
+    // demande côté serveur (auth.uid()), et rien d'autre.
+    window.__journal.push({ op: 'rpc', nom, params,
+      session: (window.__session && window.__session.user && window.__session.user.id) || null });
     if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
     if (nom === 'informations_demande') return { data: window.__infos || [], error: null };
     if (nom === 'repondre_informations_demande') return { data: 1, error: null };
@@ -246,9 +249,21 @@ window.fetch = function (url, options) {
   if (demande) {
     check('C2 : elle porte un identifiant généré côté navigateur',
       !!demande.id, String(demande.id));
-    check('C3 : elle est reliée au compte authentifié',
-      demande.auth_user_id === '55555555-5555-5555-5555-555555555555',
-      String(demande.auth_user_id));
+    // LE NAVIGATEUR NE DÉSIGNE PAS LE PROPRIÉTAIRE.
+    //
+    // La migration 92 ignore volontairement tout auth_user_id reçu et
+    // n'utilise que auth.uid() : sans cela, n'importe qui pourrait
+    // s'attribuer la demande d'un tiers. Vérifier que le navigateur
+    // envoie le bon identifiant revenait donc à vérifier une valeur que
+    // le serveur jette — et à croire un rattachement qui n'a pas
+    // forcément eu lieu.
+    //
+    // Ce qui rattache, c'est la SESSION au moment de l'appel. C'est
+    // cela qu'on vérifie.
+    check('C3 : le navigateur ne prétend PAS désigner le propriétaire',
+      demande.auth_user_id === undefined, String(demande.auth_user_id));
+    check('C3b : et l\'appel part bien avec une session ouverte — c\'est elle qui rattache',
+      appel.session === '55555555-5555-5555-5555-555555555555', String(appel.session));
     check('C4 : elle reçoit une référence HelixCar',
       !!demande.numero_client, String(demande.numero_client));
     check('C5 : elle porte le service choisi',
@@ -334,8 +349,9 @@ window.fetch = function (url, options) {
   check('C9 : « Trouver un professionnel » est réellement enregistrable',
     !!envoiPro && envoiPro.type_service === 'professionnel' && !!envoiPro.professionnel_details,
     JSON.stringify(envoiPro && envoiPro.type_service));
-  check('C10 : cette demande est elle aussi reliée au compte',
-    !!envoiPro && envoiPro.auth_user_id === '55555555-5555-5555-5555-555555555555');
+  check('C10 : cette demande non plus ne désigne son propriétaire',
+    !!envoiPro && envoiPro.auth_user_id === undefined,
+    String(envoiPro && envoiPro.auth_user_id));
 
   // ── D. DOUBLE CLIC, F5, COUPURE RÉSEAU ──
   // On repart d'un état propre : la restauration de brouillon a sa

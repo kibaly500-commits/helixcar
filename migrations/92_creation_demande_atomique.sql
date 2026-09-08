@@ -338,7 +338,14 @@ begin
     'id', v_id,
     'numero_client', v_numero,
     'vehicules', v_nb,
-    'deja_existante', v_rejeu
+    'deja_existante', v_rejeu,
+    -- Le SERVEUR dit si la demande est rattachée à un compte. Le
+    -- navigateur ne peut pas le déduire : il envoie bien un
+    -- auth_user_id, mais cette fonction l'ignore volontairement et
+    -- n'utilise que auth.uid(). Sans cette réponse, l'écran de succès
+    -- pourrait annoncer un espace client utilisable alors que la
+    -- demande n'y est pas.
+    'rattachee', (v_uid is not null)
   );
 end $$;
 

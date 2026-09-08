@@ -7266,8 +7266,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </div>
 
-        <h2 class="hc-succes-titre">Votre compte est créé.</h2>
-        <p class="hc-succes-sous">Bienvenue chez HelixCar.</p>
+        <h2 class="hc-succes-titre" id="client-success-titre">Votre demande est enregistrée.</h2>
+        <p class="hc-succes-sous" id="client-success-sous">Bienvenue chez HelixCar.</p>
 
         <div id="client-success-msg"></div>
 
@@ -15739,31 +15739,60 @@ async function _submitClientFormInterne() {
   // On fournit donc l'identifiant nous-mêmes : plus aucune relecture.
   payload.id = _hcNouvelIdentifiant();
 
-  // Demande déposée depuis un compte connecté : elle lui est rattachée
-  // dès l'insertion. C'est ce lien que lisent l'espace client et les
-  // politiques RLS ; il n'est jamais deviné après coup par e-mail.
+  // ── RATTACHEMENT : SEULE UNE SESSION COMPTE ──
+  //
+  // Le navigateur ne DÉCIDE PAS à qui appartient une demande. La
+  // fonction serveur (migration 92) ignore volontairement tout
+  // auth_user_id reçu et n'utilise que auth.uid() : sans quoi n'importe
+  // qui pourrait s'attribuer la demande d'un tiers.
+  //
+  // Conséquence à ne pas manquer : envoyer payload.auth_user_id ne
+  // rattache RIEN. Seule une session ouverte au moment de l'appel
+  // rattache la demande. On ne l'envoie donc plus — le laisser
+  // entretenait l'illusion d'un rattachement.
   var _idCompteDepot = _hcIdCompteConnecte();
-  if (_idCompteDepot) payload.auth_user_id = _idCompteDepot;
 
   // ── CRÉATION DU COMPTE HELIXCAR ──
   // Le formulaire demandait déjà un mot de passe, mais il n'était
   // envoyé nulle part : aucun compte n'était créé et la connexion à
   // l'espace client était impossible. On crée donc réellement le compte
-  // Supabase Auth ici, et on relie la demande à ce compte.
+  // Supabase Auth ici.
+  //
+  // DEUX CAS, ET ILS NE SE VALENT PAS.
+  //
+  //   * signUp() renvoie une SESSION — confirmation d'e-mail désactivée.
+  //     L'appel suivant est authentifié : la demande est rattachée.
+  //   * signUp() renvoie un utilisateur SANS session — confirmation
+  //     d'e-mail active, le cas par défaut chez Supabase. L'appel reste
+  //     ANONYME, et la demande est enregistrée sans propriétaire.
+  //
+  // Le second cas était traité comme le premier : l'écran annonçait un
+  // compte créé et un espace client, alors que la demande n'y était pas.
+  //
+  // On tente donc réellement d'ouvrir une session avant d'écrire. Si la
+  // confirmation est désactivée, signInWithPassword aboutit et la
+  // demande est rattachée. Si elle est active, elle échoue — et c'est
+  // cette réalité-là que l'écran de succès annoncera.
   //
   // Un échec de création NE DOIT JAMAIS faire perdre la demande : si
   // l'adresse est déjà utilisée (client de retour) ou si le service est
   // indisponible, la demande est enregistrée sans rattachement. On ne
   // rattache jamais une demande à un compte sur la seule foi d'une
   // adresse e-mail : cela exposerait la demande d'un tiers.
+  var _compteCree = false;
   if (!_idCompteDepot && _sb && _sb.auth && email_val) {
     var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
     if (mdpSaisi) {
       try {
         var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
-        if (!rCompte.error && utilisateur && utilisateur.id) {
-          payload.auth_user_id = utilisateur.id;
+        _compteCree = !rCompte.error && !!(utilisateur && utilisateur.id);
+        var sessionCreation = rCompte && rCompte.data && rCompte.data.session;
+        if (_compteCree && !sessionCreation) {
+          // Pas de session : on tente d'en ouvrir une. Elle n'aboutira
+          // que si la confirmation d'e-mail est désactivée.
+          try { await _sb.auth.signInWithPassword({ email: email_val, password: mdpSaisi }); }
+          catch (e2) { /* confirmation requise : on reste anonyme */ }
         }
       } catch (e) {
         console.warn('Création du compte impossible, la demande est conservée :', e);
@@ -15870,6 +15899,30 @@ async function _submitClientFormInterne() {
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
       } else {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
+      }
+
+      // ── CE QU'ON ANNONCE DOIT ÊTRE CE QUI S'EST PASSÉ ──
+      //
+      // C'est le SERVEUR qui dit si la demande est rattachée à un
+      // compte : lui seul connaît auth.uid() au moment de l'écriture.
+      // Le navigateur ne peut pas le deviner — il envoyait autrefois un
+      // auth_user_id que la fonction ignore.
+      //
+      // Sans ce contrôle, un client dont la confirmation d'e-mail est
+      // requise lisait « votre espace client » et n'y trouvait rien.
+      var _retour = (r && r.retour) || {};
+      var _rattachee = _retour.rattachee === true;
+      if (_compteCree && !_rattachee) {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + '<strong>Confirmez votre adresse e-mail</strong> pour activer votre '
+          + 'espace client : un message vient de vous être envoyé. '
+          + 'Votre demande est bien enregistrée et notre équipe la traite déjà — '
+          + 'elle apparaîtra dans votre espace une fois votre adresse confirmée.'
+          + '</div>';
+      } else if (_rattachee) {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + 'Votre demande est dès maintenant visible dans votre espace client.'
+          + '</div>';
       }
 
       document.getElementById('client-success-msg').innerHTML = html;
