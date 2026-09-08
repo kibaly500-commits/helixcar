@@ -15,7 +15,7 @@ l'ordre ci-dessous est **impératif**.
 | **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
 | **B** | Déploiement de la nouvelle `dashboard.html` | — |
 | **C** | `90_durcissement_rls_partenaires.sql` puis `91_durcissement_rls_clients.sql` | ❌ **non** — exige la phase B |
-| **D** | `92` → `97` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
+| **D** | `92` → `98` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
 
 ### Pourquoi la phase C ne peut pas venir plus tôt
 
@@ -70,6 +70,7 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 13 | D | `95_metiers_partenaires.sql` | `convoyeurs.metiers` + activité `technicien` acceptée |
 | 14 | D | `96_missions_nettoyage.sql` | missions de nettoyage (`missions.type_mission` + colonnes d'intervention), photos avant/après, bucket privé `missions-photos` et ses politiques |
 | 15 | **D** | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ce qu'un partenaire a le droit de changer sur une mission — colonnes, transitions de statut, attribution, photos exigées |
+| 16 | **D** | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo n'est acceptée que si son fichier existe réellement dans le bucket privé et appartient à la mission ; `ajoutee_par` imposé par le serveur |
 
 ### Pourquoi `97` ne peut pas attendre
 
@@ -274,6 +275,7 @@ update public.convoyeurs c
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;` puis `drop function if exists public.verrou_photo_mission();`, et réappliquer `97` pour retrouver l'ancienne `mission_photos_completes()`. | **Aucune** — mais revenir dessus permet de nouveau de justifier une prestation avec des photos qui n'existent pas. |
 | `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` puis `drop trigger if exists trg_verrou_creation_mission on public.missions;` et les cinq fonctions listées en fin de fichier. | **Aucune** : ces objets ne font que contrôler. Mais les revenir rouvre le défaut de sécurité qu'ils ferment. |
 | `96` | Laisser les colonnes de `public.missions` et la table `mission_photos` EN PLACE : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (voir la fin du fichier). | Retirer la table supprimerait les photos d'état des véhicules. |
 | `95` | Laisser `convoyeurs.metiers` en place (nullable, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie 0. | Retirer la colonne supprimerait des métiers réellement déclarés. |

@@ -231,7 +231,9 @@ const FICHIER = urlFichier('dashboard.html');
     /Bloqué/.test(relu.etat || ''), JSON.stringify(relu));
   check('D2 : et sa ligne reste distinguée', /blocked/.test(relu.classe || ''), relu.classe);
   await page.evaluate(() => voirConvoyeurSb('p-1'));
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() =>
+    ((document.getElementById('dossier-statut-partenaire') || {}).textContent || '').trim().length > 0,
+    null, { timeout: 5000 }).catch(() => {});
   const ficheRelue = await page.evaluate(() => ({
     statut: (document.getElementById('dossier-statut-partenaire') || {}).textContent || '',
     texte: (document.getElementById('dossier-content') || {}).textContent || '',

@@ -113,6 +113,17 @@ Dans l'ordre chronologique, du plus ancien au plus récent.
 | 28 | `0af092b` | 4 + 9 + 10 | Audit 4, 9 et 10 : le Dashboard, ce qu'il envoie et ce qu'il affiche |
 | 29 | `454b26f` | 11 | Audit 11 : une campagne de tests qui ne pouvait pas echouer |
 | 30 | `45545e3` | — | Non-regression : elargir le perimetre, en le nommant |
+| 31 | `68c820a` | doc | Dossier de recette : les onze correctifs de l'audit |
+
+**Puis le second audit indépendant** (§ 4 ter) :
+
+| # | Empreinte | Point | Message |
+|---|---|---|---|
+| 32 | `92af19f` | 1 | Audit 2-1 : plus aucune donnee de base dans un attribut JavaScript |
+| 33 | `985980b` | 2 | Audit 2-2 : une photo justificative doit exister vraiment |
+| 34 | `6ad8615` | 3 | Audit 2-3 : des tests de dates qui ne tenaient que sous UTC |
+| 35 | `adcf27a` | 4 | Audit 2-4 : la CI tournait, et elle avait raison d'echouer |
+| 36 | `2676e8f` | 5 | Audit 2-5 : ne plus annoncer un espace client ou la demande n'est pas |
 
 Les deux derniers commits méritent une explication, parce qu'ils sont nés de
 la campagne de tests finale et non du cahier des charges :
@@ -301,6 +312,40 @@ Trois principes en sortent, appliqués à tous les nouveaux contrôles :
 
 ---
 
+## 4 ter. Second audit indépendant — cinq points, cinq corrigés
+
+Un second audit a relu la branche au commit `68c820a`. Cinq points, dont
+**deux bloquants**. Tous corrigés, chacun avec un test qui échoue si le
+défaut revient.
+
+| # | Défaut | Ce qu'il permettait | Preuve du défaut |
+|---|---|---|---|
+| 1 | **Injection JavaScript encore exploitable** dans `loadCandidatures()` | Le nom d'un candidat passait par `escapeHtml()` — qui transforme `'` en `&#39;` — puis par un `.replace(/'/g, …)` qui ne trouvait donc plus rien à échapper. Le navigateur redécodait avant le parseur JavaScript : **la charge s'exécutait au clic sur « Valider »** | `t_durcissement` B12 — sur `68c820a`, `window.__xss = 99` |
+| 2 | **De fausses photos justifiaient une prestation** | `mission_photos_completes()` ne comptait que des LIGNES. Un partenaire écrivait deux chemins vers des fichiers inexistants, puis passait sa mission à « fini ». `ajoutee_par` était de surcroît choisi par l'appelant | `t_rls.sh` Z20/Z21 (reproduction) — **9 FAIL** sans la migration `98` |
+| 3 | **Tests de dates non portables** | `toISOString()` sur des dates civiles : en France le 10 décembre devient le 9. Les tests passaient sous `TZ=UTC` et tombaient sous `Europe/Paris` — le fuseau des utilisateurs | `TZ=Europe/Paris node tests/t_dates.js` → 2 FAIL avant correction |
+| 4 | **La CI échouait** — et pour une raison grave | Sur un runner GitHub, le CDN répond : la **vraie** bibliothèque `supabase-js` écrasait le double des tests. 44 contrôles tombaient, et surtout les tests **auraient pu atteindre la base réelle** | Exécution nº 2 du workflow sur `68c820a` : 813 PASS / 44 FAIL |
+| 5 | **Un espace client annoncé mais vide** | `signUp()` renvoie un utilisateur sans session dès que la confirmation d'e-mail est active. L'appel restait anonyme, la demande partait sans propriétaire, et l'écran annonçait un compte créé | `t_rattachement` — **10 FAIL** sur `68c820a` |
+
+### 4 ter.1 Ce que le point nº 1 a changé dans l'approche
+
+Corriger l'échappement une fois de plus n'aurait rien réglé : le défaut
+venait de l'existence même d'un contexte JavaScript dans un attribut.
+**Les 44 handlers dynamiques du Dashboard ont donc été supprimés.** Les
+arguments voyagent dans des attributs `data-*` — du texte, rien d'autre —
+et un écouteur délégué unique les relit au clic, en résolvant le nom de
+l'action dans un registre explicite. Il n'y a plus d'ordre d'échappement
+à ne pas se tromper, parce qu'il n'y a plus d'échappement à faire.
+
+### 4 ter.2 Ce que le point nº 4 a changé dans la façon de tester
+
+Les suites ne dépendent plus du hasard du réseau. `tests/env.js` coupe
+désormais **toute** requête sortante, sur toutes les machines. Seuls
+subsistent les fichiers locaux et les serveurs de test lancés sur la
+machine elle-même. C'est ce qui garantit — et non plus seulement ce qui
+espère — qu'aucun test ne peut atteindre Supabase.
+
+---
+
 ## 5. Blocages techniques démontrés
 
 Ce ne sont pas des suppositions : chacun a été constaté puis contourné sans
@@ -442,7 +487,7 @@ select count(*) from pg_proc
 
 ---
 
-### Étape 2 — Migrations `93`, `94`, `95`, `96`, `97` (12 minutes)
+### Étape 2 — Migrations `93` à `98` (15 minutes)
 
 **Un fichier à la fois, dans cet ordre, en vérifiant chaque fois.**
 
@@ -453,6 +498,7 @@ select count(*) from pg_proc
 | 2.3 | `95_metiers_partenaires.sql` | les candidats peuvent déclarer plusieurs métiers ; l'activité « technicien » devient possible | `select count(*) from information_schema.columns where table_name='convoyeurs' and column_name='metiers';` → **1** |
 | 2.4 | `96_missions_nettoyage.sql` | les missions de nettoyage et leurs photos avant/après | `select count(*) from storage.buckets where id = 'missions-photos';` → **1** |
 | 2.5 | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ferme ce qu'un partenaire peut changer sur une mission | `select count(*) from pg_trigger where tgrelid='public.missions'::regclass and not tgisinternal;` → **au moins 2** |
+| 2.6 | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo justificative doit exister vraiment | `select count(*) from pg_trigger where tgrelid='public.mission_photos'::regclass and not tgisinternal;` → **au moins 1** |
 
 *Contrôle global de fin d'étape* :
 ```sql
@@ -1017,6 +1063,7 @@ qu'il faut faire — et surtout ce qu'il ne faut **pas** faire.
 
 | Fichier | Retour arrière | Perte de données ? |
 |---|---|---|
+| `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;`, puis réappliquer `97`. | **Aucune** — mais revenir dessus permet de nouveau de **justifier une prestation avec des photos qui n'existent pas**. |
 | `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` et `drop trigger if exists trg_verrou_creation_mission on public.missions;` (les fonctions à retirer sont listées en fin de fichier). | **Aucune** — mais revenir dessus **rouvre le défaut de sécurité** : un partenaire pourrait de nouveau changer le prix d'une mission ou la valider lui-même. |
 | `96` | **Laisser en place** les colonnes de `public.missions` et la table `mission_photos` : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (SQL en fin de fichier). | Supprimer la table **effacerait les photos d'état des véhicules**. |
 | `95` | **Laisser `convoyeurs.metiers` en place** (colonne facultative, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie **0**. | Supprimer la colonne **effacerait des métiers réellement déclarés**. |
