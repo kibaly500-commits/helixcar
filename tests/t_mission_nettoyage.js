@@ -46,6 +46,7 @@ const INCOMPLETE = Object.assign({}, DEMANDE, {
 const INIT = `
 window.__db = { missions: [], mission_photos: [], objets: [] };
 window.__ecritures = [];
+window.__signatures = [];
 window.__emails = [];
 window.emailjs = { init:function(){}, send:function(){ window.__emails.push(1); return Promise.resolve(); },
                    sendForm:function(){ window.__emails.push(1); return Promise.resolve(); } };
@@ -93,7 +94,16 @@ window.supabase = { createClient: function(){ return {
       window.__ecritures.push({ table: 'storage:' + b, op: 'upload', chemin: chemin });
       return { data: { path: chemin }, error: null };
     },
-    createSignedUrl: async function(){ return { data: null, error: { message: 'non teste ici' } }; }
+    createSignedUrl: async function(){ return { data: null, error: { message: 'non teste ici' } }; },
+    // Une URL SIGNÉE, temporaire : c'est le seul chemin de lecture d'un
+    // bucket privé. On enregistre l'appel pour vérifier ce qui est
+    // demandé, et pour combien de temps.
+    createSignedUrls: async function(chemins, secondes){
+      window.__signatures.push({ bucket: b, chemins: chemins.slice(), secondes: secondes });
+      return { data: chemins.map(function(c){
+        return { path: c, signedUrl: 'https://exemple.invalid/signee/' + encodeURIComponent(c) + '?exp=' + secondes, error: null };
+      }), error: null };
+    }
   }; } },
 }; } };
 const _f = window.fetch;
@@ -348,6 +358,78 @@ window.fetch = function(u, o){
   check('E4 : et la validation est datée', !!m.prestation_validee_le, JSON.stringify(m.prestation_validee_le));
   check('E5 : toujours aucun e-mail', (await page.evaluate(() => window.__emails.length)) === 0);
 
+  // ══ G. RELIRE LES PHOTOS — PAR URL SIGNÉE, JAMAIS PUBLIQUE ══
+  // Valider une prestation sans voir les photos reviendrait à valider à
+  // l'aveugle : la lecture doit exister, et rester privée.
+
+  // Une photo appartenant à une AUTRE mission : elle ne doit jamais
+  // apparaître dans la fenêtre de celle-ci.
+  await page.evaluate(() => {
+    window.__db.mission_photos.push({
+      id: 'pho-autre', mission_id: 'mission-etrangere',
+      etape: 'avant', chemin: 'missions/mission-etrangere/avant-1.jpg',
+      created_at: '2026-01-01T10:00:00Z'
+    });
+    window.__signatures = [];
+  });
+
+  await page.evaluate(id => voirPhotosMission(id, 'HC-NET-2026-0001'), missionId);
+  await page.waitForTimeout(350);
+
+  const vue = await page.evaluate(() => {
+    const zone = document.getElementById('photos-mission-contenu');
+    return {
+      ouvert: (document.getElementById('modal-photos-mission') || {}).classList
+                ? document.getElementById('modal-photos-mission').classList.contains('open') : false,
+      titre: (document.getElementById('photos-mission-titre') || {}).textContent || '',
+      html: zone ? zone.innerHTML : '',
+      images: zone ? Array.from(zone.querySelectorAll('img')).map(i => i.getAttribute('src')) : [],
+      signatures: window.__signatures.slice()
+    };
+  });
+
+  check('G1 : la fenêtre des photos s\'ouvre', vue.ouvert);
+  check('G2 : elle nomme la mission concernée', /HC-NET-2026-0001/.test(vue.titre), vue.titre);
+  check('G3 : les deux étapes sont présentées',
+    /Avant intervention \(1\)/.test(vue.html) && /Après intervention \(1\)/.test(vue.html),
+    vue.html.slice(0, 200));
+  check('G4 : deux images sont réellement affichées', vue.images.length === 2, String(vue.images.length));
+  check('G5 : la lecture passe par le bucket privé des photos',
+    vue.signatures.length === 1 && vue.signatures[0].bucket === 'missions-photos',
+    JSON.stringify(vue.signatures));
+  check('G6 : seules les photos de CETTE mission sont demandées',
+    vue.signatures[0] && vue.signatures[0].chemins.every(c => c.indexOf('missions/' + missionId + '/') === 0),
+    JSON.stringify(vue.signatures[0] && vue.signatures[0].chemins));
+  check('G7 : la photo d\'une autre mission n\'apparaît jamais',
+    !/mission-etrangere/.test(vue.html));
+  check('G8 : le lien de lecture est temporaire',
+    vue.signatures[0] && vue.signatures[0].secondes > 0 && vue.signatures[0].secondes <= 900,
+    String(vue.signatures[0] && vue.signatures[0].secondes));
+  check('G9 : aucune URL publique n\'est construite',
+    vue.images.every(u => u.indexOf('/object/public/') === -1), vue.images.join(' | '));
+
+  // Fermer doit détacher les images : une URL signée ne doit pas
+  // survivre dans le document après la fermeture.
+  await page.evaluate(() => fermerPhotosMission());
+  await page.waitForTimeout(120);
+  const apresFermeture = await page.evaluate(() => ({
+    vide: (document.getElementById('photos-mission-contenu') || {}).innerHTML === '',
+    ferme: !document.getElementById('modal-photos-mission').classList.contains('open')
+  }));
+  check('G10 : la fenêtre se ferme', apresFermeture.ferme);
+  check('G11 : et aucune URL signée ne reste dans la page', apresFermeture.vide);
+
+  // Une mission sans photo le dit, au lieu d'afficher une zone vide.
+  await page.evaluate(() => voirPhotosMission('mission-sans-photo', 'HC-NET-2026-0002'));
+  await page.waitForTimeout(300);
+  const vide = await page.evaluate(() => ({
+    etat: (document.getElementById('photos-mission-etat') || {}).textContent || '',
+    html: (document.getElementById('photos-mission-contenu') || {}).innerHTML || ''
+  }));
+  check('G12 : une mission sans photo l\'annonce clairement',
+    /aucune photo/i.test(vide.etat) && vide.html === '', vide.etat);
+  await page.evaluate(() => fermerPhotosMission());
+
   // ══ F. LE SYSTÈME DE MISSIONS EXISTANT EST RÉUTILISÉ ══
   const src = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
   const mig = fs.readFileSync('/home/user/helixcar/migrations/96_missions_nettoyage.sql', 'utf8');
@@ -367,6 +449,10 @@ window.fetch = function(u, o){
     /function public\.est_partenaire_de_mission/.test(mig) && /security definer/.test(mig));
   check('F8 : un partenaire bloqué perd ce droit',
     /coalesce\(c\.bloque, false\) = false/.test(mig));
+  check('F9 : la relecture des photos réutilise le mécanisme des vidéos',
+    /createSignedUrls?\(/.test(src) && !/missions-photos[\s\S]{0,120}getPublicUrl/.test(src));
+  check('F10 : l\'administrateur peut voir les photos avant de valider',
+    /voirPhotosMission\(/.test(src) && /Valider la prestation/.test(src));
 
   check('Z1 : aucune erreur JavaScript', errs.length === 0, errs.slice(0, 3).join(' | '));
 

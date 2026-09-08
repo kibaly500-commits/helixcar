@@ -2192,6 +2192,16 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
+<!-- Photos d'intervention : lecture par URL signée, jamais publique -->
+<div class="modal-overlay" id="modal-photos-mission">
+  <div class="modal" style="position:relative;max-width:900px">
+    <button class="modal-close" onclick="fermerPhotosMission()">&#10005;</button>
+    <h3 id="photos-mission-titre">Photos d'intervention</h3>
+    <div id="photos-mission-etat" style="font-size:.85rem;color:#888;margin-bottom:12px">Préparation de la lecture sécurisée…</div>
+    <div id="photos-mission-contenu"></div>
+  </div>
+</div>
+
 <!-- Mission detail -->
 <div class="modal-overlay" id="modal-mission">
   <div class="modal" style="position:relative">
@@ -6069,6 +6079,14 @@ function loadMissions() {
       } else {
         actions = '—';
       }
+      // Une prestation de nettoyage se valide sur pièces : le bouton
+      // Photos est donc offert à TOUS les états, y compris une fois la
+      // mission terminée — c'est la trace de l'état des véhicules.
+      if (estNettoyage) {
+        actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
+          + 'onclick="voirPhotosMission(\'' + m.id + '\',\'' + escapeHtml(m.reference || '') + '\')">'
+          + '\uD83D\uDCF7 Photos</button>' + (actions === '—' ? '' : actions);
+      }
       const lettreVdv = estNettoyage ? '—' : (m.lettre_voiture_signee_url
         ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
         : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>');
@@ -6411,6 +6429,13 @@ function _actionsMissionNettoyage(m) {
     boutons += '<button class="btn btn-sm btn-outline" onclick="ouvrirPhotosMission(\'' + m.id + '\',\'apres\')">'
       + '📷 Après (' + etat.apres + ')</button>';
   }
+  // Le partenaire relit ce qu'il a déposé — et rien d'autre : les
+  // politiques Storage ne lui ouvrent que les photos de SA mission.
+  if (etat.avant + etat.apres > 0) {
+    boutons += '<button class="btn btn-sm btn-secondary" '
+      + 'onclick="voirPhotosMission(\'' + m.id + '\',\'' + escapeHtml(m.reference || '') + '\')">'
+      + 'Voir les photos</button>';
+  }
   if (m.statut === 'acceptee' || m.statut === 'en_cours') {
     // On ne peut déclarer une intervention terminée sans l'avoir
     // constatée : une photo avant et une photo après, au minimum.
@@ -6440,6 +6465,114 @@ function chargerPhotosMissions(missions) {
       return _photosParMission;
     })
     .catch(function () { return _photosParMission; });
+}
+
+// ── CONSULTER LES PHOTOS D'UNE MISSION ─────────────────────
+// Valider une prestation sans voir les photos reviendrait à valider à
+// l'aveugle. La lecture réutilise EXACTEMENT le mécanisme des vidéos de
+// candidature : une URL signée temporaire, obtenue depuis la session
+// ouverte, après le contrôle d'autorisation des politiques Storage.
+// Aucune URL publique n'est jamais construite, et rien n'est mis en
+// cache : à la fermeture, les images sont détachées.
+var PHOTOS_MISSION_VALIDITE_S = 300;
+
+function fermerPhotosMission() {
+  var zone = document.getElementById('photos-mission-contenu');
+  // Les URL signées ne survivent pas à la fermeture de la fenêtre.
+  if (zone) zone.innerHTML = '';
+  closeModal('photos-mission');
+}
+
+async function voirPhotosMission(missionId, reference) {
+  var zone  = document.getElementById('photos-mission-contenu');
+  var etat  = document.getElementById('photos-mission-etat');
+  var titre = document.getElementById('photos-mission-titre');
+  if (!zone || !etat) return;
+
+  zone.innerHTML = '';
+  etat.style.display = 'block';
+  etat.style.color = '#888';
+  etat.textContent = 'Préparation de la lecture sécurisée…';
+  if (titre) titre.textContent = 'Photos d\'intervention' + (reference ? ' — ' + reference : '');
+  openModal('photos-mission');
+
+  if (typeof sbAuth === 'undefined' || !sbAuth || !sbAuth.storage) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Lecture impossible : session authentifiée requise.';
+    return;
+  }
+
+  var lignes;
+  try {
+    lignes = await sbFetchToutePage(
+      'mission_photos?select=chemin,etape,created_at&mission_id=eq.'
+      + encodeURIComponent(missionId) + '&order=created_at.asc');
+  } catch (e) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Les photos n\'ont pas pu être listées.';
+    console.error('voirPhotosMission (liste):', e);
+    return;
+  }
+
+  lignes = (lignes || []).filter(function (p) { return p && p.chemin; });
+  if (!lignes.length) {
+    etat.style.color = '#888';
+    etat.textContent = 'Aucune photo n\'a encore été déposée pour cette mission.';
+    return;
+  }
+
+  var urls = {};
+  try {
+    var res = await sbAuth.storage.from('missions-photos')
+      .createSignedUrls(lignes.map(function (p) { return p.chemin; }), PHOTOS_MISSION_VALIDITE_S);
+    if (res && res.error) throw new Error(res.error.message);
+    (res && res.data ? res.data : []).forEach(function (d) {
+      if (d && !d.error) urls[d.path] = d.signedUrl || d.signedURL;
+    });
+  } catch (e) {
+    etat.style.color = 'var(--red)';
+    etat.textContent = 'Erreur : lecture non autorisée ou service indisponible.';
+    console.error('voirPhotosMission (signature):', e);
+    return;
+  }
+
+  function colonne(etape, libelle) {
+    var lot = lignes.filter(function (p) { return p.etape === etape; });
+    var html = '<div style="flex:1;min-width:260px">'
+      + '<div style="font-weight:700;font-size:.85rem;margin-bottom:8px">'
+      + escapeHtml(libelle) + ' (' + lot.length + ')</div>';
+    if (!lot.length) {
+      html += '<div style="font-size:.82rem;color:#888">Aucune photo.</div>';
+    } else {
+      lot.forEach(function (p) {
+        var u = urls[p.chemin];
+        var quand = p.created_at
+          ? new Date(p.created_at).toLocaleString('fr-FR',
+              { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '';
+        html += '<figure style="margin:0 0 12px">';
+        html += u
+          ? '<img src="' + escapeHtml(u) + '" alt="' + escapeHtml(libelle) + '" '
+            + 'style="width:100%;border-radius:8px;border:1px solid var(--gray-light)">'
+          : '<div style="font-size:.82rem;color:var(--red)">Photo illisible.</div>';
+        if (quand) {
+          html += '<figcaption style="font-size:.75rem;color:#888;margin-top:4px">'
+            + escapeHtml(quand) + '</figcaption>';
+        }
+        html += '</figure>';
+      });
+    }
+    return html + '</div>';
+  }
+
+  etat.style.display = 'none';
+  zone.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap">'
+    + colonne('avant', 'Avant intervention')
+    + colonne('apres', 'Après intervention')
+    + '</div>'
+    + '<div style="font-size:.75rem;color:#888;margin-top:12px">'
+    + 'Ces images sont accessibles par un lien temporaire de '
+    + PHOTOS_MISSION_VALIDITE_S + ' secondes. Le stockage reste privé.</div>';
 }
 
 // Le partenaire dépose une photo. Le chemin est TOUJOURS
