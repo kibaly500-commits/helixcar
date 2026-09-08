@@ -32,8 +32,13 @@ create schema if not exists auth;
 
 create table if not exists auth.users (
   id    uuid primary key default gen_random_uuid(),
-  email text
+  email text,
+  -- Supabase renseigne cette colonne quand l'adresse est REELLEMENT
+  -- confirmee. La migration 99 en depend : un compte non confirme ne
+  -- doit rien pouvoir reclamer.
+  email_confirmed_at timestamptz
 );
+alter table auth.users add column if not exists email_confirmed_at timestamptz;
 
 -- Définitions Supabase : l'identité vient du JWT, pas du rôle SQL.
 create or replace function auth.uid() returns uuid

@@ -1200,6 +1200,171 @@ check "Z26b : et la mission garde son statut" "fini" \
 sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
  update public.convoyeurs set bloque=false where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null
 
+
+echo
+echo "── R. RATTACHEMENT APRÈS CONFIRMATION DE L'ADRESSE ──"
+# Le parcours REEL, de bout en bout.
+#
+#   1. signUp() cree l'utilisateur mais NE rend PAS de session, parce que
+#      la confirmation d'e-mail est active — le defaut Supabase.
+#   2. La demande est donc ecrite ANONYMEMENT : auth_user_id vaut NULL.
+#   3. Le client confirme ensuite son adresse et ouvre une session.
+#   4. Sa demande apparait-elle dans son espace ?
+#
+# L'ecran lui promettait que oui. On commence par verifier ce qui se
+# passe vraiment.
+
+# Le compte, cree mais PAS ENCORE confirme.
+sql "insert into auth.users (id, email, email_confirmed_at) values
+  ('99999999-9999-9999-9999-999999999999','tardif@helixcar.test', null)
+  on conflict (id) do update set email = excluded.email,
+                                 email_confirmed_at = excluded.email_confirmed_at;" >/dev/null
+
+# La demande, deposee sans session — exactement ce que fait le
+# navigateur quand signUp ne rend pas de session.
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000001',
+                        'numero_client','TEST-QA-R1','email','tardif@helixcar.test',
+                        'prenom','TEST-QA','nom','Tardif','type_service','convoyage'),
+     '[]'::jsonb, repeat('r',48)); commit;" >/dev/null
+
+check "R1 : la demande est bien enregistrée — elle n'est jamais perdue" "1" \
+  "$(sql "select count(*) from public.clients where id='aaaaaaaa-1111-4111-8111-000000000001';")"
+check "R2 : mais elle n'a AUCUN propriétaire" "NULL" \
+  "$(sql "select coalesce(auth_user_id::text,'NULL') from public.clients where id='aaaaaaaa-1111-4111-8111-000000000001';")"
+
+# Le client confirme son adresse, puis se connecte.
+sql "update auth.users set email_confirmed_at = now()
+      where id='99999999-9999-9999-9999-999999999999';" >/dev/null
+
+check "R3 : REPRODUCTION — après confirmation, sa demande reste INVISIBLE" "0" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select count(*) from public.v_mes_demandes; commit;" | tail -1)"
+check "R4 : REPRODUCTION — et elle n'a toujours pas de propriétaire" "NULL" \
+  "$(sql "select coalesce(auth_user_id::text,'NULL') from public.clients where id='aaaaaaaa-1111-4111-8111-000000000001';")"
+
+errR=$(appliquer migrations/99_reclamation_demande.sql)
+check "R5 : migrations/99 s'applique sans erreur" "" "$errR"
+
+# ── Une NOUVELLE demande, deposee apres 99 : la reclamation est armee ──
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000002',
+                        'numero_client','TEST-QA-R2','email','tardif@helixcar.test',
+                        'prenom','TEST-QA','nom','Tardif','type_service','convoyage'),
+     '[]'::jsonb, repeat('k',48)); commit;" >/dev/null
+
+check "R6 : le secret n'est JAMAIS stocké — seule son empreinte l'est" "1|0" \
+  "$(sql "select (reclamation_cle_hash is not null)::int||'|'||
+                 (reclamation_cle_hash = repeat('k',48))::int
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+check "R7 : l'empreinte est bien celle du secret fourni" "1" \
+  "$(sql "select (reclamation_cle_hash = encode(sha256(convert_to(repeat('k',48),'UTF8')),'hex'))::int
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+check "R8 : et elle a une date d'expiration" "1" \
+  "$(sql "select (reclamation_expire_le > now())::int
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+
+# ── LES REFUS ──
+# Un visiteur anonyme n'a meme pas le droit d'EXECUTER la fonction : le
+# refus arrive avant la premiere ligne de code. C'est plus strict que le
+# code SESSION_REQUISE, qui reste le filet pour un role authentifie sans
+# session valide.
+check "R9 : sans session, on ne réclame rien — refus au niveau du privilège" "refuse" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)); commit;" \
+   | grep -qiE 'permission denied|SESSION_REQUISE' && echo refuse || echo passe)"
+
+# Le tiers qui va tenter sa chance est un compte REELLEMENT confirme :
+# sans cela, il serait ecarte des l'etape 2 et la suite ne prouverait
+# rien sur le secret ni sur l'adresse.
+sql "update auth.users set email_confirmed_at = now()
+      where id='66666666-6666-6666-6666-666666666666';" >/dev/null
+
+sql "insert into auth.users (id, email, email_confirmed_at) values
+  ('88888888-8888-8888-8888-888888888888','tardif@helixcar.test', null)
+  on conflict (id) do update set email_confirmed_at = null;" >/dev/null
+check "R10 : un compte NON CONFIRMÉ ne réclame rien, même avec le bon secret" "ADRESSE_NON_CONFIRMEE" \
+  "$(sql "begin; select public.devenir('88888888-8888-8888-8888-888888888888','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)) ->> 'code'; commit;" | tail -1)"
+
+check "R11 : le BON secret entre les mains d'un AUTRE compte est refusé" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)) ->> 'code'; commit;" | tail -1)"
+check "R12 : ... et la demande n'a pas changé de mains" "NULL" \
+  "$(sql "select coalesce(auth_user_id::text,'NULL') from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+
+check "R13 : le BON compte avec un MAUVAIS secret est refusé" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('z',48)) ->> 'code'; commit;" | tail -1)"
+check "R14 : un secret trop court est refusé d'emblée" "CLE_INVALIDE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', 'court') ->> 'code'; commit;" | tail -1)"
+check "R15 : connaître l'UUID SANS secret ne donne rien" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('x',48)) ->> 'code'; commit;" | tail -1)"
+
+# Bon secret, bon compte confirme — mais l'adresse de la demande differe.
+sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','aaaaaaaa-1111-4111-8111-000000000003',
+                        'numero_client','TEST-QA-R3','email','quelquun.dautre@helixcar.test',
+                        'type_service','convoyage'),
+     '[]'::jsonb, repeat('m',48)); commit;" >/dev/null
+check "R16 : bon secret mais adresse de la demande DIFFÉRENTE — refusé" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000003', repeat('m',48)) ->> 'code'; commit;" | tail -1)"
+check "R17 : ... et cette demande-là non plus n'a pas bougé" "NULL" \
+  "$(sql "select coalesce(auth_user_id::text,'NULL') from public.clients where id='aaaaaaaa-1111-4111-8111-000000000003';")"
+
+# Secret expire.
+sql "update public.clients set reclamation_expire_le = now() - interval '1 day'
+      where id='aaaaaaaa-1111-4111-8111-000000000003';" >/dev/null
+check "R18 : un secret EXPIRÉ ne vaut plus rien" "RECLAMATION_EXPIREE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000003', repeat('m',48)) ->> 'code'; commit;" | tail -1)"
+
+# ── LE PARCOURS LEGITIME ──
+check "R19 : le bon compte, confirmé, avec le bon secret : la demande est rattachée" "RATTACHEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)) ->> 'code'; commit;" | tail -1)"
+check "R20 : elle appartient désormais au compte" "99999999-9999-9999-9999-999999999999" \
+  "$(sql "select auth_user_id::text from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+check "R21 : et elle est ENFIN visible dans son espace client" "TEST-QA-R2" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select numero_client from public.v_mes_demandes
+    where id='aaaaaaaa-1111-4111-8111-000000000002'; commit;" | tail -1)"
+check "R22 : le secret est CONSOMMÉ — l'empreinte est effacée" "NULL|NULL" \
+  "$(sql "select coalesce(reclamation_cle_hash,'NULL')||'|'||coalesce(reclamation_expire_le::text,'NULL')
+            from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+check "R23 : le rejeu par le MÊME compte est idempotent, jamais une erreur" "DEJA_RATTACHEE" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)) ->> 'code'; commit;" | tail -1)"
+check "R24 : le rejeu du secret par un TIERS est refusé" "RECLAMATION_REFUSEE" \
+  "$(sql "begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test');
+   select public.reclamer_demande('aaaaaaaa-1111-4111-8111-000000000002', repeat('k',48)) ->> 'code'; commit;" | tail -1)"
+check "R25 : ... et le propriétaire n'a pas changé" "99999999-9999-9999-9999-999999999999" \
+  "$(sql "select auth_user_id::text from public.clients where id='aaaaaaaa-1111-4111-8111-000000000002';")"
+
+# ── AUCUN RATTACHEMENT PAR SIMPLE CORRESPONDANCE D'E-MAIL ──
+check "R26 : la demande ANCIENNE, de même adresse, n'a PAS suivi" "NULL" \
+  "$(sql "select coalesce(auth_user_id::text,'NULL') from public.clients where id='aaaaaaaa-1111-4111-8111-000000000001';")"
+check "R27 : elle reste invisible dans l'espace du client" "0" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select count(*) from public.v_mes_demandes where id='aaaaaaaa-1111-4111-8111-000000000001'; commit;" | tail -1)"
+check "R28 : son espace ne contient QUE ce qu'il a réellement réclamé" "1" \
+  "$(sql "begin; select public.devenir('99999999-9999-9999-9999-999999999999','tardif@helixcar.test');
+   select count(*) from public.v_mes_demandes; commit;" | tail -1)"
+
+# ── LE DROIT D'EXECUTION ──
+check "R29 : réclamer n'est PAS accordé à un visiteur anonyme" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='reclamer_demande' and grantee='anon';")"
+check "R30 : armer_reclamation n'est appelable par personne de l'extérieur" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='armer_reclamation' and grantee in ('anon','authenticated');")"
+
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
@@ -1213,6 +1378,7 @@ err95=$(appliquer migrations/95_metiers_partenaires.sql)
 err96=$(appliquer migrations/96_missions_nettoyage.sql)
 err97=$(appliquer migrations/97_missions_verrou_serveur.sql)
 err98=$(appliquer migrations/98_photos_justificatives_reelles.sql)
+err99=$(appliquer migrations/99_reclamation_demande.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
@@ -1222,6 +1388,7 @@ check "F3d : 95 se rejoue sans erreur" "" "$err95"
 check "F3e : 96 se rejoue sans erreur" "" "$err96"
 check "F3f : 97 se rejoue sans erreur" "" "$err97"
 check "F3g : 98 se rejoue sans erreur" "" "$err98"
+check "F3h : 99 se rejoue sans erreur" "" "$err99"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"

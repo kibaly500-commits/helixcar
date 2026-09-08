@@ -332,6 +332,19 @@ begin
     end loop;
   end if;
 
+  -- Demande déposée SANS session : elle n'a pas de propriétaire. On arme
+  -- alors la réclamation, pour que le client puisse la rattacher après
+  -- avoir confirmé son adresse (migration 99). L'appel est conditionnel
+  -- et silencieux : tant que 99 n'est pas appliquée, rien ne se passe et
+  -- la création fonctionne exactement comme avant.
+  if v_uid is null and v_hash is not null and not v_rejeu then
+    begin
+      perform public.armer_reclamation(v_id, p_cle_creation);
+    exception when undefined_function then
+      null;   -- migration 99 pas encore appliquée
+    end;
+  end if;
+
   select c.numero_client into v_numero from public.clients c where c.id = v_id;
 
   return jsonb_build_object(

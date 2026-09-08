@@ -214,6 +214,129 @@ async function deposerCompteSeul(browser, avecSession) {
   check('C8b : et il est bien intercepté — rien ne part réellement',
     c.etat.emails >= 0 && c.erreurs.length === 0);
   check('C9 : aucune erreur JavaScript', c.erreurs.length === 0, c.erreurs.slice(0, 2).join(' | '));
+
+  // ══ C bis. LE PARCOURS COMPLET : CONFIRMATION PUIS SESSION ══
+  //
+  // C'est le point que le test precedent ne verifiait PAS. Il lisait le
+  // message affiche, et s'arretait la. La phrase « elle apparaitra dans
+  // votre espace une fois votre adresse confirmee » n'etait donc jamais
+  // eprouvee — et elle etait fausse.
+  //
+  // Ici, on va jusqu'au bout : le client confirme, ouvre une session, et
+  // on regarde ce que le serveur fait REELLEMENT de sa demande.
+  const enAttente = await c.page.evaluate(() => {
+    let liste = [];
+    try { liste = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    return liste;
+  });
+  check('C10 : de quoi réclamer la demande est conservé',
+    enAttente.length === 1 && !!enAttente[0].id && !!enAttente[0].cle,
+    JSON.stringify(enAttente));
+  check('C11 : et rien de plus que le strict nécessaire',
+    enAttente[0] && Object.keys(enAttente[0]).sort().join(',') === 'cle,email,expire,id',
+    JSON.stringify(enAttente[0] && Object.keys(enAttente[0])));
+  check('C12 : avec une date d\'expiration',
+    enAttente[0] && enAttente[0].expire > Date.now(), String(enAttente[0] && enAttente[0].expire));
+  check('C13 : le secret conservé est celui envoyé à la création',
+    enAttente[0] && c.etat.appels[0]
+      && enAttente[0].cle === c.etat.appels[0].params.p_cle_creation,
+    'mémorisé ≠ envoyé');
+  check('C14 : et l\'identifiant est celui de la demande écrite',
+    enAttente[0] && c.etat.appels[0]
+      && enAttente[0].id === c.etat.appels[0].params.p_demande.id);
+
+  // Le client confirme son adresse, puis revient. Un double serveur qui
+  // se comporte comme la migration 99 : il n'accepte que sur preuve.
+  const apresConfirmation = await c.page.evaluate(async () => {
+    const journal = [];
+    const DEMANDE = { id: null, email: 'test-qa@example.invalid', proprietaire: null,
+                      hash: null };
+    let liste = [];
+    try { liste = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    DEMANDE.id = liste[0] && liste[0].id;
+    DEMANDE.hash = liste[0] && liste[0].cle;   // le double compare en clair
+
+    // Session ouverte, adresse CONFIRMÉE.
+    const client = {
+      rpc: async function (nom, params) {
+        journal.push({ nom, params });
+        if (nom !== 'reclamer_demande') return { data: null, error: null };
+        const p = params || {};
+        if (p.p_client_id !== DEMANDE.id) return { data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null };
+        if (p.p_cle !== DEMANDE.hash) return { data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null };
+        DEMANDE.proprietaire = 'u-confirme';
+        DEMANDE.hash = null;                    // le secret est consommé
+        return { data: { ok: true, code: 'RATTACHEE', id: DEMANDE.id }, error: null };
+      }
+    };
+    const r = await _hcReclamerDemandesEnAttente(client);
+    let restant = [];
+    try { restant = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    return { resultat: r, journal, proprietaire: DEMANDE.proprietaire,
+             secretRestant: DEMANDE.hash, restant };
+  });
+
+  check('C15 : la réclamation est bien envoyée au serveur',
+    apresConfirmation.journal.length === 1
+      && apresConfirmation.journal[0].nom === 'reclamer_demande',
+    JSON.stringify(apresConfirmation.journal.map(j => j.nom)));
+  check('C16 : elle présente l\'identifiant ET le secret, jamais l\'adresse seule',
+    apresConfirmation.journal[0]
+      && !!apresConfirmation.journal[0].params.p_client_id
+      && !!apresConfirmation.journal[0].params.p_cle
+      && apresConfirmation.journal[0].params.p_email === undefined,
+    JSON.stringify(apresConfirmation.journal[0] && Object.keys(apresConfirmation.journal[0].params)));
+  check('C17 : la demande est RÉELLEMENT rattachée',
+    apresConfirmation.proprietaire === 'u-confirme', String(apresConfirmation.proprietaire));
+  check('C18 : le secret est consommé côté serveur',
+    apresConfirmation.secretRestant === null, String(apresConfirmation.secretRestant));
+  check('C19 : et il est effacé du navigateur',
+    apresConfirmation.restant.length === 0, JSON.stringify(apresConfirmation.restant));
+  check('C20 : le résultat est bien un succès', 
+    apresConfirmation.resultat[0] && apresConfirmation.resultat[0].ok === true,
+    JSON.stringify(apresConfirmation.resultat));
+
+  // Un refus définitif efface aussi le secret : il ne sert plus à rien.
+  const refusDefinitif = await c.page.evaluate(async () => {
+    _hcMemoriserReclamation('id-refuse', 'k'.repeat(48), 'x@example.invalid');
+    const client = { rpc: async () => ({ data: { ok: false, code: 'RECLAMATION_REFUSEE' }, error: null }) };
+    await _hcReclamerDemandesEnAttente(client);
+    try { return JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) { return 'illisible'; }
+  });
+  check('C21 : un refus définitif efface le secret devenu inutile',
+    Array.isArray(refusDefinitif) && refusDefinitif.length === 0,
+    JSON.stringify(refusDefinitif));
+
+  // Un refus TEMPORAIRE, lui, le conserve : l'adresse n'est pas encore
+  // confirmée, mais elle peut l'être demain.
+  const refusTemporaire = await c.page.evaluate(async () => {
+    _hcMemoriserReclamation('id-attente', 'k'.repeat(48), 'x@example.invalid');
+    const client = { rpc: async () => ({ data: { ok: false, code: 'ADRESSE_NON_CONFIRMEE' }, error: null }) };
+    await _hcReclamerDemandesEnAttente(client);
+    let l = [];
+    try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    localStorage.removeItem('helixcar_reclamation');
+    return l;
+  });
+  check('C22 : une adresse pas encore confirmée n\'efface RIEN — on réessaiera',
+    refusTemporaire.length === 1 && refusTemporaire[0].id === 'id-attente',
+    JSON.stringify(refusTemporaire));
+
+  // Un secret périmé disparaît de lui-même, sans appel serveur.
+  const perime = await c.page.evaluate(async () => {
+    localStorage.setItem('helixcar_reclamation', JSON.stringify([
+      { id: 'vieux', cle: 'k'.repeat(48), email: 'x@example.invalid', expire: Date.now() - 1000 }
+    ]));
+    let appels = 0;
+    const client = { rpc: async () => { appels++; return { data: { ok: true }, error: null }; } };
+    await _hcReclamerDemandesEnAttente(client);
+    let l = [];
+    try { l = JSON.parse(localStorage.getItem('helixcar_reclamation') || '[]'); } catch (e) {}
+    return { appels, restant: l };
+  });
+  check('C23 : un secret périmé est oublié sans même interroger le serveur',
+    perime.appels === 0 && perime.restant.length === 0, JSON.stringify(perime));
+
   await c.page.close();
 
   // ══ D. LE MESSAGE VIENT DU SERVEUR, PAS D'UNE DEVINETTE ══
@@ -223,6 +346,30 @@ async function deposerCompteSeul(browser, avecSession) {
     !/utilisateur && utilisateur\.id[\s\S]{0,80}espace client/i.test(idx));
   check('D3 : le titre n\'affirme plus un compte créé avant de le savoir',
     !/hc-succes-titre[^>]*>Votre compte est créé/.test(idx));
+  // LA PROMESSE DOIT ÊTRE TENUE PAR DU CODE, pas seulement écrite.
+  check('D4 : la phrase « apparaîtra dans votre espace » est adossée à un vrai mécanisme',
+    !/apparaîtra dans votre espace/.test(idx)
+    || (/_hcMemoriserReclamation\(/.test(idx) && /_hcReclamerDemandesEnAttente\(/.test(idx)),
+    'phrase présente sans mécanisme de réclamation');
+  const mig99 = fs.readFileSync(fichier('migrations/99_reclamation_demande.sql'), 'utf8');
+  check('D5 : le serveur exige une adresse RÉELLEMENT confirmée',
+    /email_confirmed_at/.test(mig99) && /ADRESSE_NON_CONFIRMEE/.test(mig99));
+  check('D6 : il exige que l\'adresse du compte soit celle de la demande',
+    /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig99));
+  check('D7 : il n\'accepte qu\'une empreinte, jamais un secret en clair',
+    /encode\(sha256/.test(mig99) && !/reclamation_cle\s+text/.test(mig99));
+  check('D8 : le secret expire',
+    /reclamation_expire_le <= now\(\)/.test(mig99) && /RECLAMATION_EXPIREE/.test(mig99));
+  check('D9 : et il est consommé après réussite',
+    /reclamation_cle_hash\s*=\s*null/.test(mig99));
+  check('D10 : réclamer n\'est jamais accordé à un visiteur anonyme',
+    /grant execute on function public\.reclamer_demande\(uuid, text\) to authenticated;/.test(mig99)
+    && !/reclamer_demande\(uuid, text\) to anon/.test(mig99));
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+  check('D11 : l\'espace client tente le rattachement à l\'ouverture de session',
+    /_hcReclamerDemandesEnAttente\(sbAuth\)/.test(dash));
+  check('D12 : et le site public aussi, au retour de confirmation',
+    /_hcReclamerDemandesEnAttente\(_sb\)/.test(idx));
 
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

@@ -2720,6 +2720,24 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
   if (signOutSiEchec === undefined) signOutSiEchec = true;
   if (!authUserId) return false;
 
+  // RATTACHEMENT DES DEMANDES EN ATTENTE — avant de lire l'espace.
+  //
+  // Une demande déposée alors que la confirmation d'e-mail était encore
+  // requise est partie SANS propriétaire. Le navigateur a gardé de quoi
+  // la réclamer ; c'est ici, sur une session enfin ouverte, que la
+  // réclamation a un sens.
+  //
+  // Le serveur tranche seul (migration 99) : il exige une adresse
+  // réellement confirmée, identique à celle de la demande, et le secret
+  // correspondant. Un échec ne bloque JAMAIS l'ouverture de l'espace.
+  try {
+    if (typeof _hcReclamerDemandesEnAttente === 'function' && _sbAuthPret()) {
+      await _hcReclamerDemandesEnAttente(sbAuth);
+    }
+  } catch (e) {
+    console.warn('Rattachement des demandes en attente :', e);
+  }
+
   let demandes = null;
   let erreurTechnique = null;
   try {
@@ -3707,6 +3725,91 @@ async function sbAuthPatchDevisParReference(reference, corps) {
   const res = await sbAuth.from('devis').update(corps).eq('reference', reference);
   if (res.error) throw new Error('Supabase devis (mise à jour) : ' + res.error.message);
   return null;
+}
+
+// ── RATTACHEMENT APRÈS CONFIRMATION D'ADRESSE ───────────────
+//
+// Quand la confirmation d'e-mail est active — le défaut Supabase —
+// signUp() ne rend PAS de session. La demande part donc sans
+// propriétaire, et l'écran promet qu'elle apparaîtra « une fois votre
+// adresse confirmée ». Pour que cette phrase soit vraie, il faut
+// pouvoir prouver, plus tard, qu'on est bien celui qui l'a déposée.
+//
+// On conserve donc le STRICT NÉCESSAIRE : l'identifiant de la demande,
+// le secret de réclamation, l'adresse, et la date au-delà de laquelle
+// tout cela ne vaut plus rien.
+//
+// POURQUOI PERSISTER UN SECRET ICI, ALORS QU'ON A REFUSÉ DE LE FAIRE
+// POUR L'ENVOI VIDÉO. Les deux situations n'ont rien à voir :
+//
+//   * pour la vidéo, persister le jeton n'apportait RIEN — le fichier
+//     lui-même avait disparu du navigateur — et rendait la candidature
+//     confirmable par quiconque lisait le stockage ;
+//   * ici, le secret ne donne AUCUN droit à lui seul. Le serveur exige
+//     en plus une session, une adresse réellement confirmée, et que
+//     cette adresse soit celle de la demande. Volé sans le compte, il
+//     ne sert à rien ; et il est consommé au premier rattachement.
+//
+// Il expire, et il est effacé dès qu'il a servi ou qu'il est périmé.
+var HC_CLE_RECLAMATION = 'helixcar_reclamation';
+var HC_RECLAMATION_JOURS = 30;
+
+function _hcLireReclamations() {
+  try {
+    var brut = localStorage.getItem(HC_CLE_RECLAMATION);
+    var liste = brut ? JSON.parse(brut) : [];
+    if (!Array.isArray(liste)) return [];
+    // Le ménage se fait à la lecture : rien de périmé ne survit.
+    var maintenant = Date.now();
+    var vivantes = liste.filter(function (r) {
+      return r && r.id && r.cle && r.expire && r.expire > maintenant;
+    });
+    if (vivantes.length !== liste.length) _hcEcrireReclamations(vivantes);
+    return vivantes;
+  } catch (e) { return []; }
+}
+function _hcEcrireReclamations(liste) {
+  try {
+    if (!liste || !liste.length) localStorage.removeItem(HC_CLE_RECLAMATION);
+    else localStorage.setItem(HC_CLE_RECLAMATION, JSON.stringify(liste));
+  } catch (e) {}
+}
+function _hcMemoriserReclamation(id, cle, email) {
+  if (!id || !cle) return;
+  var liste = _hcLireReclamations().filter(function (r) { return r.id !== id; });
+  liste.push({
+    id: id, cle: cle, email: email || null,
+    expire: Date.now() + HC_RECLAMATION_JOURS * 24 * 3600 * 1000
+  });
+  _hcEcrireReclamations(liste);
+}
+function _hcOublierReclamation(id) {
+  _hcEcrireReclamations(_hcLireReclamations().filter(function (r) { return r.id !== id; }));
+}
+
+// Appelée au chargement, et après toute ouverture de session. Le serveur
+// tranche : le navigateur ne fait que présenter ce qu'il a gardé.
+function _hcReclamerDemandesEnAttente(client) {
+  var liste = _hcLireReclamations();
+  if (!liste.length || !client || !client.rpc) return Promise.resolve([]);
+  return Promise.all(liste.map(function (r) {
+    return client.rpc('reclamer_demande', { p_client_id: r.id, p_cle: r.cle })
+      .then(function (res) {
+        var d = res && res.data;
+        var code = d && d.code;
+        // Réussite, ou refus définitif : dans les deux cas, ce secret
+        // n'a plus de raison d'être conservé. On ne le garde que pour
+        // les refus qui peuvent encore changer — adresse pas encore
+        // confirmée, session absente.
+        if (d && d.ok) { _hcOublierReclamation(r.id); return { id: r.id, ok: true, code: code }; }
+        if (code === 'RECLAMATION_REFUSEE' || code === 'RECLAMATION_EXPIREE'
+            || code === 'CLE_INVALIDE') {
+          _hcOublierReclamation(r.id);
+        }
+        return { id: r.id, ok: false, code: code || 'ERREUR' };
+      })
+      .catch(function () { return { id: r.id, ok: false, code: 'RESEAU' }; });
+  }));
 }
 
 function escapeHtml(str) {
