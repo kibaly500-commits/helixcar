@@ -14438,9 +14438,35 @@ var TUS_RENOUVELER_SIGNATURE_MS = 10 * 60 * 1000;
 // reprend plutot que d'attendre indefiniment.
 var TUS_DELAI_REQUETE_MS = 5 * 60 * 1000;
 
-// Un envoi interrompu est retrouve au rechargement de la page grace a
-// cette empreinte : meme candidature, meme fichier, meme taille.
-var TUS_CLE_REPRISE = 'helixcar_video_reprise';
+// PORTEE REELLE DE LA REPRISE — a lire avant de la croire plus large
+// qu'elle ne l'est.
+//
+// La reprise couvre les COUPURES RESEAU tant que la page reste
+// ouverte : tunnel, changement de Wi-Fi, perte de 4G, veille courte.
+// C'est le cas qui faisait echouer les envois de 300 Mo.
+//
+// Elle ne couvre PAS un rechargement complet de la page, et ce n'est
+// pas un oubli : apres un F5, DEUX choses ont disparu du navigateur,
+// et aucune ne peut etre remise sans intervention du candidat.
+//
+//   1. Le FICHIER lui-meme. `_convVideo.fichier` est un objet File,
+//      c'est-a-dire une poignee vers un fichier du disque. Il n'est
+//      serialisable ni en localStorage ni ailleurs. Sans octets a
+//      envoyer, aucun protocole de reprise ne sert a rien.
+//   2. L'AUTORISATION. `_convJetonEnvoi` est un secret a usage unique,
+//      volontairement garde en memoire seule. Le persister rendrait
+//      une candidature reprenable — et surtout CONFIRMABLE — par
+//      quiconque lit le stockage du navigateur : un poste partage, une
+//      extension, un XSS. Le gain serait nul (voir 1) et le risque
+//      reel.
+//
+// Memoriser l'URL TUS dans localStorage donnerait donc l'illusion
+// d'une reprise apres rechargement sans jamais pouvoir l'honorer. La
+// memoire des envois en cours vit par consequent EN MEMOIRE, pour la
+// duree de vie de la page — exactement la portee de ce qu'elle sait
+// reellement faire.
+var TUS_CLE_REPRISE_HERITEE = 'helixcar_video_reprise';
+var _tusEnvoisEnCours = {};
 
 function _tusEnteteMetadonnees(chemin, mime) {
   // Upper-Metadata TUS : « cle <valeur en base64> », separes par des
@@ -14458,17 +14484,20 @@ function _tusEnteteMetadonnees(chemin, mime) {
 }
 
 function _tusMemoriserReprise(etat) {
-  try { localStorage.setItem(TUS_CLE_REPRISE, JSON.stringify(etat)); } catch (e) {}
+  if (etat && etat.empreinte) _tusEnvoisEnCours[etat.empreinte] = etat;
 }
-function _tusLireReprise() {
-  try {
-    var brut = localStorage.getItem(TUS_CLE_REPRISE);
-    return brut ? JSON.parse(brut) : null;
-  } catch (e) { return null; }
+function _tusLireReprise(empreinte) {
+  return (empreinte && _tusEnvoisEnCours[empreinte]) || null;
 }
-function _tusOublierReprise() {
-  try { localStorage.removeItem(TUS_CLE_REPRISE); } catch (e) {}
+function _tusOublierReprise(empreinte) {
+  if (empreinte) delete _tusEnvoisEnCours[empreinte];
+  else _tusEnvoisEnCours = {};
 }
+
+// Une version precedente ecrivait l'URL TUS dans localStorage. La cle
+// pouvait donc subsister sur un poste deja utilise : on l'efface au
+// chargement plutot que de la laisser trainer.
+try { localStorage.removeItem(TUS_CLE_REPRISE_HERITEE); } catch (e) {}
 
 // Empreinte d'un envoi : elle ne contient AUCUNE donnee personnelle,
 // seulement de quoi reconnaitre le meme fichier pour la meme
@@ -14544,8 +14573,8 @@ function _convEnvoyerReprenable(chemin, token) {
 
   // 1) Reprendre l'envoi precedent s'il porte sur le MEME fichier.
   function retrouverEnvoi() {
-    var memo = _tusLireReprise();
-    if (!memo || memo.empreinte !== empreinte || !memo.url) return Promise.resolve(null);
+    var memo = _tusLireReprise(empreinte);
+    if (!memo || !memo.url) return Promise.resolve(null);
     return _tusRequete('HEAD', memo.url, entetesCommuns()).then(function (r) {
       if (r.statut >= 200 && r.statut < 300) {
         var offset = parseInt(r.entete('Upload-Offset'), 10);
@@ -14554,7 +14583,7 @@ function _convEnvoyerReprenable(chemin, token) {
         }
       }
       // L'envoi memorise n'existe plus cote serveur : on repart proprement.
-      _tusOublierReprise();
+      _tusOublierReprise(empreinte);
       return null;
     });
   }
@@ -14663,7 +14692,7 @@ function _convEnvoyerReprenable(chemin, token) {
     return envoyerDepuis(depart.url, depart.offset, TUS_REPRISES_MAX);
   }).then(function (resultat) {
     _convRequeteEnCours = null;
-    if (resultat && resultat.ok) _tusOublierReprise();
+    if (resultat && resultat.ok) _tusOublierReprise(empreinte);
     // Apres une annulation, la trace de reprise est VOLONTAIREMENT
     // conservee : le candidat qui relance repart de la ou il s'etait
     // arrete, il ne recommence pas ses 300 Mo.
