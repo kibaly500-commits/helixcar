@@ -182,7 +182,7 @@ npm test
 ```
 
 30 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
-depuis zéro, en 265 secondes. Aucun chiffre de ce document n'est estimé ou
+depuis zéro, en 259 secondes. Aucun chiffre de ce document n'est estimé ou
 reporté d'une exécution antérieure.
 
 Les suites sensibles aux dates ont en outre été passées dans **deux
@@ -454,6 +454,51 @@ fonction n'est **pas** accordée à `anon`.
 Le persister pour la vidéo aurait ajouté un risque pour un gain nul. Ici,
 il est inutile sans le compte, et il rend vraie une phrase qui ne l'était
 pas.
+
+### Ce que la CI a trouvé ensuite, et que ma machine ne voyait pas
+
+La poussée suivante a fait tomber la tâche navigateur : `t_tus` **G7** et
+**G13**, avec `[0/15728640]` — le serveur n'avait reçu **aucun octet**.
+Ce n'était pas une intermittence, et je ne l'ai pas traité comme telle.
+
+La progression affichée mélange volontairement deux choses : les octets
+déjà **acquittés** par le serveur et ceux **encore en vol** dans la
+requête courante. C'est ce que le candidat doit voir. Sur 15 Mo découpés
+en morceaux de 6 Mo, le premier morceau fait donc monter l'affichage
+jusqu'à **40 %** avant que le serveur n'ait rien enregistré. Le test
+annulait à 30 % : sur une machine assez chargée pour qu'un événement de
+progression tombe en plein vol, il coupait cette première requête, et
+« l'envoi s'est arrêté avant la fin » devenait indémontrable.
+
+**Reproduit d'abord**, sans deviner : en bridant la lecture du corps par
+le serveur de test — ce que fait un runner chargé — l'ancien seuil donne
+exactement l'échec de la CI, `[0/15728640]`.
+
+Le test annule désormais sur un **fait**, pas sur un affichage : la fin
+d'une requête `PATCH`. À cet instant le serveur a acquitté le morceau et
+aucune requête n'est en vol, donc rien ne peut être tronqué, quelle que
+soit la vitesse de la machine. Un simple seuil plus haut ne suffisait
+pas : à 50 % c'est le **deuxième** morceau qui était coupé en vol, et
+**G12** tombait à son tour — vérifié, pas supposé.
+
+| Sous le même bridage | Résultat |
+|---|---|
+| ancien déclencheur (30 %) | **57 PASS / 2 FAIL** — `[0/15728640]`, l'échec de la CI |
+| seuil relevé à 50 % | **58 PASS / 1 FAIL** — G12 : `17 248 748` octets pour 15 728 640 |
+| annulation sur la fin du `PATCH` | **59 PASS / 0 FAIL**, quatre fois de suite |
+
+### L'intégration continue sur le commit de tête
+
+Exécutions nº 11 et nº 12 sur `0623364`, **observées et terminées**, non
+prédites :
+
+| Tâche | Résultat |
+|---|---|
+| Politiques RLS sur PostgreSQL 16 | ✅ **success** |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 236 PASS / 0 FAIL en 160 s** |
+
+1 236 (CI, avec `--sans-sql`) + 272 (`t_rls`, seconde tâche) = **1 508**,
+le chiffre mesuré localement.
 
 ---
 
