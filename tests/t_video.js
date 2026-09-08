@@ -290,6 +290,15 @@ async function etatVideo(page) {
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
     });
+    // La route REPRENABLE est tentee en premier depuis le lot « envoi
+    // reprenable ». La serie J ci-dessous verifie le parcours en UNE
+    // requete (le secours) : on simule donc une plateforme qui n'expose
+    // pas la route reprenable. Le parcours reprenable lui-meme est
+    // couvert, de bout en bout, par tests/t_tus.js.
+    await page.route('**/storage/v1/upload/resumable/**', async route => {
+      appels.push({ type: 'reprenable', url: route.request().url(), methode: route.request().method() });
+      return route.fulfill({ status: 404, contentType: 'text/plain', body: 'route absente' });
+    });
     await page.route('**/storage/v1/object/upload/sign/**', async route => {
       appels.push({ type: 'depot', url: route.request().url(), methode: route.request().method() });
       if (opts.depotCoupe) return route.abort('failed');
@@ -299,6 +308,7 @@ async function etatVideo(page) {
   }
   async function desarmer(page) {
     await page.unroute('**/functions/v1/candidature-video');
+    await page.unroute('**/storage/v1/upload/resumable/**');
     await page.unroute('**/storage/v1/object/upload/sign/**');
   }
   async function lancerEnvoi(page) {
@@ -331,6 +341,12 @@ async function etatVideo(page) {
     appels.some(a => a.action === 'confirmer'), JSON.stringify(appels.map(a => a.action || a.type)));
   L.check('J9 : aucune clé Supabase dans l\'URL de dépôt',
     !!depot && !/apikey|eyJ/.test(depot.url), depot && depot.url);
+  const reprenable = appels.find(a => a.type === 'reprenable');
+  L.check('J9b : l\'envoi REPRENABLE est tenté en premier',
+    !!reprenable && appels.indexOf(reprenable) < appels.indexOf(depot),
+    JSON.stringify(appels.map(a => a.action || a.type)));
+  L.check('J9c : et le secours en une requête ne part qu\'ensuite',
+    !!depot && !!reprenable);
   await desarmer(page);
 
   await armerInterceptions(page, { autoriserKo: true });

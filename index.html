@@ -14313,8 +14313,281 @@ function _convAppelerFonctionVideo(action, corps) {
   });
 }
 
+// ============================================================
+// ENVOI REPRENABLE (protocole TUS 1.0.0)
+// ============================================================
+// POURQUOI. Une video de candidature peut atteindre 300 Mo. En une
+// seule requete PUT, la moindre coupure reseau, le moindre passage en
+// tunnel ou changement de Wi-Fi obligeait a TOUT recommencer depuis
+// zero. Le protocole TUS decoupe l'envoi et reprend a l'octet exact ou
+// il s'etait arrete.
+//
+// COMMENT, SANS RIEN AFFAIBLIR. Supabase Storage expose une route
+// reprenable SIGNEE : /storage/v1/upload/resumable/sign. Elle accepte
+// exactement le meme jeton d'envoi que celui deja delivre par notre
+// fonction serveur (scope « upload », lie a UN chemin), transmis dans
+// l'en-tete x-signature. Elle n'exige donc AUCUNE session utilisateur,
+// ce qui est indispensable ici : une candidature se depose sans compte.
+//
+// Par consequent, et cela reste vrai apres ce changement :
+//   * la cle service_role ne quitte jamais la fonction serveur ;
+//   * le bucket reste PRIVE, sans aucune politique ouverte a anon ;
+//   * la video ne transite JAMAIS par la fonction serveur : elle va
+//     directement du navigateur au stockage ;
+//   * le chemin de destination est toujours choisi par le serveur ;
+//   * la signature n'autorise l'ecriture que de CE chemin, et n'ouvre
+//     aucun droit de lecture.
+//
+// Si la route reprenable n'est pas disponible, l'envoi retombe
+// automatiquement sur l'envoi en une requete d'avant : aucune
+// candidature ne peut se retrouver bloquee par cette evolution.
+
+var TUS_VERSION = '1.0.0';
+// 6 Mo : au-dessus de la taille minimale de part exigee par le stockage
+// (5 Mo), assez gros pour rester efficace, assez petit pour qu'une
+// coupure ne coute jamais plus de quelques secondes de reenvoi.
+var TUS_TAILLE_MORCEAU = 6 * 1024 * 1024;
+// Nombre de reprises automatiques sur une meme coupure, avant d'avouer
+// l'echec au candidat.
+var TUS_REPRISES_MAX = 5;
+// Une signature dure 30 minutes cote serveur ; on la renouvelle bien
+// avant, pour qu'un morceau ne parte jamais avec un jeton sur le point
+// d'expirer.
+var TUS_RENOUVELER_SIGNATURE_MS = 10 * 60 * 1000;
+// Delai au-dela duquel un morceau est considere perdu. Un morceau de
+// 6 Mo qui n'aboutit pas en 5 minutes signale une connexion morte : on
+// reprend plutot que d'attendre indefiniment.
+var TUS_DELAI_REQUETE_MS = 5 * 60 * 1000;
+
+// Un envoi interrompu est retrouve au rechargement de la page grace a
+// cette empreinte : meme candidature, meme fichier, meme taille.
+var TUS_CLE_REPRISE = 'helixcar_video_reprise';
+
+function _tusEnteteMetadonnees(chemin, mime) {
+  // Upper-Metadata TUS : « cle <valeur en base64> », separes par des
+  // virgules. Les valeurs sont encodees, jamais concatenees brutes.
+  function b64(v) {
+    var octets = new TextEncoder().encode(String(v));
+    var bin = '';
+    for (var i = 0; i < octets.length; i++) bin += String.fromCharCode(octets[i]);
+    return btoa(bin);
+  }
+  return 'bucketName ' + b64('candidatures-videos')
+    + ',objectName ' + b64(chemin)
+    + ',contentType ' + b64(mime)
+    + ',cacheControl ' + b64('3600');
+}
+
+function _tusMemoriserReprise(etat) {
+  try { localStorage.setItem(TUS_CLE_REPRISE, JSON.stringify(etat)); } catch (e) {}
+}
+function _tusLireReprise() {
+  try {
+    var brut = localStorage.getItem(TUS_CLE_REPRISE);
+    return brut ? JSON.parse(brut) : null;
+  } catch (e) { return null; }
+}
+function _tusOublierReprise() {
+  try { localStorage.removeItem(TUS_CLE_REPRISE); } catch (e) {}
+}
+
+// Empreinte d'un envoi : elle ne contient AUCUNE donnee personnelle,
+// seulement de quoi reconnaitre le meme fichier pour la meme
+// candidature. Le jeton secret n'y figure jamais.
+function _tusEmpreinteEnvoi(chemin, fichier) {
+  return [chemin, fichier.size, fichier.lastModified || 0].join('|');
+}
+
+// Une requete TUS, exprimee simplement. XMLHttpRequest plutot que
+// fetch : lui seul rapporte la progression reelle d'un envoi.
+function _tusRequete(methode, url, entetes, corps, surProgres) {
+  return new Promise(function (resolve) {
+    var xhr = new XMLHttpRequest();
+    xhr.open(methode, url, true);
+    Object.keys(entetes || {}).forEach(function (k) {
+      if (entetes[k] !== null && entetes[k] !== undefined) xhr.setRequestHeader(k, entetes[k]);
+    });
+    xhr.timeout = TUS_DELAI_REQUETE_MS;
+    if (surProgres && xhr.upload) {
+      xhr.upload.onprogress = function (e) { if (e.lengthComputable) surProgres(e.loaded); };
+    }
+    xhr.onload = function () {
+      resolve({
+        statut: xhr.status,
+        entete: function (nom) { return xhr.getResponseHeader(nom); },
+        texte: xhr.responseText
+      });
+    };
+    xhr.onerror = function () { resolve({ statut: 0, reseau: true }); };
+    xhr.ontimeout = function () { resolve({ statut: 0, reseau: true, expire: true }); };
+    xhr.onabort = function () { resolve({ statut: 0, reseau: true, interrompu: true }); };
+    try { xhr.send(corps === undefined ? null : corps); }
+    catch (e) { resolve({ statut: 0, reseau: true }); }
+  });
+}
+
+// Signature fraiche pour le chemin DEJA autorise. Le navigateur ne
+// propose jamais de chemin : il demande au serveur de resigner le sien.
+function _tusRenouvelerSignature() {
+  return _convAppelerFonctionVideo('prolonger', { jeton: _convJetonEnvoi })
+    .then(function (r) { return (r && !r.erreur && r.token) ? r.token : null; });
+}
+
+// Envoi reprenable complet. Retourne { ok } ou { erreur }, ou
+// { indisponible: true } si la route reprenable n'existe pas — auquel
+// cas l'appelant retombe sur l'envoi en une requete.
+function _convEnvoyerReprenable(chemin, token) {
+  var base = SUPABASE_URL + '/storage/v1/upload/resumable/sign';
+  var fichier = _convVideo.fichier;
+  var empreinte = _tusEmpreinteEnvoi(chemin, fichier);
+  var jetonCourant = token;
+  var signatureObtenueLe = Date.now();
+
+  function entetesCommuns() {
+    return {
+      'Tus-Resumable': TUS_VERSION,
+      'x-signature': jetonCourant,
+      'apikey': SUPABASE_KEY
+    };
+  }
+
+  function assurerSignatureFraiche() {
+    if (Date.now() - signatureObtenueLe < TUS_RENOUVELER_SIGNATURE_MS) return Promise.resolve(true);
+    return _tusRenouvelerSignature().then(function (nouveau) {
+      if (!nouveau) return false;
+      jetonCourant = nouveau;
+      signatureObtenueLe = Date.now();
+      return true;
+    });
+  }
+
+  // 1) Reprendre l'envoi precedent s'il porte sur le MEME fichier.
+  function retrouverEnvoi() {
+    var memo = _tusLireReprise();
+    if (!memo || memo.empreinte !== empreinte || !memo.url) return Promise.resolve(null);
+    return _tusRequete('HEAD', memo.url, entetesCommuns()).then(function (r) {
+      if (r.statut >= 200 && r.statut < 300) {
+        var offset = parseInt(r.entete('Upload-Offset'), 10);
+        if (isFinite(offset) && offset >= 0 && offset <= fichier.size) {
+          return { url: memo.url, offset: offset };
+        }
+      }
+      // L'envoi memorise n'existe plus cote serveur : on repart proprement.
+      _tusOublierReprise();
+      return null;
+    });
+  }
+
+  // 2) Creer un nouvel envoi.
+  function creerEnvoi(reprisesRestantes) {
+    var entetes = entetesCommuns();
+    entetes['Upload-Length'] = String(fichier.size);
+    entetes['Upload-Metadata'] = _tusEnteteMetadonnees(chemin, _convVideo.mime);
+    return _tusRequete('POST', base, entetes, null).then(function (r) {
+      if (r.statut === 404 || r.statut === 405 || r.statut === 501) return { indisponible: true };
+      // Route injoignable (reseau, proxy, plateforme sans envoi
+      // reprenable) : on ne bloque PAS le candidat sur ce diagnostic.
+      // L'envoi en une requete prend le relais et donnera, lui, une
+      // erreur exacte si le reseau est reellement coupe.
+      if (r.reseau) return { indisponible: true };
+      // La signature peut avoir expiré entre l'autorisation et le
+      // premier octet : on en reprend une, plutôt que d'abandonner.
+      if ((r.statut === 401 || r.statut === 403) && reprisesRestantes > 0) {
+        return _tusRenouvelerSignature().then(function (nouveau) {
+          if (!nouveau) return { erreur: 'Autorisation d\'envoi expirée. Réessayez.' };
+          jetonCourant = nouveau;
+          signatureObtenueLe = Date.now();
+          return creerEnvoi(reprisesRestantes - 1);
+        });
+      }
+      if (r.statut !== 201) {
+        return { erreur: 'Envoi refusé (code ' + (r.statut || 'réseau') + ').' };
+      }
+      var lieu = r.entete('Location');
+      if (!lieu) return { erreur: 'Réponse d\'envoi incomplète.' };
+      // Une Location relative est resolue contre l'origine du stockage.
+      var url = /^https?:\/\//i.test(lieu) ? lieu : (new URL(lieu, base)).toString();
+      _tusMemoriserReprise({ empreinte: empreinte, url: url, chemin: chemin });
+      return { url: url, offset: 0 };
+    });
+  }
+
+  // 3) Envoyer morceau par morceau, en reprenant a l'octet exact.
+  function envoyerDepuis(url, offset, reprisesRestantes) {
+    if (offset >= fichier.size) return Promise.resolve({ ok: true });
+    return assurerSignatureFraiche().then(function (ok) {
+      if (!ok) return { erreur: 'Autorisation d\'envoi expirée. Réessayez.' };
+      var fin = Math.min(offset + TUS_TAILLE_MORCEAU, fichier.size);
+      var morceau = fichier.slice(offset, fin);
+      var entetes = entetesCommuns();
+      entetes['Upload-Offset'] = String(offset);
+      entetes['Content-Type'] = 'application/offset+octet-stream';
+      var depart = offset;
+      return _tusRequete('PATCH', url, entetes, morceau, function (envoyes) {
+        convMajProgressionVideo(Math.round(((depart + envoyes) / fichier.size) * 100));
+      }).then(function (r) {
+        if (r.statut === 204 || r.statut === 200) {
+          var suivant = parseInt(r.entete('Upload-Offset'), 10);
+          if (!isFinite(suivant) || suivant <= offset) suivant = fin;
+          convMajProgressionVideo(Math.round((suivant / fichier.size) * 100));
+          return envoyerDepuis(url, suivant, TUS_REPRISES_MAX);
+        }
+        // 409 : notre offset ne correspond plus a celui du serveur. On
+        // le redemande plutot que de tout recommencer.
+        if (r.statut === 409 || r.statut === 460) {
+          return _tusRequete('HEAD', url, entetesCommuns()).then(function (h) {
+            var reel = parseInt(h.entete && h.entete('Upload-Offset'), 10);
+            if (isFinite(reel) && reel >= 0 && reel <= fichier.size && reprisesRestantes > 0) {
+              return envoyerDepuis(url, reel, reprisesRestantes - 1);
+            }
+            return { erreur: 'Envoi interrompu. Réessayez.' };
+          });
+        }
+        if (r.statut === 401 || r.statut === 403) {
+          // Signature expiree en cours de route : on en reprend une et
+          // on repart de l'octet exact, sans reenvoyer ce qui est passe.
+          if (reprisesRestantes > 0) {
+            return _tusRenouvelerSignature().then(function (nouveau) {
+              if (!nouveau) return { erreur: 'Autorisation d\'envoi expirée. Réessayez.' };
+              jetonCourant = nouveau;
+              signatureObtenueLe = Date.now();
+              return envoyerDepuis(url, offset, reprisesRestantes - 1);
+            });
+          }
+          return { erreur: 'Autorisation d\'envoi expirée. Réessayez.' };
+        }
+        if ((r.reseau || r.statut >= 500) && reprisesRestantes > 0) {
+          // Coupure reseau, ou panne passagere du stockage : on
+          // redemande l'offset REEL et on repart de la, jamais du debut.
+          return _tusRequete('HEAD', url, entetesCommuns()).then(function (h) {
+            var reel = parseInt(h.entete && h.entete('Upload-Offset'), 10);
+            return envoyerDepuis(url, (isFinite(reel) && reel >= offset) ? reel : offset,
+                                 reprisesRestantes - 1);
+          });
+        }
+        return { erreur: r.reseau
+          ? 'Connexion interrompue pendant l\'envoi de la vidéo.'
+          : ('Envoi refusé (code ' + r.statut + ').') };
+      });
+    });
+  }
+
+  return retrouverEnvoi().then(function (repris) {
+    return repris ? Promise.resolve(repris) : creerEnvoi(TUS_REPRISES_MAX);
+  }).then(function (depart) {
+    if (!depart || depart.indisponible) return { indisponible: true };
+    if (depart.erreur) return depart;
+    return envoyerDepuis(depart.url, depart.offset, TUS_REPRISES_MAX);
+  }).then(function (resultat) {
+    if (resultat && resultat.ok) _tusOublierReprise();
+    return resultat;
+  });
+}
+
 // Depot sur l'URL SIGNEE fournie par le serveur. Aucun chemin n'est
 // choisi ici : on renvoie exactement celui que le serveur a genere.
+// Conserve comme SECOURS : si la route reprenable n'est pas disponible,
+// l'envoi passe encore par ici, exactement comme avant.
 function _convEnvoyerVersUrlSignee(chemin, token) {
   return new Promise(function (resolve) {
     var xhr = new XMLHttpRequest();
@@ -14357,7 +14630,13 @@ function uploadVideoCandidature() {
       if (!autorisation.chemin || !autorisation.token) {
         resolve({ erreur: 'Autorisation d\'envoi incomplète.' }); return;
       }
-      _convEnvoyerVersUrlSignee(autorisation.chemin, autorisation.token).then(function (depot) {
+      // Envoi REPRENABLE en priorite ; l'envoi en une requete ne sert
+      // plus que de secours si la route reprenable est absente.
+      _convEnvoyerReprenable(autorisation.chemin, autorisation.token).then(function (r1) {
+        return (r1 && r1.indisponible)
+          ? _convEnvoyerVersUrlSignee(autorisation.chemin, autorisation.token)
+          : r1;
+      }).then(function (depot) {
         if (depot.erreur) { resolve({ erreur: depot.erreur }); return; }
         // La confirmation est indispensable : c'est elle qui vérifie
         // côté serveur que le fichier est réellement arrivé, supprime

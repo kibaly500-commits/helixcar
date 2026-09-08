@@ -15,6 +15,7 @@ l'ordre ci-dessous est **impératif**.
 | **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
 | **B** | Déploiement de la nouvelle `dashboard.html` | — |
 | **C** | `90_durcissement_rls_partenaires.sql` puis `91_durcissement_rls_clients.sql` | ❌ **non** — exige la phase B |
+| **D** | `92` → `95` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
 
 ### Pourquoi la phase C ne peut pas venir plus tôt
 
@@ -63,6 +64,38 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | — | **B** | **déploiement de `dashboard.html` ET de `index.html`** | `sbFetch()` transmet le JWT ; le formulaire public génère l'identifiant et n'attend plus de relecture |
 | 8 | C | `90_durcissement_rls_partenaires.sql` | garde-fou + RLS `convoyeurs` et `missions` + politiques |
 | 9 | C | `91_durcissement_rls_clients.sql` | RLS `clients` + accès client par la vue |
+| 10 | **D** | `92_creation_demande_atomique.sql` | **correctif obligatoire** : `creer_demande_avec_vehicules()` — sans lui, plus aucune demande avec véhicules ne peut être déposée après la phase C |
+| 11 | D | `93_bucket_video_300mo.sql` | limite du bucket vidéo portée à 300 Mo |
+| 12 | D | `94_informations_selon_scenario.sql` | `informations_demande()` selon le scénario réel + `vehicules.livraison_apres_stockage` |
+| 13 | D | `95_metiers_partenaires.sql` | `convoyeurs.metiers` + activité `technicien` acceptée |
+
+### Pourquoi la phase D vient APRÈS la phase C
+
+`92` corrige une panne que la phase C **provoque**. `public.vehicules`
+porte une politique d'insertion qui vérifie l'existence du dossier
+parent :
+
+```sql
+with check (exists (select 1 from public.clients c where c.id = vehicules.dossier_id))
+```
+
+Tant que `clients` n'avait aucune RLS, cette sous-requête voyait la
+ligne. Après `91`, un visiteur anonyme ne voit plus la demande qu'il
+vient pourtant de créer : la sous-requête ne renvoie rien, et
+PostgreSQL rejette avec
+`new row violates row-level security policy for table "vehicules"`.
+Reproduit sur PostgreSQL 16 (`tests/t_rls.sh`, section V), y compris la
+**création partielle** : la demande était écrite, ses véhicules non.
+
+`92` est donc **obligatoire** et doit suivre `91` de très près — idéalement
+dans la même fenêtre de maintenance. Les trois autres fichiers de la
+phase D sont des compléments : ils n'ont aucun effet destructeur et
+peuvent être appliqués juste après, dans l'ordre.
+
+> **Ne pas appliquer la phase D avant que la Pull Request ne soit
+> relue et prête à être fusionnée** : `94` et `95` accompagnent des
+> évolutions de `index.html` et `dashboard.html` livrées dans la même
+> Pull Request.
 
 Toutes les instructions sont **idempotentes** : la chaîne complète a été
 appliquée **deux fois de suite** sur PostgreSQL 16 sans erreur, sans
@@ -147,6 +180,36 @@ visible, son déblocage rétablit l'accès aux missions, et **aucune
 décision par activité n'est modifiée** — une activité refusée ou en
 attente le reste.
 
+### Après la phase D
+```sql
+-- 92 : la fonction de création atomique existe et est exécutable
+--      par un visiteur anonyme (c'est tout l'objet du correctif).
+select has_function_privilege('anon',
+  'public.creer_demande_avec_vehicules(jsonb, jsonb)', 'execute');   -- doit renvoyer true
+
+-- 93 : la limite du bucket vidéo
+select id, public, file_size_limit from storage.buckets
+ where id = 'candidatures-videos';        -- public = false, limite = 314572800
+
+-- 94 : la colonne de décision de sortie de stockage
+select column_name from information_schema.columns
+ where table_name = 'vehicules' and column_name = 'livraison_apres_stockage';
+
+-- 95 : les métiers et l'activité technicien
+select column_name from information_schema.columns
+ where table_name = 'convoyeurs' and column_name = 'metiers';
+select pg_get_constraintdef(oid) from pg_constraint
+ where conname = 'convoyeur_decisions_activite_check';   -- doit inclure 'technicien'
+```
+
+Puis, depuis le site :
+1. déposer une demande de convoyage **à deux véhicules** — elle doit
+   aboutir, et les deux véhicules doivent apparaître dans le Dashboard ;
+2. ouvrir la fiche d'une demande de nettoyage dont le contact sur place
+   est renseigné — il ne doit **plus** figurer dans « Encore manquantes » ;
+3. déposer une candidature **technicien** — l'activité doit être
+   acceptée et apparaître avec ses spécialités dans le Dashboard.
+
 ## Retour arrière
 
 ### Revenir sur la phase C
@@ -175,6 +238,15 @@ update public.convoyeurs c
 > Ne **pas** supprimer les colonnes `bloque*` : la connexion partenaire
 > lit `bloque`. Les laisser en place est sans effet tant que la phase C
 > n'est pas appliquée.
+
+### Revenir sur la phase D
+
+| Fichier | Retour arrière | Perte de données ? |
+|---|---|---|
+| `95` | Laisser `convoyeurs.metiers` en place (nullable, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie 0. | Retirer la colonne supprimerait des métiers réellement déclarés. |
+| `94` | Réappliquer `06_informations_manquantes.sql` : il contient la version précédente de `informations_demande(uuid)`, même signature. Laisser `vehicules.livraison_apres_stockage` en place. | Aucune : `94` ne touche qu'une fonction de lecture et ajoute une colonne vide. |
+| `93` | `update storage.buckets set file_size_limit = 52428800 where id = 'candidatures-videos';` | Les vidéos déjà déposées au-delà de la limite restent lisibles. |
+| `92` | `drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb);` — **uniquement** si l'ancienne `index.html` est remise en ligne en même temps, sans quoi plus aucune demande ne peut être déposée. | Aucune. |
 
 ### Fenêtre d'exposition à connaître
 Entre les phases A et C, `convoyeurs` reste **sans RLS**, exactement
@@ -205,14 +277,20 @@ et **ne bloquer aucun partenaire avant la phase C**.
    passe par une **URL signée temporaire** (`createSignedUrl`, 60–300 s),
    générée depuis une session authentifiée, après le contrôle
    d'autorisation assuré par les policies.
-3. **Conservation des vidéos** : définir une durée (par exemple 12 mois
+3. **Storage → Settings → limite globale de taille de fichier.** La
+   migration `93` porte la limite du bucket à **300 Mo**, mais Supabase
+   applique **aussi** une limite globale au projet. Tant que celle-ci
+   reste inférieure, c'est elle qui s'applique : une vidéo de 200 Mo
+   serait refusée malgré le réglage du bucket. À porter à **300 Mo au
+   minimum**, dans l'interface — ce réglage n'est pas accessible en SQL.
+4. **Conservation des vidéos** : définir une durée (par exemple 12 mois
    après refus ou inactivité) et la mentionner dans la politique de
    confidentialité **avant** toute mise en service.
-4. **Rattachement de l'historique client** : le rapprochement des
+5. **Rattachement de l'historique client** : le rapprochement des
    demandes existantes à un compte est laissé volontairement non exécuté
    (requête fournie en commentaire dans `06`) — un rapprochement par
    e-mail peut exposer la demande d'un tiers en cas d'adresse réutilisée.
-5. **URL de redirection à autoriser (Supabase → Authentication → URL Configuration).**
+6. **URL de redirection à autoriser (Supabase → Authentication → URL Configuration).**
    Le lien de réinitialisation du mot de passe renvoie vers
    `<origine du site>/dashboard.html`. Supabase **refuse** toute
    redirection non autorisée : le lien retomberait alors sur la page

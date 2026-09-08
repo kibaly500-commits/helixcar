@@ -56,8 +56,20 @@ const TAILLE_MAX_OCTETS = 300 * 1024 * 1024;
 // aucune colonne modifiable par le navigateur ne peut l'allonger.
 const FENETRE_ENVOI_MINUTES = 120;
 
-// Durée de validité de l'URL d'envoi signée.
-const VALIDITE_URL_ENVOI_SECONDES = 120;
+// Durée de validité de la signature d'envoi.
+//
+// 120 secondes suffisaient pour un envoi en UNE requête, mais rendaient
+// tout envoi reprenable impossible : 300 Mo sur une connexion mobile
+// dépassent largement deux minutes, et la signature expirait au milieu.
+// Portée à 30 minutes, et surtout RENOUVELABLE (action « prolonger »
+// ci-dessous) : le navigateur peut demander une signature fraîche sans
+// jamais recommencer l'envoi ni changer de chemin.
+//
+// Ce n'est pas un affaiblissement : une signature n'autorise l'écriture
+// que d'UN SEUL chemin, généré par le serveur, dans un bucket privé.
+// Elle ne donne aucun droit de lecture, aucun droit sur un autre objet,
+// et ne peut pas être transformée en droit d'écriture général.
+const VALIDITE_URL_ENVOI_SECONDES = 30 * 60;
 
 const ORIGINES_AUTORISEES = ["https://helixcar-i89b.vercel.app"];
 if (typeof Deno !== "undefined" && Deno.env?.get("ALLOW_LOCALHOST_CORS") === "true") {
@@ -100,7 +112,7 @@ export function dureeMaxPourActivites(activites: unknown): number {
   else if (typeof activites === "string") {
     liste = activites.replace(/^\{|\}$/g, "").split(",").map((s) => s.replace(/^"|"$/g, "").trim());
   }
-  if (liste.includes("renfort")) return 120;
+  if (liste.includes("renfort") || liste.includes("technicien")) return 120;
   if (liste.includes("convoyage")) return 60;
   return 0; // nettoyage seul : aucune vidéo attendue
 }
@@ -187,7 +199,17 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
 
   // CHEMIN GÉNÉRÉ ICI. Le navigateur n'en propose aucun et ne peut donc
   // pas viser le dossier d'une autre candidature.
-  const chemin = `candidatures/${c.id}/${crypto.randomUUID()}${extension}`;
+  //
+  // ENVOI REPRENABLE : si un envoi est déjà en cours pour cette
+  // candidature, dans le même format, on REPREND le même chemin au lieu
+  // d'en créer un second. Sans cela, un rechargement de page pendant
+  // l'envoi laisserait un objet partiel orphelin et recommencerait tout
+  // depuis zéro. Le chemin reste décidé par le serveur dans les deux cas.
+  const cheminEnCours = (!c.video_envoyee_le && typeof c.video_chemin === "string"
+    && c.video_chemin.startsWith(`candidatures/${c.id}/`)
+    && c.video_chemin.endsWith(extension))
+    ? c.video_chemin : null;
+  const chemin = cheminEnCours || `candidatures/${c.id}/${crypto.randomUUID()}${extension}`;
 
   const { data: signature, error: erreurSignature } = await sb
     .storage.from(BUCKET).createSignedUploadUrl(chemin);
@@ -213,6 +235,57 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
   return reponseJson({
     ok: true,
     chemin,
+    bucket: BUCKET,
+    token: signature.token,
+    validite_secondes: VALIDITE_URL_ENVOI_SECONDES,
+    // Le navigateur sait ainsi s'il reprend un envoi interrompu ou s'il
+    // en commence un nouveau — sans jamais avoir à le deviner.
+    reprise: !!cheminEnCours,
+  }, 200, cors);
+}
+
+// ============================================================
+// ACTION 1 bis — PROLONGER : une signature fraîche, MÊME chemin
+// ============================================================
+// Un envoi reprenable dure parfois plus longtemps que la signature qui
+// l'autorise. Cette action en délivre une nouvelle, pour le chemin DÉJÀ
+// enregistré et pour lui seul.
+//
+// Ce qu'elle ne fait pas, volontairement :
+//   * elle n'accepte aucun chemin venant du navigateur — elle relit
+//     celui que le serveur avait lui-même généré ;
+//   * elle ne consomme pas le jeton à usage unique : c'est « confirmer »
+//     qui le fait, une fois la vidéo réellement arrivée ;
+//   * elle ne rouvre rien sur une candidature dont la vidéo est déjà
+//     confirmée.
+export async function actionProlonger(sb: any, req: Request, corps: any, cors: Record<string, string>) {
+  const r = await resoudreCandidature(sb, req, corps);
+  if ("erreur" in r) return erreur(r.erreur[0], r.erreur[1], r.erreur[2], cors);
+  const c = r.candidature;
+
+  if (!c.video_chemin) {
+    return erreur("AUCUN_ENVOI", "Aucun envoi en cours pour cette candidature.", 400, cors);
+  }
+  if (c.video_envoyee_le) {
+    return erreur("DEJA_CONFIRMEE", "Cette vidéo a déjà été reçue.", 409, cors);
+  }
+  // Garde-fou : le chemin enregistré appartient forcément au dossier de
+  // CETTE candidature. Une valeur inattendue n'est jamais resignée.
+  if (!String(c.video_chemin).startsWith(`candidatures/${c.id}/`)) {
+    return erreur("CHEMIN_INVALIDE", "Envoi non reconnu.", 409, cors);
+  }
+
+  const { data: signature, error: erreurSignature } = await sb
+    .storage.from(BUCKET).createSignedUploadUrl(c.video_chemin, { upsert: true });
+  if (erreurSignature || !signature?.token) {
+    console.error("createSignedUploadUrl (prolonger):", erreurSignature);
+    return erreur("STOCKAGE_INDISPONIBLE", "Envoi momentanément indisponible.", 503, cors);
+  }
+
+  return reponseJson({
+    ok: true,
+    chemin: c.video_chemin,
+    bucket: BUCKET,
     token: signature.token,
     validite_secondes: VALIDITE_URL_ENVOI_SECONDES,
   }, 200, cors);
@@ -290,14 +363,17 @@ export async function traiterRequete(sb: any, req: Request): Promise<Response> {
   catch { return erreur("BAD_REQUEST", "Corps JSON invalide.", 400, cors); }
 
   const action = corps?.action;
-  if (action !== "autoriser" && action !== "confirmer") {
+  const ACTIONS: Record<string, (sb: any, req: Request, corps: any, cors: Record<string, string>) => Promise<Response>> = {
+    autoriser: actionAutoriser,
+    prolonger: actionProlonger,
+    confirmer: actionConfirmer,
+  };
+  if (typeof action !== "string" || !Object.prototype.hasOwnProperty.call(ACTIONS, action)) {
     return erreur("BAD_REQUEST", "Action inconnue.", 400, cors);
   }
 
   try {
-    return action === "autoriser"
-      ? await actionAutoriser(sb, req, corps, cors)
-      : await actionConfirmer(sb, req, corps, cors);
+    return await ACTIONS[action](sb, req, corps, cors);
   } catch (e) {
     console.error(`Erreur action=${action}:`, e instanceof Error ? e.message : String(e));
     return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
