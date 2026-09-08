@@ -29,6 +29,10 @@ function check(l, c, e) {
 const XSS_IMG   = '<img src=x onerror="window.__xss=(window.__xss||0)+1">';
 const XSS_REF   = "HC'-alert(window.__xss=(window.__xss||0)+1)-'";
 const XSS_URL   = 'javascript:window.__xss=(window.__xss||0)+1';
+// La charge exacte de l'audit : elle sort de la chaîne JavaScript en
+// s'appuyant sur le redecodage des entités HTML par le navigateur.
+const XSS_NOM   = "x');window.__xss=99;//";
+const XSS_MAIL  = "a');window.__xss=98;//@example.invalid";
 
 const INIT = `
 window.__xss = 0;
@@ -38,7 +42,10 @@ window.__insertEchoue = false;
 window.__uploadEchoue = false;
 window.__db = {
   convoyeurs: [
-    {id:'c1',prenom:${JSON.stringify(XSS_IMG)},nom:'TEST-QA',email:'c1@example.invalid',statut:'actif',created_at:'2026-09-01T10:00:00Z'}
+    {id:'c1',prenom:${JSON.stringify(XSS_IMG)},nom:'TEST-QA',email:'c1@example.invalid',statut:'actif',created_at:'2026-09-01T10:00:00Z'},
+    {id:'c2',prenom:${JSON.stringify(XSS_NOM)},nom:'TEST-QA',email:${JSON.stringify(XSS_MAIL)},
+     telephone:'+33600000001',experience:'2 ans',statut:'en_attente',
+     activites:['convoyage'],created_at:'2026-09-02T10:00:00Z'}
   ],
   clients: [
     {id:'k1',numero_client:'HC-QA-1',prenom:${JSON.stringify(XSS_IMG)},nom:'TEST-QA',email:'k1@example.invalid',statut:'nouveau',created_at:'2026-09-06T10:00:00Z',auth_user_id:'u1'}
@@ -232,6 +239,124 @@ window.fetch = function(u, o){
   await page.waitForTimeout(400);
   check('B8 : cliquer un bouton dont la référence est hostile n\'exécute rien',
     await page.evaluate(() => window.__xss) === 0);
+
+  // ══ B bis. LA PAGE DES CANDIDATURES, ET LE CLIC RÉEL ══
+  // C'est le defaut trouve par l'audit : le nom du candidat passait par
+  // escapeHtml() — qui transforme l'apostrophe en « &#39; » — puis par
+  // un .replace(/'/g, "\\'") qui ne trouvait donc plus rien a echapper.
+  // Le navigateur redecodait avant le parseur JavaScript, la chaine se
+  // refermait, et la suite s'executait AU CLIC.
+  await page.evaluate(() => { window.__xss = 0; showPage('admin-candidatures'); });
+  await page.waitForTimeout(800);
+
+  const cand = await page.evaluate(() => {
+    const t = document.getElementById('candidatures-table');
+    return {
+      html: t ? t.innerHTML : '',
+      texte: t ? t.textContent : '',
+      xss: window.__xss,
+      handlers: t ? Array.from(t.querySelectorAll('[onclick],[onchange]'))
+        .map(b => b.getAttribute('onclick') || b.getAttribute('onchange')) : [],
+      boutonsValider: t ? Array.from(t.querySelectorAll('button'))
+        .filter(b => /Valider/.test(b.textContent)).length : 0
+    };
+  });
+
+  check('B9 : la liste des candidatures s\'affiche', cand.boutonsValider >= 1,
+    'boutons Valider : ' + cand.boutonsValider);
+  check('B10 : le nom hostile apparaît comme du TEXTE',
+    cand.texte.indexOf("x');window.__xss=99") !== -1, cand.texte.slice(0, 160));
+  check('B11 : rien ne s\'est exécuté au simple affichage', cand.xss === 0, String(cand.xss));
+
+  // LE CLIC. C'est lui qui declenchait la charge.
+  const apresClic = await page.evaluate(async () => {
+    window.__validations = [];
+    window.validerConvoyeur = function (id, nom, email) {
+      window.__validations.push({ id: id, nom: nom, email: email });
+    };
+    // Le registre pointe sur l'ancienne fonction : on le realigne, comme
+    // le ferait un rechargement de page.
+    if (window.HC_ACTIONS) HC_ACTIONS.validerConvoyeur = window.validerConvoyeur;
+    const t = document.getElementById('candidatures-table');
+    const b = Array.from(t.querySelectorAll('button')).filter(x => /Valider/.test(x.textContent))[0];
+    if (b) b.click();
+    await new Promise(r => setTimeout(r, 200));
+    return { xss: window.__xss, validations: window.__validations.slice() };
+  });
+
+  check('B12 : le clic sur « Valider » n\'exécute PAS la charge',
+    apresClic.xss === 0, 'window.__xss = ' + apresClic.xss);
+  check('B13 : l\'action a bien eu lieu — la correction ne casse pas le bouton',
+    apresClic.validations.length === 1, JSON.stringify(apresClic.validations));
+  const v0 = apresClic.validations[0] || {};
+  check('B14 : le nom arrive ENTIER, sans troncature ni coupure',
+    String(v0.nom || '').indexOf("x');window.__xss=99;//") !== -1, JSON.stringify(v0));
+  check('B15 : l\'e-mail hostile arrive entier lui aussi',
+    String(v0.email || '').indexOf("a');window.__xss=98") !== -1, JSON.stringify(v0));
+
+  // ══ B ter. PLUS AUCUN HANDLER EN LIGNE PORTANT DES DONNÉES ══
+  // Le controle qui vaut pour TOUT le Dashboard, pas seulement pour les
+  // deux listes deja regardees.
+  const handlersDynamiques = [];
+  const reHandler = /on(?:click|change)=\\?"([A-Za-z_$][\w$]*)\(([^"]*?)\)\\?"/g;
+  let mh;
+  while ((mh = reHandler.exec(src)) !== null) {
+    const args = mh[2];
+    // Un handler qui interpole quoi que ce soit est suspect : la valeur
+    // vient forcement d'ailleurs, et le plus souvent de la base.
+    if (/\+|\$\{/.test(args)) {
+      handlersDynamiques.push(mh[1] + '(' + args.slice(0, 60) + ')');
+    }
+  }
+  check('B16 : AUCUN handler en ligne ne construit ses arguments par concaténation',
+    handlersDynamiques.length === 0,
+    handlersDynamiques.length + ' : ' + handlersDynamiques.slice(0, 4).join(' | '));
+
+  // Tous les handlers en ligne restants doivent etre syntaxiquement
+  // valides et ne porter que des litteraux.
+  const handlersRestants = (src.match(/on(?:click|change)="[^"]*"/g) || []);
+  const invalides = handlersRestants.filter(h => {
+    // Le fichier melange deux contextes : des handlers ecrits
+    // directement dans le HTML statique (ou « \\' » est l'echappement
+    // JavaScript d'une apostrophe) et des handlers produits par du
+    // JavaScript (ou « \\' » est l'echappement de la chaine
+    // englobante). On accepte le handler si l'une des deux lectures
+    // donne du JavaScript valide — ce qui suffit a prouver qu'aucun
+    // n'est malforme.
+    const brut = h.replace(/^on(?:click|change)="/, '').replace(/"$/, '');
+    const denude = brut.replace(/\\'/g, "'").replace(/\\"/g, '"');
+    for (const c of [brut, denude]) {
+      try { new Function(c); return false; } catch (e) { /* essai suivant */ }
+    }
+    return true;
+  });
+  check('B17 : tous les handlers en ligne restants sont syntaxiquement valides',
+    invalides.length === 0, invalides.slice(0, 3).join(' | '));
+
+  // Et le mecanisme delegue existe bel et bien.
+  const delegue = await page.evaluate(() => ({
+    registre: typeof HC_ACTIONS === 'object' && Object.keys(HC_ACTIONS).length,
+    manquantes: typeof HC_ACTIONS === 'object'
+      ? Object.keys(HC_ACTIONS).filter(k => typeof HC_ACTIONS[k] !== 'function') : ['pas de registre'],
+    aActionHtml: typeof actionHtml === 'function'
+  }));
+  check('B18 : le registre d\'actions est peuplé', delegue.registre >= 30, String(delegue.registre));
+  check('B19 : toutes les actions déclarées existent réellement',
+    delegue.manquantes.length === 0, JSON.stringify(delegue.manquantes));
+  check('B20 : les arguments voyagent en attributs data-*, pas en JavaScript',
+    delegue.aActionHtml && /data-hc-action=/.test(cand.html), 'actionHtml/data-hc-action absents');
+  check('B21 : une action inconnue ne peut PAS appeler une fonction globale',
+    await page.evaluate(() => {
+      window.__pirate = 0;
+      window.fonctionPiegee = function () { window.__pirate = 1; };
+      const d = document.createElement('button');
+      d.setAttribute('data-hc-action', 'fonctionPiegee');
+      document.body.appendChild(d);
+      d.click();
+      const r = window.__pirate;
+      d.remove();
+      return r === 0;
+    }));
 
   // ══ C. LES TROIS ÉCHAPPEMENTS, UN PAR CONTEXTE ══
   const helpers = await page.evaluate(() => ({

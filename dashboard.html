@@ -2856,10 +2856,12 @@ async function rendreInfosDemandeAdmin(c) {
     let actions = '';
     if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
       actions = '<div style="margin-top:6px;display:flex;gap:8px">'
-        + '<button class="btn btn-sm btn-primary" onclick="changerDecisionInformation(\''
-        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'validee\')">Valider</button>'
-        + '<button class="btn btn-sm btn-secondary" onclick="changerDecisionInformation(\''
-        + escapeHtml(c.id) + '\',\'' + escapeHtml(l.cle) + '\',\'a_corriger\')">À corriger</button>'
+        + '<button class="btn btn-sm btn-primary"'
+        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'validee'])
+        + '>Valider</button>'
+        + '<button class="btn btn-sm btn-secondary"'
+        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
+        + '>À corriger</button>'
         + '</div>';
     }
     return '<div class="detail-row" style="align-items:flex-start">'
@@ -3031,8 +3033,9 @@ async function loadInfosClient() {
       + escapeHtml(_libelleServiceClient(d.type_service))
       + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></div>'
       + '</div>'
-      + '<button class="btn btn-sm btn-primary" onclick="ouvrirCompletionDemande(\''
-      + escapeHtml(d.id) + '\')">Compléter mes informations →</button>'
+      + '<button class="btn btn-sm btn-primary"'
+      + actionHtml('ouvrirCompletionDemande', [d.id])
+      + '>Compléter mes informations →</button>'
       + '</div>'
       + '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
       + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '')
@@ -3737,6 +3740,64 @@ function escapeJsAttr(v) {
       .replace(/</g, '\\x3C')      // neutralise aussi une balise de fermeture
   );
 }
+
+// ── ACTIONS SANS HANDLER EN LIGNE ───────────────────────────
+// Un attribut `onclick` place une CHAÎNE JAVASCRIPT dans un attribut
+// HTML. Le navigateur décode l'attribut AVANT de livrer le résultat au
+// parseur JavaScript : toute valeur de base qui y transite doit donc
+// être échappée deux fois, dans le bon ordre. Un seul oubli, et la
+// valeur devient du code.
+//
+// C'est exactement ce qui est arrivé au nom d'un candidat : il passait
+// par escapeHtml() — qui transforme l'apostrophe en « &#39; » — puis
+// par un .replace(/'/g, "\\'") qui ne trouvait donc plus aucune
+// apostrophe à échapper. Le navigateur redécodait « &#39; » en « ' »,
+// la chaîne se refermait, et la suite s'exécutait.
+//
+// On supprime le problème au lieu de le contourner : les arguments
+// voyagent dans des attributs `data-*`, qui sont du TEXTE et rien
+// d'autre, et un seul écouteur délégué les relit via `dataset` au
+// moment du clic. AUCUNE donnée de base n'entre plus jamais dans un
+// contexte JavaScript.
+//
+// Le nom de l'action est résolu dans un registre explicite : un
+// attribut ne peut donc pas appeler n'importe quelle fonction globale.
+var HC_ACTIONS = {};
+
+function actionHtml(nom, args) {
+  var out = ' data-hc-action="' + escapeHtml(nom) + '"';
+  (args || []).forEach(function (v, i) {
+    out += ' data-hc-a' + i + '="'
+        + escapeHtml(v === null || v === undefined ? '' : v) + '"';
+  });
+  return out;
+}
+
+function _hcExecuterAction(el, ev) {
+  var nom = el.getAttribute('data-hc-action');
+  var fn = HC_ACTIONS[nom];
+  if (typeof fn !== 'function') {
+    console.error('Action inconnue :', nom);
+    return;
+  }
+  var args = [];
+  for (var i = 0; el.getAttribute('data-hc-a' + i) !== null; i++) {
+    args.push(el.getAttribute('data-hc-a' + i));
+  }
+  // Certaines actions ont besoin de l'élément lui-même (champ fichier).
+  if (el.getAttribute('data-hc-self') === '1') args.unshift(el);
+  if (ev && el.tagName === 'A') ev.preventDefault();
+  fn.apply(null, args);
+}
+
+document.addEventListener('click', function (ev) {
+  var el = ev.target && ev.target.closest ? ev.target.closest('[data-hc-action]') : null;
+  if (el && el.tagName !== 'INPUT') _hcExecuterAction(el, ev);
+});
+document.addEventListener('change', function (ev) {
+  var el = ev.target;
+  if (el && el.getAttribute && el.getAttribute('data-hc-action')) _hcExecuterAction(el, ev);
+});
 
 // Une URL venue de la base et posée dans un href. Échapper les
 // caractères ne suffit pas : « javascript:alert(1) » ne contient aucun
@@ -4931,7 +4992,12 @@ function loadCandidatures() {
       if (statPending) statPending.textContent = rows.length;
       if (badge) badge.textContent = rows.length;
       tbody.innerHTML = rows.map(function(c) {
-        const nom = escapeHtml((c.prenom || '') + ' ' + (c.nom || ''));
+        // La valeur BRUTE pour l'action — actionHtml() l'échappe pour
+        // l'attribut, et un pré-échappement la ferait arriver doublement
+        // encodée à la fonction appelée. La valeur échappée sert au
+        // seul affichage.
+        const nomBrut = (c.prenom || '') + ' ' + (c.nom || '');
+        const nom = escapeHtml(nomBrut);
         const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—';
         const rcBadge = c.rc_pro_url
           ? '<span class="badge badge-active">✅ Fournie</span>'
@@ -4944,9 +5010,9 @@ function loadCandidatures() {
           + '<td>' + rcBadge + '</td>'
           + '<td>' + dateStr + '</td>'
           + '<td style="display:flex;gap:6px;flex-wrap:wrap">'
-          + '<button class="btn btn-sm btn-outline" onclick="openDossierSb(\'' + c.id + '\')">Dossier</button>'
-          + '<button class="btn btn-sm btn-green" onclick="validerConvoyeur(\'' + c.id + '\',\'' + nom.replace(/'/g, "\\'") + '\',\'' + escapeHtml(c.email) + '\')">✓ Valider</button>'
-          + '<button class="btn btn-sm btn-red" onclick="refuserConvoyeur(\'' + c.id + '\')">✗ Refuser</button>'
+          + '<button class="btn btn-sm btn-outline" ' + actionHtml('openDossierSb', [c.id]) + '>Dossier</button>'
+          + '<button class="btn btn-sm btn-green" ' + actionHtml('validerConvoyeur', [c.id, nomBrut, c.email]) + '>✓ Valider</button>'
+          + '<button class="btn btn-sm btn-red" ' + actionHtml('refuserConvoyeur', [c.id]) + '>✗ Refuser</button>'
           + '</td></tr>';
       }).join('');
       // Garder les données en mémoire pour le dossier détaillé
@@ -5062,7 +5128,7 @@ function _boutonDecision(activite, valeur, courante) {
   return '<button type="button" class="btn btn-sm" aria-pressed="' + (actif ? 'true' : 'false') +
     '" data-activite="' + escapeHtml(activite) + '" data-decision="' + valeur + '"' +
     ' style="' + style + ';padding:5px 12px;border-width:1px;border-style:solid;border-radius:7px;margin-right:6px"' +
-    ' onclick="changerDecisionActivite(\'' + escapeHtml(activite) + '\',\'' + valeur + '\')">' +
+    ' ' + actionHtml('changerDecisionActivite', [activite, valeur]) + '>' +
     LIB_DECISION[valeur] + '</button>';
 }
 
@@ -5310,7 +5376,7 @@ function _celluleVideoCandidature(c) {
     var meta = [];
     if (c.video_duree_secondes) meta.push(Math.round(c.video_duree_secondes) + ' s');
     if (c.video_taille_octets) meta.push((c.video_taille_octets / (1024 * 1024)).toFixed(1).replace('.', ',') + ' Mo');
-    return '<button class="btn btn-sm btn-outline" onclick="ouvrirVideoCandidature(\'' + escapeHtml(String(c.id)) + '\')">' +
+    return '<button class="btn btn-sm btn-outline" ' + actionHtml('ouvrirVideoCandidature', [c.id]) + '>' +
            '🎥 Voir la vidéo</button>' +
            (meta.length ? '<span style="margin-left:8px;color:#888;font-size:.78rem">' + escapeHtml(meta.join(' · ')) + '</span>' : '');
   }
@@ -5464,14 +5530,14 @@ function afficherConvoyeursActifs(rows) {
     // bloqué ne peut plus apparaître « Actif » après un rechargement.
     const bloque = _partenaireEstBloque(c);
     const actionBlocage = bloque
-      ? '<button class="btn btn-sm btn-outline" onclick="debloquerConvoyeur(\'' + c.id + '\')">↩ Débloquer</button>'
-      : '<button class="btn btn-sm btn-red" onclick="bloquerConvoyeur(\'' + c.id + '\')">🚫 Bloquer</button>';
+      ? '<button class="btn btn-sm btn-outline" ' + actionHtml('debloquerConvoyeur', [c.id]) + '>↩ Débloquer</button>'
+      : '<button class="btn btn-sm btn-red" ' + actionHtml('bloquerConvoyeur', [c.id]) + '>🚫 Bloquer</button>';
     return '<tr' + (bloque ? ' class="blocked"' : '') + '><td><strong>' + nom + '</strong></td><td>' + escapeHtml(c.email) + '</td>'
       + '<td>' + (c.nb_missions || 0) + '</td><td>' + (c.km_total || 0) + ' km</td>'
       + '<td>' + _badgeEtatPartenaire(c) + '</td>'
-      + '<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="voirConvoyeurSb(\'' + c.id + '\')">Voir</button>'
+      + '<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" ' + actionHtml('voirConvoyeurSb', [c.id]) + '>Voir</button>'
       + actionBlocage + '</td>'
-      + '<td><button class="btn btn-sm btn-red" onclick="supprimerConvoyeur(\'' + c.id + '\')" title="Supprimer">🗑️</button></td></tr>';
+      + '<td><button class="btn btn-sm btn-red" ' + actionHtml('supprimerConvoyeur', [c.id]) + ' title="Supprimer">🗑️</button></td></tr>';
   }).join('');
 }
 
@@ -6024,7 +6090,7 @@ function chargerInscriptionsRecentes() {
         + '<td>' + escapeHtml(c.email || '—') + '</td>'
         + '<td>' + (_dvDate ? _dvDate(c.created_at) : '—') + '</td>'
         + '<td>' + badge + '</td>'
-        + '<td><button class="btn btn-sm btn-outline" onclick="showPage(\'' + x.page + '\')">Voir →</button></td></tr>';
+        + '<td><button class="btn btn-sm btn-outline" ' + actionHtml('showPage', [x.page]) + '>Voir →</button></td></tr>';
     }).join('');
   }).catch(function () {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Inscriptions indisponibles — vérifiez la console</td></tr>';
@@ -6119,15 +6185,15 @@ function loadMissions() {
       let actions = '';
       if (m.statut === 'fini') {
         actions = estNettoyage
-          ? ('<button class="btn btn-sm" style="background:#1F7A4D;color:#fff;border:none;margin-right:4px" onclick="validerPrestationNettoyage(\'' + m.id + '\')">✅ Valider la prestation</button>'
-             + '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>')
-          : ('<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" onclick="confirmerMissionTerminee(\'' + m.id + '\')">✅ Confirmer la mission</button>'
-             + '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>');
+          ? ('<button class="btn btn-sm" style="background:#1F7A4D;color:#fff;border:none;margin-right:4px" ' + actionHtml('validerPrestationNettoyage', [m.id]) + '>✅ Valider la prestation</button>'
+             + '<button class="btn btn-sm btn-red" ' + actionHtml('annulerMission', [m.id]) + '>✗ Annuler</button>')
+          : ('<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" ' + actionHtml('confirmerMissionTerminee', [m.id]) + '>✅ Confirmer la mission</button>'
+             + '<button class="btn btn-sm btn-red" ' + actionHtml('annulerMission', [m.id]) + '>✗ Annuler</button>');
       } else if (m.statut !== 'terminee' && m.statut !== 'annulee') {
-        actions += '<button class="btn btn-sm btn-outline" onclick="terminerMission(\'' + m.id + '\')" style="margin-right:4px">✅ Terminer</button>';
-        actions += '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>';
+        actions += '<button class="btn btn-sm btn-outline" ' + actionHtml('terminerMission', [m.id]) + ' style="margin-right:4px">✅ Terminer</button>';
+        actions += '<button class="btn btn-sm btn-red" ' + actionHtml('annulerMission', [m.id]) + '>✗ Annuler</button>';
       } else if (m.statut === 'terminee' && !m.validee_paiement) {
-        actions = '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" onclick="validerMissionPourPaiement(\'' + m.id + '\')">✅ Valider pour paiement</button>';
+        actions = '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" ' + actionHtml('validerMissionPourPaiement', [m.id]) + '>✅ Valider pour paiement</button>';
       } else if (m.statut === 'terminee' && m.validee_paiement) {
         actions = '<span class="badge badge-active" style="font-size:.72rem">✅ Validée</span>';
       } else {
@@ -6138,7 +6204,7 @@ function loadMissions() {
       // mission terminée — c'est la trace de l'état des véhicules.
       if (estNettoyage) {
         actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
-          + 'onclick="voirPhotosMission(\'' + escapeJsAttr(m.id) + '\',\'' + escapeJsAttr(m.reference || '') + '\')">'
+          + '' + actionHtml('voirPhotosMission', [m.id, m.reference || '']) + '>'
           + '\uD83D\uDCF7 Photos</button>' + (actions === '—' ? '' : actions);
       }
       // L'URL vient de la base : « javascript:… » y serait exécutable au
@@ -6317,7 +6383,7 @@ function loadMissionsConvoyeur() {
           + (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—') + '</strong></td>'
           + '<td>' + restitution + '</td>'
           + '<td>' + options + '</td>'
-          + '<td><button class="btn btn-sm btn-primary" onclick="accepterMission(\'' + m.id + '\')">Accepter</button></td></tr>';
+          + '<td><button class="btn btn-sm btn-primary" ' + actionHtml('accepterMission', [m.id]) + '>Accepter</button></td></tr>';
       }).join('');
     })
     .catch(function(e) {
@@ -6404,14 +6470,14 @@ function envoyerEmailFicheMission(missionId, conv) {
 //   * du texte HTML                           -> escapeHtml()
 // Les mélanger, ou n'en appliquer qu'un seul, laisse une porte ouverte.
 function _lienLettreVoiture(reference) {
-  return '<button class="btn btn-sm btn-outline" onclick="window.open(\''
-    + escapeJsAttr('lettre-voiture.html?mission=' + encodeURIComponent(reference || ''))
-    + '\',\'_blank\',\'noopener\')">📄 Lettre de voiture</button>';
+  return '<button class="btn btn-sm btn-outline"'
+    + actionHtml('ouvrirLettreVoiture', [reference])
+    + '>📄 Lettre de voiture</button>';
 }
 function _boutonEdl(reference, etape, libelle) {
-  return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\''
-    + escapeJsAttr(reference) + '\',\'' + escapeJsAttr(etape) + '\')" '
-    + 'style="margin-right:4px">' + libelle + '</button>';
+  return '<button class="btn btn-sm btn-primary"'
+    + actionHtml('allerVersEdl', [reference, etape])
+    + ' style="margin-right:4px">' + libelle + '</button>';
 }
 function _lienLettreSignee(m) {
   var u = urlSure(m && m.lettre_voiture_signee_url);
@@ -6438,12 +6504,12 @@ const CONV_MISSION_ACTIONS = {
   edl_termine: function(id, reference, m) {
     var champ = 'upload-lettre-signee-' + String(id || '');
     return _lienLettreVoiture(reference)
-      + '<button class="btn btn-sm" style="background:var(--y);color:var(--bk);border:none" '
-      + 'onclick="document.getElementById(\'' + escapeJsAttr(champ) + '\').click()">'
-      + '📸 Envoyer la lettre signée</button>'
+      + '<button class="btn btn-sm" style="background:var(--y);color:var(--bk);border:none"'
+      + actionHtml('declencherChampFichier', [champ])
+      + '>📸 Envoyer la lettre signée</button>'
       + '<input type="file" accept="image/*" capture="environment" id="' + escapeHtml(champ) + '" '
-      + 'style="display:none" onchange="envoyerLettreVoitureSignee(this, \''
-      + escapeJsAttr(id) + '\', \'' + escapeJsAttr(reference) + '\')">';
+      + 'style="display:none" data-hc-self="1"'
+      + actionHtml('envoyerLettreVoitureSignee', [id, reference]) + '>';
   },
   fini: function(id, reference, m) {
     return _lienLettreVoiture(reference) + _lienLettreSignee(m)
@@ -6504,16 +6570,16 @@ function _actionsMissionNettoyage(m) {
   var etat = _photosParMission[String(m.id)] || { avant: 0, apres: 0 };
   var boutons = '';
   if (m.statut !== 'terminee' && m.statut !== 'annulee') {
-    boutons += '<button class="btn btn-sm btn-outline" onclick="ouvrirPhotosMission(\'' + m.id + '\',\'avant\')">'
+    boutons += '<button class="btn btn-sm btn-outline" ' + actionHtml('ouvrirPhotosMission', [m.id, 'avant']) + '>'
       + '📷 Avant (' + etat.avant + ')</button>';
-    boutons += '<button class="btn btn-sm btn-outline" onclick="ouvrirPhotosMission(\'' + m.id + '\',\'apres\')">'
+    boutons += '<button class="btn btn-sm btn-outline" ' + actionHtml('ouvrirPhotosMission', [m.id, 'apres']) + '>'
       + '📷 Après (' + etat.apres + ')</button>';
   }
   // Le partenaire relit ce qu'il a déposé — et rien d'autre : les
   // politiques Storage ne lui ouvrent que les photos de SA mission.
   if (etat.avant + etat.apres > 0) {
     boutons += '<button class="btn btn-sm btn-secondary" '
-      + 'onclick="voirPhotosMission(\'' + escapeJsAttr(m.id) + '\',\'' + escapeJsAttr(m.reference || '') + '\')">'
+      + '' + actionHtml('voirPhotosMission', [m.id, m.reference || '']) + '>'
       + 'Voir les photos</button>';
   }
   if (m.statut === 'acceptee' || m.statut === 'en_cours') {
@@ -6522,7 +6588,7 @@ function _actionsMissionNettoyage(m) {
     var pret = etat.avant > 0 && etat.apres > 0;
     boutons += '<button class="btn btn-sm ' + (pret ? 'btn-primary' : 'btn-secondary') + '"'
       + (pret ? '' : ' disabled title="Ajoutez au moins une photo avant et une photo après."')
-      + ' onclick="terminerMissionNettoyage(\'' + m.id + '\')">Intervention terminée</button>';
+      + ' ' + actionHtml('terminerMissionNettoyage', [m.id]) + '>Intervention terminée</button>';
   }
   if (m.statut === 'fini') boutons += '<span class="badge badge-pending">En attente de validation HelixCar</span>';
   if (m.statut === 'terminee') boutons += '<span class="badge badge-active">✅ Validée</span>';
@@ -7071,7 +7137,7 @@ function loadFacturationAdmin() {
             + '<td>' + missionsTxt(f) + '</td>'
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
             + '<td>' + dateTxt + '</td>'
-            + '<td><button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" onclick="accepterFactureConvoyeur(\'' + f.id + '\')">✅ Accepter</button></td></tr>';
+            + '<td><button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" ' + actionHtml('accepterFactureConvoyeur', [f.id]) + '>✅ Accepter</button></td></tr>';
         }).join('');
 
     aPayerEl.innerHTML = validees.length === 0
@@ -7085,7 +7151,7 @@ function loadFacturationAdmin() {
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
             + '<td>' + dateValTxt + '</td>'
             + '<td>' + datePaieTxt + '</td>'
-            + '<td><button class="btn btn-sm btn-dark" onclick="marquerFacturePayee(\'' + f.id + '\')">💸 Marquer payée</button></td></tr>';
+            + '<td><button class="btn btn-sm btn-dark" ' + actionHtml('marquerFacturePayee', [f.id]) + '>💸 Marquer payée</button></td></tr>';
         }).join('');
 
     payeesEl.innerHTML = payees.length === 0
@@ -8115,7 +8181,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td>' + _escapeHtml(_dv(vehicule)) + '</td>' +
       '<td>' + _dvDate(c.date_prise_en_charge) + '</td>' +
       '<td>' + _statutDevisBadge(statut) + '</td>' +
-      '<td><button class="btn btn-sm btn-primary" onclick="ouvrirFicheDemande(\'' + c.id + '\')">Ouvrir</button></td>' +
+      '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirFicheDemande', [c.id]) + '>Ouvrir</button></td>' +
       '</tr>';
   });
   tbody.innerHTML = html;
@@ -8214,7 +8280,7 @@ function _blocMissionNettoyageHtml(c) {
       html += '<div style="font-size:.82rem;color:#555;margin-bottom:10px">'
         + 'La mission reprendra l\'adresse, le contact, la date, l\'horaire, la prestation et '
         + 'les consignes de cette demande. Elle sera visible par les partenaires nettoyage.</div>';
-      html += '<button class="btn btn-primary" onclick="creerMissionNettoyage(\'' + c.id + '\')">'
+      html += '<button class="btn btn-primary" ' + actionHtml('creerMissionNettoyage', [c.id]) + '>'
         + 'Créer la mission de nettoyage</button>';
     }
   }
@@ -8314,12 +8380,12 @@ function _blocDevisHtml(c) {
     }
     html += '<div id="devis-erreur-envoi" style="display:none;font-size:.82rem;color:#c0392b;margin-bottom:10px"></div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<button class="btn btn-sm btn-secondary" onclick="previsualiserDevis(\'' + c.id + '\')">Voir le devis</button>' +
-      '<button class="btn btn-sm btn-secondary" onclick="modifierPrixDevis(\'' + c.id + '\')">Modifier le prix</button>' +
+      '<button class="btn btn-sm btn-secondary" ' + actionHtml('previsualiserDevis', [c.id]) + '>Voir le devis</button>' +
+      '<button class="btn btn-sm btn-secondary" ' + actionHtml('modifierPrixDevis', [c.id]) + '>Modifier le prix</button>' +
       ((d.statut === 'accepte' || d.statut === 'refuse') ? '' :
-        '<button class="btn btn-sm btn-primary" id="btn-envoyer-devis" onclick="envoyerDevis(\'' + c.id + '\')">' +
+        '<button class="btn btn-sm btn-primary" id="btn-envoyer-devis" ' + actionHtml('envoyerDevis', [c.id]) + '>' +
           (d.statut === 'envoye' ? 'Renvoyer au client' : 'Envoyer au client') + '</button>') +
-      '<button class="btn btn-sm" id="btn-test-qa-prepare" onclick="testerPrepareDevisQA(\'' + c.id + '\')" ' +
+      '<button class="btn btn-sm" id="btn-test-qa-prepare" ' + actionHtml('testerPrepareDevisQA', [c.id]) + ' ' +
         'title="Mode test interne : appelle PREPARE sans envoyer d\'email ni changer le statut" ' +
         'style="background:#fff3cd;border:1px dashed #b8860b;color:#7a5c00;font-size:.76rem">🧪 Tester PREPARE (QA)</button>' +
       '</div>';
@@ -8328,8 +8394,8 @@ function _blocDevisHtml(c) {
       '<div><label style="display:block;font-size:.78rem;color:#666;margin-bottom:4px">' +
         _escapeHtml(_devisLibelleService(c).prix) + ' (€ TTC)</label>' +
       '<input type="number" id="devis-prix-input" min="0" step="1" placeholder="Ex : 450" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:.9rem;width:160px"></div>' +
-      '<button class="btn btn-secondary" onclick="apercuDevis(\'' + c.id + '\')">Aperçu du devis</button>' +
-      '<button class="btn btn-primary" onclick="genererDevis(\'' + c.id + '\')">Générer le devis</button>' +
+      '<button class="btn btn-secondary" ' + actionHtml('apercuDevis', [c.id]) + '>Aperçu du devis</button>' +
+      '<button class="btn btn-primary" ' + actionHtml('genererDevis', [c.id]) + '>Générer le devis</button>' +
       '</div>' +
       '<div style="font-size:.76rem;color:#888;margin-top:8px">Vérifiez le contenu du devis avant de saisir le montant.</div>';
   }
@@ -8471,7 +8537,7 @@ function ouvrirFicheDemande(clientId) {
     html += _blocMissionNettoyageHtml(c);
 
     html += '<div style="margin-top:14px;text-align:right">' +
-      '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
+      '<button class="btn btn-sm btn-secondary" ' + actionHtml('marquerDemandeNonLue', [c.id]) + '>' +
       'Marquer comme non lue</button></div>';
 
     var corpsN = document.getElementById('fiche-demande-corps');
@@ -8572,7 +8638,7 @@ function ouvrirFicheDemande(clientId) {
     html += _blocDevisHtml(c);
 
     html += '<div style="margin-top:14px;text-align:right">' +
-      '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
+      '<button class="btn btn-sm btn-secondary" ' + actionHtml('marquerDemandeNonLue', [c.id]) + '>' +
       'Marquer comme non lue</button></div>';
 
     var corpsP = document.getElementById('fiche-demande-corps');
@@ -8837,7 +8903,7 @@ function ouvrirFicheDemande(clientId) {
   // L'ouverture de la fiche l'ayant déjà marquée comme lue, seule
   // l'action inverse a du sens ici.
   html += '<div style="margin-top:14px;text-align:right">' +
-    '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
+    '<button class="btn btn-sm btn-secondary" ' + actionHtml('marquerDemandeNonLue', [c.id]) + '>' +
     'Marquer comme non lue</button></div>';
 
   var corps = document.getElementById('fiche-demande-corps');
@@ -12046,6 +12112,39 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
   _initialiserAdaptationMobileTableaux();
 }
 
+
+// ── REGISTRE DES ACTIONS ────────────────────────────────────
+// Résolu ici, une fois toutes les fonctions déclarées. Un attribut
+// data-hc-action ne peut donc appeler QUE ce qui figure dans cette
+// liste : pas n'importe quelle fonction globale, et rien qui vienne de
+// la base.
+function ouvrirLettreVoiture(reference) {
+  window.open('lettre-voiture.html?mission=' + encodeURIComponent(reference || ''),
+              '_blank', 'noopener');
+}
+function declencherChampFichier(id) {
+  var el = document.getElementById(id);
+  if (el) el.click();
+}
+
+[
+  'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
+  'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite',
+  'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
+  'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
+  'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',
+  'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',
+  'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
+  'ouvrirPhotosMission', 'ouvrirVideoCandidature', 'previsualiserDevis',
+  'refuserConvoyeur', 'showPage', 'supprimerConvoyeur', 'terminerMission',
+  'terminerMissionNettoyage', 'testerPrepareDevisQA', 'validerConvoyeur',
+  'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',
+  'voirPhotosMission'
+].forEach(function (nom) {
+  var fn = window[nom];
+  if (typeof fn === 'function') HC_ACTIONS[nom] = fn;
+  else console.error('Action déclarée mais introuvable :', nom);
+});
 </script>
 </body>
 </html>
