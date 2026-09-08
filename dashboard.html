@@ -7772,14 +7772,34 @@ var PRO_LIB_TYPE_VEHICULE = {
   'autre-vl': 'Autre véhicule léger'
 };
 
-// Horaire réellement porté par une demande de nettoyage : heure précise,
-// créneau, ou disponibilité flexible. Jamais une valeur reconstituée.
+// Horaire réellement porté par une demande de nettoyage. Jamais une
+// valeur reconstituée.
+//
+// Le formulaire ne pose plus la question « Quelle est votre
+// disponibilité ? » : l'horaire est une simple plage sur place. Les
+// demandes ANTÉRIEURES portent encore dispo_type / heure_precise dans
+// leur JSON : elles restent lues telles quelles, sans être réécrites.
 function _nettHoraireTexte(nd) {
   if (!nd) return '';
+  var plage = [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
+  if (plage) return plage;
+  // Demandes antérieures uniquement.
   if (nd.dispo_type === 'precise') return nd.heure_precise || '';
-  if (nd.dispo_type === 'creneau') return [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
   if (nd.dispo_type === 'flexible') return 'Flexible';
-  return '';
+  return nd.heure_precise || '';
+}
+
+// Période d'intervention : une date de début, et une date de fin depuis
+// la stabilisation. Une intervention d'un seul jour n'affiche qu'une
+// date. Les demandes antérieures n'ont pas de date_fin : elles se
+// lisent exactement comme avant.
+function _nettPeriodeTexte(nd, formateurDate) {
+  if (!nd || !nd.date_souhaitee) return '';
+  var f = formateurDate || function (x) { return x; };
+  if (nd.date_fin && nd.date_fin !== nd.date_souhaitee) {
+    return 'du ' + f(nd.date_souhaitee) + ' au ' + f(nd.date_fin);
+  }
+  return f(nd.date_souhaitee);
 }
 function _nettAdresseTexte(nd) {
   if (!nd) return '';
@@ -8285,6 +8305,18 @@ function loadDemandesDevis() {
 
     _rendreTableDemandesDevis(_demandesDevisListe);
 
+    // CREATION AUTOMATIQUE des missions de nettoyage pretes. Silencieuse
+    // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
+    // l'index unique empeche tout doublon. Ne bloque jamais l'affichage.
+    try {
+      _tenterMissionsNettoyageAuto().then(function (creees) {
+        if (creees) {
+          _rendreTableDemandesDevis(_demandesDevisListe);
+          if (typeof loadMissions === 'function') loadMissions();
+        }
+      }).catch(function () {});
+    } catch (e) { console.warn('Missions de nettoyage automatiques :', e); }
+
     // Recalage du compteur à partir des données réellement chargées
     // (source la plus fiable, et gratuite ici puisque déjà en mémoire).
     // Si la colonne vue_admin_at n'existe pas encore en base, on ne
@@ -8436,12 +8468,24 @@ function _blocMissionNettoyageHtml(c) {
       + 'Voir dans les missions →</button>';
   } else {
     var nd = _nettDetails(c) || {};
-    var prete = !!(nd.date_souhaitee && (nd.adresse_rue || nd.lieu === 'helixcar')
+    var dvNett = _devisParClient[String(c.id)];
+    var devisAccepte = !!(dvNett && dvNett.statut === 'accepte');
+    // Le serveur reste seul juge de ce qui manque : ce test n'est qu'un
+    // repere d'affichage, jamais une autorisation.
+    var prete = !!(nd.date_souhaitee && nd.date_fin
+                   && (nd.adresse_rue || nd.lieu === 'helixcar')
                    && _contactSurPlaceTexte(nd.contact_sur_place));
-    if (!prete) {
-      html += '<div style="font-size:.82rem;color:#8a6d3b">Il manque encore des informations '
-        + 'd\'intervention (adresse, date ou contact sur place). Elles sont listées ci-dessus, '
-        + 'dans « Informations nécessaires à la mission ».</div>';
+    if (!devisAccepte) {
+      html += '<div style="font-size:.82rem;color:#555">La mission sera créée '
+        + '<b>automatiquement</b> dès que le client aura accepté son devis et que '
+        + 'toutes les informations nécessaires seront réunies. Un devis refusé ne '
+        + 'crée aucune mission.</div>';
+    } else if (!prete) {
+      html += '<div style="font-size:.82rem;color:#8a6d3b">Le devis est accepté. '
+        + 'Il manque encore des informations d\'intervention (période, adresse ou '
+        + 'contact sur place) : elles sont listées ci-dessus, dans « Informations '
+        + 'nécessaires à la mission ». La mission se créera <b>toute seule</b> dès '
+        + 'que le client les aura fournies.</div>';
     } else {
       html += '<div style="font-size:.82rem;color:#555;margin-bottom:10px">'
         + 'La mission reprendra l\'adresse, le contact, la date, l\'horaire, la prestation et '
@@ -8471,51 +8515,78 @@ function _referenceMissionNettoyage() {
     .catch(function () { return 'HC-NET-' + annee + '-0001'; });
 }
 
+// ── CREATION DE LA MISSION DE NETTOYAGE : LE SERVEUR DECIDE ──
+//
+// Cette fonction inserait directement dans `missions` apres quelques
+// verifications faites dans le navigateur. Deux clics, un rechargement
+// au mauvais moment, un rejeu : rien n'empechait STRUCTURELLEMENT deux
+// missions pour la meme demande, et rien ne verifiait cote serveur que
+// le devis avait bien ete accepte.
+//
+// Tout passe desormais par creer_mission_nettoyage_si_prete (migration
+// 102), qui exige un administrateur, un devis ACCEPTE et aucune
+// information encore attendue. L'appel est idempotent, et un index
+// unique en base garantit l'unicite meme si la fonction etait
+// contournee. On peut donc l'appeler autant de fois qu'on veut.
 function creerMissionNettoyage(clientId) {
-  var c = (_demandesDevisListe || []).filter(function (x) { return String(x.id) === String(clientId); })[0];
-  if (!c) { alert('Demande introuvable.'); return; }
-  if (_missionNettoyageDe(c)) { alert('Une mission existe déjà pour cette demande.'); return; }
+  return _tenterMissionNettoyage(clientId, true).then(function (r) {
+    if (r && r.ok) {
+      return chargerMissionsParDemande().then(function () {
+        ouvrirFicheDemande(clientId);
+        if (typeof loadMissions === 'function') loadMissions();
+      });
+    }
+    if (r && r.code === 'DEVIS_NON_ACCEPTE') {
+      alert('La mission ne peut pas etre creee : le devis n\'a pas encore ete accepte par le client.');
+    } else if (r && r.code === 'INFORMATIONS_MANQUANTES') {
+      alert('La mission ne peut pas encore etre creee : il manque '
+        + (r.manquantes || 'des') + ' information(s). Elles sont listees dans '
+        + '« Informations necessaires a la mission ».');
+    } else if (r && r.code === 'NON_AUTORISE') {
+      alert('Seul un administrateur peut creer une mission.');
+    } else {
+      alert('La mission n\'a pas pu etre creee.');
+    }
+  });
+}
 
-  var nd = _nettDetails(c) || {};
-  var contact = nd.contact_sur_place || {};
-  var horaire = nd.dispo_type === 'creneau'
-    ? ((nd.creneau_debut || '') + ' — ' + (nd.creneau_fin || ''))
-    : (nd.heure_precise || '');
-  var dv = _devisParClient[String(c.id)];
-
-  if (!confirm('Créer la mission de nettoyage pour '
-      + ((c.prenom || '') + ' ' + (c.nom || '')).trim() + ' ?\n\n'
-      + 'Elle sera proposée aux partenaires nettoyage. Aucun e-mail n\'est envoyé.')) return;
-
-  _referenceMissionNettoyage().then(function (reference) {
-    // Le prix client vient du devis réellement établi, jamais d'une
-    // estimation : sans devis, la mission part sans montant.
-    return sbAuth.from('missions').insert({
-      reference: reference,
-      type_mission: 'nettoyage',
-      statut: 'en_attente',
-      client_id: c.id,
-      prestation: NETT_LIB_TYPE[nd.type_nettoyage] || nd.type_nettoyage || null,
-      nb_vehicules: nd.nombre_vehicules_approx || null,
-      adresse_intervention: nd.adresse_rue || (nd.lieu === 'helixcar' ? 'Locaux HelixCar' : null),
-      code_postal_intervention: nd.adresse_cp || null,
-      ville_intervention: nd.adresse_ville || null,
-      contact_nom: contact.nom || null,
-      contact_tel: contact.telephone || null,
-      date_intervention: nd.date_souhaitee || null,
-      heure_intervention: horaire || null,
-      consignes: nd.instructions || null,
-      prix_ttc: dv ? dv.prix : null
-    }).then(function (res) {
-      if (res.error) throw new Error(res.error.message);
-      return chargerMissionsParDemande();
-    }).then(function () {
-      ouvrirFicheDemande(c.id);
-      if (typeof loadMissions === 'function') loadMissions();
+// Demande au serveur de creer la mission SI elle est prete. Silencieuse
+// par defaut : c'est ce qui permet de l'appeler automatiquement, sans
+// jamais deranger l'administrateur quand il manque encore quelque chose.
+function _tenterMissionNettoyage(clientId, bruyante) {
+  if (!clientId || !_sbAuthPret()) return Promise.resolve(null);
+  return sbAuth.rpc('creer_mission_nettoyage_si_prete', { p_client_id: clientId })
+    .then(function (res) {
+      if (res && res.error) {
+        console.error('creer_mission_nettoyage_si_prete :', res.error.message);
+        return { ok: false, code: 'ERREUR' };
+      }
+      return res && res.data ? res.data : null;
+    })
+    .catch(function (e) {
+      console.error('creer_mission_nettoyage_si_prete :', e && e.message);
+      return { ok: false, code: 'ERREUR' };
     });
-  }).catch(function (e) {
-    console.error('creerMissionNettoyage:', e);
-    alert('La mission n\'a pas pu être créée.\n\n' + (e && e.message ? e.message : ''));
+}
+
+// CREATION AUTOMATIQUE. Passee sur toutes les demandes de nettoyage
+// affichees : celles qui sont pretes recoivent leur mission, les autres
+// ne bougent pas. Rejouee a chaque chargement de la liste et apres
+// chaque information fournie par le client — l'idempotence du serveur
+// fait qu'aucun doublon n'est possible.
+function _tenterMissionsNettoyageAuto() {
+  var aTenter = (_demandesDevisListe || []).filter(function (c) {
+    if (!c || c.type_service !== 'nettoyage') return false;
+    if (_missionNettoyageDe(c)) return false;              // deja creee
+    var dv = _devisParClient[String(c.id)];
+    return !!(dv && dv.statut === 'accepte');              // devis accepte seulement
+  });
+  if (!aTenter.length) return Promise.resolve(0);
+  return Promise.all(aTenter.map(function (c) {
+    return _tenterMissionNettoyage(c.id, false);
+  })).then(function (rs) {
+    var creees = rs.filter(function (r) { return r && r.ok && r.code === 'CREEE'; }).length;
+    return creees ? chargerMissionsParDemande().then(function () { return creees; }) : creees;
   });
 }
 
@@ -8667,10 +8738,10 @@ function ouvrirFicheDemande(clientId) {
     // Clés d'avant V75 : affichées uniquement si la demande les porte.
     if (nd.acces_eau) org += L('Accès à l\'eau (demande antérieure)', NETT_LIB_OUINON[nd.acces_eau] || nd.acces_eau);
     if (nd.acces_electricite) org += L('Prise électrique (demande antérieure)', NETT_LIB_OUINON[nd.acces_electricite] || nd.acces_electricite);
-    org += L('Date souhaitée', _dvDate ? _dvDate(nd.date_souhaitee) : nd.date_souhaitee);
-    if (nd.dispo_type === 'precise') org += L('Heure', nd.heure_precise);
-    else if (nd.dispo_type === 'creneau') org += L('Créneau', (nd.creneau_debut || '') + ' — ' + (nd.creneau_fin || ''));
-    else if (nd.dispo_type === 'flexible') org += L('Disponibilité', 'Flexible');
+    org += L(nd.date_fin && nd.date_fin !== nd.date_souhaitee ? 'Période' : 'Date souhaitée',
+             _nettPeriodeTexte(nd, _dvDate));
+    var _horaireNett = _nettHoraireTexte(nd);
+    if (_horaireNett) org += L('Horaire sur place', _horaireNett);
     org += L('Délai', NETT_LIB_DELAI[nd.delai] || nd.delai);
     // V77 — la cle instructions n'est plus ecrite ; conservee en lecture
     // pour les demandes anterieures.

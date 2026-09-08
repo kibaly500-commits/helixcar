@@ -1759,6 +1759,106 @@ check "T16 : aucune restitution n'est réclamée si aucun véhicule n'est concer
   "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
       where cle like '%restit%';" | tail -1)"
 
+echo "── U. NETTOYAGE : UNE PERIODE, ET UNE SEULE MISSION ──"
+# La mission de nettoyage se creait a la main, par un bouton. Deux
+# clics, un rechargement au mauvais moment, un rejeu : rien n'empechait
+# STRUCTURELLEMENT deux missions pour la meme demande, et rien ne
+# verifiait cote serveur que le devis avait ete accepte.
+
+errU=$(appliquer migrations/102_nettoyage_periode_et_mission.sql)
+check "U1 : migrations/102 s'applique sans erreur" "" "$errU"
+
+check "U2 : la mission porte desormais une date de fin" "1" \
+  "$(sql "select count(*) from information_schema.columns
+     where table_schema='public' and table_name='missions'
+       and column_name='date_fin_intervention';")"
+check "U3 : l'unicite d'une mission par demande est posee EN BASE" "1" \
+  "$(sql "select count(*) from pg_indexes
+     where schemaname='public' and indexname='missions_nettoyage_une_par_demande';")"
+check "U4 : creer_mission_nettoyage_si_prete n'est pas offerte a anon" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='creer_mission_nettoyage_si_prete' and grantee='anon';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff01','TEST-QA-CLAUDE-POSTPR2-N1',
+             'nett1@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','preparation_complete',
+               'lieu','locaux_client',
+               'adresse_rue','12 rue du Test','adresse_cp','69000','adresse_ville','Lyon',
+               'date_souhaitee','2026-11-02','date_fin','2026-11-04',
+               'creneau_debut','09:00','creneau_fin','17:00',
+               'nombre_vehicules_approx', 8,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Karim','telephone','+33600000001')))
+     on conflict (id) do nothing;" >/dev/null
+
+check "U5 : plus aucune information n'est attendue pour cette demande" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff01') where statut='attendue';" | tail -1)"
+check "U6 : SANS devis accepte, aucune mission n'est creee" "DEVIS_NON_ACCEPTE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+check "U7 : ... et la table des missions reste vide pour elle" "0" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+
+sql "insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-POSTPR2-D1','eeeeeeee-0000-0000-0000-00000000ff01', 900, 'refuse');" >/dev/null
+check "U8 : un devis REFUSE ne cree aucune mission" "DEVIS_NON_ACCEPTE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+
+sql "update public.devis set statut='accepte' where reference='TEST-QA-CLAUDE-POSTPR2-D1';" >/dev/null
+check "U9 : devis accepte et rien qui manque : la mission est creee" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+check "U10 : elle est bien typee « nettoyage » et en attente d'un partenaire" "nettoyage|en_attente" \
+  "$(sql "select type_mission||'|'||statut from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U11 : elle reprend la PERIODE complete, debut et fin" "2026-11-02|2026-11-04" \
+  "$(sql "select date_intervention||'|'||date_fin_intervention from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U12 : elle reprend l'adresse, le contact et l'horaire" "12 rue du Test|Lyon|TEST-QA Karim|09:00 – 17:00" \
+  "$(sql "select adresse_intervention||'|'||ville_intervention||'|'||contact_nom||'|'||heure_intervention
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+
+check "U13 : rejouer l'appel renvoie la mission existante" "DEJA_CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');" >/dev/null
+check "U14 : cinq rejeux de plus, et toujours UNE seule mission" "1" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U15 : et meme une insertion DIRECTE en double est refusee par la base" "refuse" \
+  "$(sql "insert into public.missions (reference, type_mission, statut, client_id)
+     values ('TEST-QA-CLAUDE-POSTPR2-DOUBLE','nettoyage','en_attente',
+             'eeeeeeee-0000-0000-0000-00000000ff01');" \
+   | grep -qiE 'duplicate key|unique' && echo refuse || echo passe)"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff02','TEST-QA-CLAUDE-POSTPR2-N2',
+             'nett2@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object('schema_version',2,'type_nettoyage','preparation_complete',
+                                'lieu','locaux_client','date_souhaitee','2026-11-02'))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-POSTPR2-D2','eeeeeeee-0000-0000-0000-00000000ff02', 700, 'accepte');" >/dev/null
+check "U16 : la date de FIN manquante est reclamee au client" "1" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff02')
+      where cle='nettoyage_date_fin' and statut='attendue';" | tail -1)"
+check "U17 : et tant qu'il manque quelque chose, aucune mission" "INFORMATIONS_MANQUANTES" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff02') ->> 'code';" | tail -1)"
+check "U18 : rien n'a ete cree pour elle" "0" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff02';")"
+
+check "U19 : un client ne peut pas creer une mission" "NON_AUTORISE" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code'; commit;" | tail -1)"
+check "U20 : un partenaire non plus" "NON_AUTORISE" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code'; commit;" | tail -1)"
+
+echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
 HIST_AVANT=$(sql "select count(*) from public.convoyeur_decisions_historique;")
@@ -1774,6 +1874,7 @@ err98=$(appliquer migrations/98_photos_justificatives_reelles.sql)
 err99=$(appliquer migrations/99_reclamation_demande.sql)
 err100=$(appliquer migrations/100_activites_partenaire.sql)
 err101=$(appliquer migrations/101_informations_types_coherents.sql)
+err102=$(appliquer migrations/102_nettoyage_periode_et_mission.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
@@ -1786,6 +1887,7 @@ check "F3g : 98 se rejoue sans erreur" "" "$err98"
 check "F3h : 99 se rejoue sans erreur" "" "$err99"
 check "F3i : 100 se rejoue sans erreur" "" "$err100"
 check "F3j : 101 se rejoue sans erreur" "" "$err101"
+check "F3k : 102 se rejoue sans erreur" "" "$err102"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"

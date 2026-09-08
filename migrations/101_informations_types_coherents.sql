@@ -57,7 +57,11 @@
 -- type aujourd'hui peuvent diverger demain.
 --
 -- Le corps est celui de la migration 94, mot pour mot, à ces sept
--- expressions près. Aucune règle métier n'est modifiée ici.
+-- expressions près — et à une rubrique ajoutée : la DATE DE FIN
+-- d'intervention du nettoyage, que le formulaire demande désormais.
+-- Les demandes antérieures ne la portent pas : elle apparaît alors
+-- simplement dans les informations manquantes, comme n'importe quelle
+-- autre. Aucune autre règle métier n'est modifiée.
 
 create or replace function public.informations_demande(p_client_id uuid)
 returns table (
@@ -281,8 +285,14 @@ begin
                          'fournie', public.hc_texte(nd,'type_nettoyage') is not null),
       jsonb_build_object('cle','nettoyage_lieu','libelle','Lieu de l''intervention',
                          'fournie', lieu_nett is not null),
-      jsonb_build_object('cle','nettoyage_date','libelle','Date d''intervention',
+      jsonb_build_object('cle','nettoyage_date','libelle','Date de début d''intervention',
                          'fournie', public.hc_texte(nd,'date_souhaitee') is not null),
+      -- Une intervention de nettoyage s'étale souvent sur plusieurs
+      -- jours : sa FIN est aussi nécessaire pour planifier un partenaire.
+      -- Les demandes antérieures ne la portent pas : elle est alors
+      -- réclamée, comme n'importe quelle information manquante.
+      jsonb_build_object('cle','nettoyage_date_fin','libelle','Date de fin d''intervention',
+                         'fournie', public.hc_texte(nd,'date_fin') is not null),
       jsonb_build_object('cle','nettoyage_horaire','libelle','Horaire d''intervention',
                          'fournie', coalesce(public.hc_texte(nd,'heure_precise'),
                                              public.hc_texte(nd,'creneau_debut')) is not null),

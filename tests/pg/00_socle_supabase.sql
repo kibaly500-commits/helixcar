@@ -108,6 +108,19 @@ do $$ begin
   end if;
 end $$;
 
+-- Les devis, tels qu'ils existent en production : la table est
+-- antérieure à ce dépôt et n'apparaît dans aucun fichier de migrations/.
+-- Le socle doit la reproduire, sans quoi la migration 102 ne pourrait
+-- pas être éprouvée.
+create table if not exists public.devis (
+  id              uuid primary key default gen_random_uuid(),
+  reference       text,
+  client_id       uuid,
+  prix            numeric,
+  statut          text not null default 'brouillon',
+  date_generation timestamptz not null default now()
+);
+
 create table if not exists public.missions (
   id           uuid primary key default gen_random_uuid(),
   convoyeur_id uuid references public.convoyeurs(id),

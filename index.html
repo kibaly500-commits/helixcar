@@ -5299,7 +5299,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <div class="service-card reveal">
       <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4.5 4V16H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/></svg>
       <h3 class="service-title">Service client ultra-réactif</h3>
-      <p class="service-desc">Disponible 7j/7, réponse garantie en moins de 2h. Notre équipe est là pour vous accompagner à chaque étape — avant, pendant et après chaque mission.</p>
+      <p class="service-desc">Disponible 7j/7, réponse garantie sous 1 heure. Notre équipe est là pour vous accompagner à chaque étape — avant, pendant et après chaque mission.</p>
     </div>
 
   </div>
@@ -6915,33 +6915,35 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
           </div>
 
-          <div class="modal-form-group">
-            <label>Quelle est la date souhaitée ? <span class="field-required">*</span></label>
-            <input type="date" id="nett-date" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-          </div>
-
-          <div class="modal-form-group" id="nett-dispo-group">
-            <label>Quelle est votre disponibilité ? <span class="field-required">*</span></label>
-            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="precise" onclick="nettOnDispoChange()"><span>Heure précise</span></label>
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="creneau" onclick="nettOnDispoChange()"><span>Créneau horaire</span></label>
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="flexible" onclick="nettOnDispoChange()"><span>Flexible</span></label>
+          <!-- Une intervention de nettoyage s'étale souvent sur
+               plusieurs jours : elle a un DÉBUT et une FIN. La question
+               « Quelle est votre disponibilité ? » (Heure précise /
+               Créneau horaire / Flexible) a été retirée : elle
+               conditionnait l'horaire à un choix supplémentaire sans
+               rapport avec la période. -->
+          <div class="modal-row">
+            <div class="modal-form-group">
+              <label>Date de début <span class="field-required">*</span></label>
+              <input type="date" id="nett-date" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+            <div class="modal-form-group">
+              <label>Date de fin <span class="field-required">*</span></label>
+              <input type="date" id="nett-date-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
             </div>
           </div>
 
-          <div class="modal-form-group" id="nett-heure-precise-bloc" style="display:none">
-            <label>Heure souhaitée <span class="field-required">*</span></label>
-            <input type="time" id="nett-heure" readonly style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-          </div>
-
-          <div id="nett-creneau-bloc" style="display:none">
+          <!-- L'horaire ne dépend plus d'aucun choix préalable : c'est
+               une plage sur place, facultative, cohérente avec la
+               période ci-dessus. Si elle manque, elle est réclamée plus
+               tard par le mécanisme des informations nécessaires. -->
+          <div id="nett-creneau-bloc">
             <div class="modal-row">
               <div class="modal-form-group">
-                <label>Début du créneau <span class="field-required">*</span></label>
+                <label>Horaire de début sur place <span class="field-optional-hint">(facultatif)</span></label>
                 <input type="time" id="nett-creneau-debut" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
-                <label>Fin du créneau <span class="field-required">*</span></label>
+                <label>Horaire de fin sur place <span class="field-optional-hint">(facultatif)</span></label>
                 <input type="time" id="nett-creneau-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
@@ -8342,13 +8344,16 @@ function _nettAdresseApplicable() {
 function _nettDate() {
   return ((document.getElementById('nett-date') || {}).value || '').trim();
 }
-function _nettTypeDispo() {
-  var el = document.querySelector('input[name="nett-dispo"]:checked');
-  return el ? el.value : '';
+// La date de FIN de la période d'intervention. Une prestation de
+// nettoyage s'étale souvent sur plusieurs jours ; début = fin est
+// parfaitement valide.
+function _nettDateFin() {
+  return ((document.getElementById('nett-date-fin') || {}).value || '').trim();
 }
-function _nettHeure() {
-  return ((document.getElementById('nett-heure') || {}).value || '').trim();
-}
+
+// _nettTypeDispo() et _nettHeure() sont supprimées avec la question
+// « Quelle est votre disponibilité ? ». L'horaire sur place est
+// désormais une simple plage, facultative, lue directement.
 function _nettCreneauDebut() {
   return ((document.getElementById('nett-creneau-debut') || {}).value || '').trim();
 }
@@ -8419,7 +8424,7 @@ function _nettMajBoutonContinuer() {
 // et surtout elle ne doit plus peser sur la navigation.
 var CLIENT_BRANCHES_SERVICE = {
   nettoyage: ['nett-eligibilite-group', 'nett-repartition-group', 'nett-type-group',
-              'nett-lieu-group', 'nett-dispo-group', 'nett-delai-group'],
+              'nett-lieu-group', 'nett-delai-group'],
   professionnel: ['pro-categorie-group', 'pro-specialite-group', 'pro-mission-group'],
   convoyage: ['trajet-type-group', 'service-mode-group'],
   stockage: ['stockage-group']
@@ -8467,21 +8472,8 @@ function nettOnLieuChange() {
   _clearGroupError('nett-lieu-group');
 }
 
-function nettOnDispoChange() {
-  var t = _nettTypeDispo();
-  var bp = document.getElementById('nett-heure-precise-bloc');
-  var bc = document.getElementById('nett-creneau-bloc');
-  if (bp) bp.style.display = (t === 'precise') ? 'block' : 'none';
-  if (bc) bc.style.display = (t === 'creneau') ? 'block' : 'none';
-  // Une heure precise et un creneau ne coexistent JAMAIS.
-  if (t !== 'precise') { var h = document.getElementById('nett-heure'); if (h) h.value = ''; _clearFieldError('nett-heure'); }
-  if (t !== 'creneau') {
-    ['nett-creneau-debut', 'nett-creneau-fin'].forEach(function (id) {
-      var e = document.getElementById(id); if (e) e.value = ''; _clearFieldError(id);
-    });
-  }
-  _clearGroupError('nett-dispo-group');
-}
+// nettOnDispoChange() est supprimée : plus aucun choix ne pilote
+// l'affichage de l'horaire, qui est toujours visible et facultatif.
 
 // ══════════════════════════════════════════════════════════════
 // CONTACT SUR PLACE — composant transversal
@@ -9235,23 +9227,30 @@ function _validateNettoyageEtape4() {
     }
   }
 
-  var td = _nettTypeDispo();
-  if (!td) { _showGroupError('nett-dispo-group', 'S\u00e9lectionnez votre disponibilit\u00e9.'); fail('nett-dispo-group'); }
+  // DATE DE FIN. Une periode a deux bornes. Une intervention d'une
+  // seule journee se declare avec debut = fin : c'est accepte.
+  if (!_checkDate('nett-date-fin', true)) fail('nett-date-fin');
   else {
-    _clearGroupError('nett-dispo-group');
-    if (td === 'precise') {
-      if (!_checkRequiredText('nett-heure', null, true)) fail('nett-heure');
-    } else if (td === 'creneau') {
-      var d1 = !_checkRequiredText('nett-creneau-debut', null, true);
-      var d2 = !_checkRequiredText('nett-creneau-fin', null, true);
-      if (d1) fail('nett-creneau-debut');
-      if (d2) fail('nett-creneau-fin');
-      var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
-      if (deb && fin && fin <= deb) {
-        _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
-        fail('nett-creneau-fin');
+    var vf = _nettDateFin(), vd = _nettDate();
+    if (vf) {
+      var auj2 = new Date(); auj2.setHours(0, 0, 0, 0);
+      var df = new Date(vf + 'T00:00:00');
+      if (df < auj2) { _showFieldError('nett-date-fin', 'La date ne peut pas \u00eatre dans le pass\u00e9.'); fail('nett-date-fin'); }
+      else if (vd && vf < vd) {
+        _showFieldError('nett-date-fin', 'La fin ne peut pas pr\u00e9c\u00e9der le d\u00e9but.');
+        fail('nett-date-fin');
       }
     }
+  }
+
+  // HORAIRE SUR PLACE : facultatif. On ne verifie que sa coherence
+  // interne — jamais sa presence.
+  var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
+  if (deb && fin && fin <= deb) {
+    _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
+    fail('nett-creneau-fin');
+  } else {
+    _clearFieldError('nett-creneau-fin');
   }
 
   if (!_nettDelai()) { _showGroupError('nett-delai-group', 'S\u00e9lectionnez un d\u00e9lai.'); fail('nett-delai-group'); }
@@ -9281,9 +9280,13 @@ function _construireDetailsNettoyage() {
     adresse_rue: null,
     adresse_cp: null,
     adresse_ville: null,
+    // date_souhaitee reste la date de DEBUT : la cle ne change pas, les
+    // demandes deja enregistrees et le Dashboard continuent de la lire.
     date_souhaitee: _nettDate() || null,
-    dispo_type: _nettTypeDispo() || null,
-    heure_precise: _nettHeure() || null,
+    date_fin: _nettDateFin() || null,
+    // dispo_type et heure_precise ne sont plus produits : la question
+    // qui les alimentait a ete retiree. Les anciennes demandes les
+    // conservent dans leur JSON, et le Dashboard sait encore les lire.
     creneau_debut: _nettCreneauDebut() || null,
     creneau_fin: _nettCreneauFin() || null,
     delai: _nettDelai() || null,
@@ -9340,9 +9343,9 @@ function construireRecapNettoyage() {
   // Libelle unique, identique au dashboard et au PDF.
   orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
   orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
-  if (d.dispo_type === 'precise') orga += _recapLigne('Heure', d.heure_precise);
-  else if (d.dispo_type === 'creneau') orga += _recapLigne('Cr\u00e9neau', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
-  else if (d.dispo_type === 'flexible') orga += _recapLigne('Disponibilit\u00e9', 'Flexible');
+  if (d.creneau_debut || d.creneau_fin) {
+    orga += _recapLigne('Horaire sur place', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
+  }
   orga += _recapLigne('D\u00e9lai', NETT_DELAI[d.delai] || '');
   html += _recapBloc('Organisation de l\'intervention', orga, 4);
 
@@ -16277,9 +16280,13 @@ async function _submitClientFormInterne() {
             if (_dN.lieu) lignesAdmin.push('Lieu d\'intervention : ' + (NETT_LIEUX[_dN.lieu] || _dN.lieu));
             if (_dN.adresse_ville) lignesAdmin.push('Ville : ' + [_dN.adresse_cp, _dN.adresse_ville].filter(Boolean).join(' '));
             if (_dN.date_souhaitee) {
-              var _hN = _dN.dispo_type === 'precise' ? (' \u00e0 ' + _dN.heure_precise)
-                : (_dN.dispo_type === 'creneau' ? (' entre ' + _dN.creneau_debut + ' et ' + _dN.creneau_fin) : ' (flexible)');
-              lignesAdmin.push('Date souhait\u00e9e : ' + _dN.date_souhaitee + _hN);
+              var _periode = _dN.date_fin && _dN.date_fin !== _dN.date_souhaitee
+                ? ('du ' + _dN.date_souhaitee + ' au ' + _dN.date_fin)
+                : ('le ' + _dN.date_souhaitee);
+              var _hN = (_dN.creneau_debut || _dN.creneau_fin)
+                ? (', entre ' + (_dN.creneau_debut || '?') + ' et ' + (_dN.creneau_fin || '?'))
+                : '';
+              lignesAdmin.push('Intervention ' + _periode + _hN);
             }
             if (_dN.delai) lignesAdmin.push('D\u00e9lai : ' + (NETT_DELAI[_dN.delai] || _dN.delai));
           } else if (_avecConvoyage()) {
@@ -19161,6 +19168,9 @@ function _hcContexteChamp(id) {
   // globalement au rendu, subsiste : aujourd'hui et le futur sont
   // acceptes, le passe est refuse. C'est exactement la regle demandee.
   if (id === 'nett-date') return { type: 'nettoyage', prefixe: 'nett-date' };
+  // La date de FIN d'intervention : meme famille, avec la seule borne
+  // metier qui existe ici — elle ne precede jamais le debut.
+  if (id === 'nett-date-fin') return { type: 'nettoyage', prefixe: 'nett-date-fin' };
   // Trouver un professionnel : periode reelle debut -> fin, colorable
   // comme celle du Convoyage/Stockage, avec la seule borne metier qui
   // existe vraiment ici (la fin ne precede jamais le debut).
@@ -19228,7 +19238,16 @@ function _hcPeriodePourChamp(id) {
   if (!ctx) return { debut: null, finLiv: null, finRestit: null };
   // V76 — le nettoyage n'a aucune periode a colorer : ni stockage, ni
   // convoyage, ni restitution.
-  if (ctx.type === 'nettoyage') return { debut: null, finLiv: null, finRestit: null };
+  // Periode d'intervention du nettoyage : debut et fin colores comme
+  // ceux du Convoyage/Stockage et du Professionnel. Aucune regle de
+  // coloration dupliquee — seule la source des deux dates change.
+  if (ctx.type === 'nettoyage') {
+    return {
+      debut: _hcParserYMD((document.getElementById('nett-date') || {}).value),
+      finLiv: _hcParserYMD((document.getElementById('nett-date-fin') || {}).value),
+      finRestit: null
+    };
+  }
   // Periode d'intervention du professionnel : memes bornes visuelles que
   // Convoyage/Stockage (debut et fin en rouge, jours intermediaires en
   // teinte plus legere, demi-teintes si debut et fin le meme jour) —
@@ -19267,6 +19286,9 @@ function _hcDateMinimaleChamp(id) {
   // La fin d'intervention ne precede jamais son debut.
   if (ctx.prefixe === 'pro-date-fin') {
     return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
+  }
+  if (ctx.prefixe === 'nett-date-fin') {
+    return _hcParserYMD((document.getElementById('nett-date') || {}).value);
   }
   if (ctx.prefixe === 'liv') {
     if (_avecStockage()) {
@@ -19490,7 +19512,10 @@ function _hcDateDebutLiee(id) {
   if (ctx.type === 'professionnel') {
     return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
   }
-  return null;   // nettoyage : aucune date liee
+  if (ctx.type === 'nettoyage') {
+    return _hcParserYMD((document.getElementById('nett-date') || {}).value);
+  }
+  return null;
 }
 
 // V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
@@ -19499,7 +19524,7 @@ function _hcDateDebutLiee(id) {
 var _hcCalTempNettoyage = null;
 
 function _hcEstCalendrierNettoyage() {
-  return _hcCalChampActif === 'nett-date';
+  return _hcCalChampActif === 'nett-date' || _hcCalChampActif === 'nett-date-fin';
 }
 
 // Confirme la selection temporaire puis ferme (bouton OK).

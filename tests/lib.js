@@ -108,16 +108,22 @@ async function fillNettoyageStep4(page, opts) {
   await page.fill('#nett-adresse-ville', 'Les Lilas');
   await fillContactSurPlace(page, 'nett',
     opts.contactType || 'autre', opts.contactNom || 'Karim B.', opts.contactTel || '+33600000000');
-  await page.evaluate(() => {
-    const d = new Date(); d.setDate(d.getDate() + 7);
-    // Date CIVILE : toISOString() reculerait d'un jour en France.
+  // PÉRIODE d'intervention : début et fin. La question « Quelle est
+  // votre disponibilité ? » n'existe plus ; l'horaire sur place est une
+  // plage facultative, toujours visible.
+  await page.evaluate((jours) => {
+    // Dates CIVILES : toISOString() reculerait d'un jour en France.
     const _p = (n) => String(n).padStart(2, '0');
-    document.getElementById('nett-date').value =
-      d.getFullYear() + '-' + _p(d.getMonth() + 1) + '-' + _p(d.getDate());
-  });
-  await page.click('input[name="nett-dispo"][value="precise"]');
-  await page.waitForTimeout(40);
-  await page.evaluate(() => { document.getElementById('nett-heure').value = '09:00'; });
+    const ymd = (n) => {
+      const d = new Date(); d.setDate(d.getDate() + n);
+      return d.getFullYear() + '-' + _p(d.getMonth() + 1) + '-' + _p(d.getDate());
+    };
+    document.getElementById('nett-date').value = ymd(jours.debut);
+    document.getElementById('nett-date-fin').value = ymd(jours.fin);
+    document.getElementById('nett-creneau-debut').value = '09:00';
+    document.getElementById('nett-creneau-fin').value = '17:00';
+  }, { debut: opts.joursDebut === undefined ? 7 : opts.joursDebut,
+       fin: opts.joursFin === undefined ? 9 : opts.joursFin });
   await page.click('input[name="nett-delai"][value="standard"]');
   await page.waitForTimeout(40);
 }

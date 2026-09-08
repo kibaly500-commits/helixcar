@@ -39,22 +39,37 @@ const L = require('./lib.js');
   await page.fill('#nett-adresse-cp', '93260');
   await page.fill('#nett-adresse-ville', 'Les Lilas');
 
-  // Date (champ readonly piloté par le calendrier maison) : on écrit la valeur
+  // PÉRIODE d'intervention : deux bornes (champs readonly pilotés par le
+  // calendrier maison). La question « Quelle est votre disponibilité ? »
+  // a été retirée : l'horaire sur place est une plage facultative,
+  // toujours visible, qui ne dépend plus d'aucun choix préalable.
   await page.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
+    const f = new Date(); f.setDate(f.getDate() + 9);
     // Le formateur de la production : aucune conversion UTC.
     document.getElementById('nett-date').value = _hcFormaterYMD(d);
+    document.getElementById('nett-date-fin').value = _hcFormaterYMD(f);
   });
-
-  // Disponibilité : heure précise
-  await page.click('input[name="nett-dispo"][value="precise"]');
-  await page.waitForTimeout(50);
-  const heureVisible = await page.evaluate(() => {
-    const b = document.getElementById('nett-heure-precise-bloc');
-    return b && b.style.display !== 'none';
+  const dispoDisparue = await page.evaluate(() => ({
+    radios: document.querySelectorAll('input[name="nett-dispo"]').length,
+    heure: !!document.getElementById('nett-heure'),
+    blocHeure: !!document.getElementById('nett-heure-precise-bloc'),
+    creneauVisible: (function () {
+      const b = document.getElementById('nett-creneau-bloc');
+      return !!b && b.style.display !== 'none';
+    })()
+  }));
+  L.check('La question « Quelle est votre disponibilité ? » a disparu',
+    dispoDisparue.radios === 0, JSON.stringify(dispoDisparue));
+  L.check('... ainsi que le champ « Heure précise » et son bloc',
+    dispoDisparue.heure === false && dispoDisparue.blocHeure === false,
+    JSON.stringify(dispoDisparue));
+  L.check('L\'horaire sur place est visible sans aucun choix préalable',
+    dispoDisparue.creneauVisible === true, JSON.stringify(dispoDisparue));
+  await page.evaluate(() => {
+    document.getElementById('nett-creneau-debut').value = '09:00';
+    document.getElementById('nett-creneau-fin').value = '17:00';
   });
-  L.check('Disponibilité "précise" -> bloc heure affiché (_nettTypeDispo)', heureVisible);
-  await page.evaluate(() => { document.getElementById('nett-heure').value = '09:00'; });
 
   // Contact sur place (obligatoire depuis le lot courant)
   await L.fillContactSurPlace(page, 'nett', 'autre', 'Karim B.', '+33600000000');
@@ -68,18 +83,19 @@ const L = require('./lib.js');
     lieu: _nettLieu(),
     adresseApplicable: _nettAdresseApplicable(),
     date: _nettDate(),
-    dispo: _nettTypeDispo(),
-    heure: _nettHeure(),
+    dateFin: _nettDateFin(),
     cdeb: _nettCreneauDebut(),
     cfin: _nettCreneauFin(),
     delai: _nettDelai()
   }));
   L.check('_nettLieu() lit le lieu', lecteurs.lieu === 'locaux_client', JSON.stringify(lecteurs));
-  L.check('_nettDate() lit la date', /^\d{4}-\d{2}-\d{2}$/.test(lecteurs.date));
-  L.check('_nettTypeDispo() lit la disponibilité', lecteurs.dispo === 'precise');
-  L.check('_nettHeure() lit l\'heure', lecteurs.heure === '09:00');
+  L.check('_nettDate() lit la date de début', /^\d{4}-\d{2}-\d{2}$/.test(lecteurs.date));
+  L.check('_nettDateFin() lit la date de fin', /^\d{4}-\d{2}-\d{2}$/.test(lecteurs.dateFin));
+  L.check('La fin ne précède pas le début', lecteurs.dateFin >= lecteurs.date,
+    lecteurs.date + ' -> ' + lecteurs.dateFin);
   L.check('_nettDelai() lit le délai', lecteurs.delai === 'standard');
-  L.check('_nettCreneauDebut/Fin() vides hors créneau', lecteurs.cdeb === '' && lecteurs.cfin === '');
+  L.check('_nettCreneauDebut/Fin() lisent la plage sur place',
+    lecteurs.cdeb === '09:00' && lecteurs.cfin === '17:00', JSON.stringify(lecteurs));
 
   // Validation de l'étape 4 sans exception
   const v4 = await page.evaluate(() => {
@@ -114,8 +130,15 @@ const L = require('./lib.js');
     const d = det.d;
     L.check('Payload : type_nettoyage renseigné', d.type_nettoyage === 'preparation_complete');
     L.check('Payload : lieu renseigné', d.lieu === 'locaux_client');
-    L.check('Payload : date renseignée', !!d.date_souhaitee);
-    L.check('Payload : heure_precise renseignée', d.heure_precise === '09:00');
+    L.check('Payload : date de début renseignée', !!d.date_souhaitee);
+    L.check('Payload : date de FIN renseignée', !!d.date_fin);
+    L.check('Payload : la période est cohérente', d.date_fin >= d.date_souhaitee,
+      d.date_souhaitee + ' -> ' + d.date_fin);
+    L.check('Payload : horaire sur place renseigné',
+      d.creneau_debut === '09:00' && d.creneau_fin === '17:00');
+    L.check('Payload : plus aucune trace de l\'ancienne disponibilité',
+      d.dispo_type === undefined && d.heure_precise === undefined,
+      JSON.stringify({ dispo_type: d.dispo_type, heure_precise: d.heure_precise }));
     L.check('Payload : delai renseigné', d.delai === 'standard');
     L.check('Payload : adresse renseignée', d.adresse_cp === '93260' && d.adresse_ville === 'Les Lilas');
     L.check('Payload : répartition = 11 véhicules',
