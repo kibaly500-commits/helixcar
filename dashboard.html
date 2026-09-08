@@ -2116,14 +2116,14 @@ body.scroll-verrouille { overflow: hidden; }
                 <div style="font-weight:700;font-size:.88rem">📄 Lettre de voiture — Mission HC-2024-0529</div>
                 <div style="font-size:.75rem;color:var(--gray);margin-top:2px">Paris → Lyon · À imprimer, signer et renvoyer</div>
               </div>
-              <a href="helixcar-lettre-voiture.html" target="_blank" class="btn btn-sm btn-outline">Ouvrir</a>
+              <a href="helixcar-lettre-voiture.html" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">Ouvrir</a>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:#FFF8E1;border-radius:8px;border:1px solid rgba(181,68,75,.3)">
               <div>
                 <div style="font-weight:700;font-size:.88rem">🔄 Lettre de voiture — Restitution HC-2024-0529-RESTIT</div>
                 <div style="font-size:.75rem;color:#8C3238;margin-top:2px">À utiliser pour l'état des lieux retour · Même procédure que l'aller</div>
               </div>
-              <a href="helixcar-lettre-voiture-restit.html" target="_blank" class="btn btn-sm" style="background:var(--yellow);color:var(--navy);font-weight:700;padding:6px 12px;font-size:.78rem;border-radius:6px;text-decoration:none">Ouvrir</a>
+              <a href="helixcar-lettre-voiture-restit.html" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:var(--yellow);color:var(--navy);font-weight:700;padding:6px 12px;font-size:.78rem;border-radius:6px;text-decoration:none">Ouvrir</a>
             </div>
           </div>
         </div>
@@ -3712,6 +3712,41 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// ── TROIS CONTEXTES, TROIS ÉCHAPPEMENTS ─────────────────────
+// escapeHtml() suffit pour du TEXTE dans du HTML. Il ne suffit pas
+// ailleurs, et s'en contenter donne une fausse impression de sûreté.
+//
+// Le cas qui trompe : une valeur placée dans une chaîne JavaScript,
+// elle-même dans un attribut HTML —
+//
+//     onclick="voirPhotosMission('ICI')"
+//
+// Le navigateur DÉCODE d'abord l'attribut HTML, PUIS livre le résultat
+// au parseur JavaScript. Une apostrophe échappée par escapeHtml() en
+// « &#39; » redevient donc une apostrophe AVANT que JavaScript ne lise
+// la ligne : elle ferme la chaîne, et tout ce qui suit est du code.
+// Il faut échapper pour JavaScript d'ABORD, pour HTML ENSUITE.
+function escapeJsAttr(v) {
+  return escapeHtml(
+    String(v === null || v === undefined ? '' : v)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/</g, '\\x3C')      // neutralise aussi une balise de fermeture
+  );
+}
+
+// Une URL venue de la base et posée dans un href. Échapper les
+// caractères ne suffit pas : « javascript:alert(1) » ne contient aucun
+// caractère spécial et s'exécute au clic. Seuls http, https et les
+// chemins internes sont acceptés ; tout le reste devient vide.
+function urlSure(u) {
+  var s = String(u === null || u === undefined ? '' : u).trim();
+  return /^(https?:\/\/|\/)/i.test(s) ? s : '';
+}
+
 // ── ACTIVITÉS PARTENAIRE (Lot 1) ─────────────────────────────
 // Source de vérité unique : la colonne convoyeurs.activites (text[]).
 // FALLBACK ANCIENNES CANDIDATURES : absente / nulle / vide => la
@@ -4929,9 +4964,12 @@ function openDossierSb(id) {
   currentCandId = id;
   const nom = (c.prenom || '') + ' ' + (c.nom || '');
   document.getElementById('dossier-name').textContent = 'Dossier — ' + nom;
+  // L'URL vient de la base : « javascript:… » s'exécuterait au clic, et
+  // un guillemet suffisait à sortir de l'attribut href.
   const docLink = function(url, label) {
-    return url
-      ? '<a href="' + url + '" target="_blank" rel="noopener" class="badge badge-active" style="text-decoration:none">✅ Voir ' + label + '</a>'
+    var u = urlSure(url);
+    return u
+      ? '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="text-decoration:none">✅ Voir ' + escapeHtml(label) + '</a>'
       : '<span class="badge badge-pending">⏳ Manquant</span>';
   };
   document.getElementById('dossier-content').innerHTML = `
@@ -5476,9 +5514,12 @@ function voirConvoyeurSb(id) {
   const note = (c.note != null) ? c.note : '—';
   const noteVal = parseFloat(note);
   const noteColor = noteVal >= 16 ? 'var(--green)' : noteVal >= 12 ? 'var(--yellow)' : 'var(--red)';
+  // L'URL vient de la base : « javascript:… » s'exécuterait au clic, et
+  // un guillemet suffisait à sortir de l'attribut href.
   const docLink = function(url, label) {
-    return url
-      ? '<a href="' + url + '" target="_blank" rel="noopener" class="badge badge-active" style="text-decoration:none">✅ Voir ' + label + '</a>'
+    var u = urlSure(url);
+    return u
+      ? '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="text-decoration:none">✅ Voir ' + escapeHtml(label) + '</a>'
       : '<span class="badge badge-pending">⏳ Manquant</span>';
   };
 
@@ -5852,20 +5893,29 @@ function filtrerClientsAdmin(texte) {
 // entièrement inventés. Un administrateur ne pouvait pas distinguer ces
 // valeurs de vraies données. Tout est désormais compté et lu dans
 // Supabase, avec les mêmes helpers que le reste du Dashboard.
-function _compterLignes(requete) {
-  return fetch(SUPABASE_URL + '/rest/v1/' + requete + '&limit=0', {
+// Le comptage ne passe pas par sbFetch() parce qu'il a besoin de
+// l'en-tête de RÉPONSE Content-Range, que sbFetch() ne rend pas. Mais
+// il doit obéir EXACTEMENT à la même règle d'authentification : le JWT
+// de la session ouverte en Authorization, la clé publique en apikey.
+//
+// Avec la clé anon en Authorization, `auth.uid()` vaut null : après le
+// durcissement RLS, est_admin() est faux et PostgREST répond « 0 » en
+// HTTP 200. Les compteurs afficheraient zéro sans la moindre erreur —
+// exactement le piège que sbFetch() a été écrit pour fermer.
+async function _compterLignes(requete) {
+  const jetonSession = await _jetonSessionSupabase();
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + requete + '&limit=0', {
     method: 'GET',
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Authorization': 'Bearer ' + (jetonSession || SUPABASE_KEY),
       'Prefer': 'count=exact'
     }
-  }).then(function (r) {
-    if (!r.ok) throw new Error('Comptage HTTP ' + r.status);
-    var total = parseInt((r.headers.get('content-range') || '').split('/')[1], 10);
-    if (isNaN(total)) throw new Error('Content-Range illisible');
-    return total;
   });
+  if (!r.ok) throw new Error('Comptage HTTP ' + r.status);
+  var total = parseInt((r.headers.get('content-range') || '').split('/')[1], 10);
+  if (isNaN(total)) throw new Error('Content-Range illisible');
+  return total;
 }
 
 function _ecrireStat(id, valeur) {
@@ -6052,9 +6102,13 @@ function loadMissions() {
     }
 
     tbody.innerHTML = missions.map(function(m) {
-      const convoyeurNom = m.convoyeur_id ? (convoyeurs[m.convoyeur_id] || '—') : '—';
-      const clientNom = m.client_id ? (clients[m.client_id] || '—') : '—';
-      const vehicule = [m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—';
+      // Ces trois valeurs viennent de la base, donc de saisies faites
+      // par des clients et des candidats. Elles finissaient dans du
+      // innerHTML SANS échappement : un nom contenant une balise
+      // s'exécutait dans le Dashboard de l'administrateur.
+      const convoyeurNom = escapeHtml(m.convoyeur_id ? (convoyeurs[m.convoyeur_id] || '—') : '—');
+      const clientNom = escapeHtml(m.client_id ? (clients[m.client_id] || '—') : '—');
+      const vehicule = escapeHtml([m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—');
       // Une mission de nettoyage n'a ni ville de départ ni ville
       // d'arrivée : elle a un LIEU d'intervention. On affiche ce que la
       // mission porte réellement, jamais une flèche vers du vide.
@@ -6084,11 +6138,14 @@ function loadMissions() {
       // mission terminée — c'est la trace de l'état des véhicules.
       if (estNettoyage) {
         actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
-          + 'onclick="voirPhotosMission(\'' + m.id + '\',\'' + escapeHtml(m.reference || '') + '\')">'
+          + 'onclick="voirPhotosMission(\'' + escapeJsAttr(m.id) + '\',\'' + escapeJsAttr(m.reference || '') + '\')">'
           + '\uD83D\uDCF7 Photos</button>' + (actions === '—' ? '' : actions);
       }
-      const lettreVdv = estNettoyage ? '—' : (m.lettre_voiture_signee_url
-        ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
+      // L'URL vient de la base : « javascript:… » y serait exécutable au
+      // clic, et un guillemet suffisait à sortir de l'attribut.
+      var urlLettre = urlSure(m.lettre_voiture_signee_url);
+      const lettreVdv = estNettoyage ? '—' : (urlLettre
+        ? '<a href="' + escapeHtml(urlLettre) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
         : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>');
       var badgeType = estNettoyage
         ? '<span class="badge badge-service">🧼 Nettoyage</span>'
@@ -6105,7 +6162,7 @@ function loadMissions() {
             + escapeHtml(m.prestation) + '</span>' : '') + '</td>'
         + '<td>' + clientNom + '</td>'
         + '<td>' + convoyeurNom + '</td>'
-        + '<td>' + (estNettoyage ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—') : vehicule) + '</td>'
+        + '<td>' + (estNettoyage ? (m.nb_vehicules ? escapeHtml(m.nb_vehicules) + ' véhicule(s)' : '—') : vehicule) + '</td>'
         + '<td>' + (estNettoyage ? '—' : (m.electrique ? '⚡ Oui' : 'Non')) + '</td>'
         + '<td>' + (estNettoyage ? '—'
             : (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non')) + '</td>'
@@ -6114,7 +6171,7 @@ function loadMissions() {
                + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
             : datePec) + '</td>'
         + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
-        + '<td>' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</td>'
+        + '<td>' + (m.prix_ttc != null ? escapeHtml(m.prix_ttc) + ' €' : '—') + '</td>'
         + '<td>' + badge + '</td>'
         + '<td>' + lettreVdv + '</td>'
         + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + actions + '</td>'
@@ -6339,38 +6396,61 @@ function envoyerEmailFicheMission(missionId, conv) {
   }).catch(function(e) { console.error('Erreur préparation email fiche mission:', e); });
 }
 
-// ── HISTORIQUE / SUIVI DE MISSION CÔTÉ CONVOYEUR (Supabase) ──
+// ── HISTORIQUE / SUIVI DE MISSION CÔTÉ CONVOYEUR ──
+// `reference` et `id` viennent de la base. Ils sont insérés ici dans
+// TROIS contextes différents, qui n'ont pas le même échappement :
+//   * une chaîne JavaScript dans un attribut  -> escapeJsAttr()
+//   * un paramètre d'URL                      -> encodeURIComponent()
+//   * du texte HTML                           -> escapeHtml()
+// Les mélanger, ou n'en appliquer qu'un seul, laisse une porte ouverte.
+function _lienLettreVoiture(reference) {
+  return '<button class="btn btn-sm btn-outline" onclick="window.open(\''
+    + escapeJsAttr('lettre-voiture.html?mission=' + encodeURIComponent(reference || ''))
+    + '\',\'_blank\',\'noopener\')">📄 Lettre de voiture</button>';
+}
+function _boutonEdl(reference, etape, libelle) {
+  return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\''
+    + escapeJsAttr(reference) + '\',\'' + escapeJsAttr(etape) + '\')" '
+    + 'style="margin-right:4px">' + libelle + '</button>';
+}
+function _lienLettreSignee(m) {
+  var u = urlSure(m && m.lettre_voiture_signee_url);
+  return u ? '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener noreferrer" '
+    + 'class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;'
+    + 'border:1px solid rgba(31,122,77,.3)">✅ Lettre signée envoyée</a>' : '';
+}
+
 const CONV_MISSION_ACTIONS = {
   acceptee: function(id, reference) {
-    return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\'' + reference + '\',\'depart\')" style="margin-right:4px">📋 État des lieux départ</button>'
-      + '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
+    return _boutonEdl(reference, 'depart', '📋 État des lieux départ') + _lienLettreVoiture(reference);
   },
   en_cours: function(id, reference) {
-    return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\'' + reference + '\',\'arrivee\')" style="margin-right:4px">📋 État des lieux arrivée</button>'
-      + '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
+    return _boutonEdl(reference, 'arrivee', '📋 État des lieux arrivée') + _lienLettreVoiture(reference);
   },
   restitution_requise: function(id, reference) {
-    return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\'' + reference + '\',\'restitution_depart\')" style="margin-right:4px">🔄 État des lieux restitution — départ</button>'
-      + '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
+    return _boutonEdl(reference, 'restitution_depart', '🔄 État des lieux restitution — départ')
+      + _lienLettreVoiture(reference);
   },
   restitution_en_cours: function(id, reference) {
-    return '<button class="btn btn-sm btn-primary" onclick="allerVersEdl(\'' + reference + '\',\'restitution_arrivee\')" style="margin-right:4px">🔄 État des lieux restitution — arrivée</button>'
-      + '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
+    return _boutonEdl(reference, 'restitution_arrivee', '🔄 État des lieux restitution — arrivée')
+      + _lienLettreVoiture(reference);
   },
   edl_termine: function(id, reference, m) {
-    const btnLettre = '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
-    return btnLettre + '<button class="btn btn-sm" style="background:var(--y);color:var(--bk);border:none" onclick="document.getElementById(\'upload-lettre-signee-\' + \'' + id + '\').click()">📸 Envoyer la lettre signée</button>'
-      + '<input type="file" accept="image/*" capture="environment" id="upload-lettre-signee-' + id + '" style="display:none" onchange="envoyerLettreVoitureSignee(this, \'' + id + '\', \'' + reference + '\')">';
+    var champ = 'upload-lettre-signee-' + String(id || '');
+    return _lienLettreVoiture(reference)
+      + '<button class="btn btn-sm" style="background:var(--y);color:var(--bk);border:none" '
+      + 'onclick="document.getElementById(\'' + escapeJsAttr(champ) + '\').click()">'
+      + '📸 Envoyer la lettre signée</button>'
+      + '<input type="file" accept="image/*" capture="environment" id="' + escapeHtml(champ) + '" '
+      + 'style="display:none" onchange="envoyerLettreVoitureSignee(this, \''
+      + escapeJsAttr(id) + '\', \'' + escapeJsAttr(reference) + '\')">';
   },
   fini: function(id, reference, m) {
-    const btnLettre = '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
-    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;border:1px solid rgba(31,122,77,.3)">✅ Lettre signée envoyée</a>' : '';
-    return btnLettre + lienLettreSignee + '<span class="badge badge-progress" style="font-size:.72rem">🔵 En attente de confirmation HelixCar</span>';
+    return _lienLettreVoiture(reference) + _lienLettreSignee(m)
+      + '<span class="badge badge-progress" style="font-size:.72rem">🔵 En attente de confirmation HelixCar</span>';
   },
   terminee: function(id, reference, m) {
-    const btnLettre = '<button class="btn btn-sm btn-outline" onclick="window.open(\'lettre-voiture.html?mission=' + reference + '\',\'_blank\')">📄 Lettre de voiture</button>';
-    const lienLettreSignee = m && m.lettre_voiture_signee_url ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;border:1px solid rgba(31,122,77,.3)">✅ Lettre signée envoyée</a>' : '';
-    return btnLettre + lienLettreSignee;
+    return _lienLettreVoiture(reference) + _lienLettreSignee(m);
   }
 };
 
@@ -6433,7 +6513,7 @@ function _actionsMissionNettoyage(m) {
   // politiques Storage ne lui ouvrent que les photos de SA mission.
   if (etat.avant + etat.apres > 0) {
     boutons += '<button class="btn btn-sm btn-secondary" '
-      + 'onclick="voirPhotosMission(\'' + m.id + '\',\'' + escapeHtml(m.reference || '') + '\')">'
+      + 'onclick="voirPhotosMission(\'' + escapeJsAttr(m.id) + '\',\'' + escapeJsAttr(m.reference || '') + '\')">'
       + 'Voir les photos</button>';
   }
   if (m.statut === 'acceptee' || m.statut === 'en_cours') {
@@ -6608,21 +6688,40 @@ async function envoyerPhotoMission(input) {
                 : fichier.type === 'image/webp' ? '.webp' : '.jpg';
   var chemin = 'missions/' + missionId + '/' + etape + '-' + Date.now() + extension;
 
+  // DEUX ÉCRITURES, DEUX SERVICES : le fichier va dans Storage, sa trace
+  // dans la base. Il n'existe pas de transaction commune. Quand la
+  // seconde échoue après la première, le fichier reste dans le bucket
+  // sans que rien ne le référence : un orphelin, que personne ne voit,
+  // que personne ne supprime, et qui compte dans le quota.
+  // On défait donc explicitement l'envoi.
+  var deposeFaite = false;
   try {
     var envoi = await sbAuth.storage.from('missions-photos')
       .upload(chemin, fichier, { contentType: fichier.type, upsert: false });
     if (envoi.error) throw new Error(envoi.error.message);
+    deposeFaite = true;
 
     var trace = await sbAuth.from('mission_photos').insert({
       mission_id: missionId, etape: etape, chemin: chemin
     });
     if (trace.error) throw new Error(trace.error.message);
+    deposeFaite = false;   // les deux écritures ont abouti : plus rien à défaire
 
     if (!_photosParMission[String(missionId)]) _photosParMission[String(missionId)] = { avant: 0, apres: 0 };
     _photosParMission[String(missionId)][etape] += 1;
     loadHistoriqueConvoyeur();
   } catch (e) {
     console.error('envoyerPhotoMission:', e);
+    if (deposeFaite) {
+      // Le ménage ne doit jamais masquer l'erreur d'origine : s'il
+      // échoue lui aussi, on le dit dans la console et on continue.
+      try {
+        var menage = await sbAuth.storage.from('missions-photos').remove([chemin]);
+        if (menage && menage.error) console.error('orphelin non supprimé:', chemin, menage.error);
+      } catch (e2) {
+        console.error('orphelin non supprimé:', chemin, e2);
+      }
+    }
     alert('La photo n\'a pas pu être envoyée.\n\n' + (e && e.message ? e.message : ''));
   } finally {
     input.value = '';
@@ -6643,7 +6742,16 @@ function terminerMissionNettoyage(missionId) {
   }).then(function () { loadHistoriqueConvoyeur(); })
     .catch(function (e) {
       console.error('terminerMissionNettoyage:', e);
-      alert('La mission n\'a pas pu être mise à jour.');
+      // Le compteur ci-dessus est un confort d'interface, pas une
+      // garantie : c'est le verrou serveur (migration 97) qui vérifie
+      // que les photos existent VRAIMENT en base. Si l'écriture est
+      // refusée pour cette raison, on le dit dans ces termes.
+      var m = String((e && e.message) || '');
+      alert(/photo/i.test(m)
+        ? 'HelixCar n\'a pas retrouvé vos photos avant et après.\n\n'
+          + 'Redéposez-les, puis réessayez.'
+        : 'La mission n\'a pas pu être mise à jour.');
+      loadHistoriqueConvoyeur();
     });
 }
 
@@ -6652,11 +6760,25 @@ function terminerMissionNettoyage(missionId) {
 function validerPrestationNettoyage(missionId) {
   if (!_sbAuthPret()) { alert('Session administrateur requise.'); return; }
   if (!confirm('Valider la prestation de nettoyage ?\n\nLa mission passera en « Validée ».')) return;
+  // On n'envoie PAS prestation_validee_par : c'est le serveur qui pose
+  // le validateur, à partir de la session (migration 97). Une valeur
+  // envoyée d'ici serait de toute façon écrasée — autant ne pas laisser
+  // croire que le navigateur en décide.
   sbAuth.from('missions').update({
     statut: 'terminee',
     prestation_validee_le: new Date().toISOString()
   }).eq('id', missionId).then(function (res) {
-    if (res.error) { alert('La validation n\'a pas pu être enregistrée.'); return; }
+    if (res.error) {
+      // Le refus le plus fréquent est celui du verrou serveur : une
+      // prestation ne se valide pas sans ses photos. On le dit
+      // clairement plutôt que d'afficher une erreur technique.
+      var m = String((res.error && res.error.message) || '');
+      alert(/non constatée|photo/i.test(m)
+        ? 'Validation refusée : cette prestation n\'a pas ses photos avant et après.\n\n'
+          + 'Ouvrez « 📷 Photos » pour vérifier ce qui a été déposé.'
+        : 'La validation n\'a pas pu être enregistrée.\n\n' + m);
+      return;
+    }
     if (typeof loadMissions === 'function') loadMissions();
   });
 }
