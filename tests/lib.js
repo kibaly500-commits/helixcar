@@ -1,9 +1,11 @@
 // Helpers partagés pour les tests navigateur HelixCar
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier, jourCivil, dansNJours } = require('./env.js');
 const path = require('path');
 
-const FILE = 'file://' + path.resolve('/home/user/helixcar/index.html');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const FILE = urlFichier('index.html');
+// Le navigateur vient de env.js : celui que Playwright a installé,
+// ou celui indiqué par CHROME_PATH. Plus aucun chemin en dur.
+const EXE = process.env.CHROME_PATH || undefined;
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -18,7 +20,7 @@ function results() {
 }
 
 async function launch() {
-  return chromium.launch({ executablePath: EXE });
+  return lancerNavigateur({ });
 }
 
 async function newPage(browser) {
@@ -108,7 +110,10 @@ async function fillNettoyageStep4(page, opts) {
     opts.contactType || 'autre', opts.contactNom || 'Karim B.', opts.contactTel || '+33600000000');
   await page.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
-    document.getElementById('nett-date').value = d.toISOString().slice(0, 10);
+    // Date CIVILE : toISOString() reculerait d'un jour en France.
+    const _p = (n) => String(n).padStart(2, '0');
+    document.getElementById('nett-date').value =
+      d.getFullYear() + '-' + _p(d.getMonth() + 1) + '-' + _p(d.getDate());
   });
   await page.click('input[name="nett-dispo"][value="precise"]');
   await page.waitForTimeout(40);
@@ -126,4 +131,7 @@ async function btnState(page) {
 
 async function step(page) { return page.evaluate(() => _formStepState.client); }
 
-module.exports = { launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
+module.exports = {
+  // Réexportés depuis env.js : une suite qui charge lib.js dispose des
+  // mêmes helpers de chemin, sans second require.
+  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };

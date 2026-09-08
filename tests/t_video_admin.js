@@ -1,6 +1,6 @@
 // Dashboard administrateur : fiche candidat unique, états de la vidéo,
 // lecture par URL signée temporaire, nettoyage à la fermeture.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const failures = [];
@@ -62,12 +62,12 @@ async function definirResultatSignature(page, litteral) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(INIT_SUPABASE);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
 
   await page.evaluate(([a, b, c]) => {
     window._candidaturesData = {};

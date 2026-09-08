@@ -1,11 +1,13 @@
 // ESPACE CLIENT — NOUVELLE DEMANDE DEPUIS LE DASHBOARD
 // Exécute le vrai code des deux pages contre un double Supabase injecté
 // AVANT les scripts (le CDN supabase-js est injoignable ici).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier , jourCivil, dansNJours } = require('./env.js');
 const path = require('path');
 const L = require('./lib.js');   // mêmes aides de remplissage que les autres suites
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 async function setVal(page, id, v) {
   await page.evaluate(([i, val]) => {
     const e = document.getElementById(i);
@@ -24,7 +26,6 @@ function check(l, c, e) {
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
 
-const RACINE = '/home/user/helixcar';
 
 // Double Supabase commun aux deux pages : session réelle simulée,
 // journal de toutes les écritures, et instrumentation d'EmailJS.
@@ -90,10 +91,17 @@ window.supabase = { createClient: function () { return {
   },
   from: _table,
   rpc: async function (nom, params) {
-    window.__journal.push({ op: 'rpc', nom, params });
+    // La session AU MOMENT de l'appel : c'est elle qui rattache la
+    // demande côté serveur (auth.uid()), et rien d'autre.
+    window.__journal.push({ op: 'rpc', nom, params,
+      session: (window.__session && window.__session.user && window.__session.user.id) || null });
     if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
     if (nom === 'informations_demande') return { data: window.__infos || [], error: null };
     if (nom === 'repondre_informations_demande') return { data: 1, error: null };
+    if (nom === 'creer_demande_avec_vehicules') {
+      if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
+      return { data: { id: (params && params.p_demande && params.p_demande.id) || 'x', vehicules: 0 }, error: null };
+    }
     return { data: null, error: null };
   },
   storage: { from: function () { return { createSignedUrl: async function () { return { data: null, error: null }; } }; } }
@@ -129,7 +137,7 @@ window.fetch = function (url, options) {
 `;
 
 (async () => {
-  const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const navigateur = await lancerNavigateur();
   const page = await navigateur.newPage({ viewport: { width: 1280, height: 1100 } });
   const erreursJs = [];
   page.on('pageerror', e => erreursJs.push(e.message));
@@ -137,7 +145,7 @@ window.fetch = function (url, options) {
   await page.addInitScript(INIT);
 
   // ── A. ESPACE CLIENT : session réelle et action visible ──
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   const connexion = await page.evaluate(async () => {
     loginRole = 'client';
     document.getElementById('login-email').value = 'clientA@helixcar.test';
@@ -181,7 +189,7 @@ window.fetch = function (url, options) {
     /index\.html\?nouvelle-demande=1/.test(cible), cible);
 
   // ── B. MODE CONNECTÉ DANS LE FORMULAIRE PUBLIC ──
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   const modeConnecte = await page.evaluate(() => ({
     modaleOuverte: document.getElementById('modal-client').classList.contains('open'),
@@ -231,25 +239,44 @@ window.fetch = function (url, options) {
   await page.waitForTimeout(250);
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
-  const payload = await page.evaluate(() => window.__journal.filter(j => j.op === 'rest'));
-  const insertion = payload.filter(j => j.table === 'clients' && j.methode === 'POST')[0];
-  check('C1 : la demande est bien envoyée dans la table commune', !!insertion, JSON.stringify(payload).slice(0, 200));
-  if (insertion) {
-    check('C2 : elle porte un identifiant généré, sans relecture',
-      !!(insertion.corps && insertion.corps.id) && /minimal/.test(insertion.prefer),
-      JSON.stringify({ id: insertion.corps && insertion.corps.id, prefer: insertion.prefer }));
-    check('C3 : elle est reliée au compte authentifié',
-      insertion.corps && insertion.corps.auth_user_id === '55555555-5555-5555-5555-555555555555',
-      JSON.stringify(insertion.corps && insertion.corps.auth_user_id));
+  // L'écriture passe désormais par creer_demande_avec_vehicules :
+  // une seule transaction serveur au lieu de deux requêtes REST.
+  const payload = await page.evaluate(() => window.__journal.filter(j => j.op === 'rpc'));
+  const appel = payload.filter(j => j.nom === 'creer_demande_avec_vehicules')[0];
+  const demande = appel && appel.params && appel.params.p_demande;
+  check('C1 : la demande part par l\'écriture atomique unique', !!demande,
+    JSON.stringify(payload.map(j => j.nom)).slice(0, 200));
+  if (demande) {
+    check('C2 : elle porte un identifiant généré côté navigateur',
+      !!demande.id, String(demande.id));
+    // LE NAVIGATEUR NE DÉSIGNE PAS LE PROPRIÉTAIRE.
+    //
+    // La migration 92 ignore volontairement tout auth_user_id reçu et
+    // n'utilise que auth.uid() : sans cela, n'importe qui pourrait
+    // s'attribuer la demande d'un tiers. Vérifier que le navigateur
+    // envoie le bon identifiant revenait donc à vérifier une valeur que
+    // le serveur jette — et à croire un rattachement qui n'a pas
+    // forcément eu lieu.
+    //
+    // Ce qui rattache, c'est la SESSION au moment de l'appel. C'est
+    // cela qu'on vérifie.
+    check('C3 : le navigateur ne prétend PAS désigner le propriétaire',
+      demande.auth_user_id === undefined, String(demande.auth_user_id));
+    check('C3b : et l\'appel part bien avec une session ouverte — c\'est elle qui rattache',
+      appel.session === '55555555-5555-5555-5555-555555555555', String(appel.session));
     check('C4 : elle reçoit une référence HelixCar',
-      !!(insertion.corps && insertion.corps.numero_client), String(insertion.corps && insertion.corps.numero_client));
+      !!demande.numero_client, String(demande.numero_client));
     check('C5 : elle porte le service choisi',
-      insertion.corps && insertion.corps.type_service === 'nettoyage', String(insertion.corps && insertion.corps.type_service));
+      demande.type_service === 'nettoyage', String(demande.type_service));
+    check('C5b : les véhicules voyagent avec la demande, pas séparément',
+      Array.isArray(appel.params.p_vehicules)
+      && payload.filter(j => j.nom === 'creer_demande_avec_vehicules').length === 1,
+      JSON.stringify(appel.params.p_vehicules).slice(0, 120));
   }
 
   // ── C bis. RÉCAPITULATIF, CONTACT « AUTRE », RETOUR ARRIÈRE ──
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.evaluate(() => { window.__journal = []; });
   await L.chooseService(page, 'nettoyage');
@@ -283,14 +310,14 @@ window.fetch = function (url, options) {
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
   const envoiAutre = await page.evaluate(() =>
-    (window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST')[0] || {}).corps || null);
+    ((window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')[0] || {}).params || {}).p_demande || null);
   check('C8 : « Contact sur place : une autre personne » arrive dans le payload',
     !!envoiAutre && JSON.stringify(envoiAutre).indexOf('TEST-QA Karim') !== -1,
     JSON.stringify(envoiAutre && envoiAutre.nettoyage_details).slice(0, 160));
 
   // ── C ter. TROUVER UN PROFESSIONNEL, DE BOUT EN BOUT ──
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.evaluate(() => { window.__journal = []; });
   await L.chooseService(page, 'professionnel');
@@ -318,18 +345,19 @@ window.fetch = function (url, options) {
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
   const envoiPro = await page.evaluate(() =>
-    (window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST')[0] || {}).corps || null);
+    ((window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')[0] || {}).params || {}).p_demande || null);
   check('C9 : « Trouver un professionnel » est réellement enregistrable',
     !!envoiPro && envoiPro.type_service === 'professionnel' && !!envoiPro.professionnel_details,
     JSON.stringify(envoiPro && envoiPro.type_service));
-  check('C10 : cette demande est elle aussi reliée au compte',
-    !!envoiPro && envoiPro.auth_user_id === '55555555-5555-5555-5555-555555555555');
+  check('C10 : cette demande non plus ne désigne son propriétaire',
+    !!envoiPro && envoiPro.auth_user_id === undefined,
+    String(envoiPro && envoiPro.auth_user_id));
 
   // ── D. DOUBLE CLIC, F5, COUPURE RÉSEAU ──
   // On repart d'un état propre : la restauration de brouillon a sa
   // propre suite (t_brouillon) et n'a pas à interférer ici.
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   const apresF5 = await page.evaluate(() => ({
     etape: (document.querySelector('#modal-client-form .form-step.active') || {}).dataset.step,
@@ -355,7 +383,7 @@ window.fetch = function (url, options) {
     window.__reseauCoupe = false;
     return {
       succes: (document.getElementById('client-success-msg') || {}).innerHTML || '',
-      tentatives: window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST').length
+      tentatives: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules').length
     };
   });
   check('D2 : une coupure réseau n\'annonce JAMAIS un succès',
@@ -370,12 +398,21 @@ window.fetch = function (url, options) {
   check('E1 : aucun e-mail supplémentaire déclenché par ce parcours', emails === 0, String(emails));
 
   const fs = require('fs');
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
-  const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   check('E2 : le dashboard ne contient AUCUNE copie du formulaire',
     !/name="type-service"/.test(dash) && /name="type-service"/.test(idx));
-  check('E3 : aucune mission créée par ce parcours',
-    !/from\('missions'\)\s*\.insert|rest\/v1\/missions.*POST/.test(dash.slice(dash.indexOf('ESPACE CLIENT —'))));
+  // La règle vérifiée est bien « l'espace CLIENT ne crée aucune
+  // mission ». La version précédente examinait TOUT ce qui suit la
+  // bannière « ESPACE CLIENT », y compris le code d'administration écrit
+  // plus bas : la création d'une mission de nettoyage par
+  // l'administrateur la faisait échouer alors que l'espace client n'y
+  // est pour rien. On borne donc la lecture au bloc lui-même.
+  const debutClient = dash.indexOf('ESPACE CLIENT —');
+  const finClient = dash.indexOf('RÉINITIALISATION DU MOT DE PASSE', debutClient);
+  const blocClient = dash.slice(debutClient, finClient > debutClient ? finClient : dash.length);
+  check('E3 : aucune mission créée par le parcours CLIENT',
+    !/from\('missions'\)\s*\.insert|rest\/v1\/missions[^']*POST/.test(blocClient));
   check('E4 : le mot de passe client n\'est plus collecté en pure perte',
     /auth\.signUp/.test(idx));
 

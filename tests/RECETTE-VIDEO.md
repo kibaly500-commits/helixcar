@@ -31,7 +31,8 @@ Chrome Android, Safari iPhone.
 | 11 | Décocher **Renfort** (Convoyage reste) | Elle **repasse** à « à remplacer », **Continuer** rebloqué |
 | 12 | MP4 de **2 min 30** | Refusé même avec Renfort |
 | 13 | Fichier **.avi** ou **.mkv** | « Format non pris en charge » |
-| 14 | Fichier vidéo **> 50 Mo** | « Fichier trop volumineux » |
+| 14 | Fichier vidéo **> 300 Mo** | « Fichier trop volumineux » |
+| 14b | Vidéo réelle de 2 min (~214 Mo) | **acceptée** — c'est le cas qui échouait avec l'ancienne limite |
 | 15 | « Remplacer » puis choisir une autre vidéo | La nouvelle remplace l'ancienne dans l'écran |
 | 16 | « Supprimer » | Retour aux deux boutons, **Continuer** rebloqué |
 | 17 | Soumettre la candidature | Barre de progression, puis « Vidéo envoyée » |

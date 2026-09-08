@@ -1,7 +1,10 @@
 // Brouillon (F5), boutons Effacer / OK des rubriques, retour arrière
 const L = require('./lib.js');
+const { jourCivil, dansNJours } = L;
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 async function setVal(page, id, v) {
   await page.evaluate(([i, val]) => {
     const e = document.getElementById(i); e.value = val;

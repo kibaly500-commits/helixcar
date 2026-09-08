@@ -15,6 +15,7 @@ l'ordre ci-dessous est **impératif**.
 | **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
 | **B** | Déploiement de la nouvelle `dashboard.html` | — |
 | **C** | `90_durcissement_rls_partenaires.sql` puis `91_durcissement_rls_clients.sql` | ❌ **non** — exige la phase B |
+| **D** | `92` → `99` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
 
 ### Pourquoi la phase C ne peut pas venir plus tôt
 
@@ -63,6 +64,95 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | — | **B** | **déploiement de `dashboard.html` ET de `index.html`** | `sbFetch()` transmet le JWT ; le formulaire public génère l'identifiant et n'attend plus de relecture |
 | 8 | C | `90_durcissement_rls_partenaires.sql` | garde-fou + RLS `convoyeurs` et `missions` + politiques |
 | 9 | C | `91_durcissement_rls_clients.sql` | RLS `clients` + accès client par la vue |
+| 10 | **D** | `92_creation_demande_atomique.sql` | **correctif obligatoire** : `creer_demande_avec_vehicules()` — sans lui, plus aucune demande avec véhicules ne peut être déposée après la phase C |
+| 11 | D | `93_bucket_video_300mo.sql` | limite du bucket vidéo portée à 300 Mo |
+| 12 | D | `94_informations_selon_scenario.sql` | `informations_demande()` selon le scénario réel + `vehicules.livraison_apres_stockage` |
+| 13 | D | `95_metiers_partenaires.sql` | `convoyeurs.metiers` + activité `technicien` acceptée |
+| 14 | D | `96_missions_nettoyage.sql` | missions de nettoyage (`missions.type_mission` + colonnes d'intervention), photos avant/après, bucket privé `missions-photos` et ses politiques |
+| 15 | **D** | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ce qu'un partenaire a le droit de changer sur une mission — colonnes, transitions de statut, attribution, photos exigées |
+| 16 | **D** | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo n'est acceptée que si son fichier existe réellement dans le bucket privé et appartient à la mission ; `ajoutee_par` imposé par le serveur |
+| 17 | **D** | `99_reclamation_demande.sql` | **correctif fonctionnel** : rattacher sa demande après confirmation d'adresse — session, adresse confirmée et identique, identifiant exact, secret dont seule l'empreinte est stockée, expiration, consommation. Le secret de réclamation est **distinct** de celui de création (§ *Deux secrets*, ci-dessous) |
+
+### Deux secrets, et pourquoi `92` retire une signature
+
+La migration `92` publie désormais `creer_demande_avec_vehicules` avec
+**quatre** arguments : `p_cle_reclamation` s'ajoute à `p_cle_creation`.
+
+* le **secret de création** prouve un rejeu ; il ne quitte jamais la
+  page et n'est écrit nulle part ;
+* le **secret de réclamation** est le seul que le navigateur conserve,
+  et il n'ouvre que `reclamer_demande()`.
+
+Les deux empreintes sont préfixées par leur usage
+(`public.empreinte_secret`) : la même chaîne ne produit pas la même
+valeur selon le mécanisme auquel on la présente. Un secret de
+réclamation ne peut donc **jamais** satisfaire la vérification de
+création.
+
+Ajouter un paramètre ne remplace pas une fonction PostgreSQL : cela en
+crée une seconde. PostgREST se retrouverait devant deux candidates et
+refuserait de choisir — **toutes** les créations de demande
+échoueraient. La migration `92` retire donc explicitement la signature à
+trois arguments avant de créer celle à quatre :
+
+```sql
+drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb, text);
+```
+
+Contrôle après application :
+
+```sql
+select count(*), min(pronargs) from pg_proc
+ where proname = 'creer_demande_avec_vehicules';
+-- attendu : 1 | 4
+```
+
+### Pourquoi `97` ne peut pas attendre
+
+La policy de `90` autorise un partenaire actif à modifier une mission qui
+lui est attribuée — **sans jamais regarder QUELLE colonne** il modifie :
+
+```sql
+with check (public.partenaire_actif())
+```
+
+Le Dashboard ne propose que deux boutons, mais un partenaire n'est pas
+obligé de passer par le Dashboard. Une requête `PATCH` directe sur l'API
+REST, avec son propre jeton de session, suffit à changer le prix d'une
+mission, la rattacher à un autre client, la passer en « terminee » ou
+cocher la validation de paiement. **Reproduit sur PostgreSQL 16**
+(`tests/t_rls.sh`, section Z, contrôles Z1 et Z2).
+
+`97` ferme cela par un trigger, qui s'applique à **tout** chemin
+d'écriture — REST, RPC, SQL Editor — et pas seulement aux boutons.
+
+### Pourquoi la phase D vient APRÈS la phase C
+
+`92` corrige une panne que la phase C **provoque**. `public.vehicules`
+porte une politique d'insertion qui vérifie l'existence du dossier
+parent :
+
+```sql
+with check (exists (select 1 from public.clients c where c.id = vehicules.dossier_id))
+```
+
+Tant que `clients` n'avait aucune RLS, cette sous-requête voyait la
+ligne. Après `91`, un visiteur anonyme ne voit plus la demande qu'il
+vient pourtant de créer : la sous-requête ne renvoie rien, et
+PostgreSQL rejette avec
+`new row violates row-level security policy for table "vehicules"`.
+Reproduit sur PostgreSQL 16 (`tests/t_rls.sh`, section V), y compris la
+**création partielle** : la demande était écrite, ses véhicules non.
+
+`92` est donc **obligatoire** et doit suivre `91` de très près — idéalement
+dans la même fenêtre de maintenance. Les trois autres fichiers de la
+phase D sont des compléments : ils n'ont aucun effet destructeur et
+peuvent être appliqués juste après, dans l'ordre.
+
+> **Ne pas appliquer la phase D avant que la Pull Request ne soit
+> relue et prête à être fusionnée** : `94` et `95` accompagnent des
+> évolutions de `index.html` et `dashboard.html` livrées dans la même
+> Pull Request.
 
 Toutes les instructions sont **idempotentes** : la chaîne complète a été
 appliquée **deux fois de suite** sur PostgreSQL 16 sans erreur, sans
@@ -147,6 +237,46 @@ visible, son déblocage rétablit l'accès aux missions, et **aucune
 décision par activité n'est modifiée** — une activité refusée ou en
 attente le reste.
 
+### Après la phase D
+```sql
+-- 92 : la fonction de création atomique existe et est exécutable
+--      par un visiteur anonyme (c'est tout l'objet du correctif).
+select has_function_privilege('anon',
+  'public.creer_demande_avec_vehicules(jsonb, jsonb)', 'execute');   -- doit renvoyer true
+
+-- 93 : la limite du bucket vidéo
+select id, public, file_size_limit from storage.buckets
+ where id = 'candidatures-videos';        -- public = false, limite = 314572800
+
+-- 94 : la colonne de décision de sortie de stockage
+select column_name from information_schema.columns
+ where table_name = 'vehicules' and column_name = 'livraison_apres_stockage';
+
+-- 95 : les métiers et l'activité technicien
+select column_name from information_schema.columns
+ where table_name = 'convoyeurs' and column_name = 'metiers';
+select pg_get_constraintdef(oid) from pg_constraint
+ where conname = 'convoyeur_decisions_activite_check';   -- doit inclure 'technicien'
+
+-- 96 : les missions de nettoyage et leurs photos
+select count(*) from public.missions where type_mission <> 'convoyage';  -- 0 juste après
+select id, public from storage.buckets where id = 'missions-photos';     -- public = false
+select policyname from pg_policies
+ where tablename = 'mission_photos';                     -- 6 politiques attendues
+```
+
+Puis, depuis le site :
+1. déposer une demande de convoyage **à deux véhicules** — elle doit
+   aboutir, et les deux véhicules doivent apparaître dans le Dashboard ;
+2. ouvrir la fiche d'une demande de nettoyage dont le contact sur place
+   est renseigné — il ne doit **plus** figurer dans « Encore manquantes » ;
+3. déposer une candidature **technicien** — l'activité doit être
+   acceptée et apparaître avec ses spécialités dans le Dashboard ;
+4. ouvrir une demande de **nettoyage** complète, établir son devis, puis
+   cliquer sur « Créer la mission de nettoyage » — la mission doit
+   apparaître dans l'onglet Missions avec le badge 🧼 Nettoyage, et
+   n'être proposée qu'aux partenaires ayant déclaré ce métier.
+
 ## Retour arrière
 
 ### Revenir sur la phase C
@@ -176,6 +306,19 @@ update public.convoyeurs c
 > lit `bloque`. Les laisser en place est sans effet tant que la phase C
 > n'est pas appliquée.
 
+### Revenir sur la phase D
+
+| Fichier | Retour arrière | Perte de données ? |
+|---|---|---|
+| `99` | `drop function if exists public.reclamer_demande(uuid, text);`, `drop function if exists public.armer_reclamation(uuid, text);`, `drop function if exists public.duree_reclamation();`. Laisser les deux colonnes `reclamation_*` en place. NE PAS retirer `public.empreinte_secret` : `92` s'en sert. | **Aucune** — mais la phrase « elle apparaîtra dans votre espace une fois votre adresse confirmée » redevient FAUSSE. La retirer alors d'`index.html`. Les demandes déjà rattachées le restent. |
+| `98` | `drop trigger if exists trg_verrou_photo_mission on public.mission_photos;` puis `drop function if exists public.verrou_photo_mission();`, et réappliquer `97` pour retrouver l'ancienne `mission_photos_completes()`. | **Aucune** — mais revenir dessus permet de nouveau de justifier une prestation avec des photos qui n'existent pas. |
+| `97` | `drop trigger if exists trg_verrou_maj_mission on public.missions;` puis `drop trigger if exists trg_verrou_creation_mission on public.missions;` et les cinq fonctions listées en fin de fichier. | **Aucune** : ces objets ne font que contrôler. Mais les revenir rouvre le défaut de sécurité qu'ils ferment. |
+| `96` | Laisser les colonnes de `public.missions` et la table `mission_photos` EN PLACE : ce sont des missions et des pièces justificatives réellement créées. Seules les politiques Storage peuvent être retirées (voir la fin du fichier). | Retirer la table supprimerait les photos d'état des véhicules. |
+| `95` | Laisser `convoyeurs.metiers` en place (nullable, ignorée par l'ancienne version). Ne revenir sur la contrainte que si `select count(*) from public.convoyeur_decisions where activite = 'technicien'` renvoie 0. | Retirer la colonne supprimerait des métiers réellement déclarés. |
+| `94` | Réappliquer `06_informations_manquantes.sql` : il contient la version précédente de `informations_demande(uuid)`, même signature. Laisser `vehicules.livraison_apres_stockage` en place. | Aucune : `94` ne touche qu'une fonction de lecture et ajoute une colonne vide. |
+| `93` | `update storage.buckets set file_size_limit = 52428800 where id = 'candidatures-videos';` | Les vidéos déjà déposées au-delà de la limite restent lisibles. |
+| `92` | `drop function if exists public.creer_demande_avec_vehicules(jsonb, jsonb);` — **uniquement** si l'ancienne `index.html` est remise en ligne en même temps, sans quoi plus aucune demande ne peut être déposée. | Aucune. |
+
 ### Fenêtre d'exposition à connaître
 Entre les phases A et C, `convoyeurs` reste **sans RLS**, exactement
 comme aujourd'hui : la phase A n'ouvre rien de plus, mais ne referme
@@ -192,27 +335,69 @@ et **ne bloquer aucun partenaire avant la phase C**.
    peut pas envoyer sa vidéo.
 
    ```bash
+   # Depuis la racine du dépôt : supabase/config.toml y est lu.
    supabase functions deploy candidature-video
    ```
+
+   **Lancer la commande depuis la racine du dépôt**, et non depuis un
+   autre dossier : c'est là que se trouve `supabase/config.toml`, qui
+   porte le réglage sans lequel la fonction répondrait `401` à toute
+   candidature —
+
+   ```toml
+   [functions.candidature-video]
+   verify_jwt = false
+   ```
+
+   *Pourquoi ce réglage.* Une candidature est déposée **avant** toute
+   authentification : le candidat n'a pas encore de compte. Le navigateur
+   envoie donc `apikey`, mais **aucun JWT utilisateur**. Avec la
+   vérification JWT du gateway active — le défaut de Supabase — la
+   requête est refusée avant d'atteindre la moindre ligne de code.
+
+   Cela n'ouvre rien : l'autorisation réelle est assurée par la fonction
+   elle-même, et elle est plus stricte que ce que le gateway saurait
+   faire — jeton applicatif à usage unique haché en base, chemin de
+   destination généré par le serveur, URL d'envoi signée et temporaire
+   sur un bucket privé, origine HTTP contrôlée.
+
+   Le réglage est **versionné dans le dépôt**, pas coché à la main dans
+   une interface : il se relit, se relie à une revue de code, et survit
+   à une recréation du projet.
 
    Elle utilise `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`, déjà
    présentes dans l'environnement des Edge Functions. **Cette clé ne doit
    jamais être placée ailleurs que là.**
 
+0 bis. **Vérifier le réglage après déploiement.** Supabase → Edge
+   Functions → `candidature-video` : la vérification JWT doit apparaître
+   comme **désactivée**. Si l'interface affiche l'inverse, le déploiement
+   n'a pas lu `config.toml` — recommencer depuis la racine du dépôt.
+
 1. **Storage → `candidatures-videos`** : vérifier que le bucket apparaît
    bien comme **Private**. C'est le point de sécurité central des vidéos.
+1 bis. **Storage → `missions-photos`** : créé par la migration `96`.
+   Vérifier lui aussi qu'il apparaît comme **Private** — les photos
+   d'état des véhicules sont des pièces, jamais des illustrations
+   publiques.
 2. **Aucune clé `service_role` côté navigateur.** La lecture d'une vidéo
    passe par une **URL signée temporaire** (`createSignedUrl`, 60–300 s),
    générée depuis une session authentifiée, après le contrôle
    d'autorisation assuré par les policies.
-3. **Conservation des vidéos** : définir une durée (par exemple 12 mois
+3. **Storage → Settings → limite globale de taille de fichier.** La
+   migration `93` porte la limite du bucket à **300 Mo**, mais Supabase
+   applique **aussi** une limite globale au projet. Tant que celle-ci
+   reste inférieure, c'est elle qui s'applique : une vidéo de 200 Mo
+   serait refusée malgré le réglage du bucket. À porter à **300 Mo au
+   minimum**, dans l'interface — ce réglage n'est pas accessible en SQL.
+4. **Conservation des vidéos** : définir une durée (par exemple 12 mois
    après refus ou inactivité) et la mentionner dans la politique de
    confidentialité **avant** toute mise en service.
-4. **Rattachement de l'historique client** : le rapprochement des
+5. **Rattachement de l'historique client** : le rapprochement des
    demandes existantes à un compte est laissé volontairement non exécuté
    (requête fournie en commentaire dans `06`) — un rapprochement par
    e-mail peut exposer la demande d'un tiers en cas d'adresse réutilisée.
-5. **URL de redirection à autoriser (Supabase → Authentication → URL Configuration).**
+6. **URL de redirection à autoriser (Supabase → Authentication → URL Configuration).**
    Le lien de réinitialisation du mot de passe renvoie vers
    `<origine du site>/dashboard.html`. Supabase **refuse** toute
    redirection non autorisée : le lien retomberait alors sur la page

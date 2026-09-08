@@ -1,7 +1,23 @@
 // Calendriers liés : mois d'ouverture, bornes, horaires même jour
 const L = require('./lib.js');
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// DATE CIVILE, jamais UTC.
+//
+// toISOString() convertit vers UTC. En France (UTC+1, UTC+2 l'été), le
+// 10 décembre à minuit heure locale devient « 2026-12-09T23:00:00Z » :
+// la découpe des dix premiers caractères donne LA VEILLE. Les tests
+// passaient sous TZ=UTC et échouaient sous Europe/Paris — c'est-à-dire
+// dans le fuseau des utilisateurs.
+//
+// C'est exactement le formateur de la production (_hcFormaterYMD dans
+// index.html) : on compare des dates civiles avec la règle qui les
+// produit.
+function jourCivil(d) {
+  if (!d) return null;
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return jourCivil(d); }
 // Prochain 10 décembre strictement futur
 function decembreFutur() {
   const auj = new Date();
@@ -100,7 +116,7 @@ async function moisOuvert(page, champId) {
   // Borne minimale : la fin ne peut pas précéder le début
   const min = await page2.evaluate(() => {
     const d = _hcDateMinimaleChamp('pro-date-fin');
-    return d ? d.toISOString().slice(0, 10) : null;
+    return d ? _hcFormaterYMD(d) : null;
   });
   L.check('B3 : date minimale de la fin = date de début', min === DEC, 'min=' + min);
 
@@ -108,8 +124,9 @@ async function moisOuvert(page, champId) {
   await setVal(page2, 'pro-date-fin', anDec + '-12-12');
   const per = await page2.evaluate(() => {
     const p = _hcPeriodePourChamp('pro-date-debut');
-    return { debut: p.debut ? p.debut.toISOString().slice(0, 10) : null,
-             fin: p.finLiv ? p.finLiv.toISOString().slice(0, 10) : null };
+    // Même formateur que la production : aucune conversion UTC.
+    return { debut: p.debut ? _hcFormaterYMD(p.debut) : null,
+             fin: p.finLiv ? _hcFormaterYMD(p.finLiv) : null };
   });
   L.check('B4 : période début/fin exposée au calendrier pour la coloration',
     per.debut === DEC && per.fin === anDec + '-12-12', JSON.stringify(per));

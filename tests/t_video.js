@@ -1,6 +1,7 @@
 // VIDÉO DE CANDIDATURE PARTENAIRE
 // Fichiers WebM RÉELS (générés par ffmpeg), décodés par le navigateur.
 const L = require('./lib.js');
+const { RACINE, fichier, urlFichier } = L;
 const path = require('path');
 const M = path.resolve(__dirname, 'medias');
 
@@ -14,13 +15,15 @@ async function ouvrirPartenaire(page) {
   await page.evaluate(() => { try { openModal('convoyeur'); } catch (e) {} });
   await page.waitForTimeout(60);
 }
+// Les activités ne se cochent plus : depuis le chantier « métiers »,
+// elles sont DÉDUITES des métiers retenus. On passe donc par le vrai
+// chemin du candidat — ajouter puis retirer des métiers — au lieu de
+// forcer un état que l'interface ne produit plus.
 async function activites(page, liste) {
   await page.evaluate(ls => {
-    ['convoyage', 'nettoyage', 'renfort'].forEach(v => {
-      const el = document.getElementById('conv-act-' + v);
-      if (el) el.checked = ls.indexOf(v) !== -1;
-    });
-    onChoixActivitesPartenaire();
+    const metierDe = { convoyage: 'convoyage', nettoyage: 'nettoyage', renfort: 'jockey' };
+    _convMetiersRetenus.slice().forEach(c => convRetirerMetier(c));
+    ls.forEach(a => { if (metierDe[a]) convAjouterMetier(metierDe[a]); });
   }, liste);
   await page.waitForTimeout(80);
 }
@@ -114,7 +117,7 @@ async function etatVideo(page) {
   const gros = await page.evaluate(() => {
     const octets = new Uint8Array(1024);
     const morceaux = [];
-    for (let i = 0; i < 51 * 1024; i++) morceaux.push(octets);   // ~51 Mo
+    for (let i = 0; i < 301 * 1024; i++) morceaux.push(octets);   // ~301 Mo
     const f = new File(morceaux, 'lourde.mp4', { type: 'video/mp4' });
     const dt = new DataTransfer(); dt.items.add(f);
     const input = document.getElementById('conv-video-fichier');
@@ -124,8 +127,20 @@ async function etatVideo(page) {
   });
   await page.waitForTimeout(200);
   e = await etatVideo(page);
-  L.check('C1 : fichier > 50 Mo refusé', e.etat === 'invalide' && /trop volumineux/i.test(e.msg), e.msg);
-  L.check('C2 : refus taille avant toute lecture', e.duree === null && gros.taille > 50 * 1024 * 1024);
+  L.check('C1 : fichier > 300 Mo refusé', e.etat === 'invalide' && /trop volumineux/i.test(e.msg), e.msg);
+  L.check('C2 : refus taille avant toute lecture', e.duree === null && gros.taille > 300 * 1024 * 1024,
+    'taille=' + gros.taille);
+  // Une vidéo de deux minutes filmée au téléphone pèse couramment plus
+  // de 200 Mo : elle doit désormais passer.
+  const deuxCents = await page.evaluate(() => {
+    const octets = new Uint8Array(1024);
+    const morceaux = [];
+    for (let i = 0; i < 214 * 1024; i++) morceaux.push(octets);   // ~214 Mo
+    const f = new File(morceaux, 'reelle.mp4', { type: 'video/mp4' });
+    return { accepte: f.size <= CONV_VIDEO_TAILLE_MAX, taille: f.size };
+  });
+  L.check('C3 : une vidéo réaliste de ~214 Mo est acceptée',
+    deuxCents.accepte === true, 'taille=' + deuxCents.taille);
 
   // ── D. Fichier illisible ──
   await deposer(page, MP4_FACTICE);
@@ -278,6 +293,15 @@ async function etatVideo(page) {
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
     });
+    // La route REPRENABLE est tentee en premier depuis le lot « envoi
+    // reprenable ». La serie J ci-dessous verifie le parcours en UNE
+    // requete (le secours) : on simule donc une plateforme qui n'expose
+    // pas la route reprenable. Le parcours reprenable lui-meme est
+    // couvert, de bout en bout, par tests/t_tus.js.
+    await page.route('**/storage/v1/upload/resumable/**', async route => {
+      appels.push({ type: 'reprenable', url: route.request().url(), methode: route.request().method() });
+      return route.fulfill({ status: 404, contentType: 'text/plain', body: 'route absente' });
+    });
     await page.route('**/storage/v1/object/upload/sign/**', async route => {
       appels.push({ type: 'depot', url: route.request().url(), methode: route.request().method() });
       if (opts.depotCoupe) return route.abort('failed');
@@ -287,6 +311,7 @@ async function etatVideo(page) {
   }
   async function desarmer(page) {
     await page.unroute('**/functions/v1/candidature-video');
+    await page.unroute('**/storage/v1/upload/resumable/**');
     await page.unroute('**/storage/v1/object/upload/sign/**');
   }
   async function lancerEnvoi(page) {
@@ -319,6 +344,12 @@ async function etatVideo(page) {
     appels.some(a => a.action === 'confirmer'), JSON.stringify(appels.map(a => a.action || a.type)));
   L.check('J9 : aucune clé Supabase dans l\'URL de dépôt',
     !!depot && !/apikey|eyJ/.test(depot.url), depot && depot.url);
+  const reprenable = appels.find(a => a.type === 'reprenable');
+  L.check('J9b : l\'envoi REPRENABLE est tenté en premier',
+    !!reprenable && appels.indexOf(reprenable) < appels.indexOf(depot),
+    JSON.stringify(appels.map(a => a.action || a.type)));
+  L.check('J9c : et le secours en une requête ne part qu\'ensuite',
+    !!depot && !!reprenable);
   await desarmer(page);
 
   await armerInterceptions(page, { autoriserKo: true });
@@ -349,8 +380,8 @@ async function etatVideo(page) {
 
   // ── K. Aucune URL publique nulle part ──
   const fs = require('fs');
-  const idx = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
-  const dash = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   L.check('K1 : aucune URL publique de bucket vidéo dans index.html',
     !/object\/public\/candidatures-videos/.test(idx));
   L.check('K2 : aucune URL publique de bucket vidéo dans dashboard.html',

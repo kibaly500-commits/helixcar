@@ -1,0 +1,10 @@
+# Dépendances installées par npm — jamais versionnées.
+node_modules/
+
+# Navigateurs téléchargés par Playwright.
+.cache/
+playwright-report/
+test-results/
+
+# Sorties locales de la campagne de tests.
+tests/*.log
