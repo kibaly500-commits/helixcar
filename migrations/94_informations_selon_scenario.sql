@@ -121,6 +121,27 @@ declare
   commun       boolean;   -- trajet commun à tous les véhicules ?
   lieu_nett    text;
 begin
+  -- ----------------------------------------------------------
+  -- AUTORISATION — le premier contrôle, avant toute lecture
+  -- ----------------------------------------------------------
+  -- Cette fonction est SECURITY DEFINER : elle lit public.clients et
+  -- public.vehicules en passant OUTRE la RLS. Elle est accordée à tout
+  -- utilisateur `authenticated` — c'est-à-dire aussi bien à un client
+  -- qu'à un partenaire.
+  --
+  -- Sans ce contrôle, connaître un identifiant de demande suffisait à
+  -- obtenir les coordonnées de son contact, ses adresses et ses dates.
+  -- Un partenaire lit précisément cet identifiant sur chaque mission
+  -- qui lui est attribuée : la fuite n'était pas théorique.
+  --
+  -- Deux appelants seulement sont légitimes : l'administrateur, et le
+  -- propriétaire réel de la demande. Tout autre appelant repart avec
+  -- ZÉRO ligne — jamais une erreur qui confirmerait l'existence de la
+  -- demande.
+  if not (public.est_admin() or public.est_proprietaire_demande(p_client_id)) then
+    return;
+  end if;
+
   select * into d from public.clients c where c.id = p_client_id;
   if not found then
     return;
@@ -383,6 +404,8 @@ end $$;
 
 revoke all on function public.informations_demande(uuid) from public;
 grant execute on function public.informations_demande(uuid) to authenticated;
+-- Le droit d'exécution ne vaut PAS droit de lecture : la fonction
+-- vérifie elle-même que l'appelant est administrateur ou propriétaire.
 
 comment on function public.informations_demande(uuid) is
   'Rubriques réellement requises pour une demande, selon le scénario '
