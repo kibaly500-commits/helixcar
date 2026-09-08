@@ -175,14 +175,14 @@ migrations/README.md
 
 ## 4. Tous les tests exécutés, avec leur résultat réel
 
-**Résultat global : 1 508 contrôles, 1 508 PASS, 0 FAIL — en une commande.**
+**Résultat global : 1 556 contrôles, 1 556 PASS, 0 FAIL — en une commande.**
 
 ```
 npm test
 ```
 
 30 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
-depuis zéro, en 259 secondes. Aucun chiffre de ce document n'est estimé ou
+depuis zéro, en 267 secondes. Aucun chiffre de ce document n'est estimé ou
 reporté d'une exécution antérieure.
 
 Les suites sensibles aux dates ont en outre été passées dans **deux
@@ -194,9 +194,10 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 ```
 
 > Le lot livrait 1 276 contrôles. Le premier audit (§ 4 bis) en a ajouté
-> 127, le second (§ 4 ter) 51, le troisième (§ 4 quater) 54 : les 30
-> contrôles offensifs de la réclamation sur PostgreSQL, et le parcours
-> complet — confirmation, session, visibilité réelle — côté navigateur.
+> 127, le second (§ 4 ter) 51, le troisième (§ 4 quater) 54, le quatrième
+> (§ 4 quinquies) 48 : la séparation des deux secrets, éprouvée
+> offensivement sur PostgreSQL, et le poste partagé par deux personnes,
+> joué de bout en bout dans le navigateur.
 
 ### 4.1 Trois familles de preuves, volontairement séparées
 
@@ -218,7 +219,7 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 
 | Suite | PASS | FAIL | Ce qu'elle couvre |
 |---|---|---|---|
-| `t_rls` | **272** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 17 sections, dont V bis, W bis, Z, Z bis et R, toutes offensives |
+| `t_rls` | **291** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 18 sections, dont V bis, W bis, Z, Z bis, R et R bis, toutes offensives |
 | `t_mdp_ui` | **88** | 0 | Longueur minimale et bouton œil sur les six champs |
 | `t_mission_nettoyage` | **72** | 0 | **§ 14** — fiche, création de mission, cloisonnement par métier, photos et leur relecture signée |
 | `t_video` | **70** | 0 | **§ 4** — exigence et durée selon les métiers, formats, taille, remplacement, envoi, erreurs réseau |
@@ -230,7 +231,7 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 | `t_devis_commun` | **52** | 0 | **§ 9** — devis réellement disponible pour les 4 services, un seul moteur |
 | `t_multivehicules` | **48** | 0 | **§ 15** — la même demande de la saisie au PDF et à la fiche admin |
 | `t_infos` | **45** | 0 | **§ 10** — rubriques manquantes uniquement, transmission, validation, garde-fous |
-| `t_rattachement` | **44** | 0 | **Audits 2 et 3** — `signUp` avec et sans session ; puis le PARCOURS COMPLET : confirmation, ouverture de session, réclamation, visibilité réelle, secret consommé |
+| `t_rattachement` | **73** | 0 | **Audits 2, 3 et 4** — `signUp` avec et sans session ; le PARCOURS COMPLET : confirmation, session, réclamation, secret consommé ; puis les DEUX secrets séparés et le poste partagé par deux personnes |
 | `t_nettoyage_dashboard` | **43** | 0 | **§ 14** — contournement de connexion, chiffres réellement lus, plus rien de fictif |
 | `t_nonreg` | **41** | 0 | **Non-régression** : convoyage, stockage, compte seul, partenaire, textes, **périmètre de fichiers** |
 | `t_devis` | **40** | 0 | Devis PDF des 3 services + non-régression du devis convoyage |
@@ -248,11 +249,11 @@ TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
 | `t_contact` | **20** | 0 | Contact sur place : moi-même / une autre personne |
 | `t_dates` | **19** | 0 | Calendriers liés, bornes, horaires même jour et multi-jours |
 | `t_etapes` | **14** | 0 | **§ 6** — le bouton Continuer ne se grise jamais |
-| **TOTAL** | **1 508** | **0** | 28 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
+| **TOTAL** | **1 556** | **0** | 28 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
 
 `t_rls` applique les **vrais** fichiers de `migrations/00` → `99` sans les
 modifier, sur un PostgreSQL 16 local jetable, puis observe le comportement
-effectif. Ses 17 sections, dont les cinq ajoutées par les audits :
+effectif. Ses 18 sections, dont les six ajoutées par les audits :
 
 | Section | Ce qu'elle prouve |
 |---|---|
