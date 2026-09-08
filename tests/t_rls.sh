@@ -334,6 +334,248 @@ check "V12 : aucune écriture anonyme directe n'a été ouverte" "refuse" \
    | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
 
 echo
+echo "── W. INFORMATIONS RÉELLEMENT MANQUANTES (§10) ──"
+# Jeux d'essai TEST-QA couvrant les scénarios que la version livrée avec
+# 06 traitait mal. Ils sont créés AVANT d'appliquer 94 pour reproduire
+# d'abord le défaut, puis prouver la correction sur les mêmes données.
+sql "insert into auth.users (id, email) values
+  ('77777777-7777-7777-7777-777777777777','clientW@helixcar.test');
+
+-- 1. NETTOYAGE complet, contact sur place IMBRIQUÉ, chez le client.
+insert into public.clients (id, auth_user_id, numero_client, email, prenom, nom,
+                            type_service, statut, nettoyage_details) values
+ ('dddddddd-0000-0000-0000-0000000000a1','77777777-7777-7777-7777-777777777777','TEST-QA-W-NETT',
+  'clientW@helixcar.test','TEST-QA','ClientW','nettoyage','nouveau',
+  '{\"type_nettoyage\":\"complet\",\"lieu\":\"locaux_client\",\"date_souhaitee\":\"2026-11-02\",
+    \"heure_precise\":\"09:00\",\"adresse_rue\":\"3 rue des Lilas\",\"adresse_ville\":\"Lyon\",
+    \"contact_sur_place\":{\"type\":\"autre\",\"nom\":\"TEST-QA Martin\",\"telephone\":\"+33600000020\"}}'::jsonb);
+
+-- 2. NETTOYAGE dans les locaux HelixCar : aucune adresse à réclamer.
+insert into public.clients (id, auth_user_id, numero_client, email,
+                            type_service, statut, nettoyage_details) values
+ ('dddddddd-0000-0000-0000-0000000000a2','77777777-7777-7777-7777-777777777777','TEST-QA-W-NETT-HC',
+  'clientW@helixcar.test','nettoyage','nouveau',
+  '{\"type_nettoyage\":\"complet\",\"lieu\":\"helixcar\",\"date_souhaitee\":\"2026-11-03\",
+    \"heure_precise\":\"10:00\",
+    \"contact_sur_place\":{\"type\":\"moi\",\"nom\":\"TEST-QA ClientW\",\"telephone\":\"+33600000021\"}}'::jsonb);
+
+-- 3. STOCKAGE : le client dépose ET récupère lui-même.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            stockage_ville, stockage_date_debut,
+                            stockage_acheminement, stockage_sortie, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000a3','77777777-7777-7777-7777-777777777777','TEST-QA-W-DEPOT',
+  'clientW@helixcar.test','stockage','nouveau','Marseille','2026-12-01',
+  'depot_client','recuperation_client', false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele) values
+ ('dddddddd-0000-0000-0000-0000000000a3',1,'DD-111-DD','Renault Clio');
+
+-- 4. STOCKAGE : HelixCar achemine ET restitue.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            stockage_ville, stockage_date_debut,
+                            stockage_acheminement, stockage_sortie, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000a4','77777777-7777-7777-7777-777777777777','TEST-QA-W-STOCK-HC',
+  'clientW@helixcar.test','stockage','nouveau','Marseille','2026-12-01',
+  'helixcar','helixcar', false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele) values
+ ('dddddddd-0000-0000-0000-0000000000a4',1,'SS-111-SS','Renault Clio');
+
+-- 5. CONVOYAGE MULTI-VÉHICULES : le 1 est complet, le 2 non.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            nb_vehicules, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000a5','77777777-7777-7777-7777-777777777777','TEST-QA-W-MULTI',
+  'clientW@helixcar.test','convoyage','nouveau',2,false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele,
+                              adresse_depart_rue, date_prise_en_charge, pc_contact_nom, pc_contact_tel,
+                              adresse_arrivee_rue, liv_contact_nom, liv_contact_tel) values
+ ('dddddddd-0000-0000-0000-0000000000a5',1,'MM-111-MM','Peugeot 208',
+  '1 rue Un','2026-10-05','TEST-QA Un','+33600000031',
+  '2 rue Deux','TEST-QA Deux','+33600000032'),
+ ('dddddddd-0000-0000-0000-0000000000a5',2,null,'Citroen C3',
+  '1 rue Un','2026-10-05','TEST-QA Un','+33600000031',
+  '2 rue Deux','TEST-QA Deux','+33600000032');
+
+-- 6. CONVOYAGE MONO-VÉHICULE entièrement renseigné.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            nb_vehicules, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000a6','77777777-7777-7777-7777-777777777777','TEST-QA-W-MONO',
+  'clientW@helixcar.test','convoyage','nouveau',1,false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele,
+                              adresse_depart_rue, date_prise_en_charge, pc_contact_nom, pc_contact_tel,
+                              adresse_arrivee_rue, liv_contact_nom, liv_contact_tel) values
+ ('dddddddd-0000-0000-0000-0000000000a6',1,'UU-111-UU','Tesla Model 3',
+  '5 rue Cinq','2026-10-09','TEST-QA Cinq','+33600000041',
+  '6 rue Six','TEST-QA Six','+33600000042');
+
+-- 7. STOCKAGE sortie HelixCar, mais UN SEUL des deux véhicules est
+--    récupéré par le client (heure de récupération enregistrée).
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            stockage_ville, stockage_date_debut,
+                            stockage_acheminement, stockage_sortie, nb_vehicules, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000a7','77777777-7777-7777-7777-777777777777','TEST-QA-W-RECUP',
+  'clientW@helixcar.test','stockage','nouveau','Marseille','2026-12-01',
+  'helixcar','helixcar',2,false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele,
+                              heure_recuperation_client) values
+ ('dddddddd-0000-0000-0000-0000000000a7',1,'RR-111-RR','Fiat 500', null),
+ ('dddddddd-0000-0000-0000-0000000000a7',2,'RR-222-RR','Fiat Panda','14:00');
+
+-- 8. PROFESSIONNEL, contact sur place IMBRIQUÉ.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            professionnel_details) values
+ ('dddddddd-0000-0000-0000-0000000000a8','77777777-7777-7777-7777-777777777777','TEST-QA-W-PRO',
+  'clientW@helixcar.test','professionnel','nouveau',
+  '{\"categorie\":\"technicien\",\"specialite\":\"carrosserie\",\"adresse_rue\":\"9 rue Neuf\",
+    \"adresse_ville\":\"Nantes\",\"date_debut\":\"2026-11-10\",\"date_fin\":\"2026-11-12\",
+    \"heure_debut\":\"08:00\",\"heure_fin\":\"17:00\",\"description\":\"TEST-QA remise en etat\",
+    \"contact_sur_place\":{\"type\":\"autre\",\"nom\":\"TEST-QA Durand\",\"telephone\":\"+33600000050\"}}'::jsonb);
+
+-- 8b. PROFESSIONNEL en mode CONSEIL : le client demande à HelixCar de
+--     déterminer le métier. Ne rien lui réclamer est la bonne réponse.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            professionnel_details) values
+ ('dddddddd-0000-0000-0000-0000000000b2','77777777-7777-7777-7777-777777777777','TEST-QA-W-CONSEIL',
+  'clientW@helixcar.test','professionnel','nouveau',
+  '{\"categorie\":\"technicien\",\"conseil\":true,\"adresse_rue\":\"9 rue Neuf\",
+    \"adresse_ville\":\"Nantes\",\"date_debut\":\"2026-11-10\",\"date_fin\":\"2026-11-12\",
+    \"heure_debut\":\"08:00\",\"heure_fin\":\"17:00\",\"description\":\"TEST-QA a definir\",
+    \"contact_sur_place\":{\"type\":\"autre\",\"nom\":\"TEST-QA Durand\",\"telephone\":\"+33600000051\"}}'::jsonb);
+
+-- 8c. PROFESSIONNEL hors conseil, métier NON choisi : là, il manque
+--     réellement quelque chose.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            professionnel_details) values
+ ('dddddddd-0000-0000-0000-0000000000b3','77777777-7777-7777-7777-777777777777','TEST-QA-W-SANS-METIER',
+  'clientW@helixcar.test','professionnel','nouveau',
+  '{\"categorie\":\"technicien\",\"conseil\":false,\"adresse_rue\":\"9 rue Neuf\",
+    \"adresse_ville\":\"Nantes\",\"date_debut\":\"2026-11-10\",\"date_fin\":\"2026-11-12\",
+    \"heure_debut\":\"08:00\",\"heure_fin\":\"17:00\",\"description\":\"TEST-QA sans metier\",
+    \"contact_sur_place\":{\"type\":\"autre\",\"nom\":\"TEST-QA Durand\",\"telephone\":\"+33600000052\"}}'::jsonb);
+
+-- 9. CRÉATION DE COMPTE seule : aucun service, donc aucune rubrique.
+insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut) values
+ ('dddddddd-0000-0000-0000-0000000000a9','77777777-7777-7777-7777-777777777777','TEST-QA-W-COMPTE',
+  'clientW@helixcar.test', null,'compte_cree');" >/dev/null
+
+# ── REPRODUCTION DU DÉFAUT (fonction livrée avec 06, 94 non appliquée) ──
+check "W1 : REPRODUCTION — le contact sur place imbriqué est réclamé à tort" "attendue" \
+  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='contact_pc_nom';")"
+check "W2 : REPRODUCTION — l'immatriculation portée par la fiche véhicule est réclamée à tort" "attendue" \
+  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='immatriculation';")"
+check "W3 : REPRODUCTION — une seule rubrique immatriculation pour DEUX véhicules" "1" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like '%immatriculation%';")"
+check "W4 : REPRODUCTION — un dépôt par le client réclame quand même une prise en charge" "1" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle='immatriculation' and statut='attendue';")"
+
+# ── CORRECTIF ──
+errW=$(appliquer migrations/94_informations_selon_scenario.sql)
+check "W5 : migrations/94 s'applique sans erreur" "" "$errW"
+
+check "W6 : le contact sur place imbriqué est reconnu (nettoyage)" "fournie|fournie" \
+  "$(sql "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle like 'contact_sur_place%';")"
+check "W7 : plus AUCUNE information manquante sur ce nettoyage complet" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where statut='attendue';")"
+check "W8 : l'adresse est demandée quand l'intervention a lieu chez le client" "1" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a1') where cle='nettoyage_adresse';")"
+check "W9 : elle ne l'est PAS dans les locaux HelixCar" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where cle like 'nettoyage_adresse%' or cle like 'nettoyage_ville%';")"
+check "W10 : et ce nettoyage-là n'a lui non plus rien de manquant" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a2') where statut='attendue';")"
+
+check "W11 : dépôt par le client — AUCUNE prise en charge n'est réclamée" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%prise_en_charge%' or cle like '%adresse_depart%' or cle like '%contact_pc%';")"
+check "W12 : récupération par le client — AUCUNE livraison n'est réclamée" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like '%adresse_arrivee%' or cle like '%contact_liv%';")"
+check "W13 : ce stockage-là ne réclame plus rien" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where statut='attendue';")"
+check "W14 : acheminement ET sortie HelixCar — les deux extrémités sont réclamées" "4|3" \
+  "$(sql "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+check "W15 : la ville et la date de stockage restent demandées dans les deux cas" "2|2" \
+  "$(sql "select (select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a3') where cle like 'stockage_%')||'|'||(select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a4') where cle like 'stockage_%');")"
+
+check "W16 : multi-véhicules — le véhicule concerné est nommé" "Véhicule 2 — immatriculation" \
+  "$(sql "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
+check "W17 : le véhicule 1 est reconnu comme fourni" "fournie" \
+  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation';")"
+check "W18 : les véhicules ne sont JAMAIS mélangés (une rubrique par véhicule)" "2" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle like 'vehicule_%_immatriculation';")"
+check "W19 : et une seule information manque au total" "1" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where statut='attendue';")"
+check "W20 : mono-véhicule — le libellé ne préfixe PAS inutilement un rang" "Immatriculation du véhicule" \
+  "$(sql "select libelle from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where cle='vehicule_1_immatriculation';")"
+check "W21 : et ce convoyage mono-véhicule complet ne réclame plus rien" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a6') where statut='attendue';")"
+
+check "W22 : véhicule récupéré par le client — aucune livraison pour LUI" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+check "W23 : mais son voisin, livré par HelixCar, garde les siennes" "3" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a7') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+
+check "W24 : professionnel — le contact sur place imbriqué est reconnu" "fournie|fournie" \
+  "$(sql "select string_agg(statut,'|' order by cle) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where cle like 'contact_sur_place%';")"
+check "W25 : et cette demande professionnelle complète ne réclame rien" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a8') where statut='attendue';")"
+check "W26 : création de compte seule — aucune rubrique inventée" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000a9');")"
+
+# ── Le parcours de réponse continue de fonctionner avec les clés du scénario ──
+check "W27 : le client répond sur la clé nommée de SON véhicule" "1" \
+  "$(sql "begin; select public.devenir('77777777-7777-7777-7777-777777777777','clientW@helixcar.test');
+   select public.repondre_informations_demande('dddddddd-0000-0000-0000-0000000000a5',
+     '{\"vehicule_2_immatriculation\":\"MM-222-MM\"}'::jsonb); commit;" | tail -1)"
+check "W28 : la réponse est bien portée par le véhicule 2, jamais par le 1" "transmise|fournie" \
+  "$(sql "select (select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_2_immatriculation')||'|'||(select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000a5') where cle='vehicule_1_immatriculation');")"
+check "W29 : une clé NON REQUISE par le scénario reste ignorée" "0" \
+  "$(sql "begin; select public.devenir('77777777-7777-7777-7777-777777777777','clientW@helixcar.test');
+   select public.repondre_informations_demande('dddddddd-0000-0000-0000-0000000000a3',
+     '{\"contact_pc_nom\":\"TEST-QA Personne\"}'::jsonb); commit;" | tail -1)"
+check "W30 : le client d'une AUTRE demande ne peut toujours pas répondre" "insufficient" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select public.repondre_informations_demande('dddddddd-0000-0000-0000-0000000000a5',
+     '{\"vehicule_1_immatriculation\":\"PIRATE\"}'::jsonb); commit;" | grep -qiE 'non autorisée|insufficient' && echo insufficient || echo passe)"
+check "W31 : aucune donnée réelle n'a été écrite dans public.vehicules par la réponse" "" \
+  "$(sql "select immatriculation from public.vehicules where dossier_id='dddddddd-0000-0000-0000-0000000000a5' and position=2;")"
+
+# ── DÉCISION DE LIVRAISON APRÈS STOCKAGE : ENREGISTRÉE, PLUS DEVINÉE ──
+# Le cas que le repli seul ne pouvait pas traiter : le client a choisi de
+# venir rechercher son véhicule mais n'a pas encore donné son heure de
+# passage. Sans la décision enregistrée, on lui réclamerait une adresse
+# de livraison qui n'a aucune raison d'exister.
+check "W32 : la colonne de décision est bien ajoutée par la migration" "1" \
+  "$(sql "select count(*) from information_schema.columns where table_schema='public' and table_name='vehicules' and column_name='livraison_apres_stockage';")"
+sql "insert into public.clients (id, auth_user_id, numero_client, email, type_service, statut,
+                            stockage_ville, stockage_date_debut,
+                            stockage_acheminement, stockage_sortie, nb_vehicules, trajet_commun) values
+ ('dddddddd-0000-0000-0000-0000000000b1','77777777-7777-7777-7777-777777777777','TEST-QA-W-DECISION',
+  'clientW@helixcar.test','stockage','nouveau','Marseille','2026-12-01',
+  'helixcar','helixcar',3,false);
+insert into public.vehicules (dossier_id, position, immatriculation, marque_modele,
+                              livraison_apres_stockage, heure_recuperation_client,
+                              adresse_arrivee_rue, liv_contact_nom, liv_contact_tel) values
+ ('dddddddd-0000-0000-0000-0000000000b1',1,'BB-111-BB','Audi A3', true, null,
+  '7 rue Sept','TEST-QA Sept','+33600000061'),
+ ('dddddddd-0000-0000-0000-0000000000b1',2,'BB-222-BB','Audi A4', false, null, null, null, null),
+ ('dddddddd-0000-0000-0000-0000000000b1',3,'BB-333-BB','Audi A5', null, '15:30', null, null, null);" >/dev/null
+check "W33 : décision « HelixCar livre » — les rubriques de livraison existent" "3" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+check "W34 : décision « le client récupère » — AUCUNE, même sans heure de passage" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_2_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+check "W35 : décision inconnue (ligne ancienne) — le repli par l'heure s'applique" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like 'vehicule_3_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+# Le véhicule 1 a sa livraison entièrement renseignée, mais AUCUNE
+# information de prise en charge : l'acheminement étant confié à
+# HelixCar, ces quatre-là manquent réellement et doivent être signalées.
+check "W36 : la livraison du véhicule 1, renseignée, n'est pas réclamée" "0" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_arrivee%' or cle like '%contact_liv%');")"
+check "W36b : sa prise en charge, elle, manque bel et bien" "4" \
+  "$(sql "select count(*) from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where statut='attendue' and cle like 'vehicule_1_%' and (cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%');")"
+check "W36c : et elle est réclamée pour CHAQUE véhicule, sans mélange" "4|4|4" \
+  "$(sql "select string_agg(n::text,'|' order by v) from (select split_part(cle,'_',2) as v, count(*) as n from public.informations_demande('dddddddd-0000-0000-0000-0000000000b1') where cle like '%adresse_depart%' or cle like '%prise_en_charge%' or cle like '%contact_pc%' group by 1) t;")"
+check "W37 : mode conseil — aucun métier n'est réclamé au client" "fournie" \
+  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b2') where cle='professionnel_besoin';")"
+check "W38 : hors conseil, un métier non choisi EST réclamé" "attendue" \
+  "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b3') where cle='professionnel_besoin';")"
+
+echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
 HIST_AVANT=$(sql "select count(*) from public.convoyeur_decisions_historique;")
@@ -341,10 +583,12 @@ err5=$(appliquer migrations/05_blocage_partenaire.sql)
 err9=$(appliquer migrations/90_durcissement_rls_partenaires.sql)
 err4=$(appliquer migrations/04_decisions_activites.sql)
 err92=$(appliquer migrations/92_creation_demande_atomique.sql)
+err94=$(appliquer migrations/94_informations_selon_scenario.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
 check "F3b : 92 se rejoue sans erreur" "" "$err92"
+check "F3c : 94 se rejoue sans erreur" "" "$err94"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"

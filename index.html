@@ -7559,6 +7559,12 @@ var CHAMPS_VEHICULE = [
   'pc_contact_nom','pc_contact_tel','date_prise_en_charge',
   'heure_prise_en_charge','pc_heure_type','pc_creneau_debut','pc_creneau_fin',
   'adresse_arrivee_rue','code_postal_arrivee','ville_arrivee',
+  // Stockage a sortie HelixCar : HelixCar livre ce vehicule, ou le
+  // client vient le rechercher. Cette decision etait lue par le
+  // recapitulatif mais JAMAIS enregistree : sans elle, impossible de
+  // savoir cote serveur si une adresse de livraison manque vraiment ou
+  // n'a tout simplement pas lieu d'etre (cf. migration 94).
+  'livraison_apres_stockage',
   'liv_contact_nom','liv_contact_tel','date_livraison',
   'heure_livraison','liv_heure_type','liv_creneau_debut','liv_creneau_fin',
   'restitution_concernee','restit_adresse_rue','restit_code_postal','restit_ville',
@@ -7574,6 +7580,11 @@ function _normaliserVehiculePourEnvoi(v) {
   CHAMPS_VEHICULE.forEach(function (k) {
     var val = v[k];
     if (k === 'restitution_concernee') { ligne[k] = !!val; return; }
+    // Tri-etat volontaire : true / false / null (« pas encore choisi »).
+    // Un !! transformerait « je ne sais pas » en « le client recupere ».
+    if (k === 'livraison_apres_stockage') {
+      ligne[k] = (val === true || val === false) ? val : null; return;
+    }
     if (k === 'position') { ligne[k] = val || 1; return; }
     ligne[k] = (val === '' || val === undefined) ? null : val;
   });

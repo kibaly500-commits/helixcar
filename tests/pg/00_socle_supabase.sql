@@ -111,10 +111,19 @@ create table if not exists public.clients (
   date_prise_en_charge  date,
   contact_pc_nom        text,
   contact_pc_tel        text,
+  adresse_depart_rue    text,
   adresse_arrivee_rue   text,
+  contact_liv_nom       text,
+  contact_liv_tel       text,
   ville_depart          text,
   ville_arrivee         text,
+  -- Trajet commun à tous les véhicules ? Depuis la refonte du
+  -- formulaire, le navigateur envoie TOUJOURS false : les informations
+  -- de trajet vivent dans public.vehicules, y compris à 1 véhicule.
+  trajet_commun         boolean,
   stockage_ville        text,
+  stockage_acheminement text,
+  stockage_sortie       text,
   stockage_date_debut   date,
   -- Colonne interne : sert à prouver qu'elle ne fuit JAMAIS vers le client.
   prix_interne          numeric,
