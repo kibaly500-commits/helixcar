@@ -47,7 +47,9 @@ const EXTENSION_PAR_MIME: Record<string, string> = {
   "video/quicktime": ".mov",
   "video/webm": ".webm",
 };
-const TAILLE_MAX_OCTETS = 50 * 1024 * 1024;
+// 300 Mo — aligné sur le navigateur, sur le bucket (migration 93) et
+// sur la limite globale Supabase Storage à régler manuellement.
+const TAILLE_MAX_OCTETS = 300 * 1024 * 1024;
 
 // Fenêtre pendant laquelle une candidature tout juste créée peut
 // encore envoyer sa vidéo. Volontairement dérivée de created_at :

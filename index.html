@@ -7307,8 +7307,30 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <input type="file" id="conv-video-fichier" accept="video/mp4,video/quicktime,video/webm" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 
             <div id="conv-video-choix" style="display:flex;gap:10px;flex-wrap:wrap">
-              <button type="button" class="hc-video-btn" id="conv-video-btn-capture" onclick="convOuvrirSelecteurVideo('capture')">Enregistrer une vidéo</button>
-              <button type="button" class="hc-video-btn" id="conv-video-btn-fichier" onclick="convOuvrirSelecteurVideo('fichier')">Choisir un fichier</button>
+              <button type="button" class="hc-video-btn" id="conv-video-btn-capture" onclick="convOuvrirEnregistreur()">Enregistrer une vidéo</button>
+              <button type="button" class="hc-video-btn" id="conv-video-btn-fichier" onclick="convOuvrirSelecteurVideo('fichier')">Choisir une vidéo existante</button>
+            </div>
+
+            <!-- ENREGISTREUR RÉEL, DANS LA PAGE.
+                 « Enregistrer une vidéo » ouvrait auparavant le sélecteur
+                 de fichiers : il ouvre désormais la caméra et enregistre
+                 vraiment. Repli automatique vers le choix de fichier si
+                 le navigateur ne sait pas enregistrer. -->
+            <div id="conv-enregistreur" style="display:none;background:#fff;border:1px solid rgba(21,27,33,.10);border-radius:12px;padding:14px 16px;margin-top:10px">
+              <div style="position:relative;background:#000;border-radius:8px;overflow:hidden">
+                <video id="conv-enr-apercu" playsinline muted style="width:100%;max-height:320px;display:block;background:#000"></video>
+                <div id="conv-enr-pastille" style="display:none;position:absolute;top:10px;left:10px;background:rgba(200,16,46,.92);color:#fff;font-size:.74rem;font-weight:700;padding:4px 9px;border-radius:99px">
+                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-right:6px"></span><span id="conv-enr-chrono">0:00</span> / 2:00
+                </div>
+              </div>
+              <div id="conv-enr-message" style="font-size:.8rem;color:#7A7F84;margin-top:9px;line-height:1.5"></div>
+              <div style="display:flex;gap:9px;margin-top:11px;flex-wrap:wrap">
+                <button type="button" class="hc-video-btn hc-video-btn--mini" id="conv-enr-demarrer" onclick="convDemarrerEnregistrement()">Démarrer</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini" id="conv-enr-arreter" onclick="convArreterEnregistrement()" style="display:none">Arrêter</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini" id="conv-enr-recommencer" onclick="convRecommencerEnregistrement()" style="display:none">Recommencer</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini" id="conv-enr-valider" onclick="convValiderEnregistrement()" style="display:none">Utiliser cette vidéo</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger" onclick="convFermerEnregistreur()">Fermer</button>
+              </div>
             </div>
 
             <div id="conv-video-etat" style="display:none;background:#fff;border:1px solid rgba(21,27,33,.10);border-radius:12px;padding:14px 16px">
@@ -7319,7 +7341,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               </div>
               <div id="conv-video-message" style="display:none;font-size:.8rem;margin-top:9px;line-height:1.5"></div>
               <div id="conv-video-actions" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
-                <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirSelecteurVideo('fichier')">Remplacer</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirSelecteurVideo('fichier')">Remplacer par un fichier</button>
+                <button type="button" class="hc-video-btn hc-video-btn--mini" onclick="convOuvrirEnregistreur()">Réenregistrer</button>
                 <button type="button" class="hc-video-btn hc-video-btn--mini hc-video-btn--danger" onclick="convSupprimerVideo()">Supprimer</button>
               </div>
             </div>
@@ -13461,7 +13484,10 @@ function _docsPartenaireManquants() {
 // sera jamais soumise.
 
 var CONV_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/webm'];
-var CONV_VIDEO_TAILLE_MAX = 50 * 1024 * 1024;   // doit rester <= file_size_limit du bucket
+// 300 Mo : une vraie vidéo de deux minutes filmée au téléphone pèse
+// couramment plus de 200 Mo. Doit rester <= file_size_limit du bucket
+// (migration 93) ET <= la limite globale Supabase Storage.
+var CONV_VIDEO_TAILLE_MAX = 300 * 1024 * 1024;
 var CONV_VIDEO_EXT_MIME = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };
 
 // SOURCE DE VERITE : l'objet ci-dessous, jamais l'input file (un input
@@ -13565,6 +13591,235 @@ function _convLireDureeVideo(fichier) {
   });
 }
 
+// ============================================================
+// ENREGISTREUR VIDÉO DANS LA PAGE
+// ============================================================
+// « Enregistrer une vidéo » ouvrait le sélecteur de fichiers : le
+// bouton ouvre désormais réellement la caméra (getUserMedia) et
+// enregistre (MediaRecorder). La vidéo produite passe par la MÊME
+// validation que celle d'un fichier choisi — format, taille, durée.
+//
+// Repli en cascade, sans jamais laisser l'utilisateur sans solution :
+//   navigateur incapable d'enregistrer  -> caméra native de l'appareil
+//                                          si elle existe, sinon choix
+//                                          d'un fichier ;
+//   autorisation refusée ou pas de caméra -> message clair + choix
+//                                          d'un fichier.
+
+var CONV_ENR_DUREE_MAX_S = 120;          // arrêt automatique à 2 minutes
+var _convEnr = {
+  flux: null, recorder: null, morceaux: [], minuteur: null,
+  compteur: null, debut: 0, blob: null, urlApercu: null
+};
+
+// Format produit : MP4 quand le navigateur sait l'encoder (Safari),
+// WebM sinon (Chrome, Firefox). Les deux sont acceptés par HelixCar.
+function _convFormatEnregistrement() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  var candidats = [
+    { mime: 'video/mp4;codecs=h264,aac', ext: 'mp4' },
+    { mime: 'video/mp4',                 ext: 'mp4' },
+    { mime: 'video/webm;codecs=vp9,opus', ext: 'webm' },
+    { mime: 'video/webm;codecs=vp8,opus', ext: 'webm' },
+    { mime: 'video/webm',                ext: 'webm' }
+  ];
+  for (var i = 0; i < candidats.length; i++) {
+    try {
+      if (MediaRecorder.isTypeSupported(candidats[i].mime)) return candidats[i];
+    } catch (e) {}
+  }
+  return null;
+}
+
+function _convEnregistrementPossible() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+            && typeof MediaRecorder !== 'undefined' && _convFormatEnregistrement());
+}
+
+function _convEnrMessage(texte) {
+  var el = document.getElementById('conv-enr-message');
+  if (el) el.textContent = texte || '';
+}
+
+function _convEnrBoutons(etat) {
+  var vis = {
+    'conv-enr-demarrer':    etat === 'pret',
+    'conv-enr-arreter':     etat === 'enregistre',
+    'conv-enr-recommencer': etat === 'termine',
+    'conv-enr-valider':     etat === 'termine'
+  };
+  Object.keys(vis).forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b) b.style.display = vis[id] ? '' : 'none';
+  });
+  var pastille = document.getElementById('conv-enr-pastille');
+  if (pastille) pastille.style.display = (etat === 'enregistre') ? 'block' : 'none';
+}
+
+async function convOuvrirEnregistreur() {
+  var panneau = document.getElementById('conv-enregistreur');
+  if (!panneau) return;
+
+  if (!_convEnregistrementPossible()) {
+    // Repli : la caméra native de l'appareil (surtout sur mobile), et à
+    // défaut le simple choix d'un fichier.
+    var natif = document.getElementById('conv-video-capture');
+    if (natif) {
+      _convEnrMessage('');
+      natif.value = '';
+      natif.click();
+      return;
+    }
+    alert("Votre navigateur ne permet pas d'enregistrer une vidéo dans la page.\n\n"
+        + "Utilisez « Choisir une vidéo existante ».");
+    convOuvrirSelecteurVideo('fichier');
+    return;
+  }
+
+  panneau.style.display = 'block';
+  _convEnrBoutons('pret');
+  _convEnrMessage('Autorisez l\'accès à la caméra pour commencer.');
+
+  try {
+    _convEnr.flux = await navigator.mediaDevices.getUserMedia({
+      // Résolution et cadence bornées : une vidéo de deux minutes reste
+      // ainsi très en dessous de la limite de 300 Mo.
+      video: { width: { ideal: 1280 }, height: { ideal: 720 },
+               frameRate: { ideal: 30, max: 30 }, facingMode: 'user' },
+      audio: true
+    });
+  } catch (e) {
+    var nom = String((e && e.name) || '');
+    if (nom === 'NotAllowedError' || nom === 'SecurityError') {
+      _convEnrMessage("Accès à la caméra refusé. Autorisez-le dans votre navigateur, "
+        + "ou utilisez « Choisir une vidéo existante ».");
+    } else if (nom === 'NotFoundError' || nom === 'OverconstrainedError') {
+      _convEnrMessage("Aucune caméra détectée sur cet appareil. "
+        + "Utilisez « Choisir une vidéo existante ».");
+    } else {
+      _convEnrMessage("La caméra n'a pas pu être ouverte. "
+        + "Utilisez « Choisir une vidéo existante ».");
+    }
+    _convEnrBoutons('');
+    return;
+  }
+
+  var apercu = document.getElementById('conv-enr-apercu');
+  if (apercu) {
+    apercu.srcObject = _convEnr.flux;
+    apercu.muted = true;          // évite le larsen pendant la prise
+    apercu.controls = false;
+    try { await apercu.play(); } catch (e) {}
+  }
+  _convEnrMessage('Caméra prête. Deux minutes maximum : l\'enregistrement s\'arrête tout seul.');
+  _convEnrBoutons('pret');
+}
+
+function convDemarrerEnregistrement() {
+  if (!_convEnr.flux) return;
+  var format = _convFormatEnregistrement();
+  if (!format) return;
+
+  _convEnr.morceaux = [];
+  _convEnr.blob = null;
+  try {
+    _convEnr.recorder = new MediaRecorder(_convEnr.flux, {
+      mimeType: format.mime,
+      videoBitsPerSecond: 2500000   // ~2,5 Mbit/s : net, et léger
+    });
+  } catch (e) {
+    _convEnrMessage("L'enregistrement n'a pas pu démarrer. Utilisez « Choisir une vidéo existante ».");
+    return;
+  }
+
+  _convEnr.recorder.ondataavailable = function (ev) {
+    if (ev.data && ev.data.size) _convEnr.morceaux.push(ev.data);
+  };
+  _convEnr.recorder.onstop = function () {
+    _convEnr.blob = new Blob(_convEnr.morceaux, { type: format.mime.split(';')[0] });
+    var apercu = document.getElementById('conv-enr-apercu');
+    if (apercu) {
+      apercu.srcObject = null;
+      if (_convEnr.urlApercu) { try { URL.revokeObjectURL(_convEnr.urlApercu); } catch (e) {} }
+      _convEnr.urlApercu = URL.createObjectURL(_convEnr.blob);
+      apercu.src = _convEnr.urlApercu;
+      apercu.muted = false;
+      apercu.controls = true;      // relecture avant validation
+    }
+    _convEnrMessage('Enregistrement terminé (' + _convFormaterTaille(_convEnr.blob.size)
+      + '). Relisez-le, puis validez ou recommencez.');
+    _convEnrBoutons('termine');
+  };
+
+  _convEnr.debut = Date.now();
+  _convEnr.recorder.start(1000);   // un morceau par seconde
+  _convEnrBoutons('enregistre');
+  _convEnrMessage('Enregistrement en cours…');
+
+  // Chrono affiché, et arrêt automatique à deux minutes.
+  _convEnr.compteur = setInterval(function () {
+    var s = Math.floor((Date.now() - _convEnr.debut) / 1000);
+    var el = document.getElementById('conv-enr-chrono');
+    if (el) el.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }, 250);
+  _convEnr.minuteur = setTimeout(function () {
+    _convEnrMessage('Durée maximale atteinte : enregistrement arrêté automatiquement.');
+    convArreterEnregistrement();
+  }, CONV_ENR_DUREE_MAX_S * 1000);
+}
+
+function convArreterEnregistrement() {
+  if (_convEnr.minuteur) { clearTimeout(_convEnr.minuteur); _convEnr.minuteur = null; }
+  if (_convEnr.compteur) { clearInterval(_convEnr.compteur); _convEnr.compteur = null; }
+  try {
+    if (_convEnr.recorder && _convEnr.recorder.state !== 'inactive') _convEnr.recorder.stop();
+  } catch (e) {}
+}
+
+async function convRecommencerEnregistrement() {
+  _convEnr.blob = null;
+  _convEnr.morceaux = [];
+  var apercu = document.getElementById('conv-enr-apercu');
+  if (apercu) { apercu.src = ''; apercu.controls = false; apercu.muted = true; }
+  if (_convEnr.urlApercu) { try { URL.revokeObjectURL(_convEnr.urlApercu); } catch (e) {} _convEnr.urlApercu = null; }
+  // On rouvre proprement la caméra : le flux précédent a pu être libéré.
+  await convOuvrirEnregistreur();
+}
+
+// La vidéo enregistrée rejoint le parcours normal : même validation,
+// même affichage, même envoi qu'un fichier choisi sur l'appareil.
+function convValiderEnregistrement() {
+  if (!_convEnr.blob) return;
+  var format = _convFormatEnregistrement();
+  var ext = (format && format.ext) || 'webm';
+  var nom = 'presentation-' + new Date().toISOString().slice(0, 10) + '.' + ext;
+  var fichier;
+  try {
+    fichier = new File([_convEnr.blob], nom, { type: _convEnr.blob.type || ('video/' + ext) });
+  } catch (e) {
+    // Vieux navigateurs sans constructeur File : on complète le Blob.
+    fichier = _convEnr.blob;
+    fichier.name = nom;
+  }
+  convFermerEnregistreur();
+  _convTraiterFichierVideo(fichier);
+}
+
+function convFermerEnregistreur() {
+  convArreterEnregistrement();
+  if (_convEnr.flux) {
+    try { _convEnr.flux.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    _convEnr.flux = null;
+  }
+  var apercu = document.getElementById('conv-enr-apercu');
+  if (apercu) { apercu.srcObject = null; apercu.src = ''; apercu.controls = false; }
+  if (_convEnr.urlApercu) { try { URL.revokeObjectURL(_convEnr.urlApercu); } catch (e) {} _convEnr.urlApercu = null; }
+  var panneau = document.getElementById('conv-enregistreur');
+  if (panneau) panneau.style.display = 'none';
+  _convEnrBoutons('');
+  _convEnrMessage('');
+}
+
 function convOuvrirSelecteurVideo(mode) {
   var id = (mode === 'capture') ? 'conv-video-capture' : 'conv-video-fichier';
   var el = document.getElementById(id);
@@ -13575,6 +13830,15 @@ function convOuvrirSelecteurVideo(mode) {
 // considerer le fichier comme utilisable.
 function convOnVideoChoisie(input) {
   var f = input && input.files && input.files[0];
+  if (!f) return;
+  _convTraiterFichierVideo(f);
+}
+
+// Validation d'UNE vidéo, quelle que soit sa provenance : fichier
+// choisi sur l'appareil, ou enregistrement réalisé dans la page. Les
+// deux passent exactement par les mêmes contrôles — format, taille,
+// durée — sans qu'aucune règle ne soit recopiée.
+function _convTraiterFichierVideo(f) {
   if (!f) return;
 
   _convVideoChemin = null;

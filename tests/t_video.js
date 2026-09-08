@@ -114,7 +114,7 @@ async function etatVideo(page) {
   const gros = await page.evaluate(() => {
     const octets = new Uint8Array(1024);
     const morceaux = [];
-    for (let i = 0; i < 51 * 1024; i++) morceaux.push(octets);   // ~51 Mo
+    for (let i = 0; i < 301 * 1024; i++) morceaux.push(octets);   // ~301 Mo
     const f = new File(morceaux, 'lourde.mp4', { type: 'video/mp4' });
     const dt = new DataTransfer(); dt.items.add(f);
     const input = document.getElementById('conv-video-fichier');
@@ -124,8 +124,20 @@ async function etatVideo(page) {
   });
   await page.waitForTimeout(200);
   e = await etatVideo(page);
-  L.check('C1 : fichier > 50 Mo refusé', e.etat === 'invalide' && /trop volumineux/i.test(e.msg), e.msg);
-  L.check('C2 : refus taille avant toute lecture', e.duree === null && gros.taille > 50 * 1024 * 1024);
+  L.check('C1 : fichier > 300 Mo refusé', e.etat === 'invalide' && /trop volumineux/i.test(e.msg), e.msg);
+  L.check('C2 : refus taille avant toute lecture', e.duree === null && gros.taille > 300 * 1024 * 1024,
+    'taille=' + gros.taille);
+  // Une vidéo de deux minutes filmée au téléphone pèse couramment plus
+  // de 200 Mo : elle doit désormais passer.
+  const deuxCents = await page.evaluate(() => {
+    const octets = new Uint8Array(1024);
+    const morceaux = [];
+    for (let i = 0; i < 214 * 1024; i++) morceaux.push(octets);   // ~214 Mo
+    const f = new File(morceaux, 'reelle.mp4', { type: 'video/mp4' });
+    return { accepte: f.size <= CONV_VIDEO_TAILLE_MAX, taille: f.size };
+  });
+  L.check('C3 : une vidéo réaliste de ~214 Mo est acceptée',
+    deuxCents.accepte === true, 'taille=' + deuxCents.taille);
 
   // ── D. Fichier illisible ──
   await deposer(page, MP4_FACTICE);
