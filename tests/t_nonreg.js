@@ -195,15 +195,39 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   const fichiers = execSync('git diff origin/main --name-only', { cwd: RACINE }).toString().trim().split('\n');
   // creer-compte-convoyeur.html est entré dans le périmètre avec
   // l'harmonisation des mots de passe : l'inscription partenaire y vit,
-  // et elle était explicitement demandée. Élargissement DÉLIBÉRÉ, pas
-  // un assouplissement du garde-fou — la liste de E6b reste la barrière
-  // pour tous les autres fichiers.
+  // et elle était explicitement demandée.
+  //
+  // L'audit indépendant y a fait entrer six autres entrées, chacune
+  // pour une raison nommée. Élargissement DÉLIBÉRÉ, énuméré ici plutôt
+  // que dilué dans un préfixe fourre-tout — tout ce qui n'y figure pas
+  // reste refusé, et la liste de E6b reste la barrière dure.
+  const PERIMETRE = [
+    'index.html',
+    'dashboard.html',
+    'creer-compte-convoyeur.html',
+    // Le réglage sans lequel la fonction vidéo répondrait 401 à toute
+    // candidature. Versionné exprès, plutôt que coché à la main.
+    'supabase/config.toml',
+    // Outillage des tests : dépendance Playwright et verrou de version.
+    'package.json',
+    'package-lock.json',
+    // Le lanceur de tests et la campagne d'intégration continue.
+    '.github/workflows/tests.yml',
+    // node_modules et sorties locales, désormais ignorés par git.
+    '.gitignore',
+    // Le dossier de recette et de mise en production.
+    'RECETTE-LOT.md',
+  ];
   L.check('E6 : périmètre de fichiers maîtrisé',
-    fichiers.every(f => f === 'index.html' || f === 'dashboard.html'
-                     || f === 'creer-compte-convoyeur.html'
+    fichiers.every(f => PERIMETRE.indexOf(f) !== -1
                      || f.startsWith('migrations/') || f.startsWith('tests/')
                      || f.startsWith('supabase/functions/')),
-    fichiers.join(', '));
+    fichiers.filter(f => PERIMETRE.indexOf(f) === -1
+                      && !f.startsWith('migrations/') && !f.startsWith('tests/')
+                      && !f.startsWith('supabase/functions/')).join(', '));
+  L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 12,
+    PERIMETRE.length + ' entrées');
   L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
     !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
                          'lettre-voiture.html',
