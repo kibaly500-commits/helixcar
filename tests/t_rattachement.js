@@ -292,7 +292,7 @@ async function deposerCompteSeul(browser, avecSession) {
     apresConfirmation.secretRestant === null, String(apresConfirmation.secretRestant));
   check('C19 : et il est effacé du navigateur',
     apresConfirmation.restant.length === 0, JSON.stringify(apresConfirmation.restant));
-  check('C20 : le résultat est bien un succès', 
+  check('C20 : le résultat est bien un succès',
     apresConfirmation.resultat[0] && apresConfirmation.resultat[0].ok === true,
     JSON.stringify(apresConfirmation.resultat));
 
