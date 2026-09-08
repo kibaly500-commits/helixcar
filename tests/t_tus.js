@@ -474,15 +474,44 @@ async function preparerVideo(page, octets) {
   check('G5 : et « Annuler » disparaît', apresEchec.annulerVisible === 'none', apresEchec.annulerVisible);
 
   // Annulation RÉELLE au milieu de l'envoi.
+  //
+  // Le déclencheur ne peut pas être un pourcentage. La progression
+  // affichée mélange volontairement deux choses — les octets déjà
+  // acquittés par le serveur ET ceux encore en vol dans la requête
+  // courante — parce que c'est ce que le candidat doit voir. Sur une
+  // machine chargée, un événement de progression tombe EN PLEIN VOL du
+  // premier morceau : annuler à ce moment-là coupe la requête avant que
+  // le serveur n'ait rien enregistré, et « l'envoi s'est arrêté avant la
+  // fin » devient indémontrable. C'est exactement ce qui a fait tomber
+  // G7 et G13 sur un runner GitHub, avec 0 octet reçu.
+  //
+  // On annule donc sur un fait, pas sur un affichage : la FIN d'une
+  // requête PATCH. À cet instant le serveur a acquitté le morceau, et
+  // aucune requête n'est en vol — l'annulation ne peut donc tronquer
+  // aucun envoi. C'est vrai quelle que soit la vitesse de la machine.
   await page.evaluate(() => {
     _convVideoEtat = 'envoi';
     window.__progression = [];
+    const ouvrirReel = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (m, u) {
+      this.__methode = m;
+      return ouvrirReel.apply(this, arguments);
+    };
+    const envoyerReel = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function () {
+      this.addEventListener('load', () => {
+        if (this.__methode === 'PATCH' && !window.__dejaAnnule) {
+          window.__dejaAnnule = true;
+          window.__annule = true;
+          convAnnulerEnvoiVideo();
+        }
+      });
+      return envoyerReel.apply(this, arguments);
+    };
     const vrai = convMajProgressionVideo;
     window.convMajProgressionVideo = function (p) {
       window.__progression.push(p);
       vrai(p);
-      // Dès qu'un morceau est passé, le candidat renonce.
-      if (p >= 30 && !window.__annule) { window.__annule = true; convAnnulerEnvoiVideo(); }
     };
   });
   const rAnnule = await page.evaluate(() => uploadVideoCandidature());
