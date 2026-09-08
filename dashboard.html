@@ -124,6 +124,9 @@ html, body { height: 100%; font-family: 'Instrument Sans', system-ui, sans-serif
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  /* « Détail » se coupait en « Déta / il » dans les tableaux denses :
+     un libellé de commande ne se coupe jamais en deux. */
+  white-space: nowrap;
   padding: 11px 22px; border-radius: 8px; cursor: pointer; border: none;
   /* Comme sur le site : Instrument Sans pour les commandes, Fraunces
      réservé aux titres. Une police de titres sur un bouton de tableau
@@ -912,23 +915,25 @@ body.scroll-verrouille { overflow: hidden; }
     </button>
 
     <p style="text-align:center;font-size:0.78rem;color:var(--gray);margin-top:16px">
-      <strong>Démo :</strong> client@helixcar.com (mot de passe : demo123)<br>
-      Convoyeur : connexion avec le compte créé après validation du dossier
+      Convoyeur : connexion avec le compte créé après validation du dossier.<br>
+      Client : connexion avec le compte créé lors de votre demande.
     </p>
   </div>
 </div>
 
 <script>
-// Masque l'écran de connexion tout de suite s'il y a une session à restaurer (démo ou
-// convoyeur), avant même que le reste de la page ne s'affiche — évite le flash visuel
-// pendant que la logique complète de restauration (plus bas) fait le vrai travail.
+// Masque l'écran de connexion tout de suite s'il y a une VRAIE session
+// Supabase à restaurer, avant même que le reste de la page ne s'affiche
+// — évite le flash visuel pendant que la logique complète de
+// restauration (plus bas) fait le vrai travail. L'ancienne clé de
+// « session démo » n'est plus consultée : elle permettait de masquer
+// l'écran de connexion sans qu'aucune session n'existe.
 (function masquagePrecoceLoginScreen() {
   try {
-    var aUneSessionDemo = !!localStorage.getItem('helixcar_demo_email');
     var aUneSessionSupabase = Object.keys(localStorage).some(function(k) {
       return k.indexOf('-auth-token') !== -1;
     });
-    if (aUneSessionDemo || aUneSessionSupabase) {
+    if (aUneSessionSupabase) {
       document.getElementById('login-screen').style.display = 'none';
       // Filet de sécurité : si la vraie restauration (plus bas dans la page) échoue en
       // silence, on ne veut pas rester sur une page blanche — on rétablit l'écran de connexion.
@@ -993,19 +998,20 @@ body.scroll-verrouille { overflow: hidden; }
       <!-- ADMIN: Dashboard -->
       <div class="page" id="page-admin-dashboard">
         <div id="alerte-nouvelles-demandes" class="alert alert-warning" style="display:none;margin-bottom:14px;cursor:pointer" onclick="showPage('admin-devis')"></div>
+        <!-- Ces cinq chiffres étaient écrits en dur (3, 12, 47, 8,
+             4 820 €) : ils ressemblaient à des indicateurs réels et
+             n'en étaient pas. Ils sont désormais comptés dans Supabase.
+             Les variations « ↑ 2 aujourd'hui » ont disparu : aucun
+             historique n'existe pour les calculer. -->
         <div class="stats-row">
-          <div class="stat-card yellow"><div class="stat-label">Candidatures en attente</div><div class="stat-value" id="stat-pending">3</div><div class="stat-sub">↑ 2 aujourd'hui</div></div>
-          <div class="stat-card green"><div class="stat-label">Convoyeurs actifs</div><div class="stat-value">12</div><div class="stat-sub">↑ 1 ce mois</div></div>
-          <div class="stat-card blue"><div class="stat-label">Clients inscrits</div><div class="stat-value">47</div><div class="stat-sub">↑ 5 cette semaine</div></div>
-          <div class="stat-card orange"><div class="stat-label">Missions en cours</div><div class="stat-value">8</div></div>
-          <div class="stat-card red"><div class="stat-label">CA ce mois (€)</div><div class="stat-value">4 820</div><div class="stat-sub">↑ +12%</div></div>
+          <div class="stat-card yellow"><div class="stat-label">Candidatures en attente</div><div class="stat-value" id="stat-pending">…</div></div>
+          <div class="stat-card green"><div class="stat-label">Convoyeurs actifs</div><div class="stat-value" id="stat-convoyeurs">…</div></div>
+          <div class="stat-card blue"><div class="stat-label">Clients inscrits</div><div class="stat-value" id="stat-clients">…</div></div>
+          <div class="stat-card orange"><div class="stat-label">Missions en cours</div><div class="stat-value" id="stat-missions">…</div></div>
+          <div class="stat-card red"><div class="stat-label">Devis acceptés ce mois (€)</div><div class="stat-value" id="stat-ca">…</div><div class="stat-sub" id="stat-ca-sub"></div></div>
         </div>
 
-        <div class="alert alert-warning"><span>⚠️ <strong>3 candidatures convoyeurs</strong> sont en attente de validation.</span></div>
-        <div class="alert" style="background:rgba(181,68,75,.1);border:1.5px solid rgba(181,68,75,.4);border-radius:10px;padding:12px 16px;color:#8C3238;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span>🏁 <strong>Challenge mai terminé</strong> — 3 convoyeurs éligibles à récompenser</span>
-          <button class="btn btn-sm" style="background:var(--yellow);color:var(--navy);border:none;font-weight:700" onclick="showPage('admin-challenge')">Voir le classement →</button>
-        </div>
+        <div class="alert alert-warning" id="alerte-candidatures" style="display:none;cursor:pointer" onclick="showPage('admin-candidatures')"></div>
 
         <div class="card">
           <div class="card-header">
@@ -1014,11 +1020,8 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="table-wrap">
             <table>
               <thead><tr><th>Nom</th><th>Type</th><th>Email</th><th>Date</th><th>Statut</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr><td><strong>Karim Benali</strong></td><td>Convoyeur</td><td>k.benali@email.com</td><td>Aujourd'hui</td><td><span class="badge badge-pending">En attente</span></td><td><button class="btn btn-sm btn-primary" onclick="showPage('admin-candidatures')">Voir →</button></td></tr>
-                <tr><td><strong>Sophie Martin</strong></td><td>Client</td><td>s.martin@email.com</td><td>Hier</td><td><span class="badge badge-active">Actif</span></td><td><button class="btn btn-sm btn-outline">Voir</button></td></tr>
-                <tr><td><strong>Thomas Durand</strong></td><td>Convoyeur</td><td>t.durand@email.com</td><td>Il y a 2j</td><td><span class="badge badge-pending">En attente</span></td><td><button class="btn btn-sm btn-primary" onclick="showPage('admin-candidatures')">Voir →</button></td></tr>
-                <tr><td><strong>Leila Mansour</strong></td><td>Client</td><td>l.mansour@email.com</td><td>Il y a 3j</td><td><span class="badge badge-active">Actif</span></td><td><button class="btn btn-sm btn-outline">Voir</button></td></tr>
+              <tbody id="inscriptions-recentes">
+                <tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1032,71 +1035,8 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="table-wrap">
             <table>
               <thead><tr><th>Trajet</th><th>Client</th><th>Convoyeur</th><th>Véhicule</th><th>Date</th><th>Prix client</th><th>💚 Convoyeur (50%)</th><th>⛽ Frais (25%)</th><th>📊 HelixCar (25%)</th><th>Statut</th><th>Action</th></tr></thead>
-<tbody>
-<tr>
-  <td><strong>Paris → Lyon</strong><br><span style="font-size:.72rem;color:#888">463 km · HC-2024-0529</span></td>
-  <td>Marc Dupont<br><span style="font-size:.72rem;color:#888">06 11 22 33 44</span></td>
-  <td>Antoine Arcelin<br><span style="font-size:.72rem;color:#888">CNV-0001</span></td>
-  <td>BMW 320d · AB-123-CD</td><td>30/05</td>
-  <td><strong>417 €</strong></td>
-  <td style="color:var(--green);font-weight:700">208 €</td>
-  <td style="color:#888;font-size:.82rem">104 €</td>
-  <td><strong style="color:var(--green)">105 €</strong></td>
-  <td><span class="badge badge-progress">🚗 En cours</span></td>
-  <td><button class="btn btn-sm btn-outline" onclick="showMission(0)">Détail</button></td>
-</tr>
-<tr>
-  <td><strong>Paris → Marseille</strong><br><span style="font-size:.72rem;color:#888">775 km · HC-2024-0530</span></td>
-  <td>Sarah Kohen<br><span style="font-size:.72rem;color:#888">06 22 33 44 55</span></td>
-  <td>Jean Pellerin<br><span style="font-size:.72rem;color:#888">CNV-0002</span></td>
-  <td>Mercedes C220 · CD-456-EF</td><td>30/05</td>
-  <td><strong>698 €</strong></td>
-  <td style="color:var(--green);font-weight:700">349 €</td>
-  <td style="color:#888;font-size:.82rem">174 €</td>
-  <td><strong style="color:var(--green)">175 €</strong></td>
-  <td>
-    <span class="badge" style="background:rgba(181,68,75,.15);color:#A65E22">🔧 Panne signalée</span>
-    <div style="font-size:.7rem;color:#A65E22;margin-top:2px">A7 · km 312 · 14h32</div>
-  </td>
-  <td><button class="btn btn-sm btn-outline" style="border-color:var(--red);color:var(--red)" onclick="showMission(1)">Détail</button></td>
-</tr>
-<tr>
-  <td><strong>Lyon → Bordeaux</strong><br><span style="font-size:.72rem;color:#888">463 km · HC-2024-0531</span></td>
-  <td>Pierre Moreau<br><span style="font-size:.72rem;color:#888">06 33 44 55 66</span></td>
-  <td>—</td>
-  <td>Renault Clio · GH-789-IJ</td><td>31/05</td>
-  <td><strong>417 €</strong></td>
-  <td style="color:var(--green);font-weight:700">208 €</td>
-  <td style="color:#888;font-size:.82rem">104 €</td>
-  <td><strong style="color:var(--green)">105 €</strong></td>
-  <td><span class="badge badge-pending">⏳ Sans convoyeur</span></td>
-  <td><button class="btn btn-sm btn-primary" onclick="showMission(2)">Assigner</button></td>
-</tr>
-<tr>
-  <td><strong>Paris → Lille</strong><br><span style="font-size:.72rem;color:#888">225 km · HC-2024-0520</span></td>
-  <td>Julie Robert<br><span style="font-size:.72rem;color:#888">06 44 55 66 77</span></td>
-  <td>Sara Bouali<br><span style="font-size:.72rem;color:#888">CNV-0003</span></td>
-  <td>Peugeot 308 · KL-012-MN</td><td>28/05</td>
-  <td><strong>202 €</strong></td>
-  <td style="color:var(--green);font-weight:700">101 €</td>
-  <td style="color:#888;font-size:.82rem">50 €</td>
-  <td><strong style="color:var(--green)">51 €</strong></td>
-  <td><span class="badge badge-done">✅ Terminée</span></td>
-  <td><button class="btn btn-sm btn-outline" onclick="showMission(3)">Détail</button></td>
-</tr>
-<tr>
-  <td><strong>Paris → Bordeaux</strong><br><span style="font-size:.72rem;color:#888">589 km · HC-2024-0519</span></td>
-  <td>Farid Alami<br><span style="font-size:.72rem;color:#888">06 55 66 77 88</span></td>
-  <td>Antoine Arcelin<br><span style="font-size:.72rem;color:#888">CNV-0001</span></td>
-  <td>Tesla Model 3 · OP-345-QR</td><td>25/05</td>
-  <td><strong>530 €</strong></td>
-  <td style="color:var(--green);font-weight:700">265 €</td>
-  <td style="color:#888;font-size:.82rem">132 €</td>
-  <td><strong style="color:var(--green)">133 €</strong></td>
-  <td><span class="badge badge-done">✅ Terminée</span></td>
-  <td><button class="btn btn-sm btn-outline" onclick="showMission(4)">Détail</button></td>
-</tr>
-
+<tbody id="missions-accueil">
+<tr><td colspan="11" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
 </tbody>
             </table>
           </div>
@@ -1159,41 +1099,14 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-admin-clients">
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Base clients</div><div class="card-sub">47 inscrits — recherche rapide par N° client, nom ou mission</div></div>
-            <input type="text" placeholder="🔍 Rechercher…" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:.83rem;width:200px;outline:none">
+            <div><div class="card-title">Base clients</div><div class="card-sub" id="clients-count-sub">Comptes clients réellement créés</div></div>
+            <input type="text" id="recherche-clients" placeholder="🔍 Rechercher…" oninput="filtrerClientsAdmin(this.value)" style="padding:7px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:.83rem;width:200px;outline:none">
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>N° Client</th><th>Nom</th><th>Email</th><th>Type</th><th>Missions</th><th>Km total</th><th>Palier</th><th>VIN</th><th>Statut</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">CLI-0001</span></td>
-                  <td><strong>Marc Dupont</strong></td><td>m.dupont@email.com</td><td>Particulier</td><td>8</td><td>3 840 km</td><td>Palier 2</td>
-                  <td style="font-family:monospace;font-size:.75rem">VF1AB12CD…</td>
-                  <td><span class="badge badge-active">Actif</span></td>
-                  <td><button class="btn btn-sm btn-outline" onclick="alert('Missions de Marc Dupont :\n• HC-2024-0529 ✅\n• HC-2024-0512 ✅\n• HC-2024-0498 ✅\n...')">Voir missions</button></td>
-                </tr>
-                <tr>
-                  <td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">CLI-0002</span></td>
-                  <td><strong>Sarah Kohen</strong></td><td>s.kohen@email.com</td><td>Particulier</td><td>5</td><td>2 210 km</td><td>Palier 1</td>
-                  <td style="font-family:monospace;font-size:.75rem">VF3CD98EF…</td>
-                  <td><span class="badge badge-active">Actif</span></td>
-                  <td><button class="btn btn-sm btn-outline" onclick="alert('Missions de Sarah Kohen :\n• HC-2024-0488 ✅\n...')">Voir missions</button></td>
-                </tr>
-                <tr>
-                  <td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">ENT-0001</span></td>
-                  <td><strong>AutoFleet SAS</strong></td><td>contact@autofleet.fr</td><td>Entreprise</td><td>32</td><td>18 500 km</td><td>Entreprises</td>
-                  <td style="font-family:monospace;font-size:.75rem">Multiple</td>
-                  <td><span class="badge badge-active">Actif</span></td>
-                  <td><button class="btn btn-sm btn-outline" onclick="alert('32 missions — voir toutes')">Voir missions</button></td>
-                </tr>
-                <tr>
-                  <td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">CLI-0003</span></td>
-                  <td><strong>Pierre Moreau</strong></td><td>p.moreau@email.com</td><td>Particulier</td><td>2</td><td>840 km</td><td>–</td>
-                  <td style="font-family:monospace;font-size:.75rem">WBA3A5C5…</td>
-                  <td><span class="badge badge-active">Actif</span></td>
-                  <td><button class="btn btn-sm btn-outline" onclick="alert('Missions de Pierre Moreau :\n• HC-2024-0401 ✅\n• HC-2024-0399 ✅')">Voir missions</button></td>
-                </tr>
+              <thead><tr><th>N° Client</th><th>Nom</th><th>Email</th><th>Type</th><th>Téléphone</th><th>Demandes</th><th>Inscrit le</th><th>Action</th></tr></thead>
+              <tbody id="clients-table">
+                <tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1280,7 +1193,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Demandes recontact -->
       <div class="page" id="page-admin-recontact">
-        <div class="alert alert-info" style="margin-bottom:14px">📬 Ces demandes proviennent du formulaire "Être recontacté" du site. Une fois Supabase connecté, elles apparaissent ici en temps réel.</div>
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="card">
           <div class="card-header">
             <div><div class="card-title">📬 Demandes de recontact</div><div class="card-sub">Formulaires soumis depuis helixcar.com</div></div>
@@ -1378,6 +1291,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Challenge mensuel -->
       <div class="page" id="page-admin-challenge">
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
 
         <!-- Alerte récompenses à attribuer -->
         <div class="alert" style="background:rgba(181,68,75,.12);border:2px solid rgba(181,68,75,.5);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px">
@@ -1464,8 +1378,9 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Pannes -->
       <div class="page" id="page-admin-pannes">
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="alert" style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.25);border-radius:10px;padding:12px 16px;color:#A65E22;margin-bottom:14px">
-          🔧 <strong>1 panne active en ce moment.</strong> Le client a été informé automatiquement.
+          🔧 <strong>Exemple : 1 panne active.</strong> Aucun client n'est informé : le suivi des pannes n'est pas connecté.
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">🔧 Pannes & incidents signalés</div><div class="card-sub">Mis à jour en temps réel par les convoyeurs</div></div>
@@ -1501,7 +1416,8 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Notations -->
       <div class="page" id="page-admin-notations">
-        <div class="alert alert-warning"><span>⚠️ <strong>1 convoyeur</strong> est en zone de danger (note &lt; 12/20). <strong>1 convoyeur est bloqué</strong> (note &lt; 10/20).</span></div>
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
+        <div class="alert alert-info"><span>ℹ️ Le blocage d'un partenaire est toujours une décision prise à la main, depuis sa fiche. Aucune note ne bloque personne automatiquement.</span></div>
 
         <div class="card">
           <div class="card-header">
@@ -1680,7 +1596,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CLIENT: Notation après mission -->
       <div class="page" id="page-client-notation">
-        <div class="alert alert-info"><span>📋 Vous avez <strong>1 mission</strong> en attente d'évaluation.</span></div>
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="card">
           <div class="card-header">
             <div><div class="card-title">Évaluer votre convoyeur</div><div class="card-sub">Mission : Paris → Lyon · Antoine Arcelin · 29/05/2024</div></div>
@@ -1772,6 +1688,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Paramètres -->
       <div class="page" id="page-admin-parametres">
+        <div class="alert alert-info" style="margin-bottom:14px">ℹ️ Les informations bancaires ci-dessous sont enregistrées pour vous. Les blocs « retenues » et « SMS » plus bas ne sont pas encore connectés : ils n'enregistrent rien et n'envoient rien.</div>
         <div class="card">
           <div class="card-header"><div class="card-title">🏦 Informations bancaires (RIB)</div><div class="card-sub">Visible uniquement par vous — jamais partagé</div></div>
           <div class="alert alert-warning">🔒 Ces informations sont strictement confidentielles et stockées de manière sécurisée.</div>
@@ -1794,9 +1711,9 @@ body.scroll-verrouille { overflow: hidden; }
           <button class="btn btn-primary" onclick="alert('Notification envoyée à tous les convoyeurs actifs ✓')">🔔 Envoyer la notification</button>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">⚠️ Appliquer une retenue</div><div class="card-sub">L'email est envoyé automatiquement au convoyeur</div></div>
+          <div class="card-header"><div class="card-title">⚠️ Appliquer une retenue</div><div class="card-sub">Fonction non connectée : rien n'est encore enregistré ni envoyé</div></div>
           <div class="form-group"><label>Convoyeur concerné</label>
-            <select><option>Antoine Arcelin</option><option>Jean Pellerin</option><option>Sara Bouali</option></select>
+            <select><option>Fonction non connectée</option></select>
           </div>
           <div class="form-group"><label>Mission concernée</label><input type="text" placeholder="Ex : HC-2024-0529 · Paris → Lyon"></div>
           <div class="form-group"><label>Motif de la retenue</label>
@@ -1813,10 +1730,10 @@ body.scroll-verrouille { overflow: hidden; }
             </select>
           </div>
           <div class="form-group"><label>Précision (optionnel)</label><input type="text" placeholder="Ex : 45 min de retard, client informé…"></div>
-          <button class="btn btn-red" onclick="envoyerPenalite()">⚠️ Appliquer la retenue et envoyer l'email</button>
+          <button class="btn btn-red" onclick="envoyerPenalite()">⚠️ Appliquer la retenue</button>
         </div>
         <div class="card">
-          <p style="font-size:0.88rem;color:#555;margin-bottom:16px;line-height:1.6">Un SMS est envoyé automatiquement au client lorsque le convoyeur arrive à destination. Configurez votre service SMS ci-dessous.</p>
+          <p style="font-size:0.88rem;color:#555;margin-bottom:16px;line-height:1.6">Aucun SMS n'est envoyé aujourd'hui : le service n'est pas connecté. Cette page prépare sa configuration.</p>
           <div class="alert alert-info"><span>ℹ️ Service SMS via <strong>Twilio</strong> ou <strong>OVH SMS</strong>. Une fois votre clé API renseignée, les notifications partent automatiquement à chaque arrivée confirmée.</span></div>
           <div class="form-group" style="margin-top:16px"><label>Clé API SMS</label><input type="text" placeholder="Votre clé API Twilio ou OVH SMS"></div>
           <div class="form-group"><label>Numéro expéditeur</label><input type="text" placeholder="+33 X XX XX XX XX"></div>
@@ -1903,7 +1820,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="form-group"><label>Retard estimé</label>
             <select><option>Non estimé</option><option>+30 min</option><option>+1h</option><option>+2h</option><option>+3h ou plus</option><option>Mission compromise</option></select>
           </div>
-          <button class="btn btn-red" onclick="alert('🔧 Incident signalé.\n📱 SMS client envoyé automatiquement.\n📧 Email client envoyé.\n✅ HelixCar notifié.')">🔧 Signaler — Prévenir le client automatiquement</button>
+          <button class="btn btn-red" onclick="alert('Le signalement d\'incident n\'est pas encore connecté : rien n\'a été enregistré, et aucun SMS ni e-mail n\'a été envoyé au client.')">🔧 Signaler un incident</button>
         </div>
       </div>
 
@@ -1974,6 +1891,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CONVOYEUR: Récompenses -->
       <div class="page" id="page-convoyeur-recompenses">
+        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="card">
           <div class="card-header"><div class="card-title">🏆 Challenge mensuel — Mai 2024</div></div>
           <div class="alert alert-success"><span>✅ Vous êtes éligible au challenge (2+ mois d'activité). Vous êtes actuellement <strong>2ème</strong> avec 3 840 km ce mois.</span></div>
@@ -2044,10 +1962,11 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header"><div class="card-title">Mission en cours</div></div>
-          <div class="alert alert-success"><span>🚗 Votre véhicule est en route ! Convoyeur : <strong>Antoine Arcelin</strong> · Paris → Lyon</span></div>
+          <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
+          <div class="alert alert-success"><span>🚗 Exemple de suivi : véhicule en route, Paris → Lyon.</span></div>
           <div class="detail-row"><span class="detail-label">Trajet</span><span class="detail-val">Paris → Lyon (463 km)</span></div>
           <div class="detail-row"><span class="detail-label">Véhicule</span><span class="detail-val">BMW 320d · AB-123-CD</span></div>
-          <div class="detail-row"><span class="detail-label">Convoyeur</span><span class="detail-val">Antoine Arcelin · 06 12 34 56 78</span></div>
+          <div class="detail-row"><span class="detail-label">Convoyeur</span><span class="detail-val">—</span></div>
           <div class="detail-row"><span class="detail-label">Départ</span><span class="detail-val">29/05/2024 · 08h00</span></div>
           <div class="detail-row"><span class="detail-label">Arrivée estimée</span><span class="detail-val">29/05/2024 · 14h30</span></div>
           <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val"><span class="badge badge-progress">En route</span></span></div>
@@ -2241,7 +2160,6 @@ body.scroll-verrouille { overflow: hidden; }
         </select>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-outline" id="dossier-btn-docs" onclick="voirDocumentsConvoyeur()">📄 Voir les documents</button>
         <button class="btn btn-red" id="dossier-btn-block" onclick="toggleBlockConvoyeur()">🚫 Bloquer l'accès</button>
       </div>
     </div>
@@ -2289,24 +2207,10 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
-<!-- Info mission -->
-<div class="modal-overlay" id="modal-info-mission">
-  <div class="modal" style="position:relative">
-    <button class="modal-close" onclick="closeModal('info-mission')">✕</button>
-    <h3>Informations mission</h3>
-    <p>Récapitulatif complet de la mission.</p>
-    <div class="detail-row"><span class="detail-label">Trajet</span><span class="detail-val">Paris → Lyon</span></div>
-    <div class="detail-row"><span class="detail-label">Véhicule</span><span class="detail-val">BMW 320d · AB-123-CD</span></div>
-    <div class="detail-row"><span class="detail-label">Client</span><span class="detail-val">Marc Dupont · 06 11 22 33 44</span></div>
-    <div class="detail-row"><span class="detail-label">Date</span><span class="detail-val">20/05/2024</span></div>
-    <div class="detail-row"><span class="detail-label">Distance</span><span class="detail-val">463 km</span></div>
-    <div class="detail-row"><span class="detail-label">Rémunération</span><span class="detail-val">200 €</span></div>
-    <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val"><span class="badge badge-done">Terminée</span></span></div>
-    <div style="margin-top:16px;background:var(--gray-light);border-radius:8px;padding:12px;font-size:0.8rem;color:#555;line-height:1.6">
-      📋 <strong>Rappel des règles :</strong> Respectez l'état du véhicule, effectuez l'état des lieux Weproov au départ et à l'arrivée, conservez vos tickets de péage et carburant.
-    </div>
-  </div>
-</div>
+<!-- MODALE « INFORMATIONS MISSION » SUPPRIMÉE : son contenu était
+     entièrement écrit en dur (Paris → Lyon, BMW 320d, Marc Dupont,
+     200 €) et aucun bouton de la page ne l'ouvrait. Le détail réel
+     d'une mission se lit dans l'onglet Missions. -->
 
 <!-- Frais de route -->
 <div class="modal-overlay" id="modal-frais">
@@ -2498,22 +2402,21 @@ body.scroll-verrouille { overflow: hidden; }
 let currentRole = 'admin';
 let loginRole = 'admin';
 
-const USERS = {
-  // V50.5B.2 — le compte de démonstration admin a été retiré : l'admin
-  // s'authentifie désormais réellement via sbAuth.auth.signInWithPassword
-  // (cf. doLoginAdmin/finaliserSessionAdmin plus bas). Le rôle 'client'
-  // s'authentifie lui aussi réellement depuis le chantier « espace
-  // client » (doLoginClient/finaliserSessionClient) : cette table ne
-  // sert plus à aucune connexion. Elle est conservée telle quelle pour
-  // ne rien casser d'autre qui la lirait.
-  'convoyeur@helixcar.com': { pw: 'demo123', role: 'convoyeur', name: 'Antoine A.',  initials: 'A' },
-  'client@helixcar.com':    { pw: 'demo123', role: 'client',    name: 'Marc D.',     initials: 'M' },
-};
+// TABLE DE COMPTES DE DÉMONSTRATION SUPPRIMÉE.
+// Les trois rôles s'authentifient réellement via Supabase Auth
+// (doLoginAdmin, doLoginConvoyeur, doLoginClient). Cette table ne
+// servait plus à aucune connexion, mais elle restait lue au démarrage
+// par une restauration de « session démo » : il suffisait d'écrire
+// helixcar_demo_email dans le stockage local du navigateur pour ouvrir
+// l'interface sans jamais saisir de mot de passe. Les deux ont été
+// retirées ensemble — la restauration de session passe uniquement par
+// onAuthStateChange / finaliserSessionParUid, c'est-à-dire par une
+// vraie session Supabase.
 
 const NAVS = {
   admin: [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
-    { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badge: 3 },
+    { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
     { id: 'admin-missions',     icon: '🚗', label: 'Missions' },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
@@ -3240,7 +3143,7 @@ function buildNav(role) {
     const btn = document.createElement('button');
     btn.className = 'nav-item';
     btn.id = 'nav-' + item.id;
-    btn.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}${item.badgeDynamique ? `<span class="nav-badge" id="badge-${item.id}" style="display:none"></span>` : ''}`;
+    btn.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}${item.badgeDynamique ? `<span class="nav-badge" id="badge-${item.id}" style="display:none"></span>` : ''}${item.badgeCandidatures ? `<span class="nav-badge" id="badge-candidatures" style="display:none"></span>` : ''}`;
     btn.onclick = () => showPage(item.id);
     nav.appendChild(btn);
   });
@@ -3306,6 +3209,8 @@ function showPage(id) {
   const t = PAGE_TITLES[id] || ['', ''];
   document.getElementById('topbar-title').textContent = t[0];
   document.getElementById('topbar-sub').textContent = t[1];
+  if (id === 'admin-dashboard') { chargerAccueilAdmin(); }
+  if (id === 'admin-clients') { chargerClientsAdmin(); }
   if (id === 'admin-candidatures') { loadCandidatures(); loadConvoyeursActifs(); }
   if (id === 'admin-missions') { loadMissions(); }
   if (id === 'convoyeur-dashboard') { loadDashboardMissionsPreview(); }
@@ -3410,20 +3315,13 @@ const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-// Restaure la session client démo si elle existe (persistance au
-// rechargement). Depuis V50.5B.2, l'admin n'est plus dans USERS : une
-// éventuelle ancienne valeur localStorage 'admin@helixcar.com' ne
-// correspond plus à rien ici et est donc ignorée sans effet — sa
-// restauration passe désormais uniquement par onAuthStateChange /
-// finaliserSessionParUid, comme pour convoyeur.
-(function restaurerSessionDemo() {
-  try {
-    const emailSauve = localStorage.getItem('helixcar_demo_email');
-    if (emailSauve && USERS[emailSauve]) {
-      currentRole = USERS[emailSauve].role;
-      initApp(USERS[emailSauve]);
-    }
-  } catch (e) { console.error('Erreur restauration session démo:', e); }
+// RESTAURATION DE « SESSION DÉMO » SUPPRIMÉE.
+// Elle ouvrait l'interface sur la seule foi d'une valeur écrite dans le
+// stockage local du navigateur, sans aucune vérification : une adresse
+// connue suffisait à entrer. Une éventuelle valeur résiduelle est
+// effacée ici, une fois, pour ne laisser aucune trace derrière elle.
+(function oublierAncienneSessionDemo() {
+  try { localStorage.removeItem('helixcar_demo_email'); } catch (e) {}
 })();
 
 // ============================================================
@@ -5830,6 +5728,270 @@ const MISSION_STATUT_BADGE = {
   annulee:    '<span class="badge badge-refused">Annulée</span>'
 };
 
+// ── BASE CLIENTS — LES COMPTES RÉELLEMENT CRÉÉS ─────────────
+// La page affichait quatre clients inventés (Marc Dupont, Sarah Kohen,
+// AutoFleet SAS, Pierre Moreau) avec des kilométrages, des paliers et
+// des VIN fictifs, et un bouton « Voir missions » qui ouvrait une liste
+// de missions imaginaires. Les colonnes qui n'existent nulle part
+// (Km total, Palier, VIN) ont disparu : on n'affiche que ce que la base
+// contient réellement.
+var _clientsAdminListe = [];
+
+// Le compteur du menu est mis à jour dès l'entrée dans l'espace
+// administrateur, sans attendre une navigation.
+function majBadgeCandidatures() {
+  _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
+    .then(function (n) {
+      var bdg = document.getElementById('badge-candidatures');
+      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
+    })
+    .catch(function () {});
+}
+
+function chargerClientsAdmin() {
+  var tbody = document.getElementById('clients-table');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  sbFetchToutePage('clients?select=id,numero_client,prenom,nom,email,telephone,type_client,created_at,auth_user_id'
+                   + '&auth_user_id=not.is.null&order=created_at.desc')
+    .then(function (rows) {
+      _clientsAdminListe = rows || [];
+      afficherClientsAdmin(_clientsAdminListe);
+      var sub = document.getElementById('clients-count-sub');
+      if (sub) sub.textContent = _clientsAdminListe.length + ' compte(s) client';
+      var champ = document.getElementById('recherche-clients');
+      if (champ) champ.value = '';
+    })
+    .catch(function () {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Base clients indisponible — vérifiez la console</td></tr>';
+    });
+}
+
+function afficherClientsAdmin(rows) {
+  var tbody = document.getElementById('clients-table');
+  if (!tbody) return;
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Aucun compte client pour le moment</td></tr>';
+    return;
+  }
+  // Une même personne peut avoir plusieurs demandes : on regroupe par
+  // compte, et on compte ses demandes, plutôt que de la lister deux fois.
+  var parCompte = {};
+  rows.forEach(function (c) {
+    var cle = c.auth_user_id || c.id;
+    if (!parCompte[cle]) parCompte[cle] = { ref: c, demandes: 0 };
+    parCompte[cle].demandes += 1;
+    if (String(c.created_at) < String(parCompte[cle].ref.created_at)) parCompte[cle].ref = c;
+  });
+  tbody.innerHTML = Object.keys(parCompte).map(function (cle) {
+    var c = parCompte[cle].ref;
+    var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—';
+    var type = c.type_client === 'pro' ? 'Professionnel'
+             : c.type_client === 'particulier' ? 'Particulier' : '—';
+    return '<tr>'
+      + '<td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">'
+        + escapeHtml(c.numero_client || '—') + '</span></td>'
+      + '<td><strong>' + escapeHtml(nom) + '</strong></td>'
+      + '<td>' + escapeHtml(c.email || '—') + '</td>'
+      + '<td>' + type + '</td>'
+      + '<td>' + escapeHtml(c.telephone || '—') + '</td>'
+      + '<td>' + parCompte[cle].demandes + '</td>'
+      + '<td>' + (_dvDate ? _dvDate(c.created_at) : '—') + '</td>'
+      + '<td><button class="btn btn-sm btn-outline" onclick="showPage(\'admin-devis\')">Voir ses demandes →</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function filtrerClientsAdmin(texte) {
+  var t = (texte || '').trim().toLowerCase();
+  if (!t) { afficherClientsAdmin(_clientsAdminListe); return; }
+  afficherClientsAdmin(_clientsAdminListe.filter(function (c) {
+    return [c.numero_client, c.prenom, c.nom, c.email, c.telephone]
+      .some(function (v) { return String(v || '').toLowerCase().indexOf(t) !== -1; });
+  }));
+}
+
+// ── ACCUEIL ADMINISTRATEUR — CHIFFRES ET LISTES RÉELS ───────
+// Cette page affichait cinq indicateurs écrits en dur (3 candidatures,
+// 12 convoyeurs, 47 clients, 8 missions, 4 820 € de CA) et deux tableaux
+// entièrement inventés. Un administrateur ne pouvait pas distinguer ces
+// valeurs de vraies données. Tout est désormais compté et lu dans
+// Supabase, avec les mêmes helpers que le reste du Dashboard.
+function _compterLignes(requete) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + requete + '&limit=0', {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Prefer': 'count=exact'
+    }
+  }).then(function (r) {
+    if (!r.ok) throw new Error('Comptage HTTP ' + r.status);
+    var total = parseInt((r.headers.get('content-range') || '').split('/')[1], 10);
+    if (isNaN(total)) throw new Error('Content-Range illisible');
+    return total;
+  });
+}
+
+function _ecrireStat(id, valeur) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = valeur;
+}
+
+function _premierJourDuMois() {
+  var d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function chargerAccueilAdmin() {
+  // Chaque compteur est indépendant : si l'un échoue, les autres
+  // s'affichent quand même, et celui qui a échoué le dit.
+  _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
+    .then(function (n) {
+      _ecrireStat('stat-pending', n);
+      // Le badge du menu affichait « 3 » en dur, quel que soit le
+      // nombre réel de candidatures en attente.
+      var bdg = document.getElementById('badge-candidatures');
+      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
+      var al = document.getElementById('alerte-candidatures');
+      if (al) {
+        al.textContent = n > 0
+          ? '⚠️ ' + n + (n > 1 ? ' candidatures partenaires sont en attente de validation.'
+                              : ' candidature partenaire est en attente de validation.')
+          : '';
+        al.style.display = n > 0 ? '' : 'none';
+      }
+    })
+    .catch(function () { _ecrireStat('stat-pending', '—'); });
+
+  _compterLignes('convoyeurs?select=id&statut=eq.actif')
+    .then(function (n) { _ecrireStat('stat-convoyeurs', n); })
+    .catch(function () { _ecrireStat('stat-convoyeurs', '—'); });
+
+  // Un « client inscrit » est un compte réellement créé, pas une simple
+  // demande déposée : c'est la présence d'un auth_user_id qui le dit.
+  _compterLignes('clients?select=id&auth_user_id=not.is.null')
+    .then(function (n) { _ecrireStat('stat-clients', n); })
+    .catch(function () { _ecrireStat('stat-clients', '—'); });
+
+  _compterLignes('missions?select=id&statut=in.(acceptee,en_cours,proposee,fini)')
+    .then(function (n) { _ecrireStat('stat-missions', n); })
+    .catch(function () { _ecrireStat('stat-missions', '—'); });
+
+  // Le chiffre d'affaires n'était rattaché à rien. On affiche à la place
+  // ce qui EXISTE réellement : le montant des devis acceptés ce mois-ci.
+  sbFetchToutePage('devis?select=prix,statut,date_generation&statut=eq.accepte'
+                   + '&date_generation=gte.' + _premierJourDuMois())
+    .then(function (rows) {
+      var total = (rows || []).reduce(function (a, d) { return a + (Number(d.prix) || 0); }, 0);
+      _ecrireStat('stat-ca', total.toLocaleString('fr-FR'));
+      var sub = document.getElementById('stat-ca-sub');
+      if (sub) sub.textContent = (rows || []).length + ' devis accepté(s)';
+    })
+    .catch(function () {
+      _ecrireStat('stat-ca', '—');
+      var sub = document.getElementById('stat-ca-sub');
+      if (sub) sub.textContent = 'Table devis indisponible';
+    });
+
+  chargerInscriptionsRecentes();
+  chargerMissionsAccueil();
+}
+
+// Un statut technique ('en_attente', 'compte_cree') n'a rien à faire
+// sous les yeux d'un administrateur : il est traduit ici, une fois.
+var LIB_STATUT_INSCRIPTION = {
+  actif: 'Actif', en_attente: 'En attente', refuse: 'Refusé',
+  video_attendue: 'Vidéo attendue', nouveau: 'Nouvelle demande',
+  compte_cree: 'Compte créé', validee: 'Validée', annulee: 'Annulée'
+};
+
+function _badgeStatutInscription(statut) {
+  var lib = LIB_STATUT_INSCRIPTION[statut] || statut || 'En attente';
+  var classe = (statut === 'actif' || statut === 'validee') ? 'badge-active'
+             : (statut === 'refuse' || statut === 'annulee') ? 'badge-refused'
+             : 'badge-pending';
+  return '<span class="badge ' + classe + '">' + escapeHtml(lib) + '</span>';
+}
+
+function chargerInscriptionsRecentes() {
+  var tbody = document.getElementById('inscriptions-recentes');
+  if (!tbody) return;
+  Promise.all([
+    sbFetch('convoyeurs?select=id,prenom,nom,email,statut,created_at&order=created_at.desc&limit=5'),
+    sbFetch('clients?select=id,prenom,nom,email,statut,created_at,auth_user_id&auth_user_id=not.is.null&order=created_at.desc&limit=5')
+  ]).then(function (res) {
+    var lignes = []
+      .concat((res[0] || []).map(function (c) { return { type: 'Partenaire', page: 'admin-candidatures', l: c }; }))
+      .concat((res[1] || []).map(function (c) { return { type: 'Client', page: 'admin-clients', l: c }; }))
+      .sort(function (a, b) { return String(b.l.created_at).localeCompare(String(a.l.created_at)); })
+      .slice(0, 6);
+    if (!lignes.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Aucune inscription pour le moment</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lignes.map(function (x) {
+      var c = x.l;
+      var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—';
+      var badge = _badgeStatutInscription(c.statut);
+      return '<tr><td><strong>' + escapeHtml(nom) + '</strong></td>'
+        + '<td>' + x.type + '</td>'
+        + '<td>' + escapeHtml(c.email || '—') + '</td>'
+        + '<td>' + (_dvDate ? _dvDate(c.created_at) : '—') + '</td>'
+        + '<td>' + badge + '</td>'
+        + '<td><button class="btn btn-sm btn-outline" onclick="showPage(\'' + x.page + '\')">Voir →</button></td></tr>';
+    }).join('');
+  }).catch(function () {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Inscriptions indisponibles — vérifiez la console</td></tr>';
+  });
+}
+
+function chargerMissionsAccueil() {
+  var tbody = document.getElementById('missions-accueil');
+  if (!tbody) return;
+  Promise.all([
+    sbFetch('missions?select=id,reference,ville_depart,ville_arrivee,client_id,convoyeur_id,marque_modele,immatriculation,date_prise_en_charge,prix_ttc,statut&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc&limit=6'),
+    sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
+    sbFetchToutePage('clients?select=id,prenom,nom')
+  ]).then(function (res) {
+    var missions = res[0] || [];
+    var conv = {}, cli = {};
+    (res[1] || []).forEach(function (c) { conv[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
+    (res[2] || []).forEach(function (c) { cli[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
+    if (!missions.length) {
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#888;padding:20px">Aucune mission en cours</td></tr>';
+      return;
+    }
+    tbody.innerHTML = missions.map(function (m) {
+      // La répartition 50 / 25 / 25 est la règle affichée en en-tête du
+      // tableau : elle est calculée, jamais recopiée d'un exemple.
+      var prix = Number(m.prix_ttc) || 0;
+      var partConvoyeur = Math.round(prix * 0.50);
+      var partFrais = Math.round(prix * 0.25);
+      var partHelix = prix - partConvoyeur - partFrais;
+      var vehicule = [m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—';
+      var badge = (typeof MISSION_STATUT_BADGE !== 'undefined' && MISSION_STATUT_BADGE[m.statut])
+        || '<span class="badge">' + escapeHtml(m.statut || '—') + '</span>';
+      return '<tr>'
+        + '<td><strong>' + escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—') + '</strong>'
+        + '<br><span style="font-size:.72rem;color:#888">' + escapeHtml(m.reference || '') + '</span></td>'
+        + '<td>' + escapeHtml(m.client_id ? (cli[m.client_id] || '—') : '—') + '</td>'
+        + '<td>' + escapeHtml(m.convoyeur_id ? (conv[m.convoyeur_id] || '—') : '—') + '</td>'
+        + '<td>' + escapeHtml(vehicule) + '</td>'
+        + '<td>' + (_dvDate ? _dvDate(m.date_prise_en_charge) : '—') + '</td>'
+        + '<td><strong>' + (prix ? prix.toLocaleString('fr-FR') + ' €' : '—') + '</strong></td>'
+        + '<td style="color:var(--green);font-weight:700">' + (prix ? partConvoyeur + ' €' : '—') + '</td>'
+        + '<td style="color:#888;font-size:.82rem">' + (prix ? partFrais + ' €' : '—') + '</td>'
+        + '<td><strong style="color:var(--green)">' + (prix ? partHelix + ' €' : '—') + '</strong></td>'
+        + '<td>' + badge + '</td>'
+        + '<td><button class="btn btn-sm btn-outline" onclick="showPage(\'admin-missions\')">Voir →</button></td>'
+        + '</tr>';
+    }).join('');
+  }).catch(function () {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:20px">Missions indisponibles — vérifiez la console</td></tr>';
+  });
+}
+
 function loadMissions() {
   const tbody = document.getElementById('missions-table');
   if (!tbody) return;
@@ -6518,7 +6680,7 @@ function acceptMission() {
   openModal('mission-accepted');
 }
 
-function openInfoMission() { openModal('info-mission'); }
+// openInfoMission() SUPPRIMÉE avec la modale qu'elle ouvrait.
 function openFraisModal() { openModal('frais'); }
 function handleDashVideo(input) {
   const div = document.getElementById('dash-video-name');
@@ -6538,8 +6700,10 @@ function handleDashVideo(input) {
 
 
 function envoyerRecompenses() {
-  if(!confirm('Confirmer l\'attribution des récompenses ?\n\n🥇 Antoine Arcelin — 150 €\n🥈 Jean Pellerin — 100 €\n🥉 Sara Bouali — 50 €\n\nChaque convoyeur recevra un email de notification.')) return;
-  alert('✅ Récompenses attribuées !\n\n📧 Emails envoyés aux 3 convoyeurs récompensés.\n💸 Versements à effectuer avec leurs prochaines factures.');
+  // La version précédente annonçait trois lauréats nommés et un e-mail
+  // envoyé à chacun : rien n'était enregistré, aucun e-mail ne partait.
+  alert('Le challenge mensuel n\'est pas encore connecté : aucune '
+    + 'récompense n\'a été attribuée et aucun message n\'a été envoyé.');
 }
 
 function calcSimulateur() {
@@ -6577,140 +6741,14 @@ function calcSimulateur() {
 }
 
 
-const MISSIONS = [
-  {
-    code:'HC-2024-0529', from:'Paris', to:'Lyon', km:463,
-    client:'Marc Dupont', tel:'06 11 22 33 44',
-    convoyeur:'Antoine Arcelin', convId:'CNV-0001', convTel:'06 12 34 56 78',
-    vehicule:'BMW 320d', immat:'AB-123-CD',
-    total:417, conv:208, frais:63, marge:146,
-    statut:'en-cours', incident:null, date:'30/05'
-  },
-  {
-    code:'HC-2024-0530', from:'Paris', to:'Marseille', km:775,
-    client:'Sarah Kohen', tel:'06 22 33 44 55',
-    convoyeur:'Jean Pellerin', convId:'CNV-0002', convTel:'06 98 76 54 32',
-    vehicule:'Mercedes C220', immat:'CD-456-EF',
-    total:698, conv:349, frais:105, marge:244,
-    statut:'panne', incident:'Panne moteur signalée A7 km 312 à 14h32. Convoyeur en attente dépanneuse. Client informé par SMS.',
-    date:'30/05'
-  },
-  {
-    code:'HC-2024-0531', from:'Lyon', to:'Bordeaux', km:463,
-    client:'Pierre Moreau', tel:'06 33 44 55 66',
-    convoyeur:null, convId:null,
-    vehicule:'Renault Clio', immat:'GH-789-IJ',
-    total:417, conv:208, frais:63, marge:146,
-    statut:'sans-convoyeur', incident:null, date:'31/05'
-  },
-  {
-    code:'HC-2024-0520', from:'Paris', to:'Lille', km:225,
-    client:'Julie Robert', tel:'06 44 55 66 77',
-    convoyeur:'Sara Bouali', convId:'CNV-0003', convTel:'07 11 22 33 44',
-    vehicule:'Peugeot 308', immat:'KL-012-MN',
-    total:202, conv:101, frais:24, marge:77,
-    statut:'terminee', incident:null, date:'28/05'
-  },
-  {
-    code:'HC-2024-0519', from:'Paris', to:'Bordeaux', km:589,
-    client:'Farid Alami', tel:'06 55 66 77 88',
-    convoyeur:'Antoine Arcelin', convId:'CNV-0001', convTel:'06 12 34 56 78',
-    vehicule:'Tesla Model 3', immat:'OP-345-QR',
-    total:530, conv:265, frais:80, marge:185,
-    statut:'terminee', incident:null, date:'25/05'
-  }
-];
-
-function showMission(idx) {
-  const m = MISSIONS[idx];
-  showMissionDetail(
-    m.code, m.from, m.to, m.km,
-    m.client, m.tel,
-    m.convoyeur || 'Non assigné', m.convId || '', m.convTel || '',
-    m.vehicule, m.immat,
-    m.total, m.conv, m.frais, m.marge,
-    m.statut, m.incident
-  );
-}
-
-function showMissionDetail(code, from, to, km, client, clientTel, convoyeur, convId, convTel, vehicule, immat, total, conv, frais, marge, statut, incident) {
-  const r = helixCarCalculator(total, km);
-  conv = r.conv; frais = r.frais; marge = r.marge;
-
-  const statusMap = {
-    'en-cours':       { badge: '🚗 En cours',        color: 'var(--blue-mid)',  bg: 'rgba(58,65,73,.08)' },
-    'panne':          { badge: '🔧 Panne signalée',  color: '#A65E22',          bg: 'rgba(181,68,75,.08)' },
-    'terminee':       { badge: '✅ Terminée',         color: '#1F7A4D',          bg: 'rgba(31,122,77,.08)' },
-    'sans-convoyeur': { badge: '⏳ Sans convoyeur',  color: '#8C3238',          bg: 'rgba(181,68,75,.1)'  },
-  };
-  const s = statusMap[statut] || statusMap['en-cours'];
-
-  const incidentHtml = incident ? `
-    <div style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.25);border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-weight:700;color:#A65E22;font-size:.88rem;margin-bottom:8px">🔧 Incident en cours</div>
-      <p style="font-size:.83rem;color:#555;line-height:1.6">${incident}</p>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-sm" style="background:#A65E22;color:#fff;border:none" onclick="alert('📱 SMS envoyé au client.')">📱 Prévenir le client</button>
-        <button class="btn btn-sm btn-outline" onclick="alert('✅ Incident marqué comme résolu.')">✅ Marquer résolu</button>
-      </div>
-    </div>
-  ` : '';
-
-  const convHtml = convoyeur && convoyeur !== 'Non assigné'
-    ? `<div style="font-weight:700;font-size:.88rem">${convoyeur}</div>
-       <div style="font-size:.8rem;color:#666;margin-top:2px">${convId} · Certifié HelixCar</div>
-       <div style="font-size:.8rem;color:#666;margin-top:1px">📞 ${convTel}</div>
-       <a href="tel:${convTel.replace(/\\s/g,'')}" style="display:inline-block;margin-top:6px;background:var(--navy);color:#fff;padding:4px 10px;border-radius:5px;font-size:.72rem;font-weight:700;text-decoration:none">📞 Appeler</a>`
-    : `<div style="font-weight:700;font-size:.88rem;color:#A65E22">⚠️ Non assigné</div>`;
-
-  document.getElementById('split-content').innerHTML = `
-    <div style="background:${s.bg};border-radius:8px;padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
-      <span style="color:${s.color};font-weight:700;font-size:.88rem">${s.badge}</span>
-      <span style="font-family:monospace;font-size:.82rem;font-weight:700;color:var(--blue-mid)">${code}</span>
-    </div>
-    ${incidentHtml}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div style="background:var(--gray-light);border-radius:8px;padding:10px">
-        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:6px">👤 Client</div>
-        <div style="font-weight:700;font-size:.88rem">${client}</div>
-        <div style="font-size:.8rem;color:#666;margin-top:2px">${clientTel}</div>
-        <a href="tel:${clientTel.replace(/\s/g,'')}" style="display:inline-block;margin-top:6px;background:var(--navy);color:#fff;padding:4px 10px;border-radius:5px;font-size:.72rem;font-weight:700;text-decoration:none">📞 Appeler</a>
-      </div>
-      <div style="background:var(--gray-light);border-radius:8px;padding:10px">
-        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:6px">🚗 Convoyeur</div>
-        ${convHtml}
-      </div>
-    </div>
-    <div style="background:var(--gray-light);border-radius:8px;padding:10px;margin-bottom:10px">
-      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:6px">🚙 Véhicule</div>
-      <div style="display:flex;justify-content:space-between;font-size:.83rem">
-        <span>${vehicule}</span>
-        <span style="font-family:monospace;font-weight:700">${immat}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-top:4px">
-        <span style="color:#888">Trajet</span>
-        <span><strong>${from} → ${to}</strong> · ${km} km</span>
-      </div>
-    </div>
-    <div style="border-radius:8px;overflow:hidden;border:1px solid #eee;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#F0FDF4;border-bottom:1px solid #eee;font-size:.83rem">
-        <span style="color:#666">💚 Convoyeur (50%)</span><span style="font-weight:700;color:var(--green)">${conv} €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#FEF2F2;border-bottom:1px solid #eee;font-size:.83rem">
-        <span style="color:#666">⛽ Frais de route (25%)</span><span style="font-weight:700;color:#A65E22">${frais} €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#EFF6FF;font-size:.83rem">
-        <span style="color:#666">📊 Marge HelixCar (25%)</span><span style="font-weight:700;color:var(--blue-mid)">${marge} €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--navy)">
-        <span style="color:rgba(255,255,255,.7);font-size:.88rem">Total payé par le client</span>
-        <span style="font-family:'Fraunces',Georgia,serif;font-weight:900;font-size:1.2rem;color:var(--yellow)">${total} €</span>
-      </div>
-    </div>
-  `;
-  document.getElementById('modal-split').querySelector('h3').textContent = 'Mission ' + code;
-  openModal('split');
-}
+// JEU DE MISSIONS DE DÉMONSTRATION SUPPRIMÉ, AVEC showMission() ET
+// showMissionDetail(). Cinq missions inventées (Marc Dupont, Sarah
+// Kohen, Pierre Moreau, Julie Robert, Farid Alami) alimentaient le
+// tableau de l'accueil, qui lit désormais Supabase. Le détail qu'elles
+// ouvraient contenait en outre deux boutons annonçant un SMS envoyé au
+// client et un incident « marqué résolu » : ni l'un ni l'autre
+// n'existait. La répartition 50 / 25 / 25 reste calculée par
+// helixCarCalculator(), toujours utilisée par la simulation.
 
 function helixCarCalculator(total, km) {
   const conv = total * 0.50;
@@ -6755,9 +6793,12 @@ function showSplit(km) {
   openModal('split');
 }
 
-function voirDocumentsConvoyeur() {
-  alert('📄 Documents de ' + (window._currentConvNom || 'ce convoyeur') + '\n\n✅ Permis de conduire — valide\n✅ Pièce d\'identité — valide\n✅ RC Pro — valide jusqu\'au 12/2025\n✅ RIB — FR76 3000 1234 5678…\n\n💡 En production : les PDFs s\'ouvriront directement depuis Supabase Storage.\nLes documents envoyés à helixcardoc@gmail.com seront associés automatiquement via leur code mission.');
-}
+// BOUTON « VOIR LES DOCUMENTS » SUPPRIMÉ, ET SA FONCTION AVEC.
+// Il affichait une liste de documents INVENTÉE — permis « valide », RC
+// Pro « valide jusqu'au 12/2025 », un RIB fictif — quels que soient les
+// documents réellement fournis par le candidat. La fiche affiche déjà,
+// juste au-dessus, les VRAIS liens vers les pièces déposées, ou la
+// mention « Manquant » quand elles ne le sont pas.
 
 // ANCIENNE VERSION SUPPRIMÉE — elle n'écrivait RIEN dans Supabase :
 // elle affichait seulement une alerte, refermait la fiche, et annonçait
@@ -6767,19 +6808,21 @@ function voirDocumentsConvoyeur() {
 // réellement `convoyeurs.bloque` via la session administrateur, garde la
 // trace de qui et quand, et ne déclenche aucun email.
 
-function refuserFromModal() {
-  const header = document.getElementById('dossier-name').textContent;
-  const nom = header.split(' —')[0].replace('Dossier — ','');
-  if(confirm('⚠️ Confirmer le refus de ' + nom + ' ?')) {
-    alert('❌ Accès refusé. Un email a été envoyé à ' + nom + '.');
-    closeModal('dossier');
-  }
-}
+// refuserFromModal() SUPPRIMÉE : plus aucun bouton ne l'appelait, et
+// elle annonçait un e-mail qui n'était jamais envoyé. Le refus réel
+// d'une candidature passe par refuserConvoyeur(), qui écrit dans
+// Supabase.
 
 function envoyerPenalite() {
   const motif = document.getElementById('penalite-motif').value;
-  if (!motif) { alert('⚠️ Veuillez sélectionner un motif.'); return; }
-  alert(`✅ Retenue appliquée.\n\nMotif : ${motif}\n\nUn email a été envoyé automatiquement au convoyeur avec le détail de la retenue.`);
+  if (!motif) { alert('Veuillez sélectionner un motif.'); return; }
+  // La version précédente annonçait « Retenue appliquée » et un e-mail
+  // envoyé au convoyeur : rien n'était enregistré, et aucun e-mail ne
+  // partait. Tant que les retenues ne sont pas connectées, le
+  // Dashboard le dit plutôt que de laisser croire le contraire.
+  alert('Les retenues ne sont pas encore connectées : rien n\'a été '
+    + 'enregistré et aucun message n\'a été envoyé au convoyeur.\n\n'
+    + 'Motif saisi : ' + motif);
 }
 
 // ── MOBILE BOTTOM NAV ─────────────────────────────────────
@@ -6881,7 +6924,7 @@ function updateNotePreview() {
 
   badge.innerHTML = `<span class="note-badge ${cls}">${label}</span>`;
   if (total < 10 && Object.keys(notes).length === 6) {
-    badge.innerHTML += `<div style="font-size:0.75rem;color:var(--red);margin-top:6px">⚠️ Cette note déclenchera un blocage automatique</div>`;
+    badge.innerHTML += `<div style="font-size:0.75rem;color:var(--red);margin-top:6px">⚠️ Note très basse — elle sera examinée par HelixCar</div>`;
   }
 }
 
@@ -6893,18 +6936,21 @@ function soumettreNotation() {
   }
   document.getElementById('notation-form').style.display = 'none';
   document.getElementById('notation-success').style.display = 'block';
-  if (total < 10) {
-    setTimeout(() => alert('⚠️ Note inférieure à 10/20 — ce convoyeur a été automatiquement bloqué et a reçu un email de notification.'), 600);
-  } else if (total < 12) {
-    setTimeout(() => alert('⚠️ Note inférieure à 12/20 — un email d\'avertissement a été envoyé au convoyeur.'), 600);
-  }
+  // Les deux alertes précédentes annonçaient un blocage automatique et
+  // des e-mails d'avertissement. Ni l'un ni les autres n'existent : le
+  // blocage d'un partenaire est une décision prise à la main par un
+  // administrateur, tracée dans convoyeurs.bloque, et aucun e-mail
+  // n'est envoyé sur une note.
   // Remove badge on nav
   const navBadge = document.querySelector('#nav-client-notation .nav-badge');
   if (navBadge) navBadge.remove();
 }
 
 function openNotationAdmin(name, note) {
-  alert(`Historique des évaluations de ${name}\nNote moyenne : ${note}/20\n\n(Dans la version connectée à Supabase, vous verrez ici toutes les évaluations détaillées mission par mission.)`);
+  // Aucune évaluation n'est encore enregistrée : on le dit clairement
+  // plutôt que de promettre un historique qui n'existe pas.
+  alert('Les évaluations détaillées ne sont pas encore connectées : '
+    + 'aucun historique réel n\'est disponible pour ' + name + '.');
 }
 
 // ── BLOCAGE DEPUIS LA LISTE ─────────────────────────────────
@@ -11292,9 +11338,13 @@ function demarrerSurveillanceDemandes() {
   _surveillanceDemarree = true;
 
   majBadgeDemandes(true);
+  if (typeof majBadgeCandidatures === 'function') majBadgeCandidatures();
 
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) majBadgeDemandes(false);
+    if (!document.hidden) {
+      majBadgeDemandes(false);
+      if (typeof majBadgeCandidatures === 'function') majBadgeCandidatures();
+    }
   });
 }
 
