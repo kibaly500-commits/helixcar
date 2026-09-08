@@ -1044,20 +1044,111 @@ check "Z19 : un nettoyage SANS photo ne peut pas être déclaré fini" "acceptee
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
    select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+
+# ── Z bis. UNE PHOTO SANS FICHIER N'EST PAS UNE PREUVE ──
+#
+# REPRODUCTION du defaut, AVANT la migration 98 : la ligne suffisait.
+# Les anciens controles Z20 et Z21 inseraient justement des metadonnees
+# sans jamais creer l'objet Storage, puis concluaient que la mission
+# etait justifiee. Ils validaient le defaut qu'ils devaient interdire.
 sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
- insert into public.mission_photos (mission_id,etape,chemin)
-   values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d3/avant-1.jpg'); commit;" >/dev/null
-check "Z20 : avec la seule photo AVANT, toujours pas" "acceptee" \
+ insert into public.mission_photos (mission_id,etape,chemin) values
+   ('bbbbbbbb-0000-0000-0000-0000000000d3','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d3/fantome-avant.jpg'),
+   ('bbbbbbbb-0000-0000-0000-0000000000d3','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d3/fantome-apres.jpg');
+ commit;" >/dev/null
+check "Z20 : REPRODUCTION — deux photos SANS FICHIER suffisaient a finir" "fini" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
+   select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+# Le partenaire attribue sa photo a l'ADMINISTRATEUR : l'appelant
+# choisissait librement qui etait cense l'avoir deposee.
+check "Z21 : REPRODUCTION — et l'appelant choisissait qui les avait deposees" "11111111-1111-1111-1111-111111111111" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin,ajoutee_par) values
+     ('bbbbbbbb-0000-0000-0000-0000000000d3','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d3/faux-auteur.jpg',
+      '11111111-1111-1111-1111-111111111111'); commit;
+   select ajoutee_par::text from public.mission_photos
+    where chemin='missions/bbbbbbbb-0000-0000-0000-0000000000d3/faux-auteur.jpg';" | tail -1)"
+
+# Remise a zero, puis application du verrou.
+sql "delete from public.mission_photos where mission_id='bbbbbbbb-0000-0000-0000-0000000000d3';
+ update public.missions set statut='acceptee' where id='bbbbbbbb-0000-0000-0000-0000000000d3';" >/dev/null
+
+errP=$(appliquer migrations/98_photos_justificatives_reelles.sql)
+check "Z21b : migrations/98 s'applique sans erreur" "" "$errP"
+
+check "Z21c : un chemin SANS FICHIER est desormais refuse" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant',
+             'missions/bbbbbbbb-0000-0000-0000-0000000000d3/inexistant.jpg'); commit;" \
+   | grep -qiE 'Aucun fichier ne correspond' && echo refuse || echo passe)"
+check "Z21d : et rien n'a ete ecrit" "0" \
+  "$(sql "select count(*) from public.mission_photos where mission_id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+
+# Le fichier d'une AUTRE mission ne justifie pas celle-ci.
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ insert into storage.objects (bucket_id,name)
+   values ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-autre.jpg')
+   on conflict do nothing; commit;" >/dev/null
+check "Z21e : un chemin appartenant a une AUTRE mission est refuse" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant',
+             'missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-autre.jpg'); commit;" \
+   | grep -qiE 'hors de la mission' && echo refuse || echo passe)"
+
+# Le bon chemin, mais dans le mauvais bucket.
+sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+ insert into storage.objects (bucket_id,name)
+   values ('candidatures-videos','missions/bbbbbbbb-0000-0000-0000-0000000000d3/mauvais-bucket.jpg')
+   on conflict do nothing; commit;" >/dev/null
+check "Z21f : un fichier du MAUVAIS BUCKET ne compte pas" "refuse" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant',
+             'missions/bbbbbbbb-0000-0000-0000-0000000000d3/mauvais-bucket.jpg'); commit;" \
+   | grep -qiE 'Aucun fichier ne correspond' && echo refuse || echo passe)"
+
+# LE PARCOURS LEGITIME : le fichier est envoye, PUIS sa trace ecrite.
+sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+ insert into storage.objects (bucket_id,name) values
+   ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000d3/avant-1.jpg'); commit;" >/dev/null
+check "Z22a : le depot legitime de la photo AVANT est accepte" "1" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000d3','avant',
+             'missions/bbbbbbbb-0000-0000-0000-0000000000d3/avant-1.jpg'); commit;
+   select count(*) from public.mission_photos where mission_id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+check "Z22b : ajoutee_par est impose par le serveur, pas par l'appelant" "22222222-2222-2222-2222-222222222222" \
+  "$(sql "select ajoutee_par::text from public.mission_photos
+    where chemin='missions/bbbbbbbb-0000-0000-0000-0000000000d3/avant-1.jpg';" | tail -1)"
+check "Z22c : avec la seule photo AVANT, la mission ne peut pas finir" "acceptee" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
    select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
 sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+ insert into storage.objects (bucket_id,name) values
+   ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg');
  insert into public.mission_photos (mission_id,etape,chemin)
-   values ('bbbbbbbb-0000-0000-0000-0000000000d3','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg'); commit;" >/dev/null
-check "Z21 : avec les DEUX, la mission peut être déclarée finie" "fini" \
+   values ('bbbbbbbb-0000-0000-0000-0000000000d3','apres',
+           'missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg'); commit;" >/dev/null
+check "Z22d : avec DEUX vrais fichiers, la mission peut etre declaree finie" "fini" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    update public.missions set statut='fini' where id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
    select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
+check "Z22e : si le fichier disparait, la preuve disparait avec lui" "false" \
+  "$(sql "delete from storage.objects where name='missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg';
+   select public.mission_photos_completes('bbbbbbbb-0000-0000-0000-0000000000d3')::text;" | tail -1)"
+sql "insert into storage.objects (bucket_id,name) values
+   ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000d3/apres-1.jpg')
+   on conflict do nothing;" >/dev/null
+check "Z22f : le partenaire ne supprime toujours pas ses justificatifs" "0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   delete from public.mission_photos where mission_id='bbbbbbbb-0000-0000-0000-0000000000d3'; commit;
+   select 0; " | tail -1)"
+check "Z22g : ... et ses photos sont toujours la" "2" \
+  "$(sql "select count(*) from public.mission_photos where mission_id='bbbbbbbb-0000-0000-0000-0000000000d3';" | tail -1)"
 
 # ── L'administrateur, lui, valide — mais sur pièces ──
 sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
@@ -1069,14 +1160,27 @@ check "Z22 : l'ADMINISTRATEUR non plus ne valide pas un nettoyage sans photos" "
    update public.missions set statut='terminee', prestation_validee_le=now()
     where id='bbbbbbbb-0000-0000-0000-0000000000d4'; commit;
    select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
-check "Z23 : avec les photos, il valide" "terminee" \
+# Les fichiers sont deposes par le PARTENAIRE, seul a en avoir le droit
+# (policy « depot partenaire » de 96), puis leurs traces sont ecrites.
+sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+ insert into storage.objects (bucket_id,name) values
+   ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000d4/a.jpg'),
+   ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000d4/b.jpg');
+ insert into public.mission_photos (mission_id,etape,chemin) values
+   ('bbbbbbbb-0000-0000-0000-0000000000d4','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d4/a.jpg'),
+   ('bbbbbbbb-0000-0000-0000-0000000000d4','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d4/b.jpg');
+ commit;" >/dev/null
+check "Z23 : avec des photos REELLEMENT deposees, il valide" "terminee" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
-   insert into public.mission_photos (mission_id,etape,chemin) values
-     ('bbbbbbbb-0000-0000-0000-0000000000d4','avant','missions/bbbbbbbb-0000-0000-0000-0000000000d4/a.jpg'),
-     ('bbbbbbbb-0000-0000-0000-0000000000d4','apres','missions/bbbbbbbb-0000-0000-0000-0000000000d4/b.jpg');
    update public.missions set statut='terminee', prestation_validee_le=now()
     where id='bbbbbbbb-0000-0000-0000-0000000000d4'; commit;
    select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
+check "Z23b : l'ADMINISTRATEUR non plus ne justifie pas avec un fichier absent" "refuse" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   insert into public.mission_photos (mission_id,etape,chemin)
+     values ('bbbbbbbb-0000-0000-0000-0000000000d4','avant',
+             'missions/bbbbbbbb-0000-0000-0000-0000000000d4/fantome.jpg'); commit;" \
+   | grep -qiE 'Aucun fichier ne correspond' && echo refuse || echo passe)"
 check "Z24 : le validateur est posé PAR LE SERVEUR, jamais déclaré" "11111111-1111-1111-1111-111111111111" \
   "$(sql "select prestation_validee_par::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d4';" | tail -1)"
 check "Z25 : un validateur envoyé par l'appelant est écrasé" "11111111-1111-1111-1111-111111111111" \
@@ -1108,6 +1212,7 @@ err94=$(appliquer migrations/94_informations_selon_scenario.sql)
 err95=$(appliquer migrations/95_metiers_partenaires.sql)
 err96=$(appliquer migrations/96_missions_nettoyage.sql)
 err97=$(appliquer migrations/97_missions_verrou_serveur.sql)
+err98=$(appliquer migrations/98_photos_justificatives_reelles.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
@@ -1116,6 +1221,7 @@ check "F3c : 94 se rejoue sans erreur" "" "$err94"
 check "F3d : 95 se rejoue sans erreur" "" "$err95"
 check "F3e : 96 se rejoue sans erreur" "" "$err96"
 check "F3f : 97 se rejoue sans erreur" "" "$err97"
+check "F3g : 98 se rejoue sans erreur" "" "$err98"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"
