@@ -123,6 +123,60 @@ create table if not exists public.clients (
 
 -- Grants Supabase par défaut : les rôles ont les privilèges de table,
 -- c'est la RLS — et elle seule — qui filtre ensuite les lignes.
+-- Table des véhicules d'une demande. Elle EXISTE en production et
+-- n'a jamais été touchée par une migration du dépôt : sa RLS vient donc
+-- du projet Supabase lui-même. On reproduit ici l'état qui provoque
+-- l'erreur 42501 constatée après le durcissement des demandes.
+create table if not exists public.vehicules (
+  id                     uuid primary key default gen_random_uuid(),
+  dossier_id             uuid references public.clients(id) on delete cascade,
+  position               integer default 1,
+  type_vehicule          text,
+  marque_modele          text,
+  immatriculation        text,
+  vin                    text,
+  mode_transport         text,
+  consignes              text,
+  adresse_depart_rue     text,
+  code_postal_depart     text,
+  ville_depart           text,
+  pc_contact_nom         text,
+  pc_contact_tel         text,
+  date_prise_en_charge   date,
+  heure_prise_en_charge  text,
+  pc_heure_type          text,
+  pc_creneau_debut       text,
+  pc_creneau_fin         text,
+  adresse_arrivee_rue    text,
+  code_postal_arrivee    text,
+  ville_arrivee          text,
+  liv_contact_nom        text,
+  liv_contact_tel        text,
+  date_livraison         date,
+  heure_livraison        text,
+  liv_heure_type         text,
+  liv_creneau_debut      text,
+  liv_creneau_fin        text,
+  restitution_concernee  boolean default false,
+  restit_adresse_rue     text,
+  restit_code_postal     text,
+  restit_ville           text,
+  restit_contact_nom     text,
+  restit_contact_tel     text,
+  restit_date            date,
+  restit_heure           text,
+  restit_heure_type      text,
+  restit_creneau_debut   text,
+  restit_creneau_fin     text,
+  restit_contraintes     text,
+  heure_recuperation_client text,
+  restit_type_vehicule   text,
+  restit_marque_modele   text,
+  restit_immatriculation text,
+  restit_vin             text,
+  created_at             timestamptz not null default now()
+);
+
 grant select, insert, update, delete on all tables in schema public to anon, authenticated;
 grant select on all tables in schema auth to anon, authenticated;
 
@@ -156,6 +210,19 @@ grant select on storage.buckets to anon, authenticated;
 -- pour que la vérification porte bien sur la RLS et non sur un grant.
 alter default privileges in schema public
   grant select, insert, update, delete on tables to anon, authenticated;
+
+-- ÉTAT REPRODUIT : public.vehicules porte déjà une RLS dont la policy
+-- d'insertion vérifie l'existence du dossier parent dans public.clients.
+-- Tant que public.clients n'avait AUCUNE RLS, cette sous-requête voyait
+-- la ligne et l'insertion passait. C'est exactement la configuration qui
+-- casse dès que les demandes sont fermées.
+alter table public.vehicules enable row level security;
+drop policy if exists "vehicules : depot lie au dossier" on public.vehicules;
+create policy "vehicules : depot lie au dossier"
+  on public.vehicules for insert to anon, authenticated
+  with check (
+    exists (select 1 from public.clients c where c.id = vehicules.dossier_id)
+  );
 
 -- État de départ : la RLS de public.admins est déjà en place aujourd'hui
 -- (le Dashboard lit sa propre ligne via une session authentifiée).

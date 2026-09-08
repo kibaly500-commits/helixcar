@@ -7486,51 +7486,37 @@ function supabaseInsertReturning(table, data) {
 }
 
 // Insère les N véhicules d'un dossier en UNE SEULE requête groupée.
-function enregistrerVehicules(dossierId, vehicules) {
-  if (!vehicules || !vehicules.length) return Promise.resolve({ ok: true, ignores: true });
-  // Mapping générique : toute clé lue par _lireFichesVehicules() est
-  // transmise. Impossible d'oublier un champ en ajoutant une saisie.
-  var CHAMPS_VEHICULE = [
-    'position','type_vehicule','marque_modele','immatriculation','vin',
-    'mode_transport','consignes',
-    'adresse_depart_rue','code_postal_depart','ville_depart',
-    'pc_contact_nom','pc_contact_tel','date_prise_en_charge',
-    'heure_prise_en_charge','pc_heure_type','pc_creneau_debut','pc_creneau_fin',
-    'adresse_arrivee_rue','code_postal_arrivee','ville_arrivee',
-    'liv_contact_nom','liv_contact_tel','date_livraison',
-    'heure_livraison','liv_heure_type','liv_creneau_debut','liv_creneau_fin',
-    'restitution_concernee','restit_adresse_rue','restit_code_postal','restit_ville',
-    'restit_contact_nom','restit_contact_tel','restit_date',
-    'restit_heure','restit_heure_type','restit_creneau_debut','restit_creneau_fin',
-    'restit_contraintes','heure_recuperation_client',
-    // V55 — identité du véhicule à restituer (voir migration SQL fournie).
-    'restit_type_vehicule','restit_marque_modele','restit_immatriculation','restit_vin'
-  ];
-  var lignes = vehicules.map(function (v) {
-    var ligne = { dossier_id: dossierId };
-    CHAMPS_VEHICULE.forEach(function (k) {
-      var val = v[k];
-      if (k === 'restitution_concernee') { ligne[k] = !!val; return; }
-      if (k === 'position') { ligne[k] = val || 1; return; }
-      ligne[k] = (val === '' || val === undefined) ? null : val;
-    });
-    return ligne;
+// Normalise UNE fiche véhicule avant envoi. Ne fait plus d'écriture :
+// c'est creer_demande_avec_vehicules (migration 92) qui écrit la
+// demande et ses véhicules dans la même transaction. La liste des
+// champs reste la source unique — impossible d'en oublier un en
+// ajoutant une saisie.
+var CHAMPS_VEHICULE = [
+  'position','type_vehicule','marque_modele','immatriculation','vin',
+  'mode_transport','consignes',
+  'adresse_depart_rue','code_postal_depart','ville_depart',
+  'pc_contact_nom','pc_contact_tel','date_prise_en_charge',
+  'heure_prise_en_charge','pc_heure_type','pc_creneau_debut','pc_creneau_fin',
+  'adresse_arrivee_rue','code_postal_arrivee','ville_arrivee',
+  'liv_contact_nom','liv_contact_tel','date_livraison',
+  'heure_livraison','liv_heure_type','liv_creneau_debut','liv_creneau_fin',
+  'restitution_concernee','restit_adresse_rue','restit_code_postal','restit_ville',
+  'restit_contact_nom','restit_contact_tel','restit_date',
+  'restit_heure','restit_heure_type','restit_creneau_debut','restit_creneau_fin',
+  'restit_contraintes','heure_recuperation_client',
+  // V55 — identité du véhicule à restituer (voir migration SQL fournie).
+  'restit_type_vehicule','restit_marque_modele','restit_immatriculation','restit_vin'
+];
+
+function _normaliserVehiculePourEnvoi(v) {
+  var ligne = {};
+  CHAMPS_VEHICULE.forEach(function (k) {
+    var val = v[k];
+    if (k === 'restitution_concernee') { ligne[k] = !!val; return; }
+    if (k === 'position') { ligne[k] = val || 1; return; }
+    ligne[k] = (val === '' || val === undefined) ? null : val;
   });
-  return fetch(SUPABASE_URL + '/rest/v1/vehicules', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify(lignes)   // tableau = insert groupé, 1 seule requête
-  }).then(function (r) {
-    if (!r.ok) {
-      return r.text().then(function (txt) { throw new Error('HTTP ' + r.status + ' — ' + txt); });
-    }
-    return { ok: true };
-  });
+  return ligne;
 }
 
 function supabaseInsert(table, data) {
@@ -14758,25 +14744,44 @@ async function _submitClientFormInterne() {
     }
   }
 
-  console.log('Payload complet:', payload);
+  // ── ÉCRITURE ATOMIQUE : LA DEMANDE ET SES VÉHICULES ENSEMBLE ──
+  // L'ancienne version écrivait la demande, PUIS les véhicules, en deux
+  // requêtes. Quand la seconde échouait — ce qui est arrivé en
+  // production avec l'erreur 42501 sur `vehicules` — la demande restait
+  // enregistrée SANS ses véhicules : une création partielle, invisible
+  // pour le client comme pour HelixCar.
+  //
+  // Tout passe désormais par creer_demande_avec_vehicules (migration
+  // 92) : une seule transaction côté serveur, soit tout est écrit, soit
+  // rien ne l'est. Le serveur impose lui-même le propriétaire et le
+  // statut ; le navigateur ne peut plus les choisir.
+  var vehiculesAEnvoyer = [];
+  if (_fichesVehiculesRequises()) {
+    vehiculesAEnvoyer = _lireFichesVehicules().filter(Boolean).map(_normaliserVehiculePourEnvoi);
+  }
 
   function inserer(tentativesRestantes) {
-    return supabaseInsert('clients', payload)
-      .then(function (r) {
-        if (r && r.error) return { error: String(r.error) };
-        if (!r) return { error: 'Echec de connexion.' };
-        return { ok: true, row: { id: payload.id } };
+    return _sb.rpc('creer_demande_avec_vehicules', {
+      p_demande: payload,
+      p_vehicules: vehiculesAEnvoyer
+    })
+      .then(function (res) {
+        if (res && res.error) return { error: res.error.message || String(res.error) };
+        return { ok: true, row: { id: payload.id }, retour: res && res.data };
       })
-      .catch(function (e) { return { error: String(e.message || e) }; })
+      .catch(function (e) { return { error: String((e && e.message) || e) }; })
       .then(function(r) {
       var collisionNumero = r && r.error && typeof r.error === 'string'
         && r.error.indexOf('numero_client') !== -1 && r.error.indexOf('duplicate') !== -1;
       if (collisionNumero && tentativesRestantes > 0) {
-        // Numéro déjà pris par hasard (généré aléatoirement) : on en tire un nouveau, en silence.
+        // Numéro déjà pris par hasard (généré aléatoirement) : on en tire
+        // un nouveau, en silence. L'identifiant de la demande change lui
+        // aussi, sans quoi la reprise retomberait sur la ligne partielle.
         clientNum = generateClientNumber();
         parrCode = generateParrainageCode(clientNum);
         payload.numero_client = clientNum;
         payload.code_parrainage = parrCode;
+        payload.id = _hcNouvelIdentifiant();
         return inserer(tentativesRestantes - 1);
       }
       return r;
@@ -14784,27 +14789,20 @@ async function _submitClientFormInterne() {
   }
 
   inserer(5)
-    .then(function (r) {
-      // Les fiches véhicules ne sont enregistrées que si elles ont été
-      // réellement demandées au client (>= 2 véhicules, hors mode flotte).
-      if (!r || r.error || !r.row || !r.row.id) return r;
-      if (!_fichesVehiculesRequises()) return r;
-      var vh = _lireFichesVehicules().filter(Boolean);
-      if (!vh.length) return r;
-      return enregistrerVehicules(r.row.id, vh)
-        .then(function () { return r; })
-        .catch(function (e) {
-          // Le dossier existe mais les véhicules ont échoué : on NE
-          // déclare PAS la demande envoyée et on conserve le brouillon.
-          console.error('Echec enregistrement vehicules:', e);
-          return { error: 'VEHICULES: ' + (e.message || e), dossierId: r.row.id };
-        });
-    })
     .then(function(r) {
-      console.log('Insert result:', r);
       var dbg = document.getElementById('supabase-debug');
       if (!r || r.error) {
-        if (dbg) { dbg.style.display='block'; dbg.innerHTML = '<b>Erreur:</b> ' + (r && r.error ? JSON.stringify(r.error) : 'Echec de connexion. Reessayez.'); }
+        // Le détail technique reste dans la console du navigateur, à
+        // l'usage du développeur. Le client, lui, lit une phrase qu'il
+        // peut comprendre et suivre.
+        console.error('Echec de creation de la demande :', r && r.error);
+        if (dbg) {
+          dbg.style.display = 'block';
+          dbg.textContent = 'Votre demande n\'a pas pu être enregistrée. '
+            + 'Rien n\'a été validé et vos informations sont conservées : '
+            + 'vérifiez votre connexion internet puis réessayez. '
+            + 'Si le problème persiste, contactez HelixCar.';
+        }
         return;
       }
       // Succes

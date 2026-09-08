@@ -94,6 +94,10 @@ window.supabase = { createClient: function () { return {
     if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
     if (nom === 'informations_demande') return { data: window.__infos || [], error: null };
     if (nom === 'repondre_informations_demande') return { data: 1, error: null };
+    if (nom === 'creer_demande_avec_vehicules') {
+      if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
+      return { data: { id: (params && params.p_demande && params.p_demande.id) || 'x', vehicules: 0 }, error: null };
+    }
     return { data: null, error: null };
   },
   storage: { from: function () { return { createSignedUrl: async function () { return { data: null, error: null }; } }; } }
@@ -231,20 +235,27 @@ window.fetch = function (url, options) {
   await page.waitForTimeout(250);
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
-  const payload = await page.evaluate(() => window.__journal.filter(j => j.op === 'rest'));
-  const insertion = payload.filter(j => j.table === 'clients' && j.methode === 'POST')[0];
-  check('C1 : la demande est bien envoyée dans la table commune', !!insertion, JSON.stringify(payload).slice(0, 200));
-  if (insertion) {
-    check('C2 : elle porte un identifiant généré, sans relecture',
-      !!(insertion.corps && insertion.corps.id) && /minimal/.test(insertion.prefer),
-      JSON.stringify({ id: insertion.corps && insertion.corps.id, prefer: insertion.prefer }));
+  // L'écriture passe désormais par creer_demande_avec_vehicules :
+  // une seule transaction serveur au lieu de deux requêtes REST.
+  const payload = await page.evaluate(() => window.__journal.filter(j => j.op === 'rpc'));
+  const appel = payload.filter(j => j.nom === 'creer_demande_avec_vehicules')[0];
+  const demande = appel && appel.params && appel.params.p_demande;
+  check('C1 : la demande part par l\'écriture atomique unique', !!demande,
+    JSON.stringify(payload.map(j => j.nom)).slice(0, 200));
+  if (demande) {
+    check('C2 : elle porte un identifiant généré côté navigateur',
+      !!demande.id, String(demande.id));
     check('C3 : elle est reliée au compte authentifié',
-      insertion.corps && insertion.corps.auth_user_id === '55555555-5555-5555-5555-555555555555',
-      JSON.stringify(insertion.corps && insertion.corps.auth_user_id));
+      demande.auth_user_id === '55555555-5555-5555-5555-555555555555',
+      String(demande.auth_user_id));
     check('C4 : elle reçoit une référence HelixCar',
-      !!(insertion.corps && insertion.corps.numero_client), String(insertion.corps && insertion.corps.numero_client));
+      !!demande.numero_client, String(demande.numero_client));
     check('C5 : elle porte le service choisi',
-      insertion.corps && insertion.corps.type_service === 'nettoyage', String(insertion.corps && insertion.corps.type_service));
+      demande.type_service === 'nettoyage', String(demande.type_service));
+    check('C5b : les véhicules voyagent avec la demande, pas séparément',
+      Array.isArray(appel.params.p_vehicules)
+      && payload.filter(j => j.nom === 'creer_demande_avec_vehicules').length === 1,
+      JSON.stringify(appel.params.p_vehicules).slice(0, 120));
   }
 
   // ── C bis. RÉCAPITULATIF, CONTACT « AUTRE », RETOUR ARRIÈRE ──
@@ -283,7 +294,7 @@ window.fetch = function (url, options) {
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
   const envoiAutre = await page.evaluate(() =>
-    (window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST')[0] || {}).corps || null);
+    ((window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')[0] || {}).params || {}).p_demande || null);
   check('C8 : « Contact sur place : une autre personne » arrive dans le payload',
     !!envoiAutre && JSON.stringify(envoiAutre).indexOf('TEST-QA Karim') !== -1,
     JSON.stringify(envoiAutre && envoiAutre.nettoyage_details).slice(0, 160));
@@ -318,7 +329,7 @@ window.fetch = function (url, options) {
   await page.evaluate(async () => { try { await submitClientForm(); } catch (e) {} });
   await page.waitForTimeout(300);
   const envoiPro = await page.evaluate(() =>
-    (window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST')[0] || {}).corps || null);
+    ((window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')[0] || {}).params || {}).p_demande || null);
   check('C9 : « Trouver un professionnel » est réellement enregistrable',
     !!envoiPro && envoiPro.type_service === 'professionnel' && !!envoiPro.professionnel_details,
     JSON.stringify(envoiPro && envoiPro.type_service));
@@ -355,7 +366,7 @@ window.fetch = function (url, options) {
     window.__reseauCoupe = false;
     return {
       succes: (document.getElementById('client-success-msg') || {}).innerHTML || '',
-      tentatives: window.__journal.filter(j => j.op === 'rest' && j.methode === 'POST').length
+      tentatives: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules').length
     };
   });
   check('D2 : une coupure réseau n\'annonce JAMAIS un succès',

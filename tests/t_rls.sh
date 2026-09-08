@@ -255,15 +255,96 @@ check "H13 : les valeurs conditionnelles obsolètes sont SUPPRIMÉES" "0" \
   "$(sql "select count(*) from public.demande_informations_manquantes where client_id='cccccccc-0000-0000-0000-00000000000A' and cle in ('contact_pc_nom','contact_pc_tel');")"
 
 echo
+echo "── V. CRÉATION D'UNE DEMANDE AVEC VÉHICULES (erreur 42501) ──"
+# On reproduit d'abord la panne telle qu'elle se produit en production,
+# AVANT d'appliquer le correctif : sans cela, le test ne prouverait pas
+# que la migration 92 corrige quelque chose de réel.
+# Le navigateur émet DEUX requêtes HTTP distinctes : deux transactions
+# séparées. Les enchaîner dans un seul begin/commit annulerait la
+# première quand la seconde échoue — ce qui ne reproduirait PAS la
+# création partielle constatée en production.
+sql "begin; select public.devenir_anon();
+   insert into public.clients (id,numero_client,email,type_service,statut)
+     values ('eeeeeeee-0000-0000-0000-0000000000e1','TEST-QA-REPRO','r@helixcar.test','convoyage','nouveau');
+   commit;" >/dev/null
+check "V1 : REPRODUCTION — l'écriture directe des véhicules est rejetée" "refuse" \
+  "$(sql "begin; select public.devenir_anon();
+   insert into public.vehicules (dossier_id,position,marque_modele)
+     values ('eeeeeeee-0000-0000-0000-0000000000e1',1,'TEST-QA'); commit;" \
+   | grep -qE 'row-level security policy for table \"vehicules\"' && echo refuse || echo passe)"
+check "V2 : et elle laisse une création PARTIELLE (demande sans véhicule)" "1|0" \
+  "$(sql "select (select count(*) from public.clients where numero_client='TEST-QA-REPRO')||'|'||(select count(*) from public.vehicules where dossier_id='eeeeeeee-0000-0000-0000-0000000000e1');")"
+
+errV=$(appliquer migrations/92_creation_demande_atomique.sql)
+check "V3 : migrations/92 s'applique sans erreur" "" "$errV"
+
+check "V4 : après correctif, un dépôt public écrit demande ET véhicules" "2" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000A','numero_client','TEST-QA-V4',
+                        'email','v4@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA A'),
+                       jsonb_build_object('position',2,'marque_modele','TEST-QA B'))); commit;
+   select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000A';" | tail -1)"
+check "V5 : un seul véhicule fonctionne aussi" "1" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-V5',
+                        'email','v5@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul'))); commit;
+   select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B';" | tail -1)"
+check "V6 : REJEU — aucune duplication" "1|1" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000B','numero_client','TEST-QA-V5',
+                        'email','v5@helixcar.test','type_service','convoyage'),
+     jsonb_build_array(jsonb_build_object('position',1,'marque_modele','TEST-QA Seul'))); commit;
+   select (select count(*) from public.clients where numero_client='TEST-QA-V5')||'|'||(select count(*) from public.vehicules where dossier_id='ffffffff-0000-0000-0000-00000000000B');" | tail -1)"
+check "V7 : un dépôt anonyme ne peut PAS se déclarer propriétaire" "NULL" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000C','numero_client','TEST-QA-V7',
+                        'email','v7@helixcar.test','type_service','convoyage',
+                        'auth_user_id','11111111-1111-1111-1111-111111111111'),'[]'::jsonb); commit;
+   select coalesce(auth_user_id::text,'NULL') from public.clients where id='ffffffff-0000-0000-0000-00000000000C';" | tail -1)"
+check "V8 : un client authentifié devient propriétaire de SA demande" "55555555-5555-5555-5555-555555555555" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000D','numero_client','TEST-QA-V8',
+                        'email','clientA@helixcar.test','type_service','nettoyage'),'[]'::jsonb); commit;
+   select auth_user_id::text from public.clients where id='ffffffff-0000-0000-0000-00000000000D';" | tail -1)"
+check "V9 : le statut envoyé par le navigateur est IGNORÉ" "nouveau" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000E','numero_client','TEST-QA-V9',
+                        'email','v9@helixcar.test','type_service','convoyage','statut','validee'),'[]'::jsonb); commit;
+   select statut from public.clients where id='ffffffff-0000-0000-0000-00000000000E';" | tail -1)"
+check "V10 : une colonne administrative envoyée est IGNORÉE" "0" \
+  "$(sql "begin; select public.devenir_anon();
+   select public.creer_demande_avec_vehicules(
+     jsonb_build_object('id','ffffffff-0000-0000-0000-00000000000F','numero_client','TEST-QA-V10',
+                        'email','v10@helixcar.test','type_service','convoyage','prix_interne',999),'[]'::jsonb); commit;
+   select count(*) from public.clients where id='ffffffff-0000-0000-0000-00000000000F' and prix_interne is not null;" | tail -1)"
+check "V11 : la RLS de vehicules reste ACTIVE" "t" \
+  "$(sql "select relrowsecurity from pg_class where relname='vehicules';")"
+check "V12 : aucune écriture anonyme directe n'a été ouverte" "refuse" \
+  "$(sql "begin; select public.devenir_anon();
+   insert into public.vehicules (dossier_id,position,marque_modele)
+     values ('ffffffff-0000-0000-0000-00000000000A',9,'TEST-QA PIRATE'); commit;" \
+   | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
+
+echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
 HIST_AVANT=$(sql "select count(*) from public.convoyeur_decisions_historique;")
 err5=$(appliquer migrations/05_blocage_partenaire.sql)
 err9=$(appliquer migrations/90_durcissement_rls_partenaires.sql)
 err4=$(appliquer migrations/04_decisions_activites.sql)
+err92=$(appliquer migrations/92_creation_demande_atomique.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
+check "F3b : 92 se rejoue sans erreur" "" "$err92"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"
