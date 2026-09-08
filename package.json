@@ -1,0 +1,14 @@
+{
+  "name": "helixcar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plateforme HelixCar — site public, espace client, espace partenaire et Dashboard.",
+  "scripts": {
+    "test": "node tests/lancer.js",
+    "test:navigateur": "node tests/lancer.js --sans-sql",
+    "test:sql": "bash tests/t_rls.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}

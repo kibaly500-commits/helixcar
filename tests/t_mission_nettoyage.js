@@ -8,7 +8,7 @@
 // Ce fichier suit le parcours complet sur le VRAI Dashboard : fiche de
 // la demande, création de la mission, visibilité côté partenaire, photos
 // avant et après, fin d'intervention, validation par HelixCar.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -145,12 +145,12 @@ window.fetch = function(u, o){
 `;
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(INIT);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate(() => {
     currentRole = 'admin';
     document.getElementById('login-screen').style.display = 'none';
@@ -431,8 +431,8 @@ window.fetch = function(u, o){
   await page.evaluate(() => fermerPhotosMission());
 
   // ══ F. LE SYSTÈME DE MISSIONS EXISTANT EST RÉUTILISÉ ══
-  const src = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
-  const mig = fs.readFileSync('/home/user/helixcar/migrations/96_missions_nettoyage.sql', 'utf8');
+  const src = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+  const mig = fs.readFileSync(fichier('migrations/96_missions_nettoyage.sql'), 'utf8');
   check('F1 : aucune seconde table de missions n\'est créée',
     !/create table[^;]*missions_nettoyage/i.test(mig));
   check('F2 : la même table missions porte les deux métiers',

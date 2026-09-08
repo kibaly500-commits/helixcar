@@ -3,7 +3,7 @@
 // Vérifie sur le VRAI Dashboard, rendu dans Chromium, que la charte du
 // site public est réellement appliquée et que le fond est blanc — pas
 // seulement que le fichier contient les bonnes chaînes.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -28,7 +28,7 @@ window.fetch = function(u){ if(String(u).indexOf('/rest/v1/')!==-1)
 
 // Palette de référence, lue sur le site public : aucune valeur inventée.
 function paletteDuSite() {
-  const src = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
+  const src = fs.readFileSync(fichier('index.html'), 'utf8');
   const bloc = src.slice(src.indexOf(':root'), src.indexOf(':root') + 1600);
   const lire = nom => {
     const m = new RegExp('--' + nom + ':\\s*([^;]+);').exec(bloc);
@@ -40,12 +40,12 @@ function paletteDuSite() {
 
 (async () => {
   const REF = paletteDuSite();
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(INIT);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.waitForTimeout(400);
 
   const vars = await page.evaluate(() => {
@@ -77,7 +77,7 @@ function paletteDuSite() {
   check('B2 : --white est le blanc pur, plus l\'ivoire #FAFAF7',
     fond.blanc.toUpperCase() === '#FFFFFF', fond.blanc);
   check('B3 : plus aucune trace du fond beige #F4F3EE dans une règle',
-    !/background:\s*#F4F3EE/i.test(fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')));
+    !/background:\s*#F4F3EE/i.test(fs.readFileSync(fichier('dashboard.html'), 'utf8')));
 
   // ── C. LES COMPOSANTS RESTENT LISIBLES SUR BLANC ──
   await page.evaluate(() => {
@@ -125,7 +125,7 @@ function paletteDuSite() {
   // ── E. AUCUNE COULEUR DE L'ANCIENNE CHARTE NE SUBSISTE ──
   // Les commentaires SQL/CSS sont retirés avant comptage : une couleur
   // citée dans une explication n'est pas une couleur appliquée.
-  const src = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')
+  const src = fs.readFileSync(fichier('dashboard.html'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/<!--[\s\S]*?-->/g, '');
   const ANCIENNES = {

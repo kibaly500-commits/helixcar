@@ -1,7 +1,7 @@
 // Devis PDF des nouveaux services — exécution réelle de _construirePdfDevis
 // avec un stub jsPDF instrumenté (le jsPDF CDN est injoignable en sandbox).
 // Ce test vérifie le CONTENU réellement émis, pas le rendu visuel.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const failures = [];
@@ -101,11 +101,11 @@ const DEM_RENFORT = Object.assign({}, CLIENT, {
 const DEVIS = { reference: 'DEV-2026-TESTQA', prix: 1250, statut: 'genere', date_generation: '2026-09-07T09:00:00Z' };
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.addScriptTag({ content: STUB });
 
   const dispo = await page.evaluate(() => typeof _construirePdfDevis === 'function');

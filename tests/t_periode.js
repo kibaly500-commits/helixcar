@@ -8,6 +8,7 @@
 // périodes se comportent désormais à l'identique — et que le stockage
 // n'a rien perdu au passage.
 const L = require('./lib.js');
+const { RACINE, fichier, urlFichier } = L;
 
 function futurYMD(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
 
@@ -254,7 +255,7 @@ async function moisFuturComplet(page) {
     heuresStock.entree === 'time' && heuresStock.sortie === 'time', JSON.stringify(heuresStock));
 
   // ══ D. UN SEUL MÉCANISME, DÉCLARATIF ══
-  const src = require('fs').readFileSync('/home/user/helixcar/index.html', 'utf8');
+  const src = require('fs').readFileSync(fichier('index.html'), 'utf8');
   L.check('D1 : les périodes sont déclarées dans une seule table',
     (src.match(/var HC_PERIODES_CALENDRIER = \[/g) || []).length === 1);
   L.check('D2 : la table couvre bien les deux périodes du formulaire',

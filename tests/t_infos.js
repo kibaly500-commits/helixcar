@@ -1,6 +1,6 @@
 // INFORMATIONS À COMPLÉTER — CÔTÉ CLIENT ET CÔTÉ ADMINISTRATEUR
 // Exécute le vrai code des deux pages contre un double Supabase.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const echecs = [];
@@ -8,7 +8,6 @@ function check(l, c, e) {
   if (c) { console.log('PASS - ' + l); pass++; }
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
-const RACINE = '/home/user/helixcar';
 
 // Le double reproduit le contrat des fonctions serveur :
 // informations_demande renvoie les rubriques REQUISES avec leur statut
@@ -139,18 +138,18 @@ window.emailjs = { init: function () {},
 `;
 
 (async () => {
-  const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const navigateur = await lancerNavigateur();
   const page = await navigateur.newPage({ viewport: { width: 1280, height: 1100 } });
   const erreursJs = [];
   page.on('pageerror', e => erreursJs.push(e.message));
   await page.addInitScript(INIT);
   // L'état du double est persisté dans localStorage : on repart propre
   // pour que la suite soit reproductible d'une exécution à l'autre.
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
 
   // ── A. ONGLET « INFORMATIONS À COMPLÉTER » ──
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   page.on('dialog', d => d.accept());
   await page.evaluate(async () => {
     loginRole = 'client';
@@ -184,7 +183,7 @@ window.emailjs = { init: function () {},
     !/prix|remuneration|rémunération|convoyeur_id|marge/i.test(onglet), onglet.slice(0, 120));
 
   // ── B. ÉCRAN DE COMPLÉTION ──
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?completer=dem-conv', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?completer=dem-conv', { waitUntil: 'load' });
   await page.waitForTimeout(600);
   const ecran = await page.evaluate(() => ({
     ouvert: document.getElementById('modal-completer').classList.contains('open'),
@@ -230,7 +229,7 @@ window.emailjs = { init: function () {},
     envoi.champsRestants.length === 0, JSON.stringify(envoi.champsRestants));
 
   // F5 : l'état vient du serveur, pas du navigateur
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?completer=dem-conv', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?completer=dem-conv', { waitUntil: 'load' });
   await page.waitForTimeout(600);
   const apresF5 = await page.evaluate(() => ({
     champs: Array.from(document.querySelectorAll('#completer-rubriques input')).map(i => i.id),
@@ -245,7 +244,7 @@ window.emailjs = { init: function () {},
     window.__infosParDemande['dem-nett'][1].statut = 'attendue';
     return true;
   });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?completer=dem-nett', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?completer=dem-nett', { waitUntil: 'load' });
   await page.waitForTimeout(600);
   const reseau = await page.evaluate(async () => {
     const champ = document.getElementById('completer-champ-contact_pc_nom');
@@ -264,7 +263,7 @@ window.emailjs = { init: function () {},
     reseau.saisieConservee === 'TEST-QA Reseau', reseau.saisieConservee);
 
   // ── C. BLOC ADMINISTRATEUR ──
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
   const bloc = await page.evaluate(async () => {
     currentRole = 'admin';
@@ -336,7 +335,7 @@ window.emailjs = { init: function () {},
     /À corriger/.test(relu) && /Numéro trop court/.test(relu), relu.slice(-200));
 
   // Le client voit la correction demandée
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?completer=dem-conv', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?completer=dem-conv', { waitUntil: 'load' });
   await page.waitForTimeout(600);
   const cote = await page.evaluate(() => ({
     html: (document.getElementById('completer-rubriques') || {}).innerHTML || '',
@@ -354,8 +353,8 @@ window.emailjs = { init: function () {},
   check('D1 : aucun e-mail déclenché par ce workflow', emails === 0, String(emails));
 
   const fs = require('fs');
-  const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
   // Tranche BORNÉE au bloc ajouté par ce chantier : sans borne de fin,
   // l'analyse emporterait du code préexistant sans rapport (par exemple
   // marquerFacturePayee, qui concerne la facturation partenaire).

@@ -1,7 +1,7 @@
 // ESPACE CLIENT — NOUVELLE DEMANDE DEPUIS LE DASHBOARD
 // Exécute le vrai code des deux pages contre un double Supabase injecté
 // AVANT les scripts (le CDN supabase-js est injoignable ici).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const L = require('./lib.js');   // mêmes aides de remplissage que les autres suites
 
@@ -24,7 +24,6 @@ function check(l, c, e) {
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
 
-const RACINE = '/home/user/helixcar';
 
 // Double Supabase commun aux deux pages : session réelle simulée,
 // journal de toutes les écritures, et instrumentation d'EmailJS.
@@ -133,7 +132,7 @@ window.fetch = function (url, options) {
 `;
 
 (async () => {
-  const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const navigateur = await lancerNavigateur();
   const page = await navigateur.newPage({ viewport: { width: 1280, height: 1100 } });
   const erreursJs = [];
   page.on('pageerror', e => erreursJs.push(e.message));
@@ -141,7 +140,7 @@ window.fetch = function (url, options) {
   await page.addInitScript(INIT);
 
   // ── A. ESPACE CLIENT : session réelle et action visible ──
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   const connexion = await page.evaluate(async () => {
     loginRole = 'client';
     document.getElementById('login-email').value = 'clientA@helixcar.test';
@@ -185,7 +184,7 @@ window.fetch = function (url, options) {
     /index\.html\?nouvelle-demande=1/.test(cible), cible);
 
   // ── B. MODE CONNECTÉ DANS LE FORMULAIRE PUBLIC ──
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   const modeConnecte = await page.evaluate(() => ({
     modaleOuverte: document.getElementById('modal-client').classList.contains('open'),
@@ -260,7 +259,7 @@ window.fetch = function (url, options) {
 
   // ── C bis. RÉCAPITULATIF, CONTACT « AUTRE », RETOUR ARRIÈRE ──
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.evaluate(() => { window.__journal = []; });
   await L.chooseService(page, 'nettoyage');
@@ -301,7 +300,7 @@ window.fetch = function (url, options) {
 
   // ── C ter. TROUVER UN PROFESSIONNEL, DE BOUT EN BOUT ──
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.evaluate(() => { window.__journal = []; });
   await L.chooseService(page, 'professionnel');
@@ -340,7 +339,7 @@ window.fetch = function (url, options) {
   // On repart d'un état propre : la restauration de brouillon a sa
   // propre suite (t_brouillon) et n'a pas à interférer ici.
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-  await page.goto('file://' + path.resolve(RACINE, 'index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
   await page.waitForTimeout(400);
   const apresF5 = await page.evaluate(() => ({
     etape: (document.querySelector('#modal-client-form .form-step.active') || {}).dataset.step,
@@ -381,8 +380,8 @@ window.fetch = function (url, options) {
   check('E1 : aucun e-mail supplémentaire déclenché par ce parcours', emails === 0, String(emails));
 
   const fs = require('fs');
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
-  const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   check('E2 : le dashboard ne contient AUCUNE copie du formulaire',
     !/name="type-service"/.test(dash) && /name="type-service"/.test(idx));
   // La règle vérifiée est bien « l'espace CLIENT ne crée aucune

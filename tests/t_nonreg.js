@@ -1,6 +1,7 @@
 // NON-RÉGRESSION : Convoyage, Stockage, création de compte, partenaire,
 // textes, et absence de tout nouvel email / statut de paiement.
 const L = require('./lib.js');
+const { RACINE, fichier, urlFichier } = L;
 const fs = require('fs');
 
 function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
@@ -125,7 +126,7 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
 
   // ── E. GARDE-FOUS DE PÉRIMÈTRE (analyse du diff réel) ──
   const { execSync } = require('child_process');
-  const diff = execSync('git diff origin/main -- index.html dashboard.html', { cwd: '/home/user/helixcar', maxBuffer: 60 * 1024 * 1024 }).toString();
+  const diff = execSync('git diff origin/main -- index.html dashboard.html', { cwd: RACINE, maxBuffer: 60 * 1024 * 1024 }).toString();
   const lignesAjoutees = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
   const ajouts = lignesAjoutees.join('\n');
   // Les garde-fous ci-dessous cherchent du CODE, pas des mots. Les
@@ -160,8 +161,8 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   }
   L.check('E4 : aucune clé privilégiée réelle introduite dans le navigateur',
     jwtsPrivilegies(ajouts).length === 0
-    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/index.html', 'utf8'))
-    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')));
+    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('index.html'), 'utf8'))
+    && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('dashboard.html'), 'utf8')));
   // Une ligne qui apparaît « supprimée » dans le diff ne prouve rien :
   // git ré-aligne les hunks dès qu'on modifie le voisinage, et une
   // validation déplacée ou ré-indentée apparaît alors comme retirée.
@@ -169,8 +170,8 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   // vérifie donc chaque validation supposée supprimée contre le contenu
   // réel des deux pages.
   const sourceActuelle =
-    fs.readFileSync('/home/user/helixcar/index.html', 'utf8')
-    + fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+    fs.readFileSync(fichier('index.html'), 'utf8')
+    + fs.readFileSync(fichier('dashboard.html'), 'utf8');
   // Le MESSAGE affiché peut légitimement changer (reformulation) sans
   // que le contrôle disparaisse. Ce qui est vérifié est donc le CONTRÔLE
   // lui-même : la fonction appelée et le champ (ou le groupe) qu'elle
@@ -191,7 +192,7 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   L.check('E5 : aucune suppression de validation métier existante',
     validationsRetirees.length === 0, validationsRetirees.slice(0, 3).join(' | '));
 
-  const fichiers = execSync('git diff origin/main --name-only', { cwd: '/home/user/helixcar' }).toString().trim().split('\n');
+  const fichiers = execSync('git diff origin/main --name-only', { cwd: RACINE }).toString().trim().split('\n');
   // creer-compte-convoyeur.html est entré dans le périmètre avec
   // l'harmonisation des mots de passe : l'inscription partenaire y vit,
   // et elle était explicitement demandée. Élargissement DÉLIBÉRÉ, pas
@@ -211,7 +212,7 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   // Ce qui est touché dans l'inscription partenaire doit se limiter aux
   // mots de passe : aucun autre comportement de cette page ne change.
   const diffConvoyeur = execSync('git diff origin/main -- creer-compte-convoyeur.html',
-    { cwd: '/home/user/helixcar' }).toString();
+    { cwd: RACINE }).toString();
   const ajoutsConvoyeur = diffConvoyeur.split('\n')
     .filter(l => (l.startsWith('+') || l.startsWith('-')) && !/^[+-]{3}/.test(l))
     .map(l => l.slice(1).trim())
@@ -221,8 +222,8 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)).slice(0, 3).join(' | '));
   // Le délai annoncé au client doit être le même partout.
   const fichiersDelai = ['index.html', 'dashboard.html', 'devis.html', 'helixcar-emails.html']
-    .filter(f => fs.existsSync('/home/user/helixcar/' + f))
-    .map(f => fs.readFileSync('/home/user/helixcar/' + f, 'utf8'));
+    .filter(f => fs.existsSync(fichier(f)))
+    .map(f => fs.readFileSync(fichier(f), 'utf8'));
   L.check('E8 : plus aucun délai « sous 2 heures » annoncé',
     fichiersDelai.every(t => !/sous 2\s*h(eures)?/i.test(t)));
   L.check('E9 : le délai annoncé est bien « sous 1 heure »',
@@ -232,7 +233,7 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
     fichiers.some(f => f.startsWith('migrations/')));
 
   // ── F. TEXTE : zéro occurrence de l'ancien message ──
-  const idx = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
   L.check('F1 : zéro « demande de convoyage à tout moment » dans index.html',
     (idx.match(/demande de convoyage à tout moment/g) || []).length === 0);
   L.check('F2 : le nouveau message est bien présent',

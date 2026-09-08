@@ -8,7 +8,7 @@
 // Aucun octet ne part vers Supabase : XMLHttpRequest est redirigé vers
 // le serveur local, et la fonction serveur est simulée par le même
 // serveur. C'est la LOGIQUE d'envoi qui est éprouvée, sur le vrai code.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -230,13 +230,13 @@ async function preparerVideo(page, octets) {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   PORT = serveur.address().port;
 
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
 
   async function nouvellePage() {
     const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     p.on('pageerror', e => { p.__errs = p.__errs || []; p.__errs.push(e.message); });
     await p.addInitScript(redirection(PORT));
-    await p.goto('file://' + path.resolve('/home/user/helixcar/index.html'), { waitUntil: 'load' });
+    await p.goto(urlFichier('index.html'), { waitUntil: 'load' });
     return p;
   }
 
@@ -311,39 +311,108 @@ async function preparerVideo(page, octets) {
     upC && upC.chemin === etat.cheminAutorise, upC && upC.chemin);
   await page.close();
 
-  // ══ D. REPRISE APRÈS RECHARGEMENT COMPLET DE LA PAGE ══
+  // ══ D. CE QU'UN RECHARGEMENT COMPLET FAIT VRAIMENT ══
+  //
+  // La version précédente de cette section « prouvait » une reprise
+  // après rechargement en rappelant preparerVideo() APRÈS le reload —
+  // ce qui réinjectait à la fois le fichier ET le jeton secret. Elle ne
+  // prouvait donc rien : elle reconstruisait à la main l'état que le
+  // rechargement venait précisément de détruire.
+  //
+  // Ici, la page est rechargée POUR DE BON et rien n'est réinjecté.
+  // Ce qui est vérifié est ce qui est réellement vrai : la reprise
+  // couvre les coupures réseau tant que la page vit, et le
+  // rechargement remet le candidat à zéro — sans laisser derrière lui
+  // ni secret exploitable ni envoi fantôme.
   etat.uploads = {}; etat.journal = []; etat.cheminAutorise = null;
   etat.confirmations = 0; etat.prolongations = 0;
   etat.couperApres = 6 * 1024 * 1024; etat.coupureFaite = false;
 
   page = await nouvellePage();
   await preparerVideo(page, TAILLE);
-  // Premier essai : on le laisse échouer en épuisant les reprises.
   await page.evaluate(() => { TUS_REPRISES_MAX = 0; });
   const r1 = await page.evaluate(() => uploadVideoCandidature());
   const recuAvant = Object.values(etat.uploads).filter(u => u.chemin)[0].recu;
   check('D1 : l\'envoi s\'interrompt réellement', !!(r1 && r1.erreur), JSON.stringify(r1));
   check('D2 : mais une partie est déjà arrivée', recuAvant > 0, String(recuAvant));
 
-  // La page est rechargée : l'envoi doit reprendre là où il en était.
+  // RECHARGEMENT RÉEL. Aucune réinjection : ni fichier, ni jeton.
   etat.couperApres = null;
+  const uploadsAvantReload = Object.keys(etat.uploads).filter(k => k.indexOf('up-') === 0).length;
   await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => typeof uploadVideoCandidature === 'function');
+
+  const apresReload = await page.evaluate(() => ({
+    jeton: _convJetonEnvoi,
+    video: _convVideo ? { aFichier: !!_convVideo.fichier } : null,
+    memoire: JSON.parse(JSON.stringify(_tusEnvoisEnCours || {})),
+    heritee: localStorage.getItem('helixcar_video_reprise'),
+    clesLocalStorage: Object.keys(localStorage)
+  }));
+
+  check('D3 : après un vrai rechargement, l\'autorisation d\'envoi a disparu',
+    apresReload.jeton === null || apresReload.jeton === undefined,
+    JSON.stringify(apresReload.jeton));
+  check('D4 : le fichier choisi a disparu lui aussi — il n\'y a rien à reprendre',
+    !apresReload.video || apresReload.video.aFichier === false,
+    JSON.stringify(apresReload.video));
+  check('D5 : aucun envoi en cours n\'est ressuscité',
+    Object.keys(apresReload.memoire).length === 0, JSON.stringify(apresReload.memoire));
+  check('D6 : AUCUN secret de reprise n\'est laissé dans le navigateur',
+    apresReload.heritee === null, String(apresReload.heritee));
+  check('D6b : aucune clé de stockage ne contient de jeton ni d\'URL signée',
+    apresReload.clesLocalStorage.every(k => !/reprise|jeton|token|sign/i.test(k)),
+    apresReload.clesLocalStorage.join(','));
+
+  // Et surtout : une tentative d'envoi après rechargement ne peut PAS
+  // aboutir en silence, et ne touche pas l'envoi partiel déjà déposé.
+  const rApres = await page.evaluate(() => uploadVideoCandidature());
+  const uploadsApresReload = Object.keys(etat.uploads).filter(k => k.indexOf('up-') === 0).length;
+  check('D7 : relancer après rechargement ne prétend pas réussir',
+    !(rApres && rApres.ok === true), JSON.stringify(rApres));
+  check('D8 : et n\'écrit pas un octet de plus dans l\'envoi interrompu',
+    uploadsApresReload === uploadsAvantReload
+    && Object.values(etat.uploads).filter(u => u.chemin)[0].recu === recuAvant,
+    uploadsApresReload + ' vs ' + uploadsAvantReload);
+  check('D9 : aucune confirmation n\'a pu être obtenue sans le jeton',
+    etat.confirmations === 0, String(etat.confirmations));
+
+  // La documentation ne doit pas promettre plus que le code ne tient.
+  const srcIdx = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  check('D10 : le code dit explicitement que la reprise ne survit pas au rechargement',
+    /ne couvre PAS un rechargement complet/.test(srcIdx));
+  check('D11 : aucun secret d\'envoi n\'est écrit dans localStorage',
+    !/localStorage\.setItem\([^)]*(jeton|reprise|token)/i.test(srcIdx));
+  await page.close();
+
+  // ══ D bis. LA REPRISE QUI EXISTE VRAIMENT : COUPURE, PAGE OUVERTE ══
+  etat.uploads = {}; etat.journal = []; etat.cheminAutorise = null;
+  etat.confirmations = 0; etat.prolongations = 0;
+  etat.couperApres = 6 * 1024 * 1024; etat.coupureFaite = false;
+
+  page = await nouvellePage();
   await preparerVideo(page, TAILLE);
-  const r2b = await page.evaluate(() => uploadVideoCandidature());
-  const upD = Object.values(etat.uploads).filter(u => u.chemin)[0];
-  check('D3 : après rechargement, l\'envoi reprend et aboutit',
-    r2b && r2b.ok === true, JSON.stringify(r2b));
-  check('D4 : il a repris l\'envoi existant, sans en créer un second',
+  await page.evaluate(() => { TUS_REPRISES_MAX = 0; });
+  const rd1 = await page.evaluate(() => uploadVideoCandidature());
+  const recuCoupure = Object.values(etat.uploads).filter(u => u.chemin)[0].recu;
+  check('D12 : premier essai interrompu', !!(rd1 && rd1.erreur), JSON.stringify(rd1));
+
+  // Le réseau revient, la page n'a PAS été rechargée : le candidat
+  // relance, et l'envoi doit repartir où il en était.
+  etat.couperApres = null;
+  await page.evaluate(() => { TUS_REPRISES_MAX = 5; });
+  const rd2 = await page.evaluate(() => uploadVideoCandidature());
+  const upDbis = Object.values(etat.uploads).filter(u => u.chemin)[0];
+  check('D13 : la relance aboutit sans recharger la page',
+    rd2 && rd2.ok === true, JSON.stringify(rd2));
+  check('D14 : elle a REPRIS l\'envoi existant, sans en créer un second',
     Object.keys(etat.uploads).filter(k => k.indexOf('up-') === 0).length === 1,
     JSON.stringify(Object.keys(etat.uploads)));
-  check('D5 : et n\'a renvoyé que ce qui manquait',
-    upD && upD.recu === TAILLE && upD.morceaux.reduce((a, b) => a + b, 0) === TAILLE,
-    upD && (upD.recu + ' / morceaux ' + upD.morceaux.join('+')));
-  check('D6 : la reprise ne conserve AUCUN secret dans le navigateur',
-    await page.evaluate(() => {
-      const brut = localStorage.getItem('helixcar_video_reprise');
-      return !brut || (brut.indexOf('aaaa') === -1 && brut.indexOf('sig-') === -1);
-    }));
+  check('D15 : et n\'a renvoyé que ce qui manquait',
+    upDbis && upDbis.recu === TAILLE
+    && upDbis.morceaux.reduce((a, b) => a + b, 0) === TAILLE
+    && recuCoupure > 0 && recuCoupure < TAILLE,
+    upDbis && (upDbis.recu + ' / reprise à ' + recuCoupure));
   await page.close();
 
   // ══ E. SECOURS SI LA ROUTE REPRENABLE N'EXISTE PAS ══
@@ -425,7 +494,10 @@ async function preparerVideo(page, octets) {
   check('G8 : aucune confirmation n\'est envoyée après une annulation',
     etat.confirmations === 0, String(etat.confirmations));
   check('G9 : la trace de reprise est CONSERVÉE — relancer ne recommence pas tout',
-    await page.evaluate(() => !!localStorage.getItem('helixcar_video_reprise')));
+    await page.evaluate(() => Object.keys(_tusEnvoisEnCours || {}).length === 1),
+    'envois mémorisés : ' + JSON.stringify(await page.evaluate(() => Object.keys(_tusEnvoisEnCours || {}))));
+  check('G9b : elle est gardée EN MÉMOIRE, jamais écrite dans le navigateur',
+    await page.evaluate(() => localStorage.getItem('helixcar_video_reprise') === null));
 
   // Relance : elle reprend là où l'annulation s'était arrêtée.
   const recuApresAnnulation = upG.recu;
@@ -448,8 +520,8 @@ async function preparerVideo(page, octets) {
   await page.close();
 
   // ══ F. CE QUI NE DOIT JAMAIS ARRIVER ══
-  const src = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
-  const fn = fs.readFileSync('/home/user/helixcar/supabase/functions/candidature-video/index.ts', 'utf8');
+  const src = fs.readFileSync(fichier('index.html'), 'utf8');
+  const fn = fs.readFileSync(fichier('supabase/functions/candidature-video/index.ts'), 'utf8');
   check('F1 : le navigateur ne contient aucune clé service_role',
     !/service_role/i.test(src.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')));
   check('F2 : la fonction serveur ne renvoie jamais la clé au navigateur',

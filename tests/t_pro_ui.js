@@ -1,5 +1,6 @@
 // « TROUVER UN PROFESSIONNEL » — MÉTIERS, ALIGNEMENT, VALIDATIONS
 const L = require('./lib.js');
+const { RACINE, fichier, urlFichier } = L;
 
 async function ouvrirRubrique(page, cle) {
   await page.evaluate(c => proBasculerRubrique(c), cle);
@@ -283,7 +284,7 @@ async function remplirVehicule(page, i, type, marque) {
     JSON.stringify(adresses));
 
   const fs = require('fs');
-  const idx = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
   L.check('E2 : le site RÉEL d\'HelixCar n\'a pas été touché',
     /ville:\s*'Noisy-le-Grand'/.test(idx) && /code_postal:\s*'93160'/.test(idx));
 

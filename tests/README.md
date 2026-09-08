@@ -17,21 +17,47 @@ Le chemin de Chromium est défini dans `lib.js` (constante `EXE`) ; adaptez-le
 ## Exécution
 
 ```bash
-cd tests
-for f in t_nettoyage t_contact t_pro t_pro_ui t_etapes t_dates t_devis t_devis_commun \
-         t_periode t_nonreg t_brouillon t_video t_enregistreur t_video_admin t_tus \
-         t_decisions t_blocage t_client t_infos t_motdepasse t_mdp_ui t_charte \
-         t_metiers t_nettoyage_dashboard t_multivehicules t_mission_nettoyage; do
-  echo "== $f"; node $f.js || echo "ÉCHEC $f"
-done
-
-# Sécurité serveur (TypeScript, sans réseau)
-node --experimental-strip-types t_video_securite.mjs
-
-# Vérification réelle des politiques RLS (PostgreSQL 16 local, jamais Supabase).
-# Requiert les binaires postgresql-16 et les droits root pour « su postgres ».
-bash t_rls.sh
+npm ci
+npx playwright install --with-deps chromium
+npm test
 ```
+
+`npm test` appelle `node tests/lancer.js` : **un seul lanceur**, qui exécute
+chaque suite dans son propre processus, additionne les échecs réellement
+rapportés, et **sort avec un code non nul dès qu'une seule chose ne va pas**.
+
+Options :
+
+```bash
+node tests/lancer.js --sans-sql            # sans PostgreSQL (poste sans postgresql-16)
+node tests/lancer.js --seulement video     # les suites dont le nom contient « video »
+```
+
+> **Pourquoi un lanceur.** La commande documentée ici était
+> `for f in t_*.js; do node $f.js || echo "ÉCHEC $f"; done`. Le `|| echo`
+> avale le code de retour : **cette boucle ne pouvait pas échouer**. Une
+> suite en échec passait inaperçue, et une intégration continue bâtie
+> dessus aurait affiché un vert mensonger.
+
+Une suite peut aussi se lancer seule : `node tests/t_video.js`.
+
+### Chemins et navigateur
+
+Aucun chemin absolu n'est écrit en dur. `tests/env.js` résout :
+
+| Question | Réponse |
+|---|---|
+| Où est le dépôt ? | déduit de l'emplacement de `env.js` |
+| Où est Playwright ? | la dépendance du projet (`npm ci`), ou `PLAYWRIGHT_MODULE` |
+| Où est le navigateur ? | celui que Playwright a installé, ou `CHROME_PATH` |
+
+En conteneur d'intégration, `CI_NO_SANDBOX=1` ajoute `--no-sandbox`.
+
+### Intégration continue
+
+`.github/workflows/tests.yml` exécute la campagne **à chaque poussée et sur
+chaque Pull Request**, en deux tâches parallèles : les suites navigateur
+d'un côté, les politiques RLS sur un PostgreSQL 16 de l'autre.
 
 Voir aussi **`RECETTE-VIDEO.md`** : recette manuelle MP4/MOV sur
 navigateur réel, et vérifications de sécurité à passer après
@@ -69,7 +95,8 @@ Chaque fichier sort en code 0 si tout passe, 1 sinon.
 | `t_nettoyage_dashboard.js` | **Nettoyage du Dashboard** : tentative réelle de contournement de la connexion, chiffres et listes réellement lus dans Supabase, base clients réelle, promesses d'e-mails et de SMS supprimées, bannières sur les pages encore fictives |
 | `t_mission_nettoyage.js` | **Nettoyage dans le Dashboard et missions** : fiche complète (prestation, options, parc, date, lieu, partenaire nécessaire, prix client, rémunération, statut), création de la mission depuis la demande, visibilité limitée aux partenaires du métier, photos avant/après dans un bucket privé, **relecture des photos par URL signée temporaire** (cloisonnement entre missions, aucune URL publique, rien qui survive à la fermeture), fin d'intervention et validation par HelixCar |
 | `t_multivehicules.js` | **Audit mono / multi-véhicules** : la même demande suivie de la saisie au PDF et à la fiche administrateur — aucune donnée d'un véhicule sur un autre, à aucune étape |
-| `t_tus.js` | **Envoi vidéo reprenable (TUS)** : le vrai code d'envoi contre un vrai serveur TUS local — découpage, reprise après coupure à l'octet exact, signature renouvelée en cours de route, reprise après rechargement de page, secours si la route reprenable est absente, aucune clé privilégiée |
+| `t_tus.js` | **Envoi vidéo reprenable (TUS)** : le vrai code d'envoi contre un vrai serveur TUS local — découpage, reprise après coupure à l'octet exact, signature renouvelée en cours de route, secours si la route reprenable est absente, aucune clé privilégiée. La section **D recharge réellement la page** et vérifie qu'aucun secret ne survit ; la section **D bis** vérifie la reprise qui existe vraiment (coupure réseau, page ouverte) |
+| `t_durcissement.js` | **Audit indépendant** : l'autorisation réellement envoyée par les compteurs (valeur du header, pas sa présence), injection HTML/JavaScript avec des charges hostiles réelles, les trois échappements selon le contexte, filtrage des URL, et le nettoyage d'une photo orpheline quand la base refuse après l'envoi |
 
 Les médias de `tests/medias/` sont de **vrais fichiers WebM** (30 s, 90 s,
 150 s) encodés par ffmpeg ; `generer.sh` les régénère.

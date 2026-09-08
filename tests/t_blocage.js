@@ -7,7 +7,7 @@
 //   * aucun e-mail n'est envoyé, dans aucun des deux sens.
 // Le double Supabase est conservé dans sessionStorage : le rechargement
 // simule un vrai retour sur la page avec la base inchangée.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const echecs = [];
@@ -116,10 +116,10 @@ window.emailjs = { send: function () { window.__db.emails.push(Array.from(argume
                    init: function () {}, sendForm: function () { window.__db.emails.push(['form']); _ecrireBase(); return Promise.resolve(); } };
 `;
 
-const FICHIER = 'file://' + path.resolve('/home/user/helixcar/dashboard.html');
+const FICHIER = urlFichier('dashboard.html');
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -277,7 +277,7 @@ const FICHIER = 'file://' + path.resolve('/home/user/helixcar/dashboard.html');
     f.motifVisible === 'block', f.motifVisible);
   check('F3 : il n\'envoie aucun e-mail (l\'ancienne version l\'annonçait à tort)',
     f.emails === 0);
-  const src = require('fs').readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const src = require('fs').readFileSync(fichier('dashboard.html'), 'utf8');
   check('F4 : plus aucune fonction ne se contente de changer une classe CSS',
     src.indexOf("alert('✅ Convoyeur bloqué. Email de notification envoyé automatiquement.')") === -1
     && src.indexOf("alert('✅ Convoyeur débloqué. Email de notification envoyé.')") === -1);

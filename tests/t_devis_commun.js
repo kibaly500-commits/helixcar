@@ -5,7 +5,7 @@
 // recherche de professionnel — et qu'aucun d'eux n'hérite du texte d'un
 // autre. Aucun e-mail n'est envoyé : le test n'appelle que les
 // fonctions de composition et le générateur de PDF.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const echecs = [];
@@ -105,13 +105,13 @@ const DEMANDES = {
 };
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   page.on('dialog', d => d.dismiss());
   await page.addInitScript(INIT);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
 
   await page.evaluate(d => {
     _demandesDevisListe = Object.values(d);
@@ -202,7 +202,7 @@ const DEMANDES = {
   }
 
   // ── E. UN SEUL ET MÊME MÉCANISME ──
-  const src = require('fs').readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const src = require('fs').readFileSync(fichier('dashboard.html'), 'utf8');
   check('E1 : une seule fonction génère la référence du devis',
     (src.match(/function _genererReferenceDevis\(/g) || []).length === 1);
   check('E2 : une seule fonction construit le PDF',
@@ -265,7 +265,7 @@ const DEMANDES = {
       bloc.creer && bloc.champ && bloc.bouton, JSON.stringify(bloc));
     await page.evaluate(() => closeModal('fiche-demande'));
   }
-  const srcH = require('fs').readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const srcH = require('fs').readFileSync(fichier('dashboard.html'), 'utf8');
   check('H5 : le bloc devis n\'est écrit qu\'UNE fois, et réutilisé',
     (srcH.match(/function _blocDevisHtml\(/g) || []).length === 1
     && (srcH.match(/html \+= _blocDevisHtml\(c\);/g) || []).length === 3

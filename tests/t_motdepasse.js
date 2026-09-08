@@ -1,6 +1,6 @@
 // RÉINITIALISATION DU MOT DE PASSE
 // Exécute le vrai code des deux pages contre un double Supabase Auth.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const echecs = [];
@@ -8,7 +8,6 @@ function check(l, c, e) {
   if (c) { console.log('PASS - ' + l); pass++; }
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
-const RACINE = '/home/user/helixcar';
 
 // Double Supabase Auth. Il journalise TOUT et permet de simuler les
 // situations réelles : adresse inconnue, limitation d'envoi, coupure
@@ -74,7 +73,7 @@ window.emailjs = { init: function () {},
 `;
 
 (async () => {
-  const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const navigateur = await lancerNavigateur();
   const page = await navigateur.newPage({ viewport: { width: 1280, height: 1000 } });
   const erreursJs = [];
   page.on('pageerror', e => erreursJs.push(e.message));
@@ -82,7 +81,7 @@ window.emailjs = { init: function () {},
   await page.addInitScript(INIT);
 
   // ── A. DEMANDE DEPUIS LE SITE PUBLIC ──
-  await page.goto('file://' + path.resolve(RACINE, 'index.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
 
   const lien = await page.evaluate(() => {
@@ -177,7 +176,7 @@ window.emailjs = { init: function () {},
     await page.evaluate(() => window.__journal.every(j => !j.mdp)));
 
   // ── B. NOUVEAU MOT DE PASSE, SUR LA PAGE D'ARRIVÉE ──
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.waitForTimeout(300);
 
   const ouverture = await page.evaluate(() => {
@@ -309,8 +308,8 @@ window.emailjs = { init: function () {},
     await page.evaluate(() => window.__emails.length) === 0);
 
   const fs = require('fs');
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
-  const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   // Ce qui compte n'est pas la présence du mot « password » — les appels
   // Supabase Auth en contiennent forcément — mais que la SEULE
   // destination du mot de passe soit auth.*, et jamais le payload d'une

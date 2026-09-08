@@ -6,7 +6,7 @@
 // même d'entrer sans mot de passe. Ce fichier vérifie chaque correction
 // sur la VRAIE page, avec un double Supabase qui renvoie des lignes
 // TEST-QA identifiables.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -81,8 +81,8 @@ window.fetch = function(u, o){
 `;
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
-  const src = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const browser = await lancerNavigateur();
+  const src = fs.readFileSync(fichier('dashboard.html'), 'utf8');
 
   // ── A. PLUS AUCUN CONTOURNEMENT DE LA CONNEXION ──
   const pageA = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
@@ -91,7 +91,7 @@ window.fetch = function(u, o){
   await pageA.addInitScript(INIT + `
     try { localStorage.setItem('helixcar_demo_email', 'client@helixcar.com'); } catch (e) {}
   `);
-  await pageA.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await pageA.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await pageA.waitForTimeout(600);
   const apresBypass = await pageA.evaluate(() => ({
     loginVisible: getComputedStyle(document.getElementById('login-screen')).display !== 'none',
@@ -114,7 +114,7 @@ window.fetch = function(u, o){
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(INIT);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate(() => {
     currentRole = 'admin';
     document.getElementById('login-screen').style.display = 'none';

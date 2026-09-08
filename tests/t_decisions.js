@@ -1,7 +1,7 @@
 // DÉCISIONS PAR ACTIVITÉ ET BLOCAGE PARTENAIRE
 // Exécute le vrai code du Dashboard contre un double Supabase injecté
 // AVANT les scripts de la page (le CDN supabase-js est injoignable ici).
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 
 let pass = 0, fail = 0; const echecs = [];
@@ -155,13 +155,13 @@ function candidat(id, prenom, activites, extra) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
   page.on('dialog', d => d.accept());   // confirm() accepté par défaut
   await page.addInitScript(INIT);
-  await page.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
 
   const UN = candidat('c-1', 'Alice', ['convoyage']);
   const DEUX = candidat('c-2', 'Bruno', ['convoyage', 'nettoyage']);
@@ -418,7 +418,7 @@ function candidat(id, prenom, activites, extra) {
   check('J1 : AUCUN email envoyé par les décisions ou le blocage',
     base.emails.length === 0, 'emails=' + base.emails.length);
   const fs = require('fs');
-  const dash = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   const bloc = dash.slice(dash.indexOf('DÉCISIONS PAR ACTIVITÉ ET BLOCAGE PARTENAIRE'),
                           dash.indexOf('VIDÉO DE CANDIDATURE — LECTURE SÉCURISÉE'));
   check('J2 : le code des décisions/blocage n\'appelle jamais EmailJS',

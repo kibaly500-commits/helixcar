@@ -6,7 +6,7 @@
 // administrateur, informations manquantes — et vérifie qu'à aucune
 // étape la donnée d'un véhicule n'apparaît sur un autre.
 const L = require('./lib.js');
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -171,7 +171,7 @@ function croisements(lignes) {
     [VEH[1], VEH[2]].every(v => JSON.stringify(mono).indexOf(v.immat) === -1
                              && JSON.stringify(mono).indexOf(v.pcRue) === -1));
   L.check('D5 : le mono-véhicule passe par le MÊME lecteur que le multi',
-    (fs.readFileSync('/home/user/helixcar/index.html', 'utf8')
+    (fs.readFileSync(fichier('index.html'), 'utf8')
       .match(/function _lireFichesVehicules\(/g) || []).length === 1);
 
   // ══ V. VERROUS DE NON-RÉGRESSION DEMANDÉS ══
@@ -343,13 +343,13 @@ function croisements(lignes) {
     return _f.apply(window, arguments); };
   `;
 
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const nav = await lancerNavigateur();
   const dash = await nav.newPage({ viewport: { width: 1400, height: 1000 } });
   const errsDash = [];
   dash.on('pageerror', e => errsDash.push(e.message));
   dash.on('dialog', d => d.dismiss());
   await dash.addInitScript(STUB);
-  await dash.goto('file://' + path.resolve('/home/user/helixcar/dashboard.html'), { waitUntil: 'load' });
+  await dash.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
 
   // La demande telle que la base la restitue : la ligne clients et ses
   // trois lignes vehicules, chacune avec SES valeurs.
@@ -453,7 +453,7 @@ function croisements(lignes) {
     [VEH[1], VEH[2]].every(v => ficheMono[0].indexOf(v.immat) === -1
                              && ficheMono[0].indexOf(v.pcContact) === -1));
   L.check('F6 : mono et multi passent par la MÊME fonction d\'affichage',
-    (fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8')
+    (fs.readFileSync(fichier('dashboard.html'), 'utf8')
       .match(/function _detailVehicule\(/g) || []).length === 1);
 
   L.check('Z1 : aucune erreur JavaScript côté Dashboard',

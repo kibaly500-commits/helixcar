@@ -1,7 +1,7 @@
 // ENREGISTREUR VIDÉO ET LIMITE 300 Mo
 // Chromium est lancé avec une caméra factice : getUserMedia et
 // MediaRecorder fonctionnent réellement, l'enregistrement est vrai.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,11 +10,9 @@ function check(l, c, e) {
   if (c) { console.log('PASS - ' + l); pass++; }
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
-const RACINE = '/home/user/helixcar';
 
 (async () => {
-  const navigateur = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const navigateur = await lancerNavigateur({
     args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
   });
   const contexte = await navigateur.newContext({ permissions: ['camera', 'microphone'] });
@@ -23,7 +21,7 @@ const RACINE = '/home/user/helixcar';
   page.on('pageerror', e => erreursJs.push(e.message));
   page.on('dialog', d => d.accept());
 
-  await page.goto('file://' + path.resolve(RACINE, 'index.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(300);
   await page.evaluate(() => { try { openModal('convoyeur'); } catch (e) {} });
   await page.waitForTimeout(200);
@@ -138,9 +136,9 @@ const RACINE = '/home/user/helixcar';
   check('F5 : aucune erreur JS', erreursJs.length === 0, erreursJs.join(' | '));
 
   // ── G. COHÉRENCE DES COUCHES ──
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
-  const fn = fs.readFileSync(path.resolve(RACINE, 'supabase/functions/candidature-video/index.ts'), 'utf8');
-  const mig = fs.readFileSync(path.resolve(RACINE, 'migrations/93_bucket_video_300mo.sql'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const fn = fs.readFileSync(fichier('supabase/functions/candidature-video/index.ts'), 'utf8');
+  const mig = fs.readFileSync(fichier('migrations/93_bucket_video_300mo.sql'), 'utf8');
   check('G1 : navigateur, fonction serveur et bucket annoncent la même limite',
     /300 \* 1024 \* 1024/.test(idx) && /300 \* 1024 \* 1024/.test(fn) && /314572800/.test(mig));
   // On ne teste que le CODE : la procédure de retour arrière de la

@@ -1,0 +1,64 @@
+name: Tests
+
+# Le seul contrôle visible sur les Pull Requests était celui de Vercel,
+# qui ne dit rien d'autre que « le site se construit ». Rien ne vérifiait
+# que les 300+ contrôles du dépôt passaient encore.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Une nouvelle poussée annule la campagne précédente sur la même branche.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  navigateur:
+    name: Suites navigateur et sécurité serveur
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # t_nonreg compare la branche à origin/main : sans l'historique,
+          # le diff est vide et le contrôle ne prouverait rien.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Installer Chromium (avec ses bibliothèques système)
+        run: npx playwright install --with-deps chromium
+
+      - name: Rendre origin/main disponible
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+
+      - name: Lancer toutes les suites
+        env:
+          CI_NO_SANDBOX: '1'
+        run: node tests/lancer.js --sans-sql
+
+  sql:
+    name: Politiques RLS sur PostgreSQL 16
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PostgreSQL 16
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16
+          sudo systemctl stop postgresql || true
+
+      - name: Appliquer les migrations sur une base JETABLE et observer
+        # Ce test ne joint JAMAIS Supabase : il monte un cluster local,
+        # y applique les vrais fichiers de migrations/ sans les modifier,
+        # et mesure le comportement effectif des politiques.
+        run: sudo bash tests/t_rls.sh

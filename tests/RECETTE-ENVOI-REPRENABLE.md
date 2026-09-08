@@ -100,7 +100,7 @@ Les quatre règles du point 2 restent donc intégralement respectées.
 |---|---|
 | Validité de la signature portée de **2 minutes à 30 minutes** | 2 minutes rendaient tout envoi long impossible. Une signature n'autorise toujours qu'un seul chemin, en écriture seule. |
 | Nouvelle action **`prolonger`** | Un envoi peut durer plus longtemps qu'une signature. Elle en délivre une fraîche **pour le chemin déjà enregistré**, jamais pour un chemin proposé par le navigateur, et **ne consomme pas** le jeton à usage unique. |
-| `autoriser` **réutilise** le chemin d'un envoi en cours | Sans cela, un rechargement de page laisserait un objet partiel orphelin et recommencerait tout. |
+| `autoriser` **réutilise** le chemin d'un envoi en cours | Sans cela, chaque nouvelle tentative laisserait un objet partiel orphelin et recommencerait tout. |
 | `technicien` ajouté à `dureeMaxPourActivites` | Cohérence avec la sélection multi-métiers. |
 
 ### Côté navigateur — `index.html`
@@ -113,8 +113,9 @@ Un client **TUS 1.0.0 minimal**, écrit sans dépendance :
 * `HEAD` pour retrouver l'offset **réel** après une coupure ;
 * renouvellement automatique de la signature avant expiration, et
   après un refus 401/403 en cours de route ;
-* mémorisation de l'envoi en cours (`localStorage`) pour **reprendre
-  après un rechargement de la page** — sans y stocker le moindre secret ;
+* mémorisation **en mémoire** de l'envoi en cours, pour reprendre après
+  une coupure réseau tant que la page reste ouverte — voir la portée
+  exacte au § 4 bis ;
 * **secours automatique** : si la route reprenable n'existe pas ou est
   injoignable, l'envoi repasse par la requête unique d'avant. Aucun
   candidat ne peut être bloqué par cette évolution.
@@ -122,6 +123,38 @@ Un client **TUS 1.0.0 minimal**, écrit sans dépendance :
 > Aucune bibliothèque n'a été ajoutée : le site charge déjà ses
 > dépendances depuis un CDN, et en ajouter une aurait fait dépendre le
 > dépôt d'une candidature de la disponibilité de ce CDN.
+
+## 4 bis. Portée exacte de la reprise — et ce qu'elle ne couvre pas
+
+Une version antérieure de cette note annonçait une reprise **après
+rechargement de la page**. **C'était faux, et c'est corrigé.**
+
+Ce qui est réellement couvert : les **coupures réseau tant que la page
+reste ouverte** — tunnel, changement de Wi-Fi, perte de 4G, veille
+courte. C'est exactement le cas qui faisait échouer les envois de
+300 Mo.
+
+Ce qui ne l'est pas : un **rechargement complet**. Ce n'est pas un
+manque d'effort, c'est une impossibilité — deux choses disparaissent, et
+aucune ne peut être rendue sans le candidat :
+
+| Ce qui disparaît | Pourquoi c'est irrécupérable |
+|---|---|
+| Le **fichier** (`_convVideo.fichier`) | C'est un objet `File`, une poignée vers un fichier du disque. Il n'est sérialisable nulle part. **Sans octets à envoyer, aucun protocole de reprise ne sert à rien.** |
+| L'**autorisation** (`_convJetonEnvoi`) | Secret à usage unique, gardé en mémoire seule. Le persister rendrait la candidature reprenable — et surtout **confirmable** — par quiconque lit le stockage du navigateur : poste partagé, extension, XSS. Le gain serait nul (voir la ligne au-dessus) et le risque réel. |
+
+Écrire l'URL TUS dans `localStorage` donnait donc l'illusion d'une
+reprise sans jamais pouvoir l'honorer. La mémoire des envois en cours
+vit désormais **en mémoire**, pour la durée de vie de la page —
+exactement la portée de ce qu'elle sait faire.
+
+La clé héritée `helixcar_video_reprise` est **effacée au chargement**,
+pour qu'aucun résidu ne subsiste sur un poste déjà utilisé.
+
+`tests/t_tus.js` section **D** recharge la page **pour de bon**, sans
+rien réinjecter, et vérifie qu'aucun secret ne survit, qu'aucun envoi
+n'est ressuscité, et qu'une relance **ne prétend pas réussir**. La
+section **D bis** vérifie la reprise qui, elle, existe vraiment.
 
 ## 5. Tests réellement exécutés
 
@@ -134,11 +167,12 @@ recette. Les octets partent réellement du navigateur.
 | Envoi complet de 15 Mo | découpé en ≥ 3 morceaux de 6 Mo maximum, tous les octets reçus, progression rapportée |
 | Panne en plein envoi | l'envoi aboutit quand même, l'offset réel est redemandé (`HEAD`), **aucun octet déjà reçu n'est renvoyé** |
 | Signature expirée avant le premier octet | une signature fraîche est demandée, l'envoi aboutit |
-| Rechargement complet de la page | l'envoi **reprend** l'objet existant, n'en crée pas un second, ne renvoie que ce qui manquait |
+| Coupure réseau, page restée ouverte | la relance **reprend** l'objet existant, n'en crée pas un second, ne renvoie que ce qui manquait |
+| **Rechargement complet de la page** | rien n'est ressuscité : l'autorisation a disparu, le fichier aussi, **aucun secret ne subsiste**, et une relance ne prétend pas réussir |
 | Route reprenable absente | le secours en une requête prend le relais et aboutit |
 | Sécurité | aucune clé privilégiée dans aucune requête, chemin toujours choisi par le serveur, bucket jamais public, vidéo jamais passée par la fonction serveur |
 
-**35 vérifications, 35 réussies.**
+**59 vérifications, 59 réussies.**
 
 ## 6. Recette manuelle, sur le site réel
 

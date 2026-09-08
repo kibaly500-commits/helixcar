@@ -1,6 +1,7 @@
 // VIDÉO DE CANDIDATURE PARTENAIRE
 // Fichiers WebM RÉELS (générés par ffmpeg), décodés par le navigateur.
 const L = require('./lib.js');
+const { RACINE, fichier, urlFichier } = L;
 const path = require('path');
 const M = path.resolve(__dirname, 'medias');
 
@@ -379,8 +380,8 @@ async function etatVideo(page) {
 
   // ── K. Aucune URL publique nulle part ──
   const fs = require('fs');
-  const idx = fs.readFileSync('/home/user/helixcar/index.html', 'utf8');
-  const dash = fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   L.check('K1 : aucune URL publique de bucket vidéo dans index.html',
     !/object\/public\/candidatures-videos/.test(idx));
   L.check('K2 : aucune URL publique de bucket vidéo dans dashboard.html',

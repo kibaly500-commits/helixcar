@@ -1,6 +1,6 @@
 // LONGUEUR MINIMALE UNIFIÉE ET BOUTON ŒIL
 // Exécute le vrai code des trois pages portant un champ de mot de passe.
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -9,7 +9,6 @@ function check(l, c, e) {
   if (c) { console.log('PASS - ' + l); pass++; }
   else { console.log('FAIL - ' + l + (e ? '  [' + e + ']' : '')); fail++; echecs.push(l); }
 }
-const RACINE = '/home/user/helixcar';
 
 const INIT = `
 window.__journal = [];
@@ -108,7 +107,7 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
 }
 
 (async () => {
-  const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const navigateur = await lancerNavigateur();
   const page = await navigateur.newPage({ viewport: { width: 1280, height: 1000 } });
   const erreursJs = [];
   page.on('pageerror', e => erreursJs.push(e.message));
@@ -116,7 +115,7 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
   await page.addInitScript(INIT);
 
   // ══ A. LONGUEUR — INSCRIPTION CLIENT ══
-  await page.goto('file://' + path.resolve(RACINE, 'index.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
   await page.evaluate(() => { try { openModal('client'); } catch (e) {} });
   await page.waitForTimeout(150);
@@ -185,7 +184,7 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
   // Une connexion réussie redirige vers l'espace : on revient sur le
   // site public pour la suite.
   await page.waitForTimeout(400);
-  await page.goto('file://' + path.resolve(RACINE, 'index.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
   await page.evaluate(() => { try { openModal('client'); closeModal('client'); openModal('connexion'); closeModal('connexion'); } catch (e) {} });
 
@@ -268,7 +267,7 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
   await page.setViewportSize({ width: 1280, height: 1000 });
 
   // ══ D. DASHBOARD : CONNEXION ET RÉINITIALISATION ══
-  await page.goto('file://' + path.resolve(RACINE, 'dashboard.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.waitForTimeout(300);
   await verifierOeil(page, 'D-connexion dashboard', 'login-pw', '#login-screen .btn-oeil');
 
@@ -334,7 +333,7 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
     attributsReinit.a === '8' && attributsReinit.b === '8', JSON.stringify(attributsReinit));
 
   // ══ E. INSCRIPTION PARTENAIRE ══
-  await page.goto('file://' + path.resolve(RACINE, 'creer-compte-convoyeur.html'), { waitUntil: 'load' });
+  await page.goto(urlFichier('creer-compte-convoyeur.html'), { waitUntil: 'load' });
   await page.waitForTimeout(250);
   await verifierOeil(page, 'E-inscription partenaire', 'cc-pw', '.pw-toggle');
 
@@ -356,9 +355,9 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
     await page.evaluate(() => window.__emails.length) === 0);
   check('F2 : aucune erreur JS', erreursJs.length === 0, erreursJs.join(' | '));
 
-  const idx = fs.readFileSync(path.resolve(RACINE, 'index.html'), 'utf8');
-  const dash = fs.readFileSync(path.resolve(RACINE, 'dashboard.html'), 'utf8');
-  const conv = fs.readFileSync(path.resolve(RACINE, 'creer-compte-convoyeur.html'), 'utf8');
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+  const conv = fs.readFileSync(fichier('creer-compte-convoyeur.html'), 'utf8');
   const toutes = idx + dash + conv;
 
   // On extrait le CORPS de la fonction par équilibrage d'accolades :
