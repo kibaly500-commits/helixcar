@@ -7537,6 +7537,56 @@ function _blocFiche(titre, lignesHtml) {
     lignesHtml + '</div>';
 }
 
+// ── BLOC DEVIS — UN SEUL POUR LES QUATRE SERVICES ───────────
+// Le devis est le MÊME mécanisme quel que soit le service : même table,
+// même référence, même PDF, même envoi, mêmes boutons. Il était
+// jusqu'ici écrit à l'intérieur de la seule fiche convoyage/stockage :
+// les fiches Nettoyage et Trouver un professionnel se terminaient par
+// un `return` AVANT lui, et il était donc IMPOSSIBLE d'établir un devis
+// pour ces deux services depuis le Dashboard. Extrait ici sans rien
+// changer à son contenu, il est désormais inséré par les trois fiches.
+function _blocDevisHtml(c) {
+  var html = '';
+  var d = _devisParClient[String(c.id)];
+  var tableDevisDispo = (document.getElementById('devis-alerte-table') || {}).style;
+  var tableManquante = tableDevisDispo && tableDevisDispo.display === 'block';
+
+  html += '<div style="margin-top:20px;padding:16px;background:#FAF8F4;border:1px solid #E8E2D8;border-radius:8px">';
+  html += '<div style="font-weight:700;font-size:.9rem;margin-bottom:10px">Créer le devis</div>';
+
+  if (tableManquante) {
+    html += '<div style="font-size:.82rem;color:#8a6d3b">Génération indisponible : la table <b>devis</b> doit d\'abord être créée dans Supabase.</div>';
+  } else if (d) {
+    html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1e8e4e">✓ Devis ' + _escapeHtml(d.reference) + ' généré</b></div>';
+    html += '<div style="font-size:.85rem;margin-bottom:10px">Montant : <b>' + Number(d.prix).toLocaleString('fr-FR') + ' €</b> — ' + _statutDevisBadge(d.statut) + '</div>';
+    if (d.statut === 'envoye') {
+      html += '<div style="font-size:.8rem;color:#666;margin-bottom:10px">Envoyé le ' + _dvDateHeure(d.date_envoi) + ' à ' + _escapeHtml(_dv(c.email)) + '</div>';
+    }
+    html += '<div id="devis-erreur-envoi" style="display:none;font-size:.82rem;color:#c0392b;margin-bottom:10px"></div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<button class="btn btn-sm btn-secondary" onclick="previsualiserDevis(\'' + c.id + '\')">Voir le devis</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="modifierPrixDevis(\'' + c.id + '\')">Modifier le prix</button>' +
+      ((d.statut === 'accepte' || d.statut === 'refuse') ? '' :
+        '<button class="btn btn-sm btn-primary" id="btn-envoyer-devis" onclick="envoyerDevis(\'' + c.id + '\')">' +
+          (d.statut === 'envoye' ? 'Renvoyer au client' : 'Envoyer au client') + '</button>') +
+      '<button class="btn btn-sm" id="btn-test-qa-prepare" onclick="testerPrepareDevisQA(\'' + c.id + '\')" ' +
+        'title="Mode test interne : appelle PREPARE sans envoyer d\'email ni changer le statut" ' +
+        'style="background:#fff3cd;border:1px dashed #b8860b;color:#7a5c00;font-size:.76rem">🧪 Tester PREPARE (QA)</button>' +
+      '</div>';
+  } else {
+    html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+      '<div><label style="display:block;font-size:.78rem;color:#666;margin-bottom:4px">' +
+        _escapeHtml(_devisLibelleService(c).prix) + ' (€ TTC)</label>' +
+      '<input type="number" id="devis-prix-input" min="0" step="1" placeholder="Ex : 450" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:.9rem;width:160px"></div>' +
+      '<button class="btn btn-secondary" onclick="apercuDevis(\'' + c.id + '\')">Aperçu du devis</button>' +
+      '<button class="btn btn-primary" onclick="genererDevis(\'' + c.id + '\')">Générer le devis</button>' +
+      '</div>' +
+      '<div style="font-size:.76rem;color:#888;margin-top:8px">Vérifiez le contenu du devis avant de saisir le montant.</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function ouvrirFicheDemande(clientId) {
   var c = _demandesDevisListe.filter(function(x) { return String(x.id) === String(clientId); })[0];
   if (!c) { alert('Demande introuvable.'); return; }
@@ -7580,7 +7630,10 @@ function ouvrirFicheDemande(clientId) {
       var totalDecl = nd.nombre_vehicules_approx || 0;
       vh += L('Nombre approximatif', totalDecl ? (totalDecl + ' véhicule(s)') : null);
       var reparti = 0;
-      (nd.repartition_categories || []).forEach(function (r) {
+      // Le contenu vient d'une colonne JSONB : on ne suppose jamais sa
+      // forme. Une ligne malformée ne doit pas vider toute la fiche.
+      var _rep = Array.isArray(nd.repartition_categories) ? nd.repartition_categories : [];
+      _rep.forEach(function (r) {
         reparti += (r.quantite || 0);
         var lib = NETT_LIB_CAT[r.categorie] || r.categorie || '—';
         if (r.precision) lib += ' (' + r.precision + ')';
@@ -7641,6 +7694,10 @@ function ouvrirFicheDemande(clientId) {
     // pour les demandes anterieures.
     if (nd.instructions) org += L('Instructions — demande antérieure', nd.instructions);
     html += S('Organisation', org);
+
+    // Même bloc devis que les autres services — plus aucune fiche ne se
+    // termine sans possibilité d'établir un devis.
+    html += _blocDevisHtml(c);
 
     html += '<div style="margin-top:14px;text-align:right">' +
       '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
@@ -7739,6 +7796,9 @@ function ouvrirFicheDemande(clientId) {
     html += SP('Suivi',
       LP('Statut de la prestation', c.statut) +
       LP('Reçue le', _dvDateHeure ? _dvDateHeure(c.created_at) : c.created_at));
+
+    // Même bloc devis que les autres services.
+    html += _blocDevisHtml(c);
 
     html += '<div style="margin-top:14px;text-align:right">' +
       '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
@@ -8000,41 +8060,7 @@ function ouvrirFicheDemande(clientId) {
   }
 
   // ── Bloc devis ──
-  var tableDevisDispo = (document.getElementById('devis-alerte-table') || {}).style;
-  var tableManquante = tableDevisDispo && tableDevisDispo.display === 'block';
-
-  html += '<div style="margin-top:20px;padding:16px;background:#FAF8F4;border:1px solid #E8E2D8;border-radius:8px">';
-  html += '<div style="font-weight:700;font-size:.9rem;margin-bottom:10px">Créer le devis</div>';
-
-  if (tableManquante) {
-    html += '<div style="font-size:.82rem;color:#8a6d3b">Génération indisponible : la table <b>devis</b> doit d\'abord être créée dans Supabase.</div>';
-  } else if (d) {
-    html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1e8e4e">✓ Devis ' + _escapeHtml(d.reference) + ' généré</b></div>';
-    html += '<div style="font-size:.85rem;margin-bottom:10px">Montant : <b>' + Number(d.prix).toLocaleString('fr-FR') + ' €</b> — ' + _statutDevisBadge(d.statut) + '</div>';
-    if (d.statut === 'envoye') {
-      html += '<div style="font-size:.8rem;color:#666;margin-bottom:10px">Envoyé le ' + _dvDateHeure(d.date_envoi) + ' à ' + _escapeHtml(_dv(c.email)) + '</div>';
-    }
-    html += '<div id="devis-erreur-envoi" style="display:none;font-size:.82rem;color:#c0392b;margin-bottom:10px"></div>';
-    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<button class="btn btn-sm btn-secondary" onclick="previsualiserDevis(\'' + c.id + '\')">Voir le devis</button>' +
-      '<button class="btn btn-sm btn-secondary" onclick="modifierPrixDevis(\'' + c.id + '\')">Modifier le prix</button>' +
-      ((d.statut === 'accepte' || d.statut === 'refuse') ? '' :
-        '<button class="btn btn-sm btn-primary" id="btn-envoyer-devis" onclick="envoyerDevis(\'' + c.id + '\')">' +
-          (d.statut === 'envoye' ? 'Renvoyer au client' : 'Envoyer au client') + '</button>') +
-      '<button class="btn btn-sm" id="btn-test-qa-prepare" onclick="testerPrepareDevisQA(\'' + c.id + '\')" ' +
-        'title="Mode test interne : appelle PREPARE sans envoyer d\'email ni changer le statut" ' +
-        'style="background:#fff3cd;border:1px dashed #b8860b;color:#7a5c00;font-size:.76rem">🧪 Tester PREPARE (QA)</button>' +
-      '</div>';
-  } else {
-    html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
-      '<div><label style="display:block;font-size:.78rem;color:#666;margin-bottom:4px">Prix du convoyage (€ TTC)</label>' +
-      '<input type="number" id="devis-prix-input" min="0" step="1" placeholder="Ex : 450" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:.9rem;width:160px"></div>' +
-      '<button class="btn btn-secondary" onclick="apercuDevis(\'' + c.id + '\')">Aperçu du devis</button>' +
-      '<button class="btn btn-primary" onclick="genererDevis(\'' + c.id + '\')">Générer le devis</button>' +
-      '</div>' +
-      '<div style="font-size:.76rem;color:#888;margin-top:8px">Vérifiez le contenu du devis avant de saisir le montant.</div>';
-  }
-  html += '</div>';
+  html += _blocDevisHtml(c);
 
   // Permet de replacer la demande dans la pile "à traiter".
   // L'ouverture de la fiche l'ayant déjà marquée comme lue, seule
@@ -8100,7 +8126,9 @@ function genererDevis(clientId) {
 function modifierPrixDevis(clientId) {
   var d = _devisParClient[String(clientId)];
   if (!d) return;
-  var saisie = prompt('Nouveau prix du convoyage (€ TTC) :', d.prix);
+  var cMod = _demandesDevisListe.filter(function (x) { return String(x.id) === String(clientId); })[0];
+  var libPrix = cMod ? _devisLibelleService(cMod).prix : 'Prix de la prestation';
+  var saisie = prompt('Nouveau ' + libPrix.charAt(0).toLowerCase() + libPrix.slice(1) + ' (€ TTC) :', d.prix);
   if (saisie === null) return;
   var prix = parseFloat(saisie);
   if (!prix || prix <= 0) { alert('Prix invalide.'); return; }
@@ -10367,13 +10395,51 @@ function telechargerDevisPdf() {
 // Aucune logique parallèle : ce que le client lit ne peut pas
 // contredire ce que le devis affiche.
 // ══════════════════════════════════════════════════════════════
+// ── SERVICE COUVERT PAR LE DEVIS — SOURCE UNIQUE ────────────
+// Le devis est le MÊME mécanisme pour les quatre services : même table,
+// même référence, même PDF, même envoi. Seul le nom de la prestation
+// change — et il est décidé ici, une seule fois. Le libellé du champ de
+// prix, l'objet de l'e-mail, la description envoyée au client et le PDF
+// s'y réfèrent tous : aucun d'eux ne peut plus annoncer « convoyage »
+// pour un nettoyage ou une mise à disposition.
+var DEVIS_LIB_SERVICE = {
+  convoyage:          { court: 'Convoyage automobile',        prix: 'Prix du convoyage' },
+  stockage:           { court: 'Stockage automobile',         prix: 'Prix du stockage' },
+  convoyage_stockage: { court: 'Convoyage et stockage',       prix: 'Prix de la prestation' },
+  nettoyage:          { court: 'Nettoyage automobile',        prix: 'Prix du nettoyage' },
+  professionnel:      { court: 'Professionnel automobile',    prix: 'Prix de la prestation' }
+};
+
+function _devisLibelleService(c) {
+  return DEVIS_LIB_SERVICE[_typeServiceDemande(c)] || DEVIS_LIB_SERVICE.convoyage;
+}
+
+// Nombre de véhicules réellement concernés. Chaque service le déclare à
+// SON endroit : le lire ailleurs afficherait « 1 véhicule » sur un
+// nettoyage de flotte de trente.
 function _nbVehiculesDossier(c) {
+  if (_estDemandeNettoyage(c)) {
+    var nd = _nettDetails(c) || {};
+    return nd.nombre_vehicules_approx || 1;
+  }
+  if (_estDemandeProfessionnel(c)) {
+    var pd = _proDetails(c) || {};
+    return pd.nombre_vehicules || 1;
+  }
   return c.nb_vehicules || (_vehiculesDuDossier(c) || []).length || 1;
 }
 
 function _objetDevis(c) {
   var n = _nbVehiculesDossier(c);
   var suffixe = (n > 1) ? 'de vos véhicules' : 'de votre véhicule';
+  if (_estDemandeNettoyage(c)) {
+    var ndObj = _nettDetails(c) || {};
+    return 'Votre devis HelixCar – ' + (NETT_LIB_TYPE[ndObj.type_nettoyage] || 'Nettoyage automobile');
+  }
+  if (_estDemandeProfessionnel(c)) {
+    var pdObj = _proDetails(c) || {};
+    return 'Votre devis HelixCar – ' + (_proPrestationTexte(pdObj) || 'Professionnel automobile');
+  }
   if (_aStockage(c) && !_aConvoyage(c)) {
     return 'Votre devis HelixCar – Stockage ' + suffixe;
   }
@@ -10389,6 +10455,47 @@ function _descriptionPrestation(c) {
   var n = _nbVehiculesDossier(c);
   var vehic = (n > 1) ? ('vos ' + n + ' véhicules') : 'votre véhicule';
   var lignes = [];
+
+  // NETTOYAGE — la version précédente ne prévoyait aucune branche :
+  // la description repartait vide, et l'e-mail annonçait un convoyage.
+  if (_estDemandeNettoyage(c)) {
+    var ndD = _nettDetails(c) || {};
+    var libNett = NETT_LIB_TYPE[ndD.type_nettoyage];
+    var phrase = 'Votre devis couvre '
+      + (libNett ? (libNett.charAt(0).toLowerCase() + libNett.slice(1)) : 'le nettoyage')
+      + ' de ' + vehic;
+    var libLieu = NETT_LIB_LIEU[ndD.lieu];
+    if (libLieu) phrase += ', ' + libLieu.charAt(0).toLowerCase() + libLieu.slice(1);
+    lignes.push(phrase + '.');
+    if (ndD.date_souhaitee) {
+      lignes.push('Intervention prévue le ' + _dvDate(ndD.date_souhaitee) + '.');
+    }
+    if (ndD.type_nettoyage === 'conseil') {
+      lignes.push('La prestation exacte sera définie avec notre équipe.');
+    }
+    return lignes.join('\n\n');
+  }
+
+  // TROUVER UN PROFESSIONNEL — même principe.
+  if (_estDemandeProfessionnel(c)) {
+    var pdD = _proDetails(c) || {};
+    var prest = _proPrestationTexte(pdD);
+    var ph = 'Votre devis couvre '
+      + (prest ? (prest.charAt(0).toLowerCase() + prest.slice(1))
+               : 'la mise à disposition de personnel automobile');
+    if (pdD.adresse_ville) ph += ' à ' + pdD.adresse_ville;
+    lignes.push(ph + '.');
+    if (pdD.date_debut && pdD.date_fin) {
+      lignes.push('Période d\'intervention : du ' + _dvDate(pdD.date_debut)
+        + ' au ' + _dvDate(pdD.date_fin)
+        + (pdD.duree_jours ? ' (' + pdD.duree_jours + (pdD.duree_jours > 1 ? ' jours' : ' jour') + ')' : '')
+        + '.');
+    }
+    if (pdD.conseil) {
+      lignes.push('Le métier et le nombre de professionnels seront définis avec notre équipe.');
+    }
+    return lignes.join('\n\n');
+  }
 
   var pc = _operationDossier(c, 'pc');
   var liv = _operationDossier(c, 'liv');
@@ -10448,7 +10555,7 @@ function _corpsDevis(c, d) {
     _formaterMontantEuros(d.prix) + '\n\n' +
     'Pour toute question concernant votre devis, notre équipe reste à votre disposition.\n\n' +
     'Cordialement,\n\n' +
-    'L\'équipe HelixCar\nConvoyage et stockage automobile – France & Europe';
+    'L\'équipe HelixCar\nConvoyage, stockage, nettoyage et professionnels automobiles – France & Europe';
 }
 
 // ══════════════════════════════════════════════════════════════
