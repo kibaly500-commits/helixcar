@@ -18191,10 +18191,12 @@ function _hcPeriodeGlobale() {
 // doit toujours afficher stock-debut → stock-fin tel quel, quel que
 // soit le scénario d'acheminement/sortie — jamais de deuxième période
 // ici (aucune notion de restitution sur le stockage lui-même).
-function _hcPeriodeStockageBrute() {
+// Période telle qu'elle est RÉELLEMENT saisie, quelle que soit la
+// période concernée : la coloration ne connaît que « début » et « fin ».
+function _hcPeriodeBrute(p) {
   return {
-    debut: _hcParserYMD((document.getElementById('stock-debut') || {}).value),
-    finLiv: _hcParserYMD((document.getElementById('stock-fin') || {}).value),
+    debut: _hcParserYMD((document.getElementById(p.debut) || {}).value),
+    finLiv: _hcParserYMD((document.getElementById(p.fin) || {}).value),
     finRestit: null
   };
 }
@@ -18292,15 +18294,37 @@ function _hcDateMaximaleChamp(id) {
   return null;
 }
 
+// ── PÉRIODES À DEUX BORNES ─────────────────────────────────
+// Une période, c'est une date de début ET une date de fin. Le stockage
+// disposait déjà du bon comportement : UN SEUL calendrier, on clique le
+// début puis la fin, la plage se colore, rien ne se referme entre les
+// deux. La période d'intervention d'un professionnel, elle, ouvrait
+// deux calendriers séparés, sans plage visible pendant la saisie.
+// La liste ci-dessous est la SEULE chose à compléter pour qu'une
+// nouvelle période bénéficie du même calendrier — aucune règle de
+// coloration, de borne ni de navigation n'est dupliquée.
+var HC_PERIODES_CALENDRIER = [
+  { debut: 'stock-debut',    fin: 'stock-fin',     legende: 'Début → fin du stockage' },
+  { debut: 'pro-date-debut', fin: 'pro-date-fin',  legende: 'Début → fin de l\'intervention' }
+];
+
+function _hcPeriodeDeuxBornes(id) {
+  for (var i = 0; i < HC_PERIODES_CALENDRIER.length; i++) {
+    var p = HC_PERIODES_CALENDRIER[i];
+    if (p.debut === id || p.fin === id) return p;
+  }
+  return null;
+}
+
 // ── ÉTAT DU CALENDRIER OUVERT ──────────────────────────────
 var _hcCalChampActif = null;   // id du champ <input type="date"> en cours d'édition (contexte de période)
 var _hcCalAnneeAffichee = null;
 var _hcCalMoisAffiche = null;  // 0-11
 var _hcCalOverlay = null;
-// Mode spécial période stockage (Objectif 2) : un seul calendrier pour
-// stock-debut ET stock-fin, sélection successive sans fermeture.
-var _hcCalModeStockage = false;
-var _hcCalSousEtapeStockage = null; // 'debut' ou 'fin', uniquement en mode stockage
+// Période à deux bornes en cours d'édition (entrée de
+// HC_PERIODES_CALENDRIER), ou null pour une date isolée.
+var _hcCalPeriode = null;
+var _hcCalSousEtapePeriode = null; // 'debut' ou 'fin', uniquement en mode période
 
 function _hcConstruireOverlay() {
   if (_hcCalOverlay) return _hcCalOverlay;
@@ -18352,7 +18376,7 @@ function _hcNaviguerMois(delta) {
 }
 
 function _hcOuvrirCalendrier(champ) {
-  var estStockage = (champ.id === 'stock-debut' || champ.id === 'stock-fin');
+  var periodeDeuxBornes = _hcPeriodeDeuxBornes(champ.id);
 
   // CORRECTIF — focusin ET click se déclenchent tous deux pour un même
   // clic utilisateur sur un champ (le focus précède le clic dans
@@ -18360,24 +18384,26 @@ function _hcOuvrirCalendrier(champ) {
   // _hcOuvrirCalendrier() s'exécutait deux fois de suite pour un seul
   // geste : l'overlay nouvellement affiché pouvait intercepter la fin
   // du même geste (mouseup/click), laissant l'état interne
-  // (_hcCalModeStockage, _hcCalSousEtapeStockage) et l'affichage
+  // (_hcCalPeriode, _hcCalSousEtapePeriode) et l'affichage
   // désynchronisés selon lequel des deux appels aboutissait réellement
   // en dernier. Si le calendrier est déjà ouvert pour EXACTEMENT le
   // même contexte, la seconde invocation ne fait rien.
   var dejaOuvertMemeContexte = _hcCalOverlay && _hcCalOverlay.classList.contains('open') &&
-    (estStockage ? _hcCalModeStockage : (!_hcCalModeStockage && _hcCalChampActif === champ.id));
+    (periodeDeuxBornes
+      ? (_hcCalPeriode && _hcCalPeriode.debut === periodeDeuxBornes.debut)
+      : (!_hcCalPeriode && _hcCalChampActif === champ.id));
   if (dejaOuvertMemeContexte) return;
 
-  _hcCalModeStockage = estStockage;
+  _hcCalPeriode = periodeDeuxBornes;
   var dateReference;
-  if (estStockage) {
+  if (periodeDeuxBornes) {
     // Un seul calendrier pour les deux champs (Objectif 2) : le
-    // contexte de période reste 'stock-debut' (mono/global, comme
-    // avant), seule _hcCalSousEtapeStockage distingue quel champ
-    // technique reçoit le prochain clic.
-    _hcCalChampActif = 'stock-debut';
-    var valDebut = (document.getElementById('stock-debut') || {}).value;
-    var valFin = (document.getElementById('stock-fin') || {}).value;
+    // contexte de période reste celui de la borne de DÉBUT, seule
+    // _hcCalSousEtapePeriode distingue quel champ technique reçoit le
+    // prochain clic.
+    _hcCalChampActif = periodeDeuxBornes.debut;
+    var valDebut = (document.getElementById(periodeDeuxBornes.debut) || {}).value;
+    var valFin = (document.getElementById(periodeDeuxBornes.fin) || {}).value;
     // CORRECTIF Anomalie 1 — le champ qui a RÉELLEMENT ouvert le
     // calendrier doit toujours être respecté, jamais déduit
     // automatiquement de la présence d'une valeur existante. Avant ce
@@ -18389,11 +18415,11 @@ function _hcOuvrirCalendrier(champ) {
     // fin » doit toujours modifier la fin ; tout le reste (dont un
     // clic sur « Date de début », avec ou sans période existante)
     // modifie le début.
-    _hcCalSousEtapeStockage = (champ.id === 'stock-fin') ? 'fin' : 'debut';
+    _hcCalSousEtapePeriode = (champ.id === periodeDeuxBornes.fin) ? 'fin' : 'debut';
     dateReference = _hcParserYMD(valDebut) || _hcParserYMD(valFin);
   } else {
     _hcCalChampActif = champ.id;
-    _hcCalSousEtapeStockage = null;
+    _hcCalSousEtapePeriode = null;
     dateReference = _hcParserYMD(champ.value);
     // V77 - reprend la date deja saisie comme selection temporaire.
     _hcCalTempNettoyage = (champ.id === 'nett-date') ? dateReference : null;
@@ -18474,8 +18500,8 @@ function _hcValiderCalendrier() {
 function _hcFermerCalendrier() {
   if (_hcCalOverlay) _hcCalOverlay.classList.remove('open');
   _hcCalChampActif = null;
-  _hcCalModeStockage = false;
-  _hcCalSousEtapeStockage = null;
+  _hcCalPeriode = null;
+  _hcCalSousEtapePeriode = null;
   _hcCalTempNettoyage = null;
 }
 
@@ -18504,7 +18530,7 @@ function _hcRendreCalendrier() {
   var decalage = (premierJourMois.getDay() + 6) % 7;
   var nbJoursMois = new Date(_hcCalAnneeAffichee, _hcCalMoisAffiche + 1, 0).getDate();
 
-  var periode = _hcCalModeStockage ? _hcPeriodeStockageBrute() : _hcPeriodePourChamp(_hcCalChampActif);
+  var periode = _hcCalPeriode ? _hcPeriodeBrute(_hcCalPeriode) : _hcPeriodePourChamp(_hcCalChampActif);
 
   // Date minimale réelle = la plus restrictive entre aujourd'hui et la
   // date métier minimale applicable au champ/à l'étape en cours
@@ -18512,9 +18538,9 @@ function _hcRendreCalendrier() {
   // l'étape (début : aucune contrainte métier ; fin : jamais avant le
   // début déjà choisi).
   var borneMetier = null;
-  if (_hcCalModeStockage) {
-    if (_hcCalSousEtapeStockage === 'fin') {
-      borneMetier = _hcParserYMD((document.getElementById('stock-debut') || {}).value);
+  if (_hcCalPeriode) {
+    if (_hcCalSousEtapePeriode === 'fin') {
+      borneMetier = _hcParserYMD((document.getElementById(_hcCalPeriode.debut) || {}).value);
     }
   } else {
     borneMetier = _hcDateMinimaleChamp(_hcCalChampActif);
@@ -18523,7 +18549,7 @@ function _hcRendreCalendrier() {
 
   // Anomalie 2 — borne maximale (jamais appliquée en mode stockage,
   // qui n'a pas de notion de borne haute).
-  var borneMaxMetier = _hcCalModeStockage ? null : _hcDateMaximaleChamp(_hcCalChampActif);
+  var borneMaxMetier = _hcCalPeriode ? null : _hcDateMaximaleChamp(_hcCalChampActif);
 
   var html = '';
   for (var k = 0; k < decalage; k++) html += '<button type="button" class="hc-cal-jour hc-cal-jour--hors-mois" tabindex="-1" disabled></button>';
@@ -18561,6 +18587,14 @@ function _hcRendreCalendrier() {
     legende.innerHTML =
       '<span><i class="p1"></i>Prise en charge → Livraison</span>' +
       '<span><i class="p2"></i>Livraison → Restitution</span>';
+  } else if (_hcCalPeriode) {
+    // Période à deux bornes : on rappelle ce que la plage colorée
+    // représente, et laquelle des deux dates le prochain clic modifiera.
+    legende.innerHTML =
+      '<span><i class="p1"></i>' + _hcCalPeriode.legende + '</span>' +
+      '<span>' + (_hcCalSousEtapePeriode === 'fin'
+        ? 'Choisissez la date de fin'
+        : 'Choisissez la date de début') + '</span>';
   } else {
     legende.innerHTML = '';
   }
@@ -18569,29 +18603,29 @@ function _hcRendreCalendrier() {
 function _hcSelectionnerJour(j) {
   var date = new Date(_hcCalAnneeAffichee, _hcCalMoisAffiche, j);
 
-  if (_hcCalModeStockage) {
-    // Mode double-sélection (Objectif 2) : le calendrier RESTE OUVERT
-    // après chaque clic, jusqu'à Effacer, OK, Échap ou clic extérieur.
-    if (_hcCalSousEtapeStockage === 'debut') {
-      var champDebut = document.getElementById('stock-debut');
+  if (_hcCalPeriode) {
+    // Mode double-sélection : le calendrier RESTE OUVERT après chaque
+    // clic, jusqu'à Effacer, OK, Échap ou clic extérieur.
+    if (_hcCalSousEtapePeriode === 'debut') {
+      var champDebut = document.getElementById(_hcCalPeriode.debut);
       champDebut.value = _hcFormaterYMD(date);
       _hcDeclencherChange(champDebut);
-      // Objectif 2.8 : si l'ancienne fin devient antérieure au nouveau
-      // début, ne jamais conserver cette chronologie incohérente — la
-      // vider et attendre une nouvelle sélection de fin.
-      var champFin = document.getElementById('stock-fin');
+      // Si l'ancienne fin devient antérieure au nouveau début, ne jamais
+      // conserver cette chronologie incohérente — la vider et attendre
+      // une nouvelle sélection de fin.
+      var champFin = document.getElementById(_hcCalPeriode.fin);
       var finActuelle = _hcParserYMD(champFin ? champFin.value : '');
       if (champFin && finActuelle && finActuelle < date) {
         champFin.value = '';
         _hcDeclencherChange(champFin);
       }
-      _hcCalSousEtapeStockage = 'fin';
+      _hcCalSousEtapePeriode = 'fin';
     } else {
-      var champFin2 = document.getElementById('stock-fin');
+      var champFin2 = document.getElementById(_hcCalPeriode.fin);
       champFin2.value = _hcFormaterYMD(date);
       _hcDeclencherChange(champFin2);
       // Reste en mode "fin" : un nouveau clic redéfinit simplement la
-      // fin, cohérent avec "modifier une période existante" (2.8).
+      // fin, cohérent avec « modifier une période existante ».
     }
     _hcRendreCalendrier();
     return;
@@ -18615,29 +18649,29 @@ function _hcSelectionnerJour(j) {
   try { champ.focus(); } catch (e) {}
 }
 
-// Objectif 2.6 — EFFACER (mode stockage uniquement) : vide UNIQUEMENT
-// stock-debut/stock-fin, jamais aucune autre date du formulaire.
-// COMPORTEMENT STRICTEMENT INCHANGÉ.
-function _hcEffacerStockage() {
-  if (!_hcCalModeStockage) return;
-  var champDebut = document.getElementById('stock-debut');
-  var champFin = document.getElementById('stock-fin');
+// EFFACER, en mode période : vide UNIQUEMENT les deux bornes de la
+// période en cours d'édition, jamais aucune autre date du formulaire.
+// Comportement du stockage strictement inchangé, désormais partagé.
+function _hcEffacerPeriode() {
+  if (!_hcCalPeriode) return;
+  var champDebut = document.getElementById(_hcCalPeriode.debut);
+  var champFin = document.getElementById(_hcCalPeriode.fin);
   if (champDebut) { champDebut.value = ''; _hcDeclencherChange(champDebut); }
   if (champFin) { champFin.value = ''; _hcDeclencherChange(champFin); }
-  _hcCalSousEtapeStockage = 'debut';
+  _hcCalSousEtapePeriode = 'debut';
   _hcRendreCalendrier(); // reste ouvert, couleurs supprimées (période recalculée à vide)
 }
 
 // Anomalie 3 (corrections calendriers) — un seul bouton EFFACER
 // (#hc-cal-effacer, jamais dupliqué) dont le comportement dépend du
-// contexte actif : en mode stockage, délègue à _hcEffacerStockage()
-// SANS AUCUNE modification de son comportement ; pour tout autre
+// contexte actif : en mode période, délègue à _hcEffacerPeriode() ;
+// pour tout autre
 // calendrier (prise en charge, livraison, restitution — mono ou
 // véhicule), efface uniquement le champ actuellement actif, déclenche
 // ses événements, recalcule les couleurs, et laisse le calendrier
 // ouvert — jamais aucune autre date du formulaire n'est touchée.
 function _hcEffacerActionBar() {
-  if (_hcCalModeStockage) { _hcEffacerStockage(); return; }
+  if (_hcCalPeriode) { _hcEffacerPeriode(); return; }
   var champ = document.getElementById(_hcCalChampActif);
   if (champ && champ.value) {
     champ.value = '';
