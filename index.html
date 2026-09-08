@@ -4483,26 +4483,67 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 /* ══════════════════════════════════════════════════════════════
    CORRECTION VISUELLE CIBLÉE (V70) — cases à cocher "Vos activités".
-   Portée strictement limitée à #modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]
+   Portée strictement limitée à #modal-convoyeur input[name="conv-activites"]
    et à la carte .radio-opt qui les contient. Aucune logique JS, valeur,
    validation, payload, Supabase, Dashboard, document ou étapeur touché ;
    aucune autre case/radio du site affectée. Réutilise var(--accent) /
    var(--accent-deep) déjà définies dans le scope #modal-convoyeur —
    aucune nouvelle couleur introduite.
    ══════════════════════════════════════════════════════════════ */
-/* Métiers d'une activité : simple retrait, aucune boîte supplémentaire —
-   la hiérarchie se lit, elle ne s'encadre pas. */
-#modal-convoyeur .conv-sous-metiers {
-  margin: -2px 0 12px 26px;
-  padding-left: 12px;
-  border-left: 2px solid var(--gray-light);
+/* Liste des métiers : une ligne par métier, avec son bouton d'ajout. */
+#modal-convoyeur .conv-metiers-liste {
+  display: flex; flex-direction: column; gap: 6px;
 }
-#modal-convoyeur .conv-sous-metiers-titre {
-  font-size: .78rem; font-weight: 600; color: #555;
-  margin: 6px 0 6px;
+#modal-convoyeur .conv-metier-ligne {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid rgba(16,24,32,.14); border-radius: 3px;
+  background: #fff;
+}
+#modal-convoyeur .conv-metier-ligne[data-retenu="oui"] {
+  border-color: var(--accent);
+  background: rgba(181,68,75,.05);
+}
+#modal-convoyeur .conv-metier-nom { flex: 1; font-size: .86rem; color: var(--ink); }
+#modal-convoyeur .conv-metier-famille {
+  font-size: .72rem; color: #8A8F94; white-space: nowrap;
+}
+#modal-convoyeur .conv-metier-plus {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1.5px solid var(--accent); border-radius: 3px;
+  background: #fff; color: var(--accent);
+  font-size: 1.05rem; font-weight: 700; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+#modal-convoyeur .conv-metier-plus:hover { background: var(--accent); color: #fff; }
+#modal-convoyeur .conv-metier-plus[disabled] {
+  border-color: rgba(16,24,32,.14); color: #B9BDC1; cursor: default; background: #fff;
 }
 
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"] {
+/* Récapitulatif des métiers retenus : des badges, retirables d'un clic. */
+#modal-convoyeur .conv-metiers-recap {
+  margin-top: 14px; padding: 12px 14px;
+  border: 1.5px solid rgba(181,68,75,.28); border-radius: 3px;
+  background: rgba(181,68,75,.04);
+}
+#modal-convoyeur .conv-metiers-recap-titre {
+  font-size: .76rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--accent); margin-bottom: 8px;
+}
+#modal-convoyeur .conv-metiers-badges { display: flex; flex-wrap: wrap; gap: 7px; }
+#modal-convoyeur .conv-metier-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 8px 5px 11px;
+  background: #fff; border: 1.5px solid var(--accent); border-radius: 99px;
+  font-size: .8rem; color: var(--ink);
+}
+#modal-convoyeur .conv-metier-retirer {
+  border: none; background: transparent; color: var(--accent);
+  font-size: .95rem; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+#modal-convoyeur .conv-metier-retirer:hover { color: var(--ink); }
+
+#modal-convoyeur input[name="conv-activites"] {
   -webkit-appearance: none;
   appearance: none;
   width: 20px !important; height: 20px !important; min-width: 20px !important;
@@ -4520,7 +4561,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 /* Coche blanche dessinée en CSS pur (pas d'image externe). */
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]::after {
+#modal-convoyeur input[name="conv-activites"]::after {
   content: "";
   display: block;
   width: 5px; height: 9px;
@@ -4530,22 +4571,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   transform: rotate(45deg) scale(0);
   transition: transform .12s ease;
 }
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]:checked {
+#modal-convoyeur input[name="conv-activites"]:checked {
   background: var(--accent);
   border-color: var(--accent);
 }
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]:checked::after {
+#modal-convoyeur input[name="conv-activites"]:checked::after {
   transform: rotate(45deg) scale(1);
 }
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]:hover {
+#modal-convoyeur input[name="conv-activites"]:hover {
   border-color: rgba(16,24,32,.5);
 }
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]:checked:hover {
+#modal-convoyeur input[name="conv-activites"]:checked:hover {
   background: var(--accent-deep);
   border-color: var(--accent-deep);
 }
 /* Focus clavier visible, jamais le contour bleu natif. */
-#modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"]:focus-visible {
+#modal-convoyeur input[name="conv-activites"]:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(158,63,70,.28);
 }
@@ -4554,11 +4595,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
    Spécificité (#id + .classe + :has) volontairement supérieure à la
    règle générique .radio-opt:has(...) déjà présente ailleurs dans le
    fichier, pour ne changer QUE ces trois cartes. */
-#modal-convoyeur .radio-opt:has(input[name="conv-activites"]:checked), #modal-convoyeur .radio-opt:has(input[name="conv-metiers"]:checked) {
+#modal-convoyeur .radio-opt:has(input[name="conv-activites"]:checked) {
   border-color: var(--accent);
   background: rgba(158,63,70,.06);
 }
-#modal-convoyeur .radio-opt:has(input[name="conv-activites"]:checked), #modal-convoyeur .radio-opt:has(input[name="conv-metiers"]:checked) span {
+#modal-convoyeur .radio-opt:has(input[name="conv-activites"]:checked) span {
   color: var(--hc-ink, var(--ink));
 }
 /* Taille fixe, jamais étirée : la case ne doit dépendre ni de la largeur
@@ -4566,7 +4607,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
    d'inputs ou de boutons radio. 22px max sur mobile, un peu plus
    confortable au doigt tout en restant discret. */
 @media (max-width: 640px) {
-  #modal-convoyeur input[name="conv-activites"], #modal-convoyeur input[name="conv-metiers"] {
+  #modal-convoyeur input[name="conv-activites"] {
     width: 22px !important; height: 22px !important; min-width: 22px !important;
   }
 }
@@ -7298,32 +7339,20 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div class="modal-form-group" id="conv-activites-group">
           <label>Quels métiers souhaitez-vous exercer avec HelixCar ? <span class="field-required">*</span></label>
-          <div style="font-size:.78rem;color:#777;margin:-2px 0 10px">Vous pouvez en sélectionner plusieurs. Précisez ensuite vos métiers pour chaque activité concernée.</div>
+          <div style="font-size:.78rem;color:#777;margin:-2px 0 10px">Ajoutez tous les métiers que vous savez tenir. Vous pouvez en retirer un à tout moment.</div>
 
-          <label class="radio-opt"><input type="checkbox" id="conv-act-convoyage" name="conv-activites" value="convoyage" onchange="onChoixActivitesPartenaire()"><span>Convoyage automobile</span></label>
-          <label class="radio-opt"><input type="checkbox" id="conv-act-nettoyage" name="conv-activites" value="nettoyage" onchange="onChoixActivitesPartenaire()"><span>Nettoyage automobile</span></label>
+          <!-- Tous les métiers réellement proposés, chacun avec son
+               bouton d'ajout. Les CLÉS sont exactement celles du
+               formulaire client (PRO_LIB_MISSION, PRO_LIB_SPECIALITE) :
+               une demande « carrosserie » et un partenaire
+               « carrosserie » s'expriment de la même façon. -->
+          <div id="conv-metiers-liste" class="conv-metiers-liste"></div>
 
-          <label class="radio-opt"><input type="checkbox" id="conv-act-renfort" name="conv-activites" value="renfort" onchange="onChoixActivitesPartenaire()"><span>Renfort automobile sur site</span></label>
-          <!-- Les CLÉS sont exactement celles du formulaire client
-               (PRO_LIB_MISSION) : une demande « accueil en concession »
-               et un partenaire « accueil en concession » parlent la
-               même langue, sans table de correspondance. -->
-          <div class="conv-sous-metiers" id="conv-metiers-renfort" style="display:none">
-            <div class="conv-sous-metiers-titre">Vos missions de renfort <span class="field-required">*</span></div>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="renfort" value="jockey" onchange="onChoixMetiersPartenaire()"><span>Jockey automobile</span></label>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="renfort" value="accueil_preparation" onchange="onChoixMetiersPartenaire()"><span>Accueil en concession</span></label>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="renfort" value="soutien_administratif" onchange="onChoixMetiersPartenaire()"><span>Soutien administratif</span></label>
-          </div>
-
-          <label class="radio-opt"><input type="checkbox" id="conv-act-technicien" name="conv-activites" value="technicien" onchange="onChoixActivitesPartenaire()"><span>Technicien automobile</span></label>
-          <!-- Mêmes clés que PRO_LIB_SPECIALITE côté client. Sans cette
-               activité, aucun candidat ne pouvait se déclarer technicien
-               alors que les clients pouvaient en demander un. -->
-          <div class="conv-sous-metiers" id="conv-metiers-technicien" style="display:none">
-            <div class="conv-sous-metiers-titre">Vos spécialités techniques <span class="field-required">*</span></div>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="technicien" value="mecanique" onchange="onChoixMetiersPartenaire()"><span>Mécanique</span></label>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="technicien" value="carrosserie" onchange="onChoixMetiersPartenaire()"><span>Carrosserie</span></label>
-            <label class="radio-opt"><input type="checkbox" name="conv-metiers" data-activite="technicien" value="diagnostic" onchange="onChoixMetiersPartenaire()"><span>Diagnostic</span></label>
+          <!-- Récapitulatif : ce que l'administrateur verra, et ce que
+               le candidat peut corriger d'un clic. -->
+          <div id="conv-metiers-recap" class="conv-metiers-recap" style="display:none">
+            <div class="conv-metiers-recap-titre">Vos métiers retenus</div>
+            <div id="conv-metiers-badges" class="conv-metiers-badges"></div>
           </div>
         </div>
 
@@ -7736,14 +7765,14 @@ function resetFormSteps(type) {
     // aucune activité pré-cochée d'une session précédente, et l'état
     // conditionnel de l'expérience recalculé en conséquence.
     _etapeMaxConvoyeur = 1;
-    ['convoyage', 'nettoyage', 'renfort'].forEach(function (v) {
-      var el = document.getElementById('conv-act-' + v);
-      if (el) el.checked = false;
-    });
+    // Aucun métier retenu d'une candidature précédente.
+    _convMetiersRetenus = [];
+    if (typeof convRendreMetiers === 'function') convRendreMetiers();
     // La vidéo est une variable JS persistante : la remise à zéro du
     // formulaire doit la vider réellement, sans quoi elle survivrait à
     // une candidature et contaminerait la suivante.
     if (typeof _reinitialiserVideoPartenaire === 'function') _reinitialiserVideoPartenaire();
+    if (typeof onChoixActivitesPartenaire === 'function') onChoixActivitesPartenaire();
     if (typeof onChoixActivitesPartenaire === 'function') onChoixActivitesPartenaire();
   }
   _renderFormStep(type);
@@ -14743,93 +14772,114 @@ document.addEventListener('change', function (e) {
 
 // Lot 1 (V69) — activités du partenaire. Source de vérité unique :
 // les 3 cases à cocher. Aucune valeur dérivée stockée en parallèle.
-// ── ACTIVITÉS ET MÉTIERS DÉCLARÉS ──────────────────────────
-// Les activités disent CE QUE fait le partenaire ; les métiers disent
-// AVEC QUELLE COMPÉTENCE. Seules les activités portent une décision
-// administrateur (convoyeur_decisions) : les métiers les précisent, ils
-// ne les remplacent pas.
-var CONV_ACTIVITES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
+// ── MÉTIERS DÉCLARÉS PAR LE CANDIDAT ───────────────────────
+// Le candidat choisit des MÉTIERS, un par un. Les ACTIVITÉS — la
+// granularité à laquelle l'administrateur décide (convoyeur_decisions)
+// — en sont DÉDUITES : elles ne sont jamais saisies deux fois, donc
+// jamais incohérentes avec les métiers.
+//
+// Les clés sont exactement celles du formulaire client
+// (PRO_LIB_MISSION, PRO_LIB_SPECIALITE) : une demande « carrosserie » et
+// un partenaire « carrosserie » s'expriment de la même façon, sans
+// table de correspondance.
+var METIERS_PARTENAIRE = [
+  { cle: 'convoyage',             libelle: 'Convoyage automobile',   activite: 'convoyage',   famille: 'Convoyage' },
+  { cle: 'nettoyage',             libelle: 'Nettoyage automobile',   activite: 'nettoyage',   famille: 'Nettoyage' },
+  { cle: 'jockey',                libelle: 'Jockey automobile',      activite: 'renfort',     famille: 'Renfort sur site' },
+  { cle: 'accueil_preparation',   libelle: 'Accueil en concession',  activite: 'renfort',     famille: 'Renfort sur site' },
+  { cle: 'soutien_administratif', libelle: 'Soutien administratif',  activite: 'renfort',     famille: 'Renfort sur site' },
+  { cle: 'mecanique',             libelle: 'Mécanique',              activite: 'technicien',  famille: 'Technicien' },
+  { cle: 'carrosserie',           libelle: 'Carrosserie',            activite: 'technicien',  famille: 'Technicien' },
+  { cle: 'diagnostic',            libelle: 'Diagnostic',             activite: 'technicien',  famille: 'Technicien' }
+];
 
-// Métiers proposés au sein d'une activité. Les clés sont EXACTEMENT
-// celles du formulaire client (PRO_LIB_MISSION, PRO_LIB_SPECIALITE) :
-// une demande « carrosserie » et un partenaire « carrosserie »
-// s'expriment de la même façon, sans table de correspondance.
-var CONV_METIERS_PAR_ACTIVITE = {
-  renfort:    ['jockey', 'accueil_preparation', 'soutien_administratif'],
-  technicien: ['mecanique', 'carrosserie', 'diagnostic']
-};
+// Métiers RETENUS par le candidat, dans l'ordre où il les a ajoutés.
+// Aucun doublon possible : l'ajout vérifie avant d'insérer.
+var _convMetiersRetenus = [];
 
+function _metierPartenaire(cle) {
+  for (var i = 0; i < METIERS_PARTENAIRE.length; i++) {
+    if (METIERS_PARTENAIRE[i].cle === cle) return METIERS_PARTENAIRE[i];
+  }
+  return null;
+}
+
+function _metiersPartenaire() {
+  // Aucune valeur incohérente ne peut sortir d'ici : seules les clés
+  // réellement proposées sont conservées.
+  return _convMetiersRetenus.filter(function (c) { return !!_metierPartenaire(c); });
+}
+
+// Les activités sont DÉDUITES des métiers, jamais saisies séparément.
 function _activitesPartenaire() {
   var out = [];
-  CONV_ACTIVITES.forEach(function (v) {
-    var el = document.getElementById('conv-act-' + v);
-    if (el && el.checked) out.push(v);
+  _metiersPartenaire().forEach(function (c) {
+    var m = _metierPartenaire(c);
+    if (m && out.indexOf(m.activite) === -1) out.push(m.activite);
   });
   return out;
 }
 
-// Métiers RÉELLEMENT retenus : cochés ET rattachés à une activité
-// elle-même cochée. Décocher une activité ne peut donc jamais laisser
-// filer un métier fantôme dans la candidature.
-function _metiersPartenaire() {
-  var actives = _activitesPartenaire();
-  var out = [];
-  Array.prototype.forEach.call(
-    document.querySelectorAll('#modal-convoyeur input[name="conv-metiers"]'),
-    function (el) {
-      if (!el.checked) return;
-      if (actives.indexOf(el.getAttribute('data-activite')) === -1) return;
-      if (out.indexOf(el.value) === -1) out.push(el.value);
+function convAjouterMetier(cle) {
+  if (!_metierPartenaire(cle)) return;                 // valeur inconnue : ignorée
+  if (_convMetiersRetenus.indexOf(cle) !== -1) return; // jamais de doublon
+  _convMetiersRetenus.push(cle);
+  convRendreMetiers();
+  onChoixActivitesPartenaire();
+}
+
+function convRetirerMetier(cle) {
+  var i = _convMetiersRetenus.indexOf(cle);
+  if (i === -1) return;
+  _convMetiersRetenus.splice(i, 1);
+  convRendreMetiers();
+  onChoixActivitesPartenaire();
+}
+
+function convRendreMetiers() {
+  var liste = document.getElementById('conv-metiers-liste');
+  if (liste) {
+    liste.innerHTML = METIERS_PARTENAIRE.map(function (m) {
+      var retenu = _convMetiersRetenus.indexOf(m.cle) !== -1;
+      return '<div class="conv-metier-ligne" data-metier="' + m.cle + '"'
+        + ' data-retenu="' + (retenu ? 'oui' : 'non') + '">'
+        + '<span class="conv-metier-nom">' + m.libelle + '</span>'
+        + '<span class="conv-metier-famille">' + m.famille + '</span>'
+        + '<button type="button" class="conv-metier-plus" data-ajouter="' + m.cle + '"'
+        + (retenu ? ' disabled aria-disabled="true"' : '')
+        + ' aria-label="Ajouter ' + m.libelle + '">' + (retenu ? '✓' : '+') + '</button>'
+        + '</div>';
+    }).join('');
+    Array.prototype.forEach.call(liste.querySelectorAll('[data-ajouter]'), function (b) {
+      b.addEventListener('click', function () { convAjouterMetier(b.getAttribute('data-ajouter')); });
     });
-  return out;
-}
+  }
 
-// Métiers retenus pour UNE activité donnée.
-function _metiersPartenairePour(activite) {
-  var out = [];
-  Array.prototype.forEach.call(
-    document.querySelectorAll('#modal-convoyeur input[name="conv-metiers"][data-activite="' + activite + '"]'),
-    function (el) { if (el.checked) out.push(el.value); });
-  return out;
-}
-
-// Activités sélectionnées qui exigent au moins un métier et n'en ont
-// aucun. Sert à la fois à la validation d'étape et au garde-fou final :
-// une seule règle, jamais deux versions divergentes.
-function _activitesSansMetier() {
-  return _activitesPartenaire().filter(function (a) {
-    return CONV_METIERS_PAR_ACTIVITE[a] && _metiersPartenairePour(a).length === 0;
-  });
+  var recap = document.getElementById('conv-metiers-recap');
+  var badges = document.getElementById('conv-metiers-badges');
+  var retenus = _metiersPartenaire();
+  if (recap) recap.style.display = retenus.length ? 'block' : 'none';
+  if (badges) {
+    badges.innerHTML = retenus.map(function (c) {
+      var m = _metierPartenaire(c);
+      return '<span class="conv-metier-badge" data-badge="' + c + '">' + m.libelle
+        + '<button type="button" class="conv-metier-retirer" data-retirer="' + c + '"'
+        + ' aria-label="Retirer ' + m.libelle + '">×</button></span>';
+    }).join('');
+    Array.prototype.forEach.call(badges.querySelectorAll('[data-retirer]'), function (b) {
+      b.addEventListener('click', function () { convRetirerMetier(b.getAttribute('data-retirer')); });
+    });
+  }
 }
 
 function _partenaireAvecConvoyage() {
   return _activitesPartenaire().indexOf('convoyage') !== -1;
 }
 
-// Un métier décoché ne doit jamais rester coché en arrière-plan : les
-// cases d'une activité abandonnée sont RÉELLEMENT vidées.
-function onChoixMetiersPartenaire() {
-  if (typeof _clearGroupError === 'function') _clearGroupError('conv-activites-group');
-}
 // Affiche/masque le SEUL champ conditionnel de l'étape 3 : l'expérience
 // de conduite. Pièce d'identité, permis et RC Pro restent demandés pour
 // TOUTES les activités — jamais masqués ici.
 function onChoixActivitesPartenaire() {
-  // Les métiers ne s'affichent que pour les activités réellement
-  // retenues, et ceux d'une activité abandonnée sont effacés — jamais
-  // conservés « au cas où » derrière un bloc masqué.
-  Object.keys(CONV_METIERS_PAR_ACTIVITE).forEach(function (a) {
-    var case_ = document.getElementById('conv-act-' + a);
-    var bloc = document.getElementById('conv-metiers-' + a);
-    var actif = !!(case_ && case_.checked);
-    if (bloc) bloc.style.display = actif ? 'block' : 'none';
-    if (!actif) {
-      Array.prototype.forEach.call(
-        document.querySelectorAll('#modal-convoyeur input[name="conv-metiers"][data-activite="' + a + '"]'),
-        function (el) { el.checked = false; });
-    }
-  });
-
   var conv = _partenaireAvecConvoyage();
   var grp = document.getElementById('conv-experience-group');
   if (grp) grp.style.display = conv ? 'block' : 'none';
@@ -14865,31 +14915,16 @@ function _validateConvStep(n) {
   }
   if (n === 2) {
     // Au moins une activité obligatoire.
-    if (_activitesPartenaire().length === 0) {
+    // Un métier au moins : c'est la seule condition, et elle suffit.
+    // Les activités en découlant, aucune ne peut rester « vide ».
+    if (_metiersPartenaire().length === 0) {
       ok = false;
       if (typeof _showGroupError === 'function') {
-        _showGroupError('conv-activites-group', 'Veuillez sélectionner au moins un métier.');
+        _showGroupError('conv-activites-group', 'Ajoutez au moins un métier.');
       }
       if (!firstInvalid) firstInvalid = document.getElementById('conv-activites-group');
-    } else {
-      // Une activité choisie sans aucun métier ne dit rien de ce que le
-      // partenaire sait faire : elle est refusée, avec un message qui
-      // nomme précisément ce qui manque.
-      var sansMetier = _activitesSansMetier();
-      if (sansMetier.length) {
-        ok = false;
-        if (typeof _showGroupError === 'function') {
-          _showGroupError('conv-activites-group',
-            sansMetier.indexOf('technicien') !== -1 && sansMetier.indexOf('renfort') !== -1
-              ? 'Précisez vos missions de renfort et vos spécialités techniques.'
-              : (sansMetier[0] === 'technicien'
-                  ? 'Précisez au moins une spécialité technique.'
-                  : 'Précisez au moins une mission de renfort.'));
-        }
-        if (!firstInvalid) firstInvalid = document.getElementById('conv-metiers-' + sansMetier[0]);
-      } else if (typeof _clearGroupError === 'function') {
-        _clearGroupError('conv-activites-group');
-      }
+    } else if (typeof _clearGroupError === 'function') {
+      _clearGroupError('conv-activites-group');
     }
   }
   if (n === 3) {
@@ -17451,28 +17486,14 @@ async function submitConvoyeurForm() {
     return;
   }
 
-  // Au moins une activité doit être sélectionnée (cohérent avec l'étape 2).
-  if (_activitesPartenaire().length === 0) {
+  // GARDE-FOU FINAL, même règle qu'à l'étape 2 : une candidature sans
+  // aucun métier ne dit rien de ce que la personne sait faire. Une
+  // soumission détournée (console, étapeur) n'en enregistre pas.
+  if (_metiersPartenaire().length === 0) {
     _formStepState.convoyeur = 2;
     _renderFormStep('convoyeur');
     if (typeof _showGroupError === 'function') {
-      _showGroupError('conv-activites-group', 'Veuillez sélectionner au moins un métier.');
-    }
-    return;
-  }
-
-  // GARDE-FOU FINAL, même règle qu'à l'étape 2 : une activité qui exige
-  // des métiers ne peut pas partir sans. Une soumission détournée
-  // (console, étapeur) n'enregistre pas une candidature incomplète.
-  var _sansMetier = _activitesSansMetier();
-  if (_sansMetier.length) {
-    _formStepState.convoyeur = 2;
-    _renderFormStep('convoyeur');
-    if (typeof _showGroupError === 'function') {
-      _showGroupError('conv-activites-group',
-        _sansMetier[0] === 'technicien'
-          ? 'Précisez au moins une spécialité technique.'
-          : 'Précisez au moins une mission de renfort.');
+      _showGroupError('conv-activites-group', 'Ajoutez au moins un métier.');
     }
     return;
   }

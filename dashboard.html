@@ -1086,9 +1086,9 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">Toutes les missions</div><div class="card-sub" id="missions-count-sub"></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Référence</th><th>Trajet</th><th>Client</th><th>Convoyeur</th><th>Véhicule</th><th>⚡ Électrique</th><th>Restitution</th><th>Prise en charge</th><th>Livraison</th><th>Prix TTC</th><th>Statut</th><th>Lettre VdV</th><th>Action</th></tr></thead>
+              <thead><tr><th>Référence</th><th>Type</th><th>Trajet / Lieu</th><th>Client</th><th>Partenaire</th><th>Véhicule</th><th>⚡ Électrique</th><th>Restitution</th><th>Prise en charge</th><th>Livraison</th><th>Prix TTC</th><th>Statut</th><th>Lettre VdV</th><th>Action</th></tr></thead>
               <tbody id="missions-table">
-                <tr><td colspan="13" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1868,6 +1868,11 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- CONVOYEUR: Historique -->
+      <!-- Un seul champ de fichier, réutilisé pour les photos avant et
+           après : le bouton cliqué dit lequel des deux. -->
+      <input type="file" id="photo-mission-input" accept="image/jpeg,image/png,image/webp"
+             style="display:none" onchange="envoyerPhotoMission(this)">
+
       <div class="page" id="page-convoyeur-historique">
         <div class="historique-stats">
           <div class="hstat"><div class="hstat-val" id="hist-stat-ca">—</div><div class="hstat-label">CA Total</div></div>
@@ -2093,6 +2098,13 @@ body.scroll-verrouille { overflow: hidden; }
             <div class="form-group"><label>Téléphone</label><input type="tel" id="profil-telephone" value=""></div>
             <div class="form-group"><label>Expérience</label><input type="text" id="profil-experience" value="" readonly></div>
             <div class="form-group"><label>RC Pro</label><input type="text" id="profil-rcpro" value="" readonly></div>
+          </div>
+          <!-- Les métiers déclarés à la candidature, tels qu'HelixCar
+               les voit : le partenaire sait ainsi pour quelles missions
+               il peut être appelé. -->
+          <div class="form-group" style="margin-top:4px">
+            <label>Mes métiers</label>
+            <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
           </div>
           <button class="btn btn-primary" style="margin-top:8px">Sauvegarder</button>
         </div>
@@ -2586,6 +2598,19 @@ function remplirProfilConvoyeur(conv) {
   for (const id in champs) {
     const el = document.getElementById(id);
     if (el) el.value = champs[id];
+  }
+
+  // Les métiers déclarés, présentés comme dans le formulaire de
+  // candidature : les mêmes libellés, la même nomenclature.
+  const zoneMetiers = document.getElementById('profil-metiers');
+  if (zoneMetiers) {
+    const metiers = normaliserMetiers(conv.metiers);
+    zoneMetiers.innerHTML = metiers.length
+      ? metiers.map(function (m) {
+          return '<span class="badge badge-active" style="font-size:.74rem;padding:4px 10px">'
+            + escapeHtml(CONV_LIB_METIER[m]) + '</span>';
+        }).join('')
+      : '<span style="font-size:.82rem;color:#888">Aucun métier déclaré. Contactez HelixCar pour les préciser.</span>';
   }
 }
 
@@ -5995,7 +6020,7 @@ function chargerMissionsAccueil() {
 function loadMissions() {
   const tbody = document.getElementById('missions-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
 
   Promise.all([
     sbFetchToutePage('missions?order=created_at.desc'),
@@ -6012,7 +6037,7 @@ function loadMissions() {
     if (sub) sub.textContent = missions.length + ' mission(s)';
 
     if (missions.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#888;padding:20px">Aucune mission pour le moment</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Aucune mission pour le moment</td></tr>';
       return;
     }
 
@@ -6020,13 +6045,20 @@ function loadMissions() {
       const convoyeurNom = m.convoyeur_id ? (convoyeurs[m.convoyeur_id] || '—') : '—';
       const clientNom = m.client_id ? (clients[m.client_id] || '—') : '—';
       const vehicule = [m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—';
+      // Une mission de nettoyage n'a ni ville de départ ni ville
+      // d'arrivée : elle a un LIEU d'intervention. On affiche ce que la
+      // mission porte réellement, jamais une flèche vers du vide.
+      const estNettoyage = m.type_mission === 'nettoyage';
       const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
       const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
       const badge = MISSION_STATUT_BADGE[m.statut] || '<span class="badge">' + escapeHtml(m.statut) + '</span>';
       let actions = '';
       if (m.statut === 'fini') {
-        actions = '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" onclick="confirmerMissionTerminee(\'' + m.id + '\')">✅ Confirmer la mission</button>'
-          + '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>';
+        actions = estNettoyage
+          ? ('<button class="btn btn-sm" style="background:#1F7A4D;color:#fff;border:none;margin-right:4px" onclick="validerPrestationNettoyage(\'' + m.id + '\')">✅ Valider la prestation</button>'
+             + '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>')
+          : ('<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px" onclick="confirmerMissionTerminee(\'' + m.id + '\')">✅ Confirmer la mission</button>'
+             + '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>');
       } else if (m.statut !== 'terminee' && m.statut !== 'annulee') {
         actions += '<button class="btn btn-sm btn-outline" onclick="terminerMission(\'' + m.id + '\')" style="margin-right:4px">✅ Terminer</button>';
         actions += '<button class="btn btn-sm btn-red" onclick="annulerMission(\'' + m.id + '\')">✗ Annuler</button>';
@@ -6037,19 +6069,33 @@ function loadMissions() {
       } else {
         actions = '—';
       }
-      const lettreVdv = m.lettre_voiture_signee_url
+      const lettreVdv = estNettoyage ? '—' : (m.lettre_voiture_signee_url
         ? '<a href="' + m.lettre_voiture_signee_url + '" target="_blank" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
-        : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>';
+        : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>');
+      var badgeType = estNettoyage
+        ? '<span class="badge badge-service">🧼 Nettoyage</span>'
+        : '<span class="badge badge-service">🚗 Convoyage</span>';
+      var lieu = estNettoyage
+        ? ([m.adresse_intervention, [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
+             .filter(Boolean).join(', ') || '—')
+        : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
       return '<tr>'
         + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(m.reference) + '</td>'
-        + '<td><strong>' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee) + '</strong></td>'
+        + '<td>' + badgeType + '</td>'
+        + '<td><strong>' + (estNettoyage ? escapeHtml(lieu) : lieu) + '</strong>'
+        + (estNettoyage && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
+            + escapeHtml(m.prestation) + '</span>' : '') + '</td>'
         + '<td>' + clientNom + '</td>'
         + '<td>' + convoyeurNom + '</td>'
-        + '<td>' + vehicule + '</td>'
-        + '<td>' + (m.electrique ? '⚡ Oui' : 'Non') + '</td>'
-        + '<td>' + (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non') + '</td>'
-        + '<td>' + datePec + '</td>'
-        + '<td>' + dateLivr + '</td>'
+        + '<td>' + (estNettoyage ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—') : vehicule) + '</td>'
+        + '<td>' + (estNettoyage ? '—' : (m.electrique ? '⚡ Oui' : 'Non')) + '</td>'
+        + '<td>' + (estNettoyage ? '—'
+            : (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non')) + '</td>'
+        + '<td>' + (estNettoyage
+            ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
+               + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
+            : datePec) + '</td>'
+        + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
         + '<td>' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</td>'
         + '<td>' + badge + '</td>'
         + '<td>' + lettreVdv + '</td>'
@@ -6148,24 +6194,52 @@ function loadMissionsConvoyeur() {
   sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc')
     .then(function(rows) {
       const sub = document.getElementById('conv-missions-sub');
-      if (sub) sub.textContent = (rows || []).length + ' mission(s) disponible(s)';
-      if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune mission disponible pour le moment</td></tr>';
+      // Un convoyeur ne doit pas se voir proposer un nettoyage, ni un
+      // nettoyeur un convoyage : la mission relève d'un métier, et le
+      // partenaire déclare les siens. La liste ne montre donc que ce
+      // qu'il peut réellement accepter.
+      const activitesPartenaire = normaliserActivites(conv.activites);
+      const visibles = (rows || []).filter(function (m) {
+        return (m.type_mission === 'nettoyage')
+          ? activitesPartenaire.indexOf('nettoyage') !== -1
+          : activitesPartenaire.indexOf('convoyage') !== -1;
+      });
+      if (sub) sub.textContent = visibles.length + ' mission(s) disponible(s)';
+      if (!visibles.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune mission disponible pour vos métiers</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map(function(m) {
-        const vehicule = m.marque_modele || '—';
+      tbody.innerHTML = visibles.map(function(m) {
+        const estNettoyage = m.type_mission === 'nettoyage';
+        const vehicule = estNettoyage
+          ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—')
+          : (m.marque_modele || '—');
         const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
         const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const options = [m.nettoyage ? '✨ Nettoyage' : null, m.plateau ? '🚛 Plateau' : null, m.urgence ? '⚡ Urgent' : null, m.electrique ? '🔋 Électrique' : null].filter(Boolean).join(', ') || (m.type_vehicule || 'Standard');
+        const options = estNettoyage
+          ? (m.prestation ? escapeHtml(m.prestation) : 'Nettoyage')
+          : ([m.nettoyage ? '✨ Nettoyage' : null, m.plateau ? '🚛 Plateau' : null, m.urgence ? '⚡ Urgent' : null, m.electrique ? '🔋 Électrique' : null].filter(Boolean).join(', ') || (m.type_vehicule || 'Standard'));
         const prioritaire = m.convoyeur_id ? ' <span class="badge badge-active" style="margin-left:4px">Prioritaire</span>' : '';
-        const restitution = m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non';
-        return '<tr><td><strong>' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee) + '</strong>' + prioritaire + '</td>'
+        const restitution = estNettoyage ? '—'
+          : (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non');
+        const intitule = estNettoyage
+          ? ('🧼 ' + escapeHtml([m.adresse_intervention,
+               [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
+               .filter(Boolean).join(', ') || 'Lieu à préciser'))
+          : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
+        const quand = estNettoyage
+          ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
+             + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
+          : datePec;
+        return '<tr><td><strong>' + intitule + '</strong>' + prioritaire + '</td>'
           + '<td>' + vehicule + '</td>'
-          + '<td>' + (m.distance_km ? m.distance_km + ' km' : '—') + '</td>'
-          + '<td>' + datePec + '</td>'
-          + '<td>' + dateLivr + '</td>'
-          + '<td><strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></td>'
+          + '<td>' + (estNettoyage ? '—' : (m.distance_km ? m.distance_km + ' km' : '—')) + '</td>'
+          + '<td>' + quand + '</td>'
+          + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
+          + '<td><strong style="color:var(--green)">'
+          // La rémunération du partenaire, pas le prix client : c'est ce
+          // qui l'intéresse, et c'est la même règle que le convoyage.
+          + (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—') + '</strong></td>'
           + '<td>' + restitution + '</td>'
           + '<td>' + options + '</td>'
           + '<td><button class="btn btn-sm btn-primary" onclick="accepterMission(\'' + m.id + '\')">Accepter</button></td></tr>';
@@ -6320,6 +6394,140 @@ function envoyerLettreVoitureSignee(input, missionId, reference) {
   });
 }
 
+// ── PHOTOS D'INTERVENTION — AVANT ET APRÈS ──────────────────
+// Elles constatent l'état des véhicules : ce sont des pièces, pas des
+// illustrations. Le bucket missions-photos est PRIVÉ, et la migration 96
+// n'y laisse écrire que le partenaire réellement affecté à la mission.
+// Aucune URL publique n'existe : la lecture passe par une URL signée
+// temporaire, comme pour les vidéos de candidature.
+var _photosParMission = {};
+
+function _actionsMissionNettoyage(m) {
+  var etat = _photosParMission[String(m.id)] || { avant: 0, apres: 0 };
+  var boutons = '';
+  if (m.statut !== 'terminee' && m.statut !== 'annulee') {
+    boutons += '<button class="btn btn-sm btn-outline" onclick="ouvrirPhotosMission(\'' + m.id + '\',\'avant\')">'
+      + '📷 Avant (' + etat.avant + ')</button>';
+    boutons += '<button class="btn btn-sm btn-outline" onclick="ouvrirPhotosMission(\'' + m.id + '\',\'apres\')">'
+      + '📷 Après (' + etat.apres + ')</button>';
+  }
+  if (m.statut === 'acceptee' || m.statut === 'en_cours') {
+    // On ne peut déclarer une intervention terminée sans l'avoir
+    // constatée : une photo avant et une photo après, au minimum.
+    var pret = etat.avant > 0 && etat.apres > 0;
+    boutons += '<button class="btn btn-sm ' + (pret ? 'btn-primary' : 'btn-secondary') + '"'
+      + (pret ? '' : ' disabled title="Ajoutez au moins une photo avant et une photo après."')
+      + ' onclick="terminerMissionNettoyage(\'' + m.id + '\')">Intervention terminée</button>';
+  }
+  if (m.statut === 'fini') boutons += '<span class="badge badge-pending">En attente de validation HelixCar</span>';
+  if (m.statut === 'terminee') boutons += '<span class="badge badge-active">✅ Validée</span>';
+  return boutons || '—';
+}
+
+function chargerPhotosMissions(missions) {
+  var ids = (missions || []).filter(function (m) { return m.type_mission === 'nettoyage'; })
+                            .map(function (m) { return m.id; });
+  _photosParMission = {};
+  if (!ids.length) return Promise.resolve(_photosParMission);
+  return sbFetchToutePage('mission_photos?select=mission_id,etape&mission_id=in.('
+                          + ids.map(encodeURIComponent).join(',') + ')')
+    .then(function (rows) {
+      (rows || []).forEach(function (p) {
+        var cle = String(p.mission_id);
+        if (!_photosParMission[cle]) _photosParMission[cle] = { avant: 0, apres: 0 };
+        if (p.etape === 'avant' || p.etape === 'apres') _photosParMission[cle][p.etape] += 1;
+      });
+      return _photosParMission;
+    })
+    .catch(function () { return _photosParMission; });
+}
+
+// Le partenaire dépose une photo. Le chemin est TOUJOURS
+// « missions/<mission_id>/... » : c'est ce que les politiques Storage
+// vérifient, et il ne peut donc jamais viser une autre mission.
+function ouvrirPhotosMission(missionId, etape) {
+  var champ = document.getElementById('photo-mission-input');
+  if (!champ) return;
+  champ.value = '';
+  champ.setAttribute('data-mission', missionId);
+  champ.setAttribute('data-etape', etape);
+  champ.click();
+}
+
+async function envoyerPhotoMission(input) {
+  var fichier = input.files && input.files[0];
+  if (!fichier) return;
+  var missionId = input.getAttribute('data-mission');
+  var etape = input.getAttribute('data-etape');
+  if (!missionId || (etape !== 'avant' && etape !== 'apres')) return;
+
+  if (!/^image\/(jpeg|png|webp)$/.test(fichier.type)) {
+    alert('Format non pris en charge. Utilisez une photo JPEG, PNG ou WebP.');
+    return;
+  }
+  if (fichier.size > 10 * 1024 * 1024) {
+    alert('Photo trop lourde (10 Mo maximum).');
+    return;
+  }
+  if (!_sbAuthPret()) { alert('Session partenaire requise.'); return; }
+
+  var extension = fichier.type === 'image/png' ? '.png'
+                : fichier.type === 'image/webp' ? '.webp' : '.jpg';
+  var chemin = 'missions/' + missionId + '/' + etape + '-' + Date.now() + extension;
+
+  try {
+    var envoi = await sbAuth.storage.from('missions-photos')
+      .upload(chemin, fichier, { contentType: fichier.type, upsert: false });
+    if (envoi.error) throw new Error(envoi.error.message);
+
+    var trace = await sbAuth.from('mission_photos').insert({
+      mission_id: missionId, etape: etape, chemin: chemin
+    });
+    if (trace.error) throw new Error(trace.error.message);
+
+    if (!_photosParMission[String(missionId)]) _photosParMission[String(missionId)] = { avant: 0, apres: 0 };
+    _photosParMission[String(missionId)][etape] += 1;
+    loadHistoriqueConvoyeur();
+  } catch (e) {
+    console.error('envoyerPhotoMission:', e);
+    alert('La photo n\'a pas pu être envoyée.\n\n' + (e && e.message ? e.message : ''));
+  } finally {
+    input.value = '';
+  }
+}
+
+function terminerMissionNettoyage(missionId) {
+  var etat = _photosParMission[String(missionId)] || { avant: 0, apres: 0 };
+  if (!(etat.avant > 0 && etat.apres > 0)) {
+    alert('Ajoutez au moins une photo avant et une photo après avant de terminer.');
+    return;
+  }
+  if (!confirm('Déclarer cette intervention terminée ?\n\nHelixCar la validera ensuite.')) return;
+  sbFetch('missions?id=eq.' + missionId, {
+    method: 'PATCH',
+    headers: { 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ statut: 'fini' })
+  }).then(function () { loadHistoriqueConvoyeur(); })
+    .catch(function (e) {
+      console.error('terminerMissionNettoyage:', e);
+      alert('La mission n\'a pas pu être mise à jour.');
+    });
+}
+
+// Validation finale par l'administrateur : elle constate la prestation,
+// et c'est elle seule qui clôt la mission.
+function validerPrestationNettoyage(missionId) {
+  if (!_sbAuthPret()) { alert('Session administrateur requise.'); return; }
+  if (!confirm('Valider la prestation de nettoyage ?\n\nLa mission passera en « Validée ».')) return;
+  sbAuth.from('missions').update({
+    statut: 'terminee',
+    prestation_validee_le: new Date().toISOString()
+  }).eq('id', missionId).then(function (res) {
+    if (res.error) { alert('La validation n\'a pas pu être enregistrée.'); return; }
+    if (typeof loadMissions === 'function') loadMissions();
+  });
+}
+
 function loadHistoriqueConvoyeur() {
   const tbody = document.getElementById('conv-historique-table');
   if (!tbody) return;
@@ -6349,24 +6557,52 @@ function loadHistoriqueConvoyeur() {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune mission acceptée pour le moment</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map(function(m) {
-        const vehicule = [m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—';
-        const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const badge = MISSION_STATUT_BADGE[m.statut] || '<span class="badge">' + escapeHtml(m.statut) + '</span>';
-        const action = (CONV_MISSION_ACTIONS[m.statut] || function() { return '—'; })(m.id, m.reference, m);
-        return '<tr><td><strong>' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee) + '</strong></td>'
-          + '<td>' + vehicule + '</td>'
-          + '<td>' + datePec + '</td>'
-          + '<td>' + dateLivr + '</td>'
-          + '<td><strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></td>'
-          + '<td>' + badge + '</td>'
-          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
-      }).join('');
+      return chargerPhotosMissions(rows).then(function () { rendreHistorique(rows); });
     })
+    .then(function () {})
     .catch(function(e) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
     });
+
+  function rendreHistorique(rows) {
+      tbody.innerHTML = rows.map(function(m) {
+        const estNettoyage = m.type_mission === 'nettoyage';
+        const vehicule = estNettoyage
+          ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—')
+          : ([m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—');
+        const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+        const badge = MISSION_STATUT_BADGE[m.statut] || '<span class="badge">' + escapeHtml(m.statut) + '</span>';
+        // Une mission de nettoyage a ses propres actions : les photos
+        // avant et après, puis la fin d'intervention.
+        const action = estNettoyage
+          ? _actionsMissionNettoyage(m)
+          : (CONV_MISSION_ACTIONS[m.statut] || function() { return '—'; })(m.id, m.reference, m);
+        const intitule = estNettoyage
+          ? ('🧼 ' + escapeHtml([m.adresse_intervention,
+               [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
+               .filter(Boolean).join(', ') || 'Lieu à préciser'))
+          : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
+        const quand = estNettoyage
+          ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
+             + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
+          : datePec;
+        return '<tr><td><strong>' + intitule + '</strong>'
+          + (estNettoyage && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
+              + escapeHtml(m.prestation) + '</span>' : '')
+          + (estNettoyage && m.contact_nom ? '<br><span style="font-size:.72rem;color:#888">Contact : '
+              + escapeHtml([m.contact_nom, m.contact_tel].filter(Boolean).join(' — ')) + '</span>' : '')
+          + (estNettoyage && m.consignes ? '<br><span style="font-size:.72rem;color:#888">Consignes : '
+              + escapeHtml(m.consignes) + '</span>' : '') + '</td>'
+          + '<td>' + vehicule + '</td>'
+          + '<td>' + quand + '</td>'
+          + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
+          + '<td><strong style="color:var(--green)">'
+          + (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—') + '</strong></td>'
+          + '<td>' + badge + '</td>'
+          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
+      }).join('');
+  }
 }
 
 // ── FACTURATION ──────────────────────────────────────────────
@@ -7525,7 +7761,9 @@ function loadDemandesDevis() {
   var pVehicules = sbFetchToutePage('vehicules?order=position.asc')
     .catch(function() { return []; });
 
-  Promise.all([pClients, pDevis, pVehicules]).then(function(res) {
+  var pMissionsNett = chargerMissionsParDemande();
+
+  Promise.all([pClients, pDevis, pVehicules, pMissionsNett]).then(function(res) {
     var clients = res[0] || [];
     var devis = res[1];
     var vehicules = res[2] || [];
@@ -7652,6 +7890,146 @@ function _blocFiche(titre, lignesHtml) {
   return '<div style="margin-bottom:18px">' +
     '<div style="font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#E5484D;margin-bottom:6px">' + _escapeHtml(titre) + '</div>' +
     lignesHtml + '</div>';
+}
+
+// ── MISSIONS DE NETTOYAGE ───────────────────────────────────
+// Une demande de nettoyage pouvait être reçue, chiffrée et devisée,
+// mais jamais TRANSFORMÉE EN MISSION : un nettoyeur n'avait donc rien à
+// accepter. Le système de missions existant est réutilisé — même table,
+// même liste, mêmes statuts — avec une colonne qui dit de quel métier
+// relève la mission (migration 96).
+var _missionsParDemande = {};
+
+function _missionNettoyageDe(c) {
+  return _missionsParDemande[String(c && c.id)] || null;
+}
+
+function _missionNettoyageTexte(c) {
+  var m = _missionNettoyageDe(c);
+  if (!m) return 'Pas encore';
+  return m.reference + ' — ' + (LIB_STATUT_MISSION[m.statut] || m.statut);
+}
+
+var LIB_STATUT_MISSION = {
+  en_attente: 'En attente d\'un partenaire',
+  proposee: 'Proposée à un partenaire',
+  acceptee: 'Acceptée',
+  en_cours: 'En cours',
+  fini: 'Terminée par le partenaire',
+  terminee: 'Validée',
+  annulee: 'Annulée'
+};
+
+// Charge les missions déjà créées pour les demandes affichées, afin de
+// ne jamais proposer deux fois la création de la même mission.
+function chargerMissionsParDemande() {
+  return sbFetchToutePage('missions?select=id,reference,statut,client_id,type_mission,convoyeur_id'
+                          + '&type_mission=eq.nettoyage')
+    .then(function (rows) {
+      _missionsParDemande = {};
+      (rows || []).forEach(function (m) {
+        if (m.client_id) _missionsParDemande[String(m.client_id)] = m;
+      });
+      return _missionsParDemande;
+    })
+    .catch(function () { _missionsParDemande = {}; return _missionsParDemande; });
+}
+
+function _blocMissionNettoyageHtml(c) {
+  var m = _missionNettoyageDe(c);
+  var html = '<div style="margin-top:16px;padding:16px;background:#F7FAF8;border:1px solid #DCE7E0;border-radius:8px">';
+  html += '<div style="font-weight:700;font-size:.9rem;margin-bottom:10px">Mission de nettoyage</div>';
+
+  if (m) {
+    html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1F7A4D">✓ Mission '
+      + escapeHtml(m.reference) + ' créée</b></div>';
+    html += '<div style="font-size:.85rem;margin-bottom:10px">État : '
+      + escapeHtml(LIB_STATUT_MISSION[m.statut] || m.statut) + '</div>';
+    html += '<button class="btn btn-sm btn-secondary" onclick="showPage(\'admin-missions\')">'
+      + 'Voir dans les missions →</button>';
+  } else {
+    var nd = _nettDetails(c) || {};
+    var prete = !!(nd.date_souhaitee && (nd.adresse_rue || nd.lieu === 'helixcar')
+                   && _contactSurPlaceTexte(nd.contact_sur_place));
+    if (!prete) {
+      html += '<div style="font-size:.82rem;color:#8a6d3b">Il manque encore des informations '
+        + 'd\'intervention (adresse, date ou contact sur place). Elles sont listées ci-dessus, '
+        + 'dans « Informations nécessaires à la mission ».</div>';
+    } else {
+      html += '<div style="font-size:.82rem;color:#555;margin-bottom:10px">'
+        + 'La mission reprendra l\'adresse, le contact, la date, l\'horaire, la prestation et '
+        + 'les consignes de cette demande. Elle sera visible par les partenaires nettoyage.</div>';
+      html += '<button class="btn btn-primary" onclick="creerMissionNettoyage(\'' + c.id + '\')">'
+        + 'Créer la mission de nettoyage</button>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function _referenceMissionNettoyage() {
+  var annee = new Date().getFullYear();
+  return sbFetchToutePage('missions?select=reference&type_mission=eq.nettoyage')
+    .then(function (rows) {
+      var max = 0;
+      (rows || []).forEach(function (r) {
+        var mm = /^HC-NET-(\d{4})-(\d+)$/.exec(r.reference || '');
+        if (mm && parseInt(mm[1], 10) === annee) {
+          var n = parseInt(mm[2], 10);
+          if (n > max) max = n;
+        }
+      });
+      return 'HC-NET-' + annee + '-' + String(max + 1).padStart(4, '0');
+    })
+    .catch(function () { return 'HC-NET-' + annee + '-0001'; });
+}
+
+function creerMissionNettoyage(clientId) {
+  var c = (_demandesDevisListe || []).filter(function (x) { return String(x.id) === String(clientId); })[0];
+  if (!c) { alert('Demande introuvable.'); return; }
+  if (_missionNettoyageDe(c)) { alert('Une mission existe déjà pour cette demande.'); return; }
+
+  var nd = _nettDetails(c) || {};
+  var contact = nd.contact_sur_place || {};
+  var horaire = nd.dispo_type === 'creneau'
+    ? ((nd.creneau_debut || '') + ' — ' + (nd.creneau_fin || ''))
+    : (nd.heure_precise || '');
+  var dv = _devisParClient[String(c.id)];
+
+  if (!confirm('Créer la mission de nettoyage pour '
+      + ((c.prenom || '') + ' ' + (c.nom || '')).trim() + ' ?\n\n'
+      + 'Elle sera proposée aux partenaires nettoyage. Aucun e-mail n\'est envoyé.')) return;
+
+  _referenceMissionNettoyage().then(function (reference) {
+    // Le prix client vient du devis réellement établi, jamais d'une
+    // estimation : sans devis, la mission part sans montant.
+    return sbAuth.from('missions').insert({
+      reference: reference,
+      type_mission: 'nettoyage',
+      statut: 'en_attente',
+      client_id: c.id,
+      prestation: NETT_LIB_TYPE[nd.type_nettoyage] || nd.type_nettoyage || null,
+      nb_vehicules: nd.nombre_vehicules_approx || null,
+      adresse_intervention: nd.adresse_rue || (nd.lieu === 'helixcar' ? 'Locaux HelixCar' : null),
+      code_postal_intervention: nd.adresse_cp || null,
+      ville_intervention: nd.adresse_ville || null,
+      contact_nom: contact.nom || null,
+      contact_tel: contact.telephone || null,
+      date_intervention: nd.date_souhaitee || null,
+      heure_intervention: horaire || null,
+      consignes: nd.instructions || null,
+      prix_ttc: dv ? dv.prix : null
+    }).then(function (res) {
+      if (res.error) throw new Error(res.error.message);
+      return chargerMissionsParDemande();
+    }).then(function () {
+      ouvrirFicheDemande(c.id);
+      if (typeof loadMissions === 'function') loadMissions();
+    });
+  }).catch(function (e) {
+    console.error('creerMissionNettoyage:', e);
+    alert('La mission n\'a pas pu être créée.\n\n' + (e && e.message ? e.message : ''));
+  });
 }
 
 // ── BLOC DEVIS — UN SEUL POUR LES QUATRE SERVICES ───────────
@@ -7812,9 +8190,30 @@ function ouvrirFicheDemande(clientId) {
     if (nd.instructions) org += L('Instructions — demande antérieure', nd.instructions);
     html += S('Organisation', org);
 
+    // INTERVENTION — ce que le nettoyage exige d'HelixCar. Un nettoyage
+    // se fait toujours sur place : il demande donc un partenaire.
+    var dv = _devisParClient[String(c.id)];
+    var prixNett = dv ? Number(dv.prix) || 0 : 0;
+    html += S('Intervention',
+      L('Partenaire nécessaire', 'Oui — un nettoyeur sur site') +
+      L('Métier requis', 'Nettoyage automobile') +
+      L('Prix client', prixNett ? _formaterMontantEuros(prixNett) : 'À définir (devis non établi)') +
+      // Même règle de partage que le convoyage, appliquée au même
+      // endroit : elle n'est pas recopiée d'un exemple.
+      L('Rémunération du partenaire',
+        prixNett ? _formaterMontantEuros(Math.round(prixNett * 0.50)) : '—') +
+      L('Mission créée', _missionNettoyageTexte(c)));
+
+    html += S('Suivi',
+      L('Statut de la demande', LIB_STATUT_INSCRIPTION[c.statut] || c.statut) +
+      L('Reçue le', _dvDateHeure ? _dvDateHeure(c.created_at) : c.created_at));
+
     // Même bloc devis que les autres services — plus aucune fiche ne se
     // termine sans possibilité d'établir un devis.
     html += _blocDevisHtml(c);
+
+    // Transformer la demande en mission attribuable à un nettoyeur.
+    html += _blocMissionNettoyageHtml(c);
 
     html += '<div style="margin-top:14px;text-align:right">' +
       '<button class="btn btn-sm btn-secondary" onclick="marquerDemandeNonLue(\'' + c.id + '\')">' +
