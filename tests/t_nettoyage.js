@@ -42,7 +42,8 @@ const L = require('./lib.js');
   // Date (champ readonly piloté par le calendrier maison) : on écrit la valeur
   await page.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
-    document.getElementById('nett-date').value = d.toISOString().slice(0, 10);
+    // Le formateur de la production : aucune conversion UTC.
+    document.getElementById('nett-date').value = _hcFormaterYMD(d);
   });
 
   // Disponibilité : heure précise

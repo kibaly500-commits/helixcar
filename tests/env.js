@@ -60,8 +60,30 @@ function lancerNavigateur(extra) {
   return chromium.launch(optionsLancement(extra));
 }
 
+// DATE CIVILE — jamais UTC.
+//
+// toISOString() convertit vers UTC. En France (UTC+1, UTC+2 l'été), le
+// 10 décembre à minuit heure locale devient « 2026-12-09T23:00:00Z » :
+// découper les dix premiers caractères donne LA VEILLE. Un test bâti
+// dessus passe sous TZ=UTC et échoue sous Europe/Paris — c'est-à-dire
+// dans le fuseau des utilisateurs.
+//
+// C'est le formateur de la production (_hcFormaterYMD dans index.html) :
+// on compare des dates civiles avec la règle qui les produit.
+function jourCivil(d) {
+  if (!d) return null;
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function dansNJours(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return jourCivil(d);
+}
+
 // Chemin d'un fichier du dépôt, et son URL file:// prête à ouvrir.
 function fichier(rel) { return path.join(RACINE, rel); }
 function urlFichier(rel) { return 'file://' + fichier(rel); }
 
-module.exports = { RACINE, chromium, lancerNavigateur, optionsLancement, fichier, urlFichier };
+module.exports = { RACINE, chromium, lancerNavigateur, optionsLancement, fichier, urlFichier,
+                   jourCivil, dansNJours };

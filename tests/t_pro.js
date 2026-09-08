@@ -1,10 +1,10 @@
 // Parcours « Trouver un professionnel automobile »
 const L = require('./lib.js');
+const { jourCivil, dansNJours } = L;
 
-function futur(n) {
-  const d = new Date(); d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 
 async function setVal(page, id, v) {
   await page.evaluate(([i, val]) => {

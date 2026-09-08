@@ -6,7 +6,7 @@
 // administrateur, informations manquantes — et vérifie qu'à aucune
 // étape la donnée d'un véhicule n'apparaît sur un autre.
 const L = require('./lib.js');
-const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier , jourCivil, dansNJours } = require('./env.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -27,7 +27,9 @@ const VEH = [
     livContact: 'Livre Charlie', livTel: '+33600000033', livDate: 12 },
 ];
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 
 async function saisirVehicule(page, i, v) {
   await page.evaluate(([idx, veh, pcDate, livDate]) => {

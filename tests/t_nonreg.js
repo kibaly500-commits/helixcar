@@ -1,10 +1,12 @@
 // NON-RÉGRESSION : Convoyage, Stockage, création de compte, partenaire,
 // textes, et absence de tout nouvel email / statut de paiement.
 const L = require('./lib.js');
-const { RACINE, fichier, urlFichier } = L;
+const { RACINE, fichier, urlFichier, jourCivil, dansNJours } = L;
 const fs = require('fs');
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 
 (async () => {
   const browser = await L.launch();

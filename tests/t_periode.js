@@ -8,9 +8,11 @@
 // périodes se comportent désormais à l'identique — et que le stockage
 // n'a rien perdu au passage.
 const L = require('./lib.js');
-const { RACINE, fichier, urlFichier } = L;
+const { RACINE, fichier, urlFichier, jourCivil, dansNJours } = L;
 
-function futurYMD(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futurYMD = dansNJours;
 
 // Ouvre RÉELLEMENT le calendrier par la fonction de production.
 async function ouvrir(page, id) {
@@ -124,7 +126,8 @@ async function moisFuturComplet(page) {
   await page.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 5);
     const e = document.getElementById('client-date-pc');
-    if (e) e.value = d.toISOString().slice(0, 10);
+    // Le formateur de la production : aucune conversion UTC.
+    if (e) e.value = _hcFormaterYMD(d);
   });
   await page.evaluate(() => document.getElementById('hc-cal-effacer').click());
   await page.waitForTimeout(60);
@@ -217,7 +220,7 @@ async function moisFuturComplet(page) {
   // Sur une intervention d'UN SEUL jour, la fin doit suivre le début.
   await page2.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 30);
-    const j = d.toISOString().slice(0, 10);
+    const j = _hcFormaterYMD(d);
     ['pro-date-debut', 'pro-date-fin'].forEach(i => {
       const e = document.getElementById(i);
       e.value = j; e.dispatchEvent(new Event('change', { bubbles: true }));

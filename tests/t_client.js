@@ -1,11 +1,13 @@
 // ESPACE CLIENT — NOUVELLE DEMANDE DEPUIS LE DASHBOARD
 // Exécute le vrai code des deux pages contre un double Supabase injecté
 // AVANT les scripts (le CDN supabase-js est injoignable ici).
-const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier , jourCivil, dansNJours } = require('./env.js');
 const path = require('path');
 const L = require('./lib.js');   // mêmes aides de remplissage que les autres suites
 
-function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+// Date CIVILE, jamais UTC : toISOString() reculerait d'un jour en
+// France (voir jourCivil dans tests/env.js).
+const futur = dansNJours;
 async function setVal(page, id, v) {
   await page.evaluate(([i, val]) => {
     const e = document.getElementById(i);

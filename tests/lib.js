@@ -1,5 +1,5 @@
 // Helpers partagés pour les tests navigateur HelixCar
-const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
+const { chromium, lancerNavigateur, RACINE, fichier, urlFichier, jourCivil, dansNJours } = require('./env.js');
 const path = require('path');
 
 const FILE = urlFichier('index.html');
@@ -110,7 +110,10 @@ async function fillNettoyageStep4(page, opts) {
     opts.contactType || 'autre', opts.contactNom || 'Karim B.', opts.contactTel || '+33600000000');
   await page.evaluate(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
-    document.getElementById('nett-date').value = d.toISOString().slice(0, 10);
+    // Date CIVILE : toISOString() reculerait d'un jour en France.
+    const _p = (n) => String(n).padStart(2, '0');
+    document.getElementById('nett-date').value =
+      d.getFullYear() + '-' + _p(d.getMonth() + 1) + '-' + _p(d.getDate());
   });
   await page.click('input[name="nett-dispo"][value="precise"]');
   await page.waitForTimeout(40);
@@ -131,4 +134,4 @@ async function step(page) { return page.evaluate(() => _formStepState.client); }
 module.exports = {
   // Réexportés depuis env.js : une suite qui charge lib.js dispose des
   // mêmes helpers de chemin, sans second require.
-  RACINE, fichier, urlFichier, lancerNavigateur, launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
+  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
