@@ -15,7 +15,7 @@ l'ordre ci-dessous est **impératif**.
 | **A** | `00` → `06` (migrations préparatoires, toutes additives) | ✅ **oui** |
 | **B** | Déploiement de la nouvelle `dashboard.html` | — |
 | **C** | `90_durcissement_rls_partenaires.sql` puis `91_durcissement_rls_clients.sql` | ❌ **non** — exige la phase B |
-| **D** | `92` → `95` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
+| **D** | `92` → `96` (correctifs et compléments du second lot) | ❌ **non** — exigent la phase C |
 
 ### Pourquoi la phase C ne peut pas venir plus tôt
 
