@@ -7169,18 +7169,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
 
-        <!-- Transport mode -->
+        <!-- Mode de transport : RETIRE d'ici, volontairement.
 
-        <div class="modal-form-group">
+             Il existait deux mecanismes concurrents pour la meme
+             question. Celui-ci etait GLOBAL au dossier : trois
+             elements — des boutons radio, un <select> masque
+             « Standard / Sur plateau », et une case a cocher masquee —
+             qui alimentaient un champ unique pour tous les vehicules.
 
-          <label>Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></label>
-          <div style="display:flex;flex-direction:column;gap:7px" id="mode-transport-group">
-            <label class="radio-opt"><input type="radio" name="mode-transport" value="standard" checked onclick="onModeTransport()"><span>Convoyage par la route</span></label>
-            <label class="radio-opt"><input type="radio" name="mode-transport" value="plateau" onclick="onModeTransport()"><span>Transport sur plateau</span></label>
-          </div>
-          <select id="client-mode" style="display:none"><option value="standard">Standard</option><option value="plateau">Sur plateau</option></select>
+             Il entrait en conflit avec le choix porte par chaque
+             vehicule, s'affichait sous la fiche des que le bloc du
+             vehicule manquait, et donnait au Dashboard un mode
+             different de celui saisi.
 
-        </div>
+             Le mode de transport appartient au VEHICULE : c'est la
+             seule source de verite, du formulaire au devis, a la base
+             et au Dashboard. Voir rendreFichesVehicules(). -->
 
 
 
@@ -7192,7 +7196,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
           <div style="display:flex;flex-direction:column;gap:7px">
 
-            <label class="radio-opt" style="display:none"><input type="checkbox" id="client-plateau" onchange="clientQuoteCalc()" style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0"><span>Transport sur plateau</span></label>
+            <!-- La case masquee « Transport sur plateau » vivait ici,
+                 dans le bloc DELAI SOUHAITE auquel elle n'appartient
+                 pas. Retiree : le mode de transport est porte par
+                 chaque vehicule. Le delai, lui, reste global. -->
 
             <div style="display:flex;flex-direction:column;gap:7px" id="delai-group">
               <label class="radio-opt"><input type="radio" name="delai" value="standard" checked onclick="onDelai()"><span>Standard</span></label>
@@ -11843,11 +11850,8 @@ function construireRecap() {
     }
     if (g) html += _recapBloc(_avecStockage() ? 'Convoyage HelixCar' : (multi ? 'Trajet commun' : 'Trajet'), g, sc.pc ? 3 : 4);
 
-    var modeEl = document.querySelector('input[name="mode-transport"]:checked');
-    if (_avecConvoyage() && modeEl) {
-      html += _recapBloc('Transport',
-        _recapLigne('Mode', modeEl.value === 'plateau' ? 'Transport sur plateau' : 'Convoyage par la route'), 4);
-    }
+    // Le mode de transport n'apparaît plus ici : il est propre à chaque
+    // véhicule et figure déjà dans sa fiche du récapitulatif.
   }
 
   // Le délai est une propriété GLOBALE de la demande. Il doit apparaître
@@ -12099,15 +12103,22 @@ function onNbVehiculesChange() {
 // Les colonnes mode_transport, plateau et urgence conservent
 // exactement leur signification actuelle : on se contente de les
 // alimenter depuis les nouveaux boutons radio.
-function onModeTransport() {
-  var el = document.querySelector('input[name="mode-transport"]:checked');
-  var val = el ? el.value : 'standard';
-  var select = document.getElementById('client-mode');
-  if (select) select.value = val;
-  var plateau = document.getElementById('client-plateau');
-  if (plateau) plateau.checked = (val === 'plateau');
-  if (typeof clientQuoteCalc === 'function') clientQuoteCalc();
+// LE MODE DE TRANSPORT EST LU SUR LES VEHICULES, ET NULLE PART AILLEURS.
+//
+// Retourne true des qu'au moins un vehicule part sur plateau. C'est la
+// regle du devis : le supplement s'applique au dossier des lors qu'un
+// plateau est necessaire.
+function _hcPlateauDemande() {
+  var n = (typeof _nbVehicules === 'function') ? _nbVehicules() : 0;
+  for (var i = 0; i < n; i++) {
+    var el = document.querySelector('input[name="veh-' + i + '-mode"]:checked');
+    if (el && el.value === 'plateau') return true;
+  }
+  return false;
 }
+
+// onModeTransport() est supprimee : elle recopiait le choix global dans
+// un <select> masque et une case a cocher masquee, tous deux retires.
 
 function onDelai() {
   var el = document.querySelector('input[name="delai"]:checked');
@@ -12330,19 +12341,14 @@ function majInfoLieuStockage() {
 
 // Les questions de transport n'ont de sens que si HelixCar convoie réellement.
 function _majBlocsTransport() {
-  // DEUX RÈGLES DISTINCTES, volontairement séparées.
-  //   MODE de transport : masqué en trajets individuels, car chaque
-  //     véhicule porte le sien ; un choix global le contredirait.
-  //   DÉLAI souhaité   : donnée GLOBALE du dossier, visible dès que
-  //     HelixCar transporte, y compris en trajets individuels.
-  // Les traiter dans la même boucle faisait disparaître le délai avec
-  // le mode : c'était la régression constatée par la QA.
-  var trajetsIndividuels = (_nbVehicules() >= 2 && !_trajetCommun());
+  // Il ne reste ici qu'une règle : le DÉLAI SOUHAITÉ, donnée GLOBALE du
+  // dossier, visible dès que HelixCar transporte — y compris en trajets
+  // individuels.
+  //
+  // Le MODE DE TRANSPORT n'est plus traité ici : il n'existe plus de
+  // bloc global à montrer ou à cacher. Chaque véhicule porte le sien,
+  // dans sa propre fiche.
   var transporte = _avecConvoyage();
-
-  var modeEl = document.getElementById('mode-transport-group');
-  var modeGrp = modeEl && modeEl.closest('.modal-form-group');
-  if (modeGrp) modeGrp.style.display = (transporte && !trajetsIndividuels) ? 'block' : 'none';
 
   var delaiEl = document.getElementById('delai-group');
   var delaiGrp = delaiEl && delaiEl.closest('.modal-form-group');
@@ -13266,10 +13272,8 @@ function _validateClientStep(n) {
       mark(_checkSelect('client-vtype'), 'client-vtype');
       mark(_checkRequiredText('client-marque'), 'client-marque');
     }
-    // Mode de transport : contrôlé seulement s'il est global et visible.
-    if (!(_nbVehicules() >= 2 && !_trajetCommun())) {
-      mark(_checkSelect('client-mode'), 'client-mode');
-    }
+    // Le mode de transport n'est plus validé ici : il n'existe plus de
+    // champ global. Chaque fiche véhicule valide le sien.
 
     // Restitution : tous les champs deviennent obligatoires dès que le client
     // demande une restitution. L'adresse de restitution est masquée quand
@@ -13386,7 +13390,7 @@ function _attacherEcouteursClient() {
     'client-from','client-from-rue','client-from-cp','client-contact-pc-nom','client-contact-pc-tel',
     'client-date-pc','client-heure-pc','client-to','client-to-rue','client-to-cp','client-contact-liv-nom','client-contact-liv-tel',
     'client-date-livraison','client-heure-liv','client-marque','client-immat','client-vin',
-    'client-type','client-vtype','client-mode',
+    'client-type','client-vtype',
     'client-restit-rue','client-restit-cp','client-restit-ville','client-restit-contact-nom','client-restit-contact-tel',
     'client-date-restit','client-heure-restit','client-restit-cdeb','client-restit-cfin','client-restit-vtype',
     'client-restit-marque','client-restit-immat','client-restit-vin'];
@@ -15277,7 +15281,7 @@ function clientQuoteCalc() {
 
   const clean   = document.getElementById('client-clean')?.checked || false;
 
-  const plateau = document.getElementById('client-plateau')?.checked || false;
+  const plateau = _hcPlateauDemande();
 
   const restit  = document.getElementById('client-restit')?.checked || false;
 
@@ -15756,9 +15760,7 @@ async function _submitClientFormInterne() {
   var marque_val  = (document.getElementById('client-marque') || {}).value || '';
   var immat_val   = (document.getElementById('client-immat') || {}).value || '';
   var vin_val     = (document.getElementById('client-vin') || {}).value || '';
-  var mode_val    = (document.getElementById('client-mode') || {}).value || '';
   var clean_val   = document.getElementById('client-clean') ? document.getElementById('client-clean').checked : false;
-  var plateau_val = document.getElementById('client-plateau') ? document.getElementById('client-plateau').checked : false;
   var urgence_val = document.getElementById('client-urgence') ? document.getElementById('client-urgence').checked : false;
   var restit_val  = document.getElementById('client-restit') ? document.getElementById('client-restit').checked : false;
   var notes_val   = (document.getElementById('client-notes') || {}).value || '';
@@ -15877,9 +15879,14 @@ async function _submitClientFormInterne() {
     marque_modele:          marque_val || null,
     immatriculation:        immat_val || null,
     vin:                    vin_val || null,
-    mode_transport:         mode_val || null,
+    // mode_transport et plateau ne sont plus envoyés au niveau du
+    // DOSSIER : ils décrivaient un choix global qui contredisait celui
+    // de chaque véhicule. La donnée vit desormais sur vehicules.
+    // mode_transport, écrit par la même transaction (migration 92).
+    // Les colonnes clients.mode_transport et clients.plateau restent en
+    // base, inchangées : les demandes déjà enregistrées les conservent,
+    // et le Dashboard continue de les lire pour celles-là.
     nettoyage:              clean_val ? 'Oui' : 'Non',
-    plateau:                plateau_val ? 'Oui' : 'Non',
     urgence:                urgence_val ? 'Oui' : 'Non',
     restitution:            restitActif ? 'Oui' : 'Non',
     adresse_restitution:    (restitActif ? restit_addr : '') || null,
@@ -18927,8 +18934,32 @@ function rendreFichesVehicules() {
 
     if (livraison) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
 
-    // Le mode de transport vient toujours APRÈS livraison/restitution.
-    if ((pcIndiv || livIndiv) && livActive===true) {
+    // ── LE MODE DE TRANSPORT, TOUJOURS PRESENT, TOUJOURS ICI ──
+    //
+    // Il vient APRES livraison/restitution, et il est genere pour CHAQUE
+    // vehicule, sans condition.
+    //
+    // DEFAUT CORRIGE. Ce bloc n'etait produit que si livActive===true,
+    // c'est-a-dire si la LIVRAISON APRES STOCKAGE de ce vehicule etait
+    // deja choisie. Or livActive vient de la fiche memorisee : il vaut
+    // null tant que le client n'a rien decide, et reste a la valeur
+    // laissee par un passage precedent dans le Stockage. Consequences
+    // observees, toutes expliquees par cette seule ligne :
+    //
+    //   * sur le vehicule 3 sur 3, jamais ouvert, le bloc n'existait
+    //     pas du tout — et le Dashboard n'affichait donc aucun mode de
+    //     transport pour V3 alors que V1 et V2 en avaient un ;
+    //   * la sequence Convoyage -> Stockage -> Livraison apres stockage
+    //     -> retour Convoyage le faisait reapparaitre, puisqu'elle
+    //     posait livActive=true ;
+    //   * et comme la rubrique disparaissait, le controle GLOBAL
+    //     « Standard / Sur plateau » restait seul visible sous la fiche,
+    //     donnant l'impression que le bloc s'etait deplace.
+    //
+    // Un vehicule est convoye par la route ou transporte sur plateau :
+    // cela ne depend d'aucune autre reponse. La rubrique est donc
+    // inconditionnelle, et elle appartient a son vehicule.
+    {
       var mode='<div class="veh-sstitre">Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></div><div style="display:flex;flex-direction:column;gap:7px">'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='plateau'?'':'checked')+'><span>Convoyage par la route</span></label>'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="plateau" '+(v.mode_transport==='plateau'?'checked':'')+'><span>Transport sur plateau</span></label></div>';
@@ -20187,8 +20218,9 @@ document.addEventListener('click', function (e) {
 #modal-client label.radio-opt:hover,
 #modal-client label.radio-opt:has(input[type="radio"]:checked),
 #modal-client label.radio-opt.selected { background:#fff !important; }
-/* Les deux anciens services cachés restent VRAIMENT cachés malgré display:grid !important. */
-#modal-client label.radio-opt:has(#client-plateau),
+/* L'ancien service caché reste VRAIMENT caché malgré display:grid !important.
+   (#client-plateau a été retiré : le mode de transport est porté par
+   chaque véhicule.) */
 #modal-client label.radio-opt:has(#client-urgence) { display:none !important; }
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
@@ -20442,7 +20474,6 @@ document.addEventListener('click', function (e) {
 #modal-client .field-required{display:inline-block;vertical-align:middle;line-height:1;}
 /* Délai souhaité : respiration forte et uniquement les deux niveaux utiles. */
 #modal-client .hc-delai-group{margin-top:42px !important;padding-top:16px !important;border-top:1px solid rgba(21,27,33,.08) !important;}
-#modal-client #client-plateau,
 #modal-client #client-urgence{display:none !important;}
 /* Créneau : rendu plus lisible. */
 .hp-picker--creneau{width:460px !important;}
@@ -20502,7 +20533,7 @@ document.addEventListener('click', function (e) {
     var dup=document.querySelector('#modal-client #bloc-nb-vehicules .hc-step2-acc-body > .modal-section-title'); if(dup)dup.style.display='none';
   }
   function cleanDelai(){
-    ['client-plateau','client-urgence'].forEach(function(id){var el=document.getElementById(id);if(el){el.checked=false;var lab=el.closest('label');if(lab)lab.style.setProperty('display','none','important');}});
+    ['client-urgence'].forEach(function(id){var el=document.getElementById(id);if(el){el.checked=false;var lab=el.closest('label');if(lab)lab.style.setProperty('display','none','important');}});
     var dg=document.getElementById('delai-group');if(dg){var g=dg.closest('.modal-form-group');if(g)g.classList.add('hc-delai-group');}
   }
   function msTime(v){var m=/^(\d{1,2}):(\d{2})$/.exec(v||'');return m?(parseInt(m[1],10)*60+parseInt(m[2],10)):null;}
