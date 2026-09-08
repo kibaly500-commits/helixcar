@@ -175,20 +175,28 @@ migrations/README.md
 
 ## 4. Tous les tests exécutés, avec leur résultat réel
 
-**Résultat global : 1 403 contrôles, 1 403 PASS, 0 FAIL — en une commande.**
+**Résultat global : 1 454 contrôles, 1 454 PASS, 0 FAIL — en une commande.**
 
 ```
 npm test
 ```
 
-29 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
-depuis zéro. Aucun chiffre de ce document n'est estimé ou reporté d'une
-exécution antérieure.
+30 suites, exécutées le 8 septembre 2026 **après le dernier commit de code**,
+depuis zéro, en 254 secondes. Aucun chiffre de ce document n'est estimé ou
+reporté d'une exécution antérieure.
 
-> Le lot livrait 1 276 contrôles. L'audit indépendant (§ 4 bis) en a ajouté
-> **127** : 44 pour le durcissement du Dashboard, 58 nouveaux contrôles SQL
-> offensifs, 13 sur le preflight CORS et la configuration versionnée, et 12
-> sur ce qu'un vrai rechargement de page fait réellement.
+Les suites sensibles aux dates ont en outre été passées dans **deux
+fuseaux** :
+
+```
+TZ=UTC           node tests/t_dates.js   →  19 PASS / 0 FAIL
+TZ=Europe/Paris  node tests/t_dates.js   →  19 PASS / 0 FAIL
+```
+
+> Le lot livrait 1 276 contrôles. Le premier audit (§ 4 bis) en a ajouté
+> 127, le second (§ 4 ter) 51 de plus : les tests offensifs sur les fausses
+> photos, l'injection au clic sur la page des candidatures, le rattachement
+> après `signUp`, et l'isolement réseau.
 
 ### 4.1 Trois familles de preuves, volontairement séparées
 
@@ -206,44 +214,45 @@ exécution antérieure.
 
 ### 4.2 Résultats réels, suite par suite
 
-#### Les 29 suites, du plus au moins fourni
+#### Les 30 suites, du plus au moins fourni
 
 | Suite | PASS | FAIL | Ce qu'elle couvre |
 |---|---|---|---|
-| `t_rls` | **227** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 15 sections, dont V bis, W bis et Z, toutes offensives |
+| `t_rls` | **241** | 0 | **Politiques RLS appliquées pour de vrai** sur PostgreSQL 16 jetable — 16 sections, dont V bis, W bis, Z et Z bis, toutes offensives |
 | `t_mdp_ui` | **88** | 0 | Longueur minimale et bouton œil sur les six champs |
 | `t_mission_nettoyage` | **72** | 0 | **§ 14** — fiche, création de mission, cloisonnement par métier, photos et leur relecture signée |
 | `t_video` | **70** | 0 | **§ 4** — exigence et durée selon les métiers, formats, taille, remplacement, envoi, erreurs réseau |
 | `t_video_securite` | **68** | 0 | **Sécurité serveur** : vrai code de `candidature-video`, **preflight CORS réel**, configuration versionnée |
+| `t_durcissement` | **59** | 0 | **Audits 1 et 2** : valeur réelle du header `Authorization`, injection au clic sur la page des candidatures, plus aucun handler en ligne, filtrage d'URL, photo orpheline, isolement réseau |
 | `t_tus` | **59** | 0 | **§ 4** — envoi reprenable contre un vrai serveur TUS ; **section D : rechargement réel**, section D bis : la reprise qui existe |
 | `t_pro` | **54** | 0 | Trouver un professionnel : catégories, compteurs, véhicules, récap, envoi |
 | `t_decisions` | **53** | 0 | Décisions par activité, six transitions, historique, persistance, refus d’autorisation |
 | `t_devis_commun` | **52** | 0 | **§ 9** — devis réellement disponible pour les 4 services, un seul moteur |
 | `t_multivehicules` | **48** | 0 | **§ 15** — la même demande de la saisie au PDF et à la fiche admin |
 | `t_infos` | **45** | 0 | **§ 10** — rubriques manquantes uniquement, transmission, validation, garde-fous |
-| `t_durcissement` | **44** | 0 | **Audit** : valeur réelle du header `Authorization`, injection HTML/JS avec charges hostiles, filtrage d’URL, photo orpheline |
 | `t_nettoyage_dashboard` | **43** | 0 | **§ 14** — contournement de connexion, chiffres réellement lus, plus rien de fictif |
 | `t_nonreg` | **41** | 0 | **Non-régression** : convoyage, stockage, compte seul, partenaire, textes, **périmètre de fichiers** |
 | `t_devis` | **40** | 0 | Devis PDF des 3 services + non-régression du devis convoyage |
 | `t_periode` | **40** | 0 | **§ 7** — un seul calendrier début/fin, plage colorée, bornes, heures |
 | `t_metiers` | **37** | 0 | **§ 13** — métiers cumulables, badges retirables, nomenclature partagée |
 | `t_blocage` | **35** | 0 | **§ 12** — état affiché = état enregistré, persistance après rechargement |
+| `t_client` | **35** | 0 | Espace client : session réelle, nouvelle demande, profil prérempli, F5, coupure réseau |
 | `t_charte` | **34** | 0 | **§ 11** — palette comparée sur les styles **réellement calculés**, fond blanc |
-| `t_client` | **34** | 0 | Espace client : session réelle, nouvelle demande, profil prérempli, F5, coupure réseau |
 | `t_motdepasse` | **33** | 0 | Réinitialisation du mot de passe, de bout en bout |
 | `t_pro_ui` | **32** | 0 | Formulaire professionnel : métiers, alignement, effacement confirmé, validations |
 | `t_nettoyage` | **28** | 0 | Parcours Nettoyage complet, du service au récapitulatif |
 | `t_video_admin` | **27** | 0 | Dashboard : états de la vidéo, lecture par URL signée, nettoyage à la fermeture |
 | `t_enregistreur` | **26** | 0 | **§ 4** — véritable enregistreur dans la page (caméra, chronomètre, relecture) |
+| `t_rattachement` | **21** | 0 | **Audit 2 nº 5** — `signUp` avec et sans session : le navigateur ne désigne pas le propriétaire, et l'écran n'annonce jamais un espace client vide |
 | `t_brouillon` | **20** | 0 | Effacer / OK par rubrique, brouillon restauré après F5 |
 | `t_contact` | **20** | 0 | Contact sur place : moi-même / une autre personne |
 | `t_dates` | **19** | 0 | Calendriers liés, bornes, horaires même jour et multi-jours |
 | `t_etapes` | **14** | 0 | **§ 6** — le bouton Continuer ne se grise jamais |
-| **TOTAL** | **1 403** | **0** | 27 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
+| **TOTAL** | **1 454** | **0** | 28 suites navigateur, 1 suite serveur, 1 suite PostgreSQL |
 
-`t_rls` applique les **vrais** fichiers de `migrations/00` → `97` sans les
+`t_rls` applique les **vrais** fichiers de `migrations/00` → `98` sans les
 modifier, sur un PostgreSQL 16 local jetable, puis observe le comportement
-effectif. Ses 15 sections, dont les trois ajoutées par l'audit :
+effectif. Ses 16 sections, dont les quatre ajoutées par les audits :
 
 | Section | Ce qu'elle prouve |
 |---|---|
@@ -257,7 +266,8 @@ effectif. Ses 15 sections, dont les trois ajoutées par l'audit :
 | **W bis** | **Audit nº 6** — qui a le droit de lire un rapport : propriétaire, administrateur, et personne d'autre |
 | **X** | **Chantier nº 13** — métiers, activité `technicien`, décisions créées **en attente** |
 | **Y** | **Chantier nº 14** — missions de nettoyage, photos, bucket privé |
-| **Z** | **Audit nº 7** — 28 écritures **hostiles directes** sur les missions : prix, client, paiement, statut, attribution, photos |
+| **Z** | **Audit 1 nº 7** — écritures **hostiles directes** sur les missions : prix, client, paiement, statut, attribution |
+| **Z bis** | **Audit 2 nº 2** — de fausses photos ne justifient plus rien : fichier inexistant, mauvaise mission, mauvais bucket, `ajoutee_par` forcé |
 | **F** | **Idempotence** : toute la chaîne rejouée — aucune erreur, aucune politique ni trigger en double |
 
 ### 4.3 Ce que la campagne a rattrapé
@@ -343,6 +353,24 @@ désormais **toute** requête sortante, sur toutes les machines. Seuls
 subsistent les fichiers locaux et les serveurs de test lancés sur la
 machine elle-même. C'est ce qui garantit — et non plus seulement ce qui
 espère — qu'aucun test ne peut atteindre Supabase.
+
+### 4 ter.3 État réel de l'intégration continue
+
+Le second audit signalait « aucune exécution du workflow ». **Ce n'était
+pas le cas** : le workflow était bien enregistré et actif, et il s'était
+exécuté deux fois sur `68c820a` — une fois sur la poussée, une fois sur la
+Pull Request.
+
+| Tâche | Sur `68c820a` |
+|---|---|
+| Politiques RLS sur PostgreSQL 16 | ✅ **verte** |
+| Suites navigateur et sécurité serveur | ❌ **rouge** — 813 PASS / 44 FAIL |
+
+Ce que l'onglet *Checks* montrait donc, c'était un workflow **rouge**, pas
+un workflow absent. La cause est le point nº 4 ci-dessus, et elle est
+corrigée. **L'état des exécutions postérieures est à lire dans l'onglet
+*Checks* de la Pull Request** : il n'est pas annoncé ici, parce qu'un
+résultat de CI ne se prédit pas.
 
 ---
 
