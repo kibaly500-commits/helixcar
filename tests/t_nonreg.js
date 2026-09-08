@@ -159,11 +159,23 @@ function futur(n) { const d = new Date(); d.setDate(d.getDate() + n); return d.t
   const sourceActuelle =
     fs.readFileSync('/home/user/helixcar/index.html', 'utf8')
     + fs.readFileSync('/home/user/helixcar/dashboard.html', 'utf8');
+  // Le MESSAGE affiché peut légitimement changer (reformulation) sans
+  // que le contrôle disparaisse. Ce qui est vérifié est donc le CONTRÔLE
+  // lui-même : la fonction appelée et le champ (ou le groupe) qu'elle
+  // vise. Un message réécrit passe ; un contrôle réellement supprimé
+  // échoue toujours.
+  const signatureControle = l => {
+    const m = /^(if \(!_check\w+\(\s*'[^']+'|_showFieldError\(\s*'[^']+'|_showGroupError\(\s*'[^']+')/.exec(l);
+    return m ? m[1] : null;
+  };
   const validationsRetirees = diff.split('\n')
     .filter(l => l.startsWith('-') && !l.startsWith('---'))
     .map(l => l.slice(1).trim())
     .filter(l => /^(if \(!_check|_showFieldError|_showGroupError)/.test(l))
-    .filter(l => sourceActuelle.indexOf(l) === -1);
+    .map(l => ({ ligne: l, sig: signatureControle(l) }))
+    .filter(o => o.sig ? sourceActuelle.indexOf(o.sig) === -1
+                       : sourceActuelle.indexOf(o.ligne) === -1)
+    .map(o => o.ligne);
   L.check('E5 : aucune suppression de validation métier existante',
     validationsRetirees.length === 0, validationsRetirees.slice(0, 3).join(' | '));
 

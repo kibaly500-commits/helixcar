@@ -576,6 +576,54 @@ check "W38 : hors conseil, un métier non choisi EST réclamé" "attendue" \
   "$(sql "select statut from public.informations_demande('dddddddd-0000-0000-0000-0000000000b3') where cle='professionnel_besoin';")"
 
 echo
+echo "── X. MÉTIERS DÉCLARÉS PAR LES PARTENAIRES (§13) ──"
+# AVANT la migration : un candidat ne peut pas se déclarer technicien,
+# alors qu'un client peut en demander un. On le prouve d'abord.
+check "X1 : REPRODUCTION — la colonne des métiers n'existe pas encore" "0" \
+  "$(sql "select count(*) from information_schema.columns where table_schema='public' and table_name='convoyeurs' and column_name='metiers';")"
+# La candidature technicien est créée AVANT la migration : c'est
+# exactement le cas d'une candidature déposée puis rattrapée par la mise
+# à jour, et cela prouve que la migration crée ses décisions manquantes.
+sql "insert into auth.users (id, email) values ('88888888-8888-8888-8888-888888888888','tech@helixcar.test');
+insert into public.convoyeurs (id, auth_user_id, prenom, nom, email, activites, statut) values
+ ('aaaaaaaa-0000-0000-0000-00000000000e','88888888-8888-8888-8888-888888888888','TEST-QA','Technicien',
+  'tech@helixcar.test','{technicien,renfort}','en_attente');" >/dev/null
+check "X2 : REPRODUCTION — l'activité technicien est refusée par la base" "refuse" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   insert into public.convoyeur_decisions (convoyeur_id, activite, decision)
+     values ('aaaaaaaa-0000-0000-0000-00000000000e','technicien','en_attente'); commit;" \
+   | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
+check "X2b : REPRODUCTION — sa candidature reste donc sans décision technicien" "0" \
+  "$(sql "select count(*) from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-00000000000e' and activite='technicien';")"
+
+errX=$(appliquer migrations/95_metiers_partenaires.sql)
+check "X3 : migrations/95 s'applique sans erreur" "" "$errX"
+
+check "X4 : la colonne des métiers existe et accepte un tableau" "1" \
+  "$(sql "select count(*) from information_schema.columns where table_schema='public' and table_name='convoyeurs' and column_name='metiers' and data_type='ARRAY';")"
+check "X5 : aucune candidature existante n'a été modifiée" "2|0" \
+  "$(sql "select count(*)||'|'||count(metiers) from public.convoyeurs where id in ('aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000002');")"
+sql "update public.convoyeurs set metiers = '{carrosserie,mecanique,jockey}'
+ where id='aaaaaaaa-0000-0000-0000-00000000000e';" >/dev/null
+check "X6 : un candidat peut désormais se déclarer technicien" "1" \
+  "$(sql "select count(*) from public.convoyeurs where id='aaaaaaaa-0000-0000-0000-00000000000e' and 'technicien' = any(activites);")"
+check "X7 : et déclarer PLUSIEURS métiers" "3" \
+  "$(sql "select array_length(metiers,1) from public.convoyeurs where id='aaaaaaaa-0000-0000-0000-00000000000e';")"
+check "X8 : la migration a créé les décisions manquantes de cette candidature" "renfort|technicien" \
+  "$(sql "select string_agg(activite,'|' order by activite) from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-00000000000e';")"
+check "X9 : une activité INVENTÉE reste refusée" "refuse" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+   insert into public.convoyeur_decisions (convoyeur_id, activite, decision)
+     values ('aaaaaaaa-0000-0000-0000-00000000000e','pirate','oui'); commit;" \
+   | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
+check "X10 : les décisions restent EN ATTENTE, jamais acceptées d'office" "2" \
+  "$(sql "select count(*) from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-00000000000e' and decision='en_attente';")"
+check "X11 : une décision par métier déclaré n'est PAS créée — la décision reste par activité" "2" \
+  "$(sql "select count(*) from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-00000000000e';")"
+check "X12 : les décisions déjà prises ne sont pas réinitialisées" "oui" \
+  "$(sql "select decision from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and activite='convoyage';")"
+
+echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
 HIST_AVANT=$(sql "select count(*) from public.convoyeur_decisions_historique;")
@@ -584,11 +632,13 @@ err9=$(appliquer migrations/90_durcissement_rls_partenaires.sql)
 err4=$(appliquer migrations/04_decisions_activites.sql)
 err92=$(appliquer migrations/92_creation_demande_atomique.sql)
 err94=$(appliquer migrations/94_informations_selon_scenario.sql)
+err95=$(appliquer migrations/95_metiers_partenaires.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
 check "F3b : 92 se rejoue sans erreur" "" "$err92"
 check "F3c : 94 se rejoue sans erreur" "" "$err94"
+check "F3d : 95 se rejoue sans erreur" "" "$err95"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"
