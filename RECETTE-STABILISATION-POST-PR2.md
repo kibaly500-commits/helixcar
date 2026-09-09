@@ -713,12 +713,16 @@ empreinte, et re-vérifié dans cette revue.
 
 | Danger | Ce qui l'empêche | Preuve |
 |---|---|---|
-| deux missions pour le même devis | index unique partiel `missions_nettoyage_une_par_demande`, **côté base** | `t_rls.sh` U7, U8 |
-| déclenchement sans acceptation réelle du devis | la fonction exige un `devis` au statut **`accepte`** | `t_rls.sh` U3, U4 |
-| contournement d'autorisation | la fonction exige `est_admin()`, et elle est `security definer` avec `search_path` fixé | `t_rls.sh` U1, U2 |
-| mission incomplète | zéro ligne `attendue` dans `informations_demande` exigée avant création | `t_rls.sh` U5, U6 |
-| rejeu | retour `DEJA_CREEE`, plus `exception when unique_violation` | `t_rls.sh` U9 → U12 |
-| **référence dupliquée** | **séquence** non transactionnelle | `t_rls.sh` **U21 → U24** |
+| deux missions pour le même devis | index unique partiel `missions_nettoyage_une_par_demande`, **côté base** — une insertion directe en double est refusée elle aussi | `t_rls.sh` **U3**, **U14**, **U15** |
+| déclenchement sans acceptation réelle du devis | la fonction exige un `devis` au statut **`accepte`** ; un devis **refusé** n'en crée aucune | `t_rls.sh` **U6**, **U7**, **U8** |
+| contournement d'autorisation | la fonction exige `est_admin()` ; elle n'est pas offerte à `anon`, ni à un client, ni à un partenaire | `t_rls.sh` **U4**, **U19**, **U20** |
+| mission incomplète | zéro ligne `attendue` dans `informations_demande` exigée avant création — la date de fin manquante est réclamée au client | `t_rls.sh` **U16**, **U17**, **U18** |
+| rejeu | retour `DEJA_CREEE`, plus `exception when unique_violation` : cinq rejeux, toujours une seule mission | `t_rls.sh` **U13**, **U14** |
+| **référence dupliquée** | **séquence** non transactionnelle, plus un index d'unicité défensif | `t_rls.sh` **U21 → U24** |
+
+La migration elle-même s'applique sans erreur et pose la période
+(`U1`, `U2`), et la mission créée reprend bien la période complète,
+l'adresse, le contact et l'horaire (`U9` → `U12`).
 
 ### 12.3 Création d'un compte particulier — jusqu'à l'existence vérifiable
 
