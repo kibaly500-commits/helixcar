@@ -446,6 +446,144 @@ function rubriquesVisibles(page, n) {
       && !/return pd\.nombre_vehicules \|\| 1;/.test(dash));
   }
 
+  // ══ G. LES PROTECTIONS DE LA PR nº 3 SURVIVENT À CE LOT ══
+  //
+  // Les lots D1 et D3 touchent la fiche véhicule et le nettoyage : on
+  // vérifie ICI que rien de ce qui avait été gagné n'est reperdu.
+  {
+    const page = await L.newPage(browser);
+    await L.fillStep1(page, 'particulier');
+    await L.chooseService(page, 'convoyage');
+    await page.waitForTimeout(150);
+
+    for (const n of [1, 2, 3, 5]) {
+      await page.evaluate((n) => {
+        const el = document.getElementById('nb-vehicules');
+        if (el) { el.value = String(n); el.dispatchEvent(new Event('change', { bubbles: true })); }
+        const r = document.querySelector('input[name="trajet-commun"][value="non"]');
+        if (r) { r.checked = true; if (typeof changerTrajetCommun === 'function') changerTrajetCommun(r); }
+        if (typeof rendreFichesVehicules === 'function') rendreFichesVehicules();
+      }, n);
+      await page.waitForTimeout(220);
+      const fiches = await page.evaluate((n) => {
+        const out = [];
+        for (let i = 0; i < n; i++) {
+          const c = document.getElementById('veh-contenu-' + i);
+          out.push({
+            rubriques: c ? Array.prototype.slice
+              .call(c.querySelectorAll('.veh-sous-accordeon .veh-sous-titre'))
+              .map(t => (t.textContent || '').trim()) : null,
+            modes: document.querySelectorAll('input[name="veh-' + i + '-mode"]').length,
+            modesDedans: c ? Array.prototype.slice
+              .call(document.querySelectorAll('input[name="veh-' + i + '-mode"]'))
+              .filter(r => c.contains(r)).length : 0
+          });
+        }
+        return out;
+      }, n);
+      check('G1-' + n + ' : ' + n + ' véhicule(s) — quatre rubriques, dans l\'ordre',
+        fiches.every(f => f.rubriques && f.rubriques.length === 4
+          && f.rubriques[0] === 'Identité du véhicule'
+          && f.rubriques[1] === 'Prise en charge'
+          && f.rubriques[2] === 'Livraison'
+          && f.rubriques[3] === 'Mode de transport'),
+        JSON.stringify(fiches.map(f => f.rubriques)));
+      check('G2-' + n + ' : le mode de transport reste DANS chaque fiche',
+        fiches.every(f => f.modes === 2 && f.modesDedans === 2),
+        JSON.stringify(fiches.map(f => [f.modes, f.modesDedans])));
+    }
+
+    // Chaque véhicule garde SA valeur, et une modification n'en touche
+    // aucun autre.
+    const modes = await page.evaluate(() => {
+      const poser = (i, v) => {
+        const r = document.querySelector('input[name="veh-' + i + '-mode"][value="' + v + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      };
+      poser(0, 'plateau'); poser(2, 'plateau');
+      return _lireFichesVehicules().map(v => v && v.mode_transport);
+    });
+    check('G3 : chaque véhicule garde sa propre valeur',
+      JSON.stringify(modes) === JSON.stringify(['plateau', 'standard', 'plateau', 'standard', 'standard']),
+      JSON.stringify(modes));
+
+    // Convoyage → Stockage → Convoyage : la structure revient intacte.
+    await L.chooseService(page, 'stockage');
+    await page.waitForTimeout(200);
+    await scenarioStockage(page, 'helixcar', 'helixcar', 5);
+    await L.chooseService(page, 'convoyage');
+    await page.waitForTimeout(250);
+    await page.evaluate(() => {
+      const r = document.querySelector('input[name="trajet-commun"][value="non"]');
+      if (r) { r.checked = true; if (typeof changerTrajetCommun === 'function') changerTrajetCommun(r); }
+      if (typeof rendreFichesVehicules === 'function') rendreFichesVehicules();
+    });
+    await page.waitForTimeout(250);
+    const retour = await rubriquesVisibles(page, 5);
+    check('G4 : après Convoyage → Stockage → Convoyage, la structure revient intacte',
+      retour.every(v => v && v.length === 4 && v[3] === 'Mode de transport'),
+      JSON.stringify(retour.map(v => v && v.length)));
+    const modesRetour = await page.evaluate(() =>
+      [0, 1, 2, 3, 4].map(i => document.querySelectorAll('input[name="veh-' + i + '-mode"]').length));
+    check('G5 : et le mode de transport ne se dédouble jamais',
+      modesRetour.every(n => n === 2), JSON.stringify(modesRetour));
+
+    // Le contrôle parasite global ne revient pas.
+    check('G6 : aucun contrôle global « Standard / Sur plateau »',
+      !/id="client-mode"/.test(idx) && !/id="client-plateau"/.test(idx)
+      && !/name="mode-transport"/.test(idx) && !/function onModeTransport/.test(idx));
+    const standard = await page.evaluate(() => {
+      const out = [];
+      document.querySelectorAll('#modal-client input[type="radio"]').forEach(r => {
+        const l = r.closest('label');
+        if (l && /^\s*Standard\s*$/.test(l.textContent || '')) out.push(r.name);
+      });
+      return out;
+    });
+    check('G7 : le mot « Standard » ne subsiste que dans « Délai souhaité »',
+      standard.length > 0 && standard.every(n => /delai/i.test(n)), JSON.stringify(standard));
+    check('G8 : et « Délai souhaité » garde ses deux choix',
+      /Prioritaire/.test(idx) && /D[ée]lai souhait[ée]/.test(idx));
+    check('G9 : aucune erreur JavaScript sur tout le cycle',
+      page.jsErrors.length === 0, page.jsErrors.slice(0, 2).join(' | '));
+    await page.close();
+  }
+
+  // ══ H. LES AUTRES PROTECTIONS DE LA PR nº 3 ══
+  {
+    const PROTECTIONS = [
+      ['compteur de demandes rafraîchi immédiatement',
+        () => /DELAI_MIN_RECOMPTAGE_MS = 30000/.test(dash) && /visibilitychange/.test(dash)],
+      ['aucune erreur COALESCE entre une date et un texte',
+        () => !/coalesce\(\s*\w+\.date_[a-z_]+\s*,\s*\w+\.[a-z_]+\s*\)\s*is null/i
+                .test(fs.readFileSync(fichier('migrations/103_nettoyage_horaires_obligatoires.sql'), 'utf8'))],
+      ['les quatre activités partenaire restent acceptées',
+        () => /activites_partenaire\(\)/.test(
+          fs.readFileSync(fichier('migrations/100_activites_partenaire.sql'), 'utf8'))],
+      ['la création de compte ne peut pas annoncer un faux succès',
+        () => /_compteEtat/.test(idx) && /existe_deja/.test(idx) && /_retourSrv/.test(idx)],
+      ['duplication indépendante des véhicules',
+        () => /_memoriserVehicules/.test(idx) && /_vehiculeMemorise/.test(idx)],
+      ['la référence de mission vient d\'une séquence, jamais d\'un max()',
+        () => /nextval\('public\.missions_nettoyage_numero'\)/.test(
+          fs.readFileSync(fichier('migrations/102_nettoyage_periode_et_mission.sql'), 'utf8'))],
+      ['une seule mission de nettoyage par demande',
+        () => /missions_nettoyage_une_par_demande/.test(
+          fs.readFileSync(fichier('migrations/102_nettoyage_periode_et_mission.sql'), 'utf8'))],
+      ['isolement réseau des tests',
+        () => /abort/.test(fs.readFileSync(fichier('tests/env.js'), 'utf8'))],
+      ['intégration continue en deux tâches', () => {
+        const y = fs.readFileSync(fichier('.github/workflows/tests.yml'), 'utf8');
+        return /Politiques RLS/.test(y) && /Suites navigateur/.test(y);
+      }]
+    ];
+    PROTECTIONS.forEach(([nom, preuve], i) => {
+      let ok = false, err = '';
+      try { ok = !!preuve(); } catch (e) { err = e.message; }
+      check('H' + (i + 1) + ' : ' + nom + ' — intacte', ok, err);
+    });
+  }
+
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));
