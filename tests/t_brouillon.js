@@ -70,32 +70,17 @@ async function setVal(page, id, v) {
   await page.waitForTimeout(60);
   await page.click('input[name="pro-specialite"][value="diagnostic"]');
   await page.waitForTimeout(60);
-  await page.evaluate(() => { proMajNbVehicules(1); });   // 2 véhicules
-  await page.waitForTimeout(60);
-  // Un seul véhicule est ouvert à la fois (accordéon exclusif voulu) :
-  // on remplit chaque carte pendant qu'elle est ouverte. Le <select> natif
-  // est enveloppé par le widget select maison (data-hc-select), donc on
-  // écrit la valeur puis on déclenche 'change', comme le fait le widget.
-  const habille = await page.evaluate(() => {
-    function remplir(i, type, marque) {
-      proBasculerVehicule(i);
-      var sel = document.getElementById('pro-veh-' + i + '-type');
-      sel.value = type; sel.dispatchEvent(new Event('change', { bubbles: true }));
-      var inp = document.getElementById('pro-veh-' + i + '-marque');
-      inp.value = marque; inp.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    remplir(0, 'berline', 'BMW Série 3');
-    remplir(1, 'suv', 'Audi Q5');
-    return {
-      widget0: !!document.querySelector('#pro-veh-acc-0 .hc-select-wrap'),
-      widget1: !!document.querySelector('#pro-veh-acc-1 .hc-select-wrap'),
-      ouverts: document.querySelectorAll('#pro-vehicules-liste .pro-veh-acc.ouvert').length
-    };
-  });
-  L.check('B0a : les selects véhicule reçoivent le widget select maison (design homogène)',
-    habille.widget0 && habille.widget1, JSON.stringify(habille));
-  L.check('B0b : une seule carte véhicule ouverte à la fois',
-    habille.ouverts === 1, 'ouverts=' + habille.ouverts);
+  // LOT D4 — la rubrique « Informations sur les vehicules » a ete
+  // SUPPRIMEE sur demande explicite : elle n'existait que pour le
+  // technicien. Le brouillon ne doit donc plus rien en memoriser, et
+  // surtout un ANCIEN brouillon ne doit pas pouvoir la ressusciter.
+  const plusDeVehicules = await page.evaluate(() => ({
+    accordeon: !!document.getElementById('pro-acc-vehicules'),
+    cartes: document.querySelectorAll('.pro-veh-acc').length
+  }));
+  L.check('B0a : plus aucune carte véhicule dans le parcours professionnel',
+    plusDeVehicules.accordeon === false && plusDeVehicules.cartes === 0,
+    JSON.stringify(plusDeVehicules));
   await page.waitForTimeout(80);
 
   await page.evaluate(() => proBasculerRubrique('lieu'));
@@ -129,9 +114,12 @@ async function setVal(page, id, v) {
     if (!k) return null;
     try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; }
   });
-  L.check('B2 : véhicules du professionnel présents dans le brouillon',
-    contenuBrouillon && contenuBrouillon.professionnelVehicules &&
-    Object.keys(contenuBrouillon.professionnelVehicules).length === 2,
+  // RÈGLE INVERSÉE SUR DEMANDE EXPLICITE (lot D4) : le brouillon ne
+  // mémorise plus AUCUN véhicule professionnel. Le contrôle n'est pas
+  // supprimé, il exige maintenant l'inverse — et c'est plus strict.
+  L.check('B2 : le brouillon ne mémorise plus aucun véhicule professionnel',
+    contenuBrouillon
+    && JSON.stringify(contenuBrouillon.professionnelVehicules || {}) === '{}',
     JSON.stringify(contenuBrouillon && contenuBrouillon.professionnelVehicules));
 
   // F5 réel
@@ -149,9 +137,7 @@ async function setVal(page, id, v) {
       service: _typeServiceChoisi(),
       categorie: _proCategorie(),
       specialite: _proSpecialite(),
-      nbVeh: _proNbVehicules(),
-      veh0: (_proMemoireVehicules[0] || {}),
-      veh1: (_proMemoireVehicules[1] || {}),
+      vehiculesResiduels: document.querySelectorAll('[id^="pro-veh-"], #pro-acc-vehicules').length,
       adresse: _proAdresseRue(),
       contact: _hcContactSurPlace('pro'),
       payload: _construireDetailsProfessionnel(),
@@ -165,17 +151,22 @@ async function setVal(page, id, v) {
     L.check('B3 : service restauré', restaure.service === 'professionnel', JSON.stringify(restaure.service));
     L.check('B4 : catégorie et métier restaurés',
       restaure.categorie === 'technicien' && restaure.specialite === 'diagnostic', JSON.stringify(restaure));
-    L.check('B5 : nombre de véhicules restauré', restaure.nbVeh === 2, 'nb=' + restaure.nbVeh);
-    L.check('B6 : véhicule 1 restauré',
-      restaure.veh0.marque_modele === 'BMW Série 3', JSON.stringify(restaure.veh0));
-    L.check('B7 : véhicule 2 restauré',
-      restaure.veh1.marque_modele === 'Audi Q5', JSON.stringify(restaure.veh1));
+    // LOT D4 — une reprise de brouillon ne doit RIEN faire réapparaître.
+    L.check('B5 : la reprise ne ressuscite aucune rubrique véhicule',
+      restaure.vehiculesResiduels === 0, String(restaure.vehiculesResiduels));
+    L.check('B6 : et le payload restauré n\'en porte aucun',
+      restaure.payload.nombre_vehicules === null
+      && (restaure.payload.vehicules || []).length === 0,
+      JSON.stringify(restaure.payload.vehicules));
     L.check('B8 : adresse restaurée', restaure.adresse === '18 rue de Paris', restaure.adresse);
     L.check('B9 : contact sur place restauré',
       restaure.contact && restaure.contact.nom === 'Karim B.', JSON.stringify(restaure.contact));
     L.check('B10 : payload complet après restauration',
-      restaure.payload && restaure.payload.vehicules.length === 2 && !!restaure.payload.date_debut,
-      JSON.stringify(restaure.payload && restaure.payload.vehicules));
+      restaure.payload && !!restaure.payload.date_debut && !!restaure.payload.date_fin
+      && !!restaure.payload.heure_debut,
+      JSON.stringify(restaure.payload && {
+        d: restaure.payload.date_debut, f: restaure.payload.date_fin,
+        h: restaure.payload.heure_debut }));
     L.check('B11 : état du bouton recalculé après restauration (sans clic ailleurs)',
       restaure.btnDisabled === false, 'disabled=' + restaure.btnDisabled);
   }

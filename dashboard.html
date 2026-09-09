@@ -466,6 +466,18 @@ body.scroll-verrouille { overflow: hidden; }
 }
 .hc-note.visible { display: block; }
 
+/* LOT B1 — selecteur d'espace : discret, dans la barre laterale. */
+.sb-roles { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
+.sb-roles button {
+  border: 1px solid rgba(23,28,33,.14); background: #fff; color: #4A5056;
+  border-radius: 999px; padding: 5px 12px; font-size: .74rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.sb-roles button:hover { border-color: var(--red); color: var(--red); }
+.sb-roles button[aria-current="true"] {
+  background: var(--navy); border-color: var(--navy); color: #fff; cursor: default;
+}
+
 /* LOT E2 — le fond bleu de l'autoremplissage, neutralise sur les
    ecrans d'authentification du Dashboard exactement comme sur la
    vitrine. `background-clip: text` limite le fond peint par le
@@ -1017,6 +1029,15 @@ body.scroll-verrouille { overflow: hidden; }
         <span class="user-role role-admin" id="sb-role">Admin</span>
       </div>
     </div>
+
+    <!-- LOT B1 — SELECTEUR D'ESPACE.
+         N'apparait QUE si l'identite possede reellement au moins deux
+         roles, et ne propose QUE ceux que le serveur a confirmes
+         (public.roles_utilisateur()). Changer d'espace ne demande
+         aucune reconnexion et n'elargit aucun droit : les politiques
+         RLS restent les seules a decider ce qui est lisible. -->
+    <div id="sb-roles" class="sb-roles" style="display:none" role="group"
+         aria-label="Changer d'espace"></div>
 
     <nav class="sidebar-nav" id="sidebar-nav">
       <!-- injected by JS -->
@@ -2704,7 +2725,9 @@ async function doLoginConvoyeur(email, pw, alertEl) {
       if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
-    await finaliserSessionConvoyeur(email, alertEl, data.user ? data.user.id : null);
+    const uidConv = data.user ? data.user.id : null;
+    const okConv = await finaliserSessionConvoyeur(email, alertEl, uidConv);
+    if (okConv !== false) await _hcPreparerRoles('partenaire', email, uidConv);
   } catch (e) {
     if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
@@ -2731,7 +2754,9 @@ async function doLoginAdmin(email, pw, alertEl) {
       if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
-    await finaliserSessionAdmin(email, alertEl, data.user ? data.user.id : null);
+    const uidAdm = data.user ? data.user.id : null;
+    const okAdm = await finaliserSessionAdmin(email, alertEl, uidAdm);
+    if (okAdm !== false) await _hcPreparerRoles('admin', email, uidAdm);
   } catch (e) {
     if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
@@ -2752,7 +2777,12 @@ async function doLoginClient(email, pw, alertEl) {
       }
       return;
     }
-    await finaliserSessionClient(email, alertEl, data.user ? data.user.id : null);
+    const uid = data.user ? data.user.id : null;
+    const ok = await finaliserSessionClient(email, alertEl, uid);
+    // LOT B1 — une connexion directe doit offrir le meme choix qu'une
+    // arrivee par onAuthStateChange : sans cela, une personne a deux
+    // casquettes n'atteignait jamais la seconde.
+    if (ok !== false) await _hcPreparerRoles('client', email, uid);
   } catch (e) {
     if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
@@ -3204,14 +3234,130 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 // convoyeur si ce n'est pas un admin — reproduisant exactement le
 // comportement déjà en place pour convoyeur seul, étendu pour couvrir
 // les deux rôles sans jamais les confondre.
+// ══════════════════════════════════════════════════════════════
+// LOT B1 — UNE IDENTITE, PLUSIEURS CASQUETTES
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : une personne a la fois cliente et partenaire
+// n'atteignait JAMAIS son second espace. finaliserSessionParUid()
+// prenait le PREMIER role trouve — admin, puis partenaire, puis client
+// — et s'arretait la.
+//
+// Les roles sont desormais demandes AU SERVEUR
+// (public.roles_utilisateur(), migration 104). La page ne devine rien,
+// n'interroge aucune table role par role, et ne peut donc pas se
+// tromper ni renseigner sur quelqu'un d'autre.
+//
+// A RETENIR : changer d'espace ne change QUE l'affichage. Aucune
+// requete n'est autorisee par ce choix : les politiques RLS restent
+// les seules a decider ce qui est lisible, et elles ne regardent que
+// auth.uid().
+window._hcRolesAutorises = [];
+window._hcRoleActif = null;
+
+const HC_LIB_ROLE = { admin: 'Admin', partenaire: 'Convoyeur', client: 'Client' };
+const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace convoyeur', client: 'Espace client' };
+
+// Les roles REELLEMENT attribues a la session en cours. En cas de
+// panne, on repart sur une liste vide : l'ancien enchainement prend
+// alors le relais, et aucun espace n'est ouvert par defaut.
+async function _hcRolesDeLaSession() {
+  try {
+    if (!_sbAuthPret || !_sbAuthPret()) return [];
+    const { data, error } = await sbAuth.rpc('roles_utilisateur');
+    if (error) { console.warn('roles_utilisateur :', error); return []; }
+    return (data || [])
+      .map(r => (typeof r === 'string' ? r : (r && r.role)))
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('roles_utilisateur :', e);
+    return [];
+  }
+}
+
+// Ouvre UN espace, et lui seul. Refuse net tout role qui n'a pas ete
+// confirme par le serveur : un appel direct depuis la console ne peut
+// donc pas ouvrir un Dashboard non attribue.
+async function _hcOuvrirEspace(role, email, authUserId) {
+  if (window._hcRolesAutorises.indexOf(role) === -1) {
+    console.warn('Espace non attribué refusé :', role);
+    return false;
+  }
+  const precedent = window._hcRoleActif;
+  window._hcRoleActif = role;
+  let ouvert;
+  if (role === 'admin')           ouvert = await finaliserSessionAdmin(email, null, authUserId, false);
+  else if (role === 'partenaire') ouvert = await finaliserSessionConvoyeur(email, null, authUserId, false);
+  else                            ouvert = await finaliserSessionClient(email, null, authUserId, false);
+  // Un espace qui n'a PAS pu s'ouvrir ne doit jamais etre presente
+  // comme ouvert : on revient a celui d'ou l'on vient, plutot que de
+  // laisser un selecteur qui affirme une bascule qui n'a pas eu lieu.
+  if (ouvert === false) window._hcRoleActif = precedent;
+  return ouvert;
+}
+
+// Le selecteur n'apparait QUE s'il y a vraiment un choix a faire.
+function _hcRendreSelecteurRoles(email, authUserId) {
+  const zone = document.getElementById('sb-roles');
+  if (!zone) return;
+  const roles = window._hcRolesAutorises || [];
+  if (roles.length < 2) { zone.style.display = 'none'; zone.innerHTML = ''; return; }
+  zone.innerHTML = '';
+  ['client', 'partenaire', 'admin'].filter(r => roles.indexOf(r) !== -1).forEach(r => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = HC_LIB_ESPACE[r] || r;
+    b.setAttribute('data-hc-role', r);
+    if (r === window._hcRoleActif) b.setAttribute('aria-current', 'true');
+    // Un clic suffit : aucune reconnexion, la session ne bouge pas.
+    b.onclick = function () {
+      if (r === window._hcRoleActif) return;
+      _hcOuvrirEspace(r, email, authUserId).then(function () {
+        _hcRendreSelecteurRoles(email, authUserId);
+      });
+    };
+    zone.appendChild(b);
+  });
+  zone.style.display = 'flex';
+}
+
+// LOT B1 — apres une connexion directe : on demande les roles reels et
+// on affiche le selecteur si, et seulement si, il y a un choix.
+// Le role deja ouvert est celui par lequel la personne est entree.
+async function _hcPreparerRoles(roleOuvert, email, authUserId) {
+  window._hcRolesAutorises = await _hcRolesDeLaSession();
+  if (window._hcRolesAutorises.indexOf(roleOuvert) === -1) {
+    // Le serveur ne confirme pas ce role : on n'invente rien, et on
+    // n'affiche aucun selecteur. L'espace deja ouvert l'a ete par le
+    // chemin historique, qui a ses propres controles.
+    window._hcRoleActif = roleOuvert;
+    const z = document.getElementById('sb-roles');
+    if (z) { z.style.display = 'none'; z.innerHTML = ''; }
+    return;
+  }
+  window._hcRoleActif = roleOuvert;
+  _hcRendreSelecteurRoles(email, authUserId);
+}
+
 async function finaliserSessionParUid(email, authUserId) {
-  const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
-  if (estAdmin) return;
-  const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
-  if (estConvoyeur) return;
-  // Ni admin ni partenaire : c'est un client. Sa session est réelle,
-  // exactement comme les deux autres rôles.
-  await finaliserSessionClient(email, null, authUserId, false);
+  window._hcRolesAutorises = await _hcRolesDeLaSession();
+
+  // Repli si le serveur ne repond pas ou si la migration 104 n'est pas
+  // encore appliquee : l'enchainement historique, strictement
+  // inchange. Aucun espace n'est ouvert sans que son role existe.
+  if (!window._hcRolesAutorises.length) {
+    const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
+    if (estAdmin) return;
+    const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
+    if (estConvoyeur) return;
+    await finaliserSessionClient(email, null, authUserId, false);
+    return;
+  }
+
+  // Ordre d'ouverture par defaut, inchange : admin, partenaire, client.
+  const prefere = ['admin', 'partenaire', 'client']
+    .filter(r => window._hcRolesAutorises.indexOf(r) !== -1)[0];
+  const ouvert = await _hcOuvrirEspace(prefere, email, authUserId);
+  if (ouvert !== false) _hcRendreSelecteurRoles(email, authUserId);
 }
 
 function initApp(user) {

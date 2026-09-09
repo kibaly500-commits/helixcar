@@ -2136,6 +2136,176 @@ check "V-D3-23 : une seule signature pour chaque fonction remplacee" "2" \
   "$(sql "select count(*) from pg_proc
      where proname in ('informations_demande','creer_mission_nettoyage_si_prete');")"
 
+echo "── W bis. LOT B1 : UNE IDENTITE, PLUSIEURS CASQUETTES ──"
+# Une meme personne doit pouvoir etre cliente ET partenaire avec la
+# MEME adresse, donc la meme identite Auth et le meme mot de passe.
+
+# Une personne qui est deja cliente et qui a depose une candidature
+# partenaire avec la meme adresse.
+sql "insert into auth.users (id, email, email_confirmed_at) values
+      ('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test', now()),
+      ('77777777-0000-0000-0000-000000000002','autre-personne@helixcar.test', now()),
+      ('77777777-0000-0000-0000-000000000003','non-confirmee@helixcar.test', null)
+     on conflict (id) do nothing;
+     insert into public.clients (id, numero_client, email, type_service, statut, auth_user_id)
+     values ('77777777-1111-0000-0000-000000000001','TEST-QA-CLAUDE-PR4-B1',
+             'deux-casquettes@helixcar.test','convoyage','nouveau',
+             '77777777-0000-0000-0000-000000000001')
+     on conflict (id) do nothing;
+     insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000001','TEST-QA','Deux Casquettes',
+             'deux-casquettes@helixcar.test', array['convoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+
+# REPRODUCTION : avant 104, la page ne peut pas connaitre les roles.
+AVANT_FN=$(sql "select count(*) from pg_proc where proname='roles_utilisateur';")
+check "W-B1-1 : REPRODUCTION — aucun moyen de connaitre ses roles avant 104" "0" "$AVANT_FN"
+AVANT_IDX=$(sql "select count(*) from pg_indexes
+   where indexname in ('admins_une_ligne_par_identite','convoyeurs_une_fiche_par_identite');")
+check "W-B1-2 : REPRODUCTION — rien n'empeche deux fiches par identite" "0" "$AVANT_IDX"
+
+errB1=$(appliquer migrations/104_identite_unique_roles_multiples.sql)
+check "W-B1-3 : migrations/104 s'applique sans erreur" "" "$errB1"
+check "W-B1-4 : les deux index d'unicite sont poses" "2" \
+  "$(sql "select count(*) from pg_indexes
+     where indexname in ('admins_une_ligne_par_identite','convoyeurs_une_fiche_par_identite');")"
+
+# La candidature n'est PAS encore rattachee : un seul role.
+check "W-B1-5 : avant rattachement, la personne n'est que cliente" "client" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select string_agg(role, ',' order by role) from public.roles_utilisateur();
+     commit;" | tail -1)"
+
+# QUELQU'UN D'AUTRE ne peut pas s'attribuer cette candidature.
+check "W-B1-6 : une autre identite ne peut pas s'attribuer la fiche" "INTROUVABLE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000002','autre-personne@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-7 : ... et la fiche reste bien non rattachee" "t" \
+  "$(sql "select (auth_user_id is null) from public.convoyeurs
+      where id='77777777-2222-0000-0000-000000000001';")"
+
+# Une adresse NON CONFIRMEE ne suffit pas.
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000009','TEST-QA','Non Confirmee',
+             'non-confirmee@helixcar.test', array['convoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+check "W-B1-8 : une adresse non confirmee ne rattache rien" "ADRESSE_NON_CONFIRMEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000003','non-confirmee@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000009') ->> 'code';
+     commit;" | tail -1)"
+
+# LE PARCOURS LEGITIME.
+check "W-B1-9 : la personne rattache SA candidature a SON identite" "RATTACHEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-10 : elle porte desormais DEUX roles, sans second mot de passe" "client,partenaire" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select string_agg(role, ',' order by role) from public.roles_utilisateur();
+     commit;" | tail -1)"
+check "W-B1-11 : une seule identite Auth pour cette adresse" "1" \
+  "$(sql "select count(*) from auth.users where email='deux-casquettes@helixcar.test';")"
+
+# IDEMPOTENCE et DOUBLE CLIC.
+check "W-B1-12 : rejouer l'appel ne duplique rien" "DEJA_RATTACHEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-13 : et toujours UNE seule fiche partenaire pour cette identite" "1" \
+  "$(sql "select count(*) from public.convoyeurs
+      where auth_user_id='77777777-0000-0000-0000-000000000001'
+        and statut is distinct from 'refuse';")"
+
+# Une SECONDE candidature de la meme personne ne cree pas un second role.
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000002','TEST-QA','Deux Casquettes Bis',
+             'deux-casquettes@helixcar.test', array['nettoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+check "W-B1-14 : une deuxieme fiche partenaire est refusee pour la meme identite" "ROLE_DEJA_PRESENT" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000002') ->> 'code';
+     commit;" | tail -1)"
+# Ecriture DIRECTE, hors de toute fonction : c'est la base elle-meme
+# qui doit refuser. L'erreur attendue est ignoree, seul le compte final
+# fait foi.
+FORCE_CONV=$(sql "update public.convoyeurs set auth_user_id='77777777-0000-0000-0000-000000000001'
+      where id='77777777-2222-0000-0000-000000000002';" 2>&1 | head -1)
+check "W-B1-15 : la base refuse elle-meme une deuxieme fiche rattachee" "1" \
+  "$(sql "select count(*) from public.convoyeurs
+      where auth_user_id='77777777-0000-0000-0000-000000000001'
+        and statut is distinct from 'refuse';")"
+check "W-B1-15 bis : et elle le dit par une violation d'unicite" "1" \
+  "$(printf '%s' "$FORCE_CONV" | grep -ci 'duplicate key\|unique' || true)"
+FORCE_ADMIN=$(sql "insert into public.admins (auth_user_id, email, actif)
+      values ('11111111-1111-1111-1111-111111111111','admin@helixcar.test', true);" 2>&1 | head -1)
+check "W-B1-16 : et deux lignes d'administrateur pour une identite aussi" "1" \
+  "$(sql "select count(*) from public.admins
+      where auth_user_id='11111111-1111-1111-1111-111111111111';")"
+check "W-B1-16 bis : la aussi par une violation d'unicite" "1" \
+  "$(printf '%s' "$FORCE_ADMIN" | grep -ci 'duplicate key\|unique' || true)"
+
+# LE ROLE ADMINISTRATEUR N'EST JAMAIS AUTO-ATTRIBUABLE.
+check "W-B1-17 : un client ne peut pas s'inscrire administrateur" "0" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from (
+       select 1 where (select count(*) from public.roles_utilisateur() where role='admin') > 0
+     ) d;
+     commit;" | tail -1)"
+check "W-B1-18 : ajouter_role_partenaire n'ecrit jamais dans admins" "0" \
+  "$(sql "select count(*) from pg_proc p
+     where p.proname='ajouter_role_partenaire'
+       and pg_get_functiondef(p.oid) ilike '%insert into public.admins%';")"
+
+# AUCUNE ENUMERATION : la fonction ne prend aucune adresse en parametre.
+check "W-B1-19 : roles_utilisateur ne prend aucun parametre" "0" \
+  "$(sql "select pronargs from pg_proc where proname='roles_utilisateur';")"
+check "W-B1-20 : elle n'est pas offerte a anon" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='roles_utilisateur' and grantee='anon';")"
+check "W-B1-21 : ajouter_role_partenaire non plus" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='ajouter_role_partenaire' and grantee='anon';")"
+# Sans session, le refus arrive AVANT meme d'entrer dans la fonction :
+# `anon` n'a pas le droit de l'executer. C'est plus strict que le garde
+# NON_AUTHENTIFIE prevu a l'interieur — lequel reste en place pour un
+# appelant authenticated dont auth.uid() serait nul.
+ANON_ROLE=$(sql "begin; select public.devenir_anon();
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" 2>&1 | tail -1)
+check "W-B1-22 : sans session, rien n'est possible" "1" \
+  "$(printf '%s' "$ANON_ROLE" | grep -ci 'permission denied\|NON_AUTHENTIFIE' || true)"
+check "W-B1-22 bis : et le garde interne existe quand meme" "1" \
+  "$(sql "select count(*) from pg_proc p
+     where p.proname='ajouter_role_partenaire'
+       and pg_get_functiondef(p.oid) ilike '%NON_AUTHENTIFIE%';")"
+
+# LES RLS NE SONT PAS ELARGIES : changer de Dashboard ne donne aucun droit.
+check "W-B1-23 : un partenaire ne lit toujours pas les demandes des clients" "0" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from public.clients where auth_user_id is distinct from auth.uid();
+     commit;" | tail -1)"
+check "W-B1-24 : il ne voit que SA fiche partenaire" "1" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from public.convoyeurs;
+     commit;" | tail -1)"
+
+errB1b=$(appliquer migrations/104_identite_unique_roles_multiples.sql)
+check "W-B1-25 : 104 se rejoue sans erreur" "" "$errB1b"
+check "W-B1-26 : une seule signature par fonction" "2" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('roles_utilisateur','ajouter_role_partenaire');")"
+
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="
 for e in "${ECHECS[@]:-}"; do [ -n "$e" ] && echo "  - $e"; done

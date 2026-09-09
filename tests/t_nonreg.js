@@ -196,7 +196,14 @@ const futur = dansNJours;
   // et sa validation avec lui.
   const RETRAITS_DELIBERES = [
     "if (!_checkRequiredText('nett-heure'",
-    "_showGroupError('nett-dispo-group'"
+    "_showGroupError('nett-dispo-group'",
+    // LOT D4 — la rubrique « Informations sur les véhicules » du
+    // parcours professionnel a été SUPPRIMÉE sur demande explicite :
+    // elle n'existait que pour le technicien, dont le besoin porte sur
+    // des personnes et une période, jamais sur un parc. Ses deux
+    // validations disparaissent donc avec elle. Compensé par E5e.
+    "_showFieldError('pro-veh-",
+    "_showFieldError('pro-veh-'"
   ];
   const validationsRetirees = diff.split('\n')
     .filter(l => l.startsWith('-') && !l.startsWith('---'))
@@ -212,13 +219,25 @@ const futur = dansNJours;
   // Le garde-fou ne doit pas devenir un fourre-tout : chaque retrait
   // délibéré est compensé par une validation qui, elle, DOIT exister.
   L.check('E5b : les retraits délibérés restent une liste courte et nommée',
-    RETRAITS_DELIBERES.length <= 4);
+    RETRAITS_DELIBERES.length <= 6);
   L.check('E5c : la période de nettoyage est validée à la place',
     /_checkDate\('nett-date-fin', true\)/.test(sourceActuelle)
     && /La fin ne peut pas pr/.test(sourceActuelle),
     'validation de la date de fin absente');
   L.check('E5d : et la cohérence de l\'horaire sur place aussi',
     /_showFieldError\('nett-creneau-fin'/.test(sourceActuelle));
+  // LOT D3 — l'horaire sur place n'est plus facultatif : sa PRÉSENCE
+  // est désormais exigée, ce qui est strictement plus strict.
+  L.check('E5d bis : les deux horaires de nettoyage sont maintenant obligatoires',
+    /_showFieldError\('nett-creneau-debut', 'Ce champ est obligatoire\.'\)/.test(sourceActuelle)
+    && /_showFieldError\('nett-creneau-fin', 'Ce champ est obligatoire\.'\)/.test(sourceActuelle));
+  // LOT D4 — compensation nommée du retrait ci-dessus : la rubrique
+  // n'existe plus DU TOUT, donc rien ne peut plus la valider à moitié.
+  L.check('E5e : plus aucune rubrique véhicule dans le parcours professionnel',
+    !/id="pro-acc-vehicules"/.test(sourceActuelle)
+    && !/id="pro-nb-vehicules"/.test(sourceActuelle)
+    && !/function proRendreVehicules/.test(sourceActuelle)
+    && /var PRO_RUBRIQUES = \['besoin', 'lieu', 'periode', 'mission'\]/.test(sourceActuelle));
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: RACINE }).toString().trim().split('\n');
   // creer-compte-convoyeur.html est entré dans le périmètre avec
@@ -247,14 +266,19 @@ const futur = dansNJours;
     'RECETTE-LOT.md',
     // Celui de la stabilisation qui a suivi la PR nº 2.
     'RECETTE-STABILISATION-POST-PR2.md',
+    // Celui du chantier qui a suivi la PR nº 3.
+    'RECETTE-POST-PR3.md',
   ];
+  // supabase/templates/ — les modèles d'e-mail Supabase, versionnés
+  // pour que ce qui part réellement aux clients soit relu et comparé
+  // comme n'importe quel autre fichier (lots A3 et B2). Ils ne sont
+  // pas déployés par une fusion : ils se recopient à la main dans
+  // Supabase, comme l'indique le dossier de recette.
+  const horsPerimetre = f => PERIMETRE.indexOf(f) === -1
+    && !f.startsWith('migrations/') && !f.startsWith('tests/')
+    && !f.startsWith('supabase/functions/') && !f.startsWith('supabase/templates/');
   L.check('E6 : périmètre de fichiers maîtrisé',
-    fichiers.every(f => PERIMETRE.indexOf(f) !== -1
-                     || f.startsWith('migrations/') || f.startsWith('tests/')
-                     || f.startsWith('supabase/functions/')),
-    fichiers.filter(f => PERIMETRE.indexOf(f) === -1
-                      && !f.startsWith('migrations/') && !f.startsWith('tests/')
-                      && !f.startsWith('supabase/functions/')).join(', '));
+    !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 12,
     PERIMETRE.length + ' entrées');
@@ -267,13 +291,52 @@ const futur = dansNJours;
   // mots de passe : aucun autre comportement de cette page ne change.
   const diffConvoyeur = execSync('git diff origin/main -- creer-compte-convoyeur.html',
     { cwd: RACINE }).toString();
-  const ajoutsConvoyeur = diffConvoyeur.split('\n')
-    .filter(l => (l.startsWith('+') || l.startsWith('-')) && !/^[+-]{3}/.test(l))
+  const lignesDiff = signe => diffConvoyeur.split('\n')
+    .filter(l => l.startsWith(signe) && !/^[+-]{3}/.test(l))
     .map(l => l.slice(1).trim())
     .filter(l => l && !l.startsWith('//'));
-  L.check('E6c : dans l\'inscription partenaire, seuls les mots de passe changent',
-    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)),
-    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{/i.test(l)).slice(0, 3).join(' | '));
+  const ajoutsConvoyeur = lignesDiff('+');
+  // CE QUI EST RETIRÉ est jugé à part, sur une liste NOMMÉE — jamais
+  // dilué dans le vocabulaire autorisé des ajouts. Le lot B1 retire
+  // exactement une chose : le PATCH anonyme sur convoyeurs.auth_user_id,
+  // que la RLS refusait en silence, et l'adresse d'aperçu codée en dur.
+  const RETRAITS_CONVOYEUR = [
+    "method: 'PATCH',", "'apikey': SUPABASE_KEY,",
+    "'Authorization': 'Bearer ' + SUPABASE_KEY,", "'Content-Type': 'application/json',",
+    "'Prefer': 'return=minimal'", "body: JSON.stringify({ auth_user_id: result.data.user.id })",
+    "await fetch(SUPABASE_URL + '/rest/v1/convoyeurs?id=eq.' + convoyeurId, {",
+    "headers: {", "}", "},", "});", "} catch (e) { console.error('Erreur liaison auth_user_id:', e); }",
+    "if (result.data && result.data.user && result.data.user.id) {", "try {",
+    "options: { emailRedirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html' }",
+    "var result = await sb.auth.signUp({", "btn.textContent = 'Création du compte…';",
+    "try {"
+  ];
+  const retraitsInattendus = lignesDiff('-')
+    .filter(l => RETRAITS_CONVOYEUR.indexOf(l) === -1);
+  L.check('E6c bis : les seuls retraits de l\'inscription partenaire sont ceux du lot B1',
+    retraitsInattendus.length === 0, retraitsInattendus.slice(0, 3).join(' | '));
+  // RÈGLE ÉLARGIE, ET NOMMÉE (lot B1). Cette page ne devait toucher que
+  // l'affichage des mots de passe. Le lot B1 en change délibérément la
+  // LOGIQUE DE COMPTE : elle ne doit plus jamais créer un second mot de
+  // passe pour une adresse déjà connue, et le rattachement de la fiche
+  // passe par une fonction serveur au lieu d'un PATCH anonyme que la
+  // RLS refusait en silence. E6d ci-dessous rend cette évolution
+  // vérifiable, et interdit tout retour en arrière.
+  L.check('E6c : l\'inscription partenaire ne change que le mot de passe et la logique de compte',
+    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)),
+    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)).slice(0, 3).join(' | '));
+  // L'ÉLARGISSEMENT CI-DESSUS EST COMPENSÉ, jamais laissé à nu : ces
+  // trois contrôles interdisent tout retour au comportement d'avant.
+  const srcConvoyeur = fs.readFileSync(fichier('creer-compte-convoyeur.html'), 'utf8');
+  L.check('E6d : la page tente d\'abord de se connecter, avant toute création',
+    srcConvoyeur.indexOf('signInWithPassword') !== -1
+    && srcConvoyeur.indexOf('signInWithPassword') < srcConvoyeur.indexOf('auth.signUp'));
+  L.check('E6d bis : le rattachement passe par le serveur, plus par un PATCH anonyme',
+    /rpc\('ajouter_role_partenaire'/.test(srcConvoyeur)
+    && !/method: 'PATCH'[\s\S]{0,300}auth_user_id/.test(srcConvoyeur));
+  L.check('E6d ter : et plus aucune adresse d\'aperçu n\'y est codée en dur',
+    !/helixcar-i89b/.test(srcConvoyeur));
+
   // Le délai annoncé au client doit être le même partout.
   const fichiersDelai = ['index.html', 'dashboard.html', 'devis.html', 'helixcar-emails.html']
     .filter(f => fs.existsSync(fichier(f)))
