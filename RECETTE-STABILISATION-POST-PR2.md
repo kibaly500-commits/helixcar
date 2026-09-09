@@ -486,16 +486,23 @@ aucun e-mail réel, aucun paiement.
 
 ### GitHub Actions — observé, jamais prédit
 
-Exécutions nº 20 (poussée) et nº 21 (Pull Request) sur le commit de tête
-**`34b74aa`**, terminées et relues :
+Exécutions nº 24 (poussée) et nº 25 (Pull Request) sur le commit de tête
+**`d8a65b8`**, terminées et relues — pas prédites :
 
 | Tâche | Résultat |
 |---|---|
 | Politiques RLS sur PostgreSQL 16 | ✅ **success** |
-| Suites navigateur et sécurité serveur | ✅ **success** — **1 345 PASS / 0 FAIL en 163 s** |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 434 PASS / 0 FAIL en 228 s** |
 
-1 345 (CI, avec `--sans-sql`) + 360 (`t_rls`, seconde tâche) = **1 705**,
-exactement le chiffre mesuré en local.
+1 434 (CI, 30 suites avec `--sans-sql`) + 364 (`t_rls`, seconde tâche)
+= **1 798**, exactement le chiffre mesuré en local.
+
+Le dernier commit de **code** est `5a0c56f` ; `d8a65b8` ne modifie que
+ce dossier de recette. Le code réellement exécuté par ces deux
+exécutions est donc bien celui de `5a0c56f`.
+
+*Rappel des exécutions précédentes, avant la revue : nº 20 et nº 21 sur
+`34b74aa`, toutes deux `success`, 1 345 PASS / 0 FAIL en 163 s.*
 
 ---
 
