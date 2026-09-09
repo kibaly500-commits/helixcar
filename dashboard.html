@@ -3425,12 +3425,27 @@ const REINIT_LONGUEUR_MIN = 8;
 // fonctionnent, avec repli sur l'adresse de production quand l'origine
 // n'est pas exploitable (ouverture d'un fichier local, par exemple).
 // Chaque origine utilisée doit être autorisée dans Supabase.
+// LOT A3 — l'origine officielle, declaree une seule fois. Le repli ne
+// pointe plus sur le deploiement d'APERCU : un lien envoye a un client
+// doit mener au site de production, qui ne disparaitra pas.
+var HC_ORIGINE_PRODUCTION = 'https://helixcar.vercel.app';
+
+// Toutes les adresses envoyees a un client sont construites a partir de
+// l'origine reellement servie, avec repli sur la production.
+function _hcOrigineOfficielle() {
+  try {
+    const o = window.location.origin;
+    if (o && /^https:/.test(o)) return o;
+  } catch (e) {}
+  return HC_ORIGINE_PRODUCTION;
+}
+
 function urlRetourReinitialisation() {
   try {
     const o = window.location.origin;
     if (o && /^https?:/.test(o)) return o + '/dashboard.html';
   } catch (e) {}
-  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
 }
 
 // Message TOUJOURS identique, que l'adresse existe ou non : il ne doit
@@ -5848,7 +5863,7 @@ function validerConvoyeur(id, name, email) {
     try {
       if (window.emailjs && email) {
         const prenom = (name || '').split(' ')[0];
-        const lienCompte = 'https://helixcar-i89b.vercel.app/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
+        const lienCompte = _hcOrigineOfficielle() + '/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
         const msg = 'Bonjour ' + prenom + ',\n\n' +
           'Votre compte convoyeur HelixCar est validé ! Bienvenue dans le programme Convoyeurs d\'Excellence.\n\n' +
           'Dernière étape : créez votre mot de passe pour accéder à votre espace convoyeur et voir les missions disponibles :\n' +
@@ -6641,7 +6656,7 @@ function envoyerEmailFicheMission(missionId, conv) {
     const notesTxt = m.notes ? '\n\n📌 Informations importantes :\n' + m.notes : '';
     const optionsListe = [m.nettoyage ? 'Nettoyage' : null, m.plateau ? 'Plateau' : null, m.urgence ? 'Urgent' : null, m.electrique ? 'Véhicule électrique' : null].filter(Boolean);
     const optionsTxt = optionsListe.length ? '\nOptions : ' + optionsListe.join(', ') : '';
-    const lienFiche = 'https://helixcar-i89b.vercel.app/fiche-mission.html?mission=' + encodeURIComponent(m.reference);
+    const lienFiche = _hcOrigineOfficielle() + '/fiche-mission.html?mission=' + encodeURIComponent(m.reference);
     const msg = 'Bonjour ' + (conv.prenom || '') + ',\n\n' +
       'Mission confirmée : ' + m.reference + '\n\n' +
       '📄 Fiche mission complète (à imprimer et à faire signer au départ et à l\'arrivée) :\n' + lienFiche + '\n\n' +
@@ -11879,7 +11894,7 @@ async function testerPrepareDevisQA(clientId) {
       return; // reste sur le Dashboard, aucune redirection
     }
 
-    var urlClient = 'https://helixcar-i89b.vercel.app/devis.html?token=' + encodeURIComponent(tokenBrut);
+    var urlClient = _hcOrigineOfficielle() + '/devis.html?token=' + encodeURIComponent(tokenBrut);
     tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
     window.location.href = urlClient; // redirection de l'onglet courant, aucun _blank
   } else {

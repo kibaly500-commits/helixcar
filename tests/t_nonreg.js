@@ -283,8 +283,21 @@ const futur = dansNJours;
   L.check('E9 : le délai annoncé est bien « sous 1 heure »',
     /sous 1 heure/.test(fichiersDelai[0]));
 
-  L.check('E7 : aucun fichier SQL exécuté (dossier migrations livré tel quel)',
-    fichiers.some(f => f.startsWith('migrations/')));
+  // RÈGLE CORRIGÉE : le libellé disait « aucun SQL exécuté », mais le
+  // contrôle exigeait seulement qu'un fichier de migrations ait été
+  // touché — ce qui ne prouve rien et devient faux dès qu'un lot
+  // n'apporte pas de SQL. La vraie garantie est double, et elle est
+  // désormais vérifiée telle quelle :
+  //   * aucune migration DÉJÀ APPLIQUÉE (92 → 102) n'est modifiée ;
+  //   * toute nouvelle migration est numérotée après 102.
+  const migrationsTouchees = fichiers.filter(f => f.startsWith('migrations/') && /\.sql$/.test(f));
+  const numero = f => parseInt((f.match(/migrations\/(\d+)_/) || [])[1] || '0', 10);
+  L.check('E7 : aucune migration déjà appliquée (92 → 102) n\'est modifiée',
+    migrationsTouchees.every(f => numero(f) > 102 || numero(f) < 92),
+    migrationsTouchees.filter(f => numero(f) >= 92 && numero(f) <= 102).join(', '));
+  L.check('E7b : toute nouvelle migration est numérotée après 102',
+    migrationsTouchees.every(f => numero(f) === 0 || numero(f) > 102 || numero(f) < 92),
+    migrationsTouchees.join(', '));
 
   // ── F. TEXTE : zéro occurrence de l'ancien message ──
   const idx = fs.readFileSync(fichier('index.html'), 'utf8');

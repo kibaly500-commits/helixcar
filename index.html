@@ -7598,6 +7598,70 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════
+     LOT A3 — CHOISIR UN NOUVEAU MOT DE PASSE
+     ══════════════════════════════════════════════════════════════
+     Le lien recu par e-mail ramene sur le site. Quand Supabase ne
+     connait pas encore l'URL de redirection demandee, il retombe sur
+     la « Site URL » du projet — c'est-a-dire CETTE page. Sans ecran
+     ici, la personne atterrissait sur la vitrine et n'avait aucun
+     moyen de choisir son mot de passe : c'est exactement ce qui etait
+     constate. L'ecran existe donc des deux cotes. -->
+<div class="modal-overlay" id="modal-reinit">
+  <div class="modal" style="max-width:520px;text-align:left">
+    <button class="modal-close" onclick="closeModal('reinit')" aria-label="Fermer">✕</button>
+
+    <div id="reinit-bloc-formulaire">
+      <h2>Nouveau mot de passe</h2>
+      <p>Choisissez un nouveau mot de passe pour votre compte HelixCar.</p>
+
+      <div id="reinit-message" class="hc-note" role="alert"></div>
+
+      <div class="modal-form-group">
+        <label>Nouveau mot de passe <span class="field-required">*</span></label>
+        <div style="position:relative">
+          <input type="password" id="reinit-mdp" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" aria-describedby="reinit-mdp-aide" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div id="reinit-mdp-aide" style="font-size:.75rem;color:#6B7280;margin-top:6px">8 caractères minimum.</div>
+      </div>
+
+      <div class="modal-form-group">
+        <label>Confirmer le nouveau mot de passe <span class="field-required">*</span></label>
+        <div style="position:relative">
+          <input type="password" id="reinit-mdp2" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp2', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              id="reinit-valider" onclick="enregistrerNouveauMotDePasse()">Enregistrer le mot de passe</button>
+    </div>
+
+    <div id="reinit-bloc-succes" style="display:none">
+      <h2>Mot de passe modifié</h2>
+      <div class="hc-note hc-note--succes visible" role="status">Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              onclick="terminerReinitialisation()">Aller à la connexion</button>
+    </div>
+
+    <div id="reinit-bloc-expire" style="display:none">
+      <h2>Lien expiré</h2>
+      <div id="reinit-message-expire" class="hc-note visible" role="alert">Ce lien de réinitialisation n'est plus valable. Il a peut-être expiré, ou il a déjà servi. Demandez-en un nouveau depuis la connexion.</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              onclick="terminerReinitialisation()">Demander un nouveau lien</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-connexion">
 
   <div class="modal">
@@ -8014,9 +8078,21 @@ function _localisationStockage() {
   return HELIXCAR_STOCKAGE.ville + ' (' + HELIXCAR_STOCKAGE.code_postal + ')';
 }
 
+// LOT A3 — l'origine officielle, declaree une seule fois et AVANT tout
+// usage. Le repli ne pointe plus sur le deploiement d'apercu : un lien
+// envoye a un client doit mener au site de production.
+var HC_ORIGINE_PRODUCTION = 'https://helixcar.vercel.app';
+
 // Destinataire des notifications administrateur + lien du dashboard.
 var HELIXCAR_EMAIL_ADMIN   = 'helixcarpro@gmail.com';
-var HELIXCAR_URL_DASHBOARD = 'https://helixcar-i89b.vercel.app/dashboard.html';
+// LOT A3 — construit, jamais code en dur sur le deploiement d'apercu.
+var HELIXCAR_URL_DASHBOARD = (function () {
+  try {
+    var o = window.location.origin;
+    if (o && /^https:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
+})();
 
 // ── SERVICE DEMANDÉ : convoyage / stockage / les deux / compte seul ──
 function _typeServiceChoisi() {
@@ -16577,13 +16653,206 @@ var _reinitEnvoiEnCours = false;
 // Même URL de retour que le Dashboard, construite depuis l'origine
 // réellement servie. Chaque origine utilisée doit être autorisée dans
 // Supabase (voir le dossier de recette).
+// ══════════════════════════════════════════════════════════════
+// LOT A3 — L'URL DE RETOUR, TOUJOURS SUR NOTRE PROPRE ORIGINE
+// ══════════════════════════════════════════════════════════════
+// Elle est CONSTRUITE a partir de l'origine servie, jamais reprise
+// d'un parametre d'URL, d'un referrer ou d'un champ : aucune
+// redirection ouverte n'est possible. Le repli ne pointe plus sur le
+// domaine d'apercu — le meme defaut que le CORS du lot A1 — mais sur
+// le site de production.
 function _hcUrlRetourReinitialisation() {
   try {
     var o = window.location.origin;
     if (o && /^https?:/.test(o)) return o + '/dashboard.html';
   } catch (e) {}
-  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
 }
+
+// ══════════════════════════════════════════════════════════════
+// LOT A3 — RECONNAITRE LE FLUX DE RECUPERATION, ET LE MENER A BOUT
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : le lien recu par e-mail ramenait sur la
+// vitrine HelixCar, sans aucun ecran permettant de choisir un nouveau
+// mot de passe. Cause : Supabase ne redirige vers `redirectTo` que si
+// cette adresse figure dans ses « Redirect URLs » ; sinon il retombe
+// silencieusement sur la « Site URL » du projet — c'est-a-dire cette
+// page. L'ecran de saisie n'existait, lui, que dans dashboard.html.
+//
+// Deux corrections, independantes l'une de l'autre :
+//   * la configuration Supabase (action manuelle, § « Actions
+//     manuelles » du dossier de recette) ;
+//   * et surtout CE CODE, qui rend le parcours robuste meme si la
+//     redirection retombe sur la vitrine.
+var _hcReinitEnregistrementEnCours = false;
+
+// Un lien perime, deja utilise ou altere revient avec une erreur dans
+// le fragment d'URL. On la lit AVANT toute tentative de session.
+function _hcErreurLienRecuperation() {
+  var brut = '';
+  try { brut = (window.location.hash || '').replace(/^#/, '') + '&' + (window.location.search || '').replace(/^\?/, ''); }
+  catch (e) { return null; }
+  if (!brut) return null;
+  var p = new URLSearchParams(brut);
+  var code = p.get('error_code') || '';
+  var err = p.get('error') || '';
+  if (!code && !err) return null;
+  if (/expired/i.test(code)) return 'expire';
+  return 'invalide';
+}
+
+// Le fragment porte-t-il bien un flux de RECUPERATION ? On ne se fie
+// jamais a un simple `type=recovery` place a la main dans la barre
+// d'adresse : l'ecran ne s'ouvre que si Supabase a reellement etabli
+// une session de recuperation (verifiee ci-dessous).
+function _hcFragmentRecuperation() {
+  try {
+    var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    return p.get('type') === 'recovery';
+  } catch (e) { return false; }
+}
+
+function ouvrirEcranNouveauMotDePasse(etat) {
+  var f = document.getElementById('reinit-bloc-formulaire');
+  var ok = document.getElementById('reinit-bloc-succes');
+  var ko = document.getElementById('reinit-bloc-expire');
+  if (f)  f.style.display  = (etat === 'formulaire') ? '' : 'none';
+  if (ok) ok.style.display = (etat === 'succes')     ? '' : 'none';
+  if (ko) ko.style.display = (etat === 'expire')     ? '' : 'none';
+  if (etat === 'formulaire') {
+    // Memorise pour survivre a un F5 : Supabase ne rejoue pas
+    // PASSWORD_RECOVERY apres rechargement, mais la session de
+    // recuperation est toujours ouverte.
+    try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+    _hcNoteEffacer('reinit-message');
+    var a = document.getElementById('reinit-mdp');
+    var b = document.getElementById('reinit-mdp2');
+    if (a) a.value = '';
+    if (b) b.value = '';
+  }
+  var deja = document.getElementById('modal-reinit');
+  if (deja && !deja.classList.contains('open')) {
+    deja.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    document.body.classList.add('hc-modal-open');
+    reinitialiserAffichageMotsDePasse(deja);
+  }
+  if (etat === 'formulaire') {
+    var champ = document.getElementById('reinit-mdp');
+    if (champ) { try { champ.focus(); } catch (e) {} }
+  }
+}
+
+async function enregistrerNouveauMotDePasse() {
+  // Double clic : le second appel ne fait rien tant que le premier n'a
+  // pas repondu.
+  if (_hcReinitEnregistrementEnCours) return;
+  var a = document.getElementById('reinit-mdp');
+  var b = document.getElementById('reinit-mdp2');
+  var mdp = a ? a.value : '';
+  var mdp2 = b ? b.value : '';
+  if (mdp.length < 8) {
+    _hcNote('reinit-message', 'Le mot de passe doit contenir au moins 8 caractères.', 'erreur');
+    if (a) a.focus();
+    return;
+  }
+  if (mdp !== mdp2) {
+    _hcNote('reinit-message', 'Les deux mots de passe ne sont pas identiques.', 'erreur');
+    if (b) b.focus();
+    return;
+  }
+  if (!_sb || !_sb.auth) {
+    _hcNote('reinit-message', 'Service momentanément indisponible. Réessayez dans quelques instants.', 'erreur');
+    return;
+  }
+
+  _hcReinitEnregistrementEnCours = true;
+  var btn = document.getElementById('reinit-valider');
+  if (btn) btn.disabled = true;
+  try {
+    // LE MOT DE PASSE N'EST CHANGE QUE S'IL EXISTE UNE VRAIE SESSION DE
+    // RECUPERATION. Sans elle, updateUser echoue — et c'est bien ainsi :
+    // aucun ecran local ne doit pouvoir modifier un mot de passe.
+    var ses = await _sb.auth.getSession();
+    if (!ses || !ses.data || !ses.data.session) {
+      ouvrirEcranNouveauMotDePasse('expire');
+      return;
+    }
+    var res = await _sb.auth.updateUser({ password: mdp });
+    if (res && res.error) {
+      var m = String(res.error.message || '');
+      if (/expired|invalid|not authenticated|session/i.test(m)) {
+        ouvrirEcranNouveauMotDePasse('expire');
+        return;
+      }
+      _hcNote('reinit-message',
+        /should be different|same/i.test(m)
+          ? 'Choisissez un mot de passe différent de l\'ancien.'
+          : 'Le mot de passe n\'a pas pu être enregistré. Réessayez dans quelques instants.',
+        'erreur');
+      return;
+    }
+    // Succes REEL, confirme par le serveur. Le contexte de
+    // recuperation est referme : le lien ne sert plus a rien.
+    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    try { _hcNettoyerFragmentRecuperation(); } catch (e) {}
+    ouvrirEcranNouveauMotDePasse('succes');
+  } catch (e) {
+    _hcNote('reinit-message', 'Le mot de passe n\'a pas pu être enregistré. Vérifiez votre connexion et réessayez.', 'erreur');
+  } finally {
+    _hcReinitEnregistrementEnCours = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Le jeton ne doit pas rester dans la barre d'adresse ni dans
+// l'historique une fois consomme.
+function _hcNettoyerFragmentRecuperation() {
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) {}
+}
+
+async function terminerReinitialisation() {
+  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  try { if (_sb && _sb.auth) await _sb.auth.signOut(); } catch (e) {}
+  _hcNettoyerFragmentRecuperation();
+  var m = document.getElementById('modal-reinit');
+  if (m) m.classList.remove('open');
+  document.body.style.overflow = '';
+  document.body.classList.remove('hc-modal-open');
+  openModal('connexion');
+}
+
+// Branchement : un seul ecouteur, pose une fois.
+(function _hcBrancherRecuperation() {
+  var erreurLien = _hcErreurLienRecuperation();
+  if (erreurLien) {
+    // Un lien perime ou altere ne doit jamais laisser la personne sur
+    // une vitrine muette.
+    try {
+      document.addEventListener('DOMContentLoaded', function () {
+        ouvrirEcranNouveauMotDePasse('expire');
+      });
+    } catch (e) {}
+  }
+  if (!_sb || !_sb.auth || !_sb.auth.onAuthStateChange) return;
+  _sb.auth.onAuthStateChange(function (evenement, session) {
+    if (evenement === 'PASSWORD_RECOVERY') {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    // Reprise apres un F5 en pleine reinitialisation, ou arrivee sur un
+    // fragment de recuperation que la bibliotheque a deja consomme.
+    var enCours = false;
+    try { enCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
+    if ((enCours || _hcFragmentRecuperation()) && session && session.user) {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+    }
+  });
+})();
 
 // Message TOUJOURS identique, que l'adresse existe ou non.
 var HC_REINIT_MESSAGE_NEUTRE =
@@ -18754,7 +19023,42 @@ function basculerLivraisonVehicule(i) {
 
 
 
+// ══════════════════════════════════════════════════════════════
+// LOT D1 — QUAND HELIXCAR N'INTERVIENT PAS SUR LE TRAJET
+// ══════════════════════════════════════════════════════════════
+// Dans un STOCKAGE ou le client depose lui-meme son vehicule ET vient
+// lui-meme le rechercher, HelixCar ne le transporte a aucun moment. La
+// rubrique « Livraison » de chaque vehicule n'a alors aucun objet : ni
+// adresse d'arrivee, ni contact, ni date, ni restitution organisee par
+// HelixCar.
+//
+// CE QUI ETAIT CONSTATE : la rubrique restait affichee, numerotee, avec
+// la question de restitution et le bloc « Vehicule a restituer ». Le
+// client repondait donc a des questions sans objet, et leurs valeurs
+// pouvaient partir en base.
+//
+// UNE SEULE fonction porte la regle. Formulaire, lecture du payload,
+// recapitulatif, Dashboard, devis et informations necessaires la
+// consultent tous : ils ne peuvent pas diverger.
+//
+// PORTEE STRICTE, volontairement : uniquement le stockage, uniquement
+// quand les DEUX trajets sont faits par le client. Les scenarios mixtes
+// (HelixCar achemine, ou HelixCar livre) et le Convoyage ne sont pas
+// touches.
+function _livraisonSansObjet() {
+  // Les deux reponses doivent avoir ete DONNEES, et donnees ainsi. Une
+  // question encore sans reponse ne fait rien disparaitre : c'est
+  // exactement l'erreur commise ailleurs, ou une rubrique dependait
+  // d'une AUTRE reponse pas encore fournie.
+  return _avecStockage()
+      && _acheminementStockage() === 'depot_client'
+      && _sortieStockage() === 'recuperation_client';
+}
+
 function _vehiculeARestitutionSpecifique(i) {
+  // Sans objet : la question n'est pas posee, donc aucune reponse
+  // heritee d'un scenario precedent ne peut etre lue.
+  if (_livraisonSansObjet()) return false;
   var r = document.querySelector('input[name="veh-' + i + '-restit-active"]:checked');
   return !!(r && r.value === 'oui');
 }
@@ -18998,7 +19302,10 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
-    if (livraison) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
+    // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
+    // sur aucun des deux trajets. Ni titre, ni numero, ni sous-champ,
+    // ni validation cachee : rien n'est rendu.
+    if (livraison && !_livraisonSansObjet()) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
 
     // ── LE MODE DE TRANSPORT, TOUJOURS PRESENT, TOUJOURS ICI ──
     //
@@ -19057,7 +19364,10 @@ function _lireFichesVehicules() {
     out.push({
       position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),mode_transport:modeEl?modeEl.value:'',consignes:g('consignes'),
       adresse_depart_rue:g('pc-rue'),code_postal_depart:g('pc-cp'),ville_depart:g('pc-ville'),pc_contact_nom:g('pc-contact'),pc_contact_tel:g('pc-tel'),date_prise_en_charge:g('pc-date'),heure_prise_en_charge:h('pc','heure'),pc_heure_type:h('pc','type'),pc_creneau_debut:h('pc','cdeb'),pc_creneau_fin:h('pc','cfin'),
-      livraison_apres_stockage:livActive,
+      // LOT D1 — quand HelixCar n'intervient sur aucun trajet, aucune
+      // valeur de livraison ne part en base, meme heritee d'un
+      // scenario precedent.
+      livraison_apres_stockage:_livraisonSansObjet()?null:livActive,
       // Heure de récupération par le client — propre à CE véhicule,
       // uniquement pertinente quand HelixCar ne le livre pas après
       // stockage (livActive===false). Jamais mélangée avec un autre

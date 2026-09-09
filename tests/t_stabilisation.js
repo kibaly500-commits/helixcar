@@ -610,14 +610,24 @@ async function modesParVehicule(page, n) {
     const page = await pageClient(browser);
     const fuite = await page.evaluate(() => {
       const dbg = document.getElementById('supabase-debug');
-      // On simule ce que faisait l'ancienne version.
-      dbg.style.display = 'block';
-      dbg.textContent = 'Erreur 400 [convoyeurs]: 23514';
+      // On simule ce que faisait l'ancienne version : un message
+      // d'erreur d'une AUTRE fenêtre, laissé affiché.
+      _hcAfficherBandeauErreur('Erreur 400 [convoyeurs]: 23514');
+      const avant = { visible: getComputedStyle(dbg).display !== 'none',
+                      texte: dbg.textContent };
       openModal('client');
-      return { affiche: dbg.style.display, texte: dbg.textContent };
+      return {
+        avant: avant,
+        visible: getComputedStyle(dbg).display !== 'none',
+        texte: dbg.textContent
+      };
     });
+    // La GARANTIE se mesure sur ce que voit le client, pas sur le
+    // mécanisme d'affichage (lot E1 : classe partagée, plus de style
+    // en ligne).
     check('F6 : ouvrir « Devenir client » efface toute erreur précédente',
-      fuite.affiche === 'none' && fuite.texte === '', JSON.stringify(fuite));
+      fuite.avant.visible === true && fuite.visible === false && fuite.texte === '',
+      JSON.stringify(fuite));
     await page.close();
   }
 
