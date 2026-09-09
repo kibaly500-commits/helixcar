@@ -177,16 +177,30 @@ window.fetch = function (url, options) {
   check('A6 : la demande réelle apparaît dans l\'espace client',
     /TEST-QA-A1/.test(accueil.liste) && /Convoyage automobile/.test(accueil.liste), accueil.liste.slice(0, 120));
 
-  // On laisse la navigation se produire réellement : c'est le
-  // comportement observable, pas une intention déclarée.
+  // ══ RÈGLE INVERSÉE SUR DEMANDE EXPLICITE (lot C1) ══
+  // Cette vérification exigeait que le bouton QUITTE le Dashboard pour
+  // la vitrine. Le propriétaire demande l'inverse : la demande doit se
+  // faire DANS l'espace client, navigation visible. Le contrôle n'est
+  // pas supprimé — il devient plus exigeant, puisqu'il faut désormais
+  // à la fois rester dans l'espace ET charger le vrai formulaire.
+  const urlAvant = page.url();
   await page.evaluate(() => {
     Array.from(document.querySelectorAll('#page-client-dashboard button'))
       .find(b => /Faire une nouvelle demande/.test(b.textContent)).click();
   });
   await page.waitForTimeout(500);
-  const cible = page.url();
-  check('A7 : elle ouvre le VRAI formulaire public, pas une copie',
-    /index\.html\?nouvelle-demande=1/.test(cible), cible);
+  const apresClic = await page.evaluate(() => ({
+    url: window.location.href,
+    pageActive: (document.querySelector('.page.active') || {}).id,
+    navVisible: document.querySelectorAll('#sidebar-nav .nav-item').length > 0,
+    src: (document.getElementById('client-demande-cadre') || {}).getAttribute('src')
+  }));
+  check('A7 : on reste dans l\'espace client, navigation visible',
+    apresClic.url === urlAvant && apresClic.navVisible === true
+    && apresClic.pageActive === 'page-client-nouvelle-demande', JSON.stringify(apresClic));
+  check('A7 bis : et c\'est bien le VRAI formulaire qui est chargé, pas une copie',
+    /index\.html\?nouvelle-demande=1&integre=1/.test(apresClic.src || ''),
+    String(apresClic.src));
 
   // ── B. MODE CONNECTÉ DANS LE FORMULAIRE PUBLIC ──
   await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });

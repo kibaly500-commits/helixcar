@@ -2810,6 +2810,50 @@
      seul le contraste du texte change, jamais la forme. */
   .hc-note--sombre { color: rgba(255,255,255,.86); }
 
+  /* ══════════════════════════════════════════════════════════════
+     LOT C1 — MODE INTEGRE A L'ESPACE CLIENT
+     ══════════════════════════════════════════════════════════════
+     Le MEME formulaire, affiche dans l'espace client au lieu de la
+     grosse modale publique : la vitrine s'efface, l'overlay sombre
+     disparait, et la fenetre devient un bloc large et aere qui suit la
+     largeur de son conteneur. Aucune question, aucune regle, aucun
+     champ n'est modifie — seule la mise en page change. */
+  body.hc-integre > header,
+  body.hc-integre > nav,
+  body.hc-integre > footer,
+  body.hc-integre > section,
+  body.hc-integre > main,
+  body.hc-integre > div:not(.modal-overlay) { display: none !important; }
+  body.hc-integre { background: #fff; overflow: auto !important; }
+  body.hc-integre #modal-client.modal-overlay {
+    position: static;
+    display: block;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    overflow: visible;
+    opacity: 1;
+    visibility: visible;
+  }
+  body.hc-integre #modal-client .modal {
+    max-width: 100%;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 26px 30px 34px;
+  }
+  body.hc-integre #modal-client .modal::before { display: none; }
+  /* La croix de fermeture n'a plus d'objet : c'est « Retour a mes
+     demandes » qui referme, dans l'espace client. */
+  body.hc-integre #modal-client .modal-close { display: none; }
+  @media (max-width: 640px) {
+    body.hc-integre #modal-client .modal { padding: 20px 16px 28px; }
+  }
+
   #modal-client .modal-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px;
   }
@@ -8926,9 +8970,59 @@ function _hcAppliquerModeConnecte() {
 // Entrée « Faire une nouvelle demande » depuis l'espace client :
 // index.html?nouvelle-demande=1 . On ouvre le parcours à la question
 // « Comment pouvons-nous vous accompagner ? ».
+// LOT C1 — le formulaire est-il affiche DANS l'espace client ?
+function _hcModeIntegre() {
+  try {
+    var p = new URLSearchParams(window.location.search || '');
+    // Deux conditions : le mode est demande, ET la page est bien
+    // encadree. Ouvrir l'adresse a la main dans un onglet ne fait donc
+    // pas disparaitre la vitrine.
+    return p.get('integre') === '1' && window.parent !== window;
+  } catch (e) { return false; }
+}
+
+// Hauteur reelle du formulaire, transmise a l'espace client pour qu'il
+// n'y ait jamais deux barres de defilement imbriquees.
+var _hcHauteurTransmise = 0;
+function _hcTransmettreHauteur() {
+  if (!_hcModeIntegre()) return;
+  try {
+    var h = Math.ceil(document.documentElement.scrollHeight);
+    if (Math.abs(h - _hcHauteurTransmise) < 12) return;
+    _hcHauteurTransmise = h;
+    window.parent.postMessage({ type: 'hc-demande-hauteur', hauteur: h }, window.location.origin);
+  } catch (e) {}
+}
+
+function _hcActiverModeIntegre() {
+  if (!_hcModeIntegre()) return;
+  document.body.classList.add('hc-integre');
+  // La hauteur suit le formulaire : etapes, accordeons, fiches
+  // vehicules ajoutees ou retirees.
+  try {
+    var obs = new MutationObserver(function () { _hcTransmettreHauteur(); });
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true });
+  } catch (e) {}
+  window.addEventListener('resize', _hcTransmettreHauteur);
+  setInterval(_hcTransmettreHauteur, 700);
+  _hcTransmettreHauteur();
+}
+
+// Previent l'espace client qu'une demande vient d'etre enregistree.
+// L'espace RECHARGE alors la liste DEPUIS LA BASE : la reference et le
+// statut affiches sont ceux que le serveur a enregistres, jamais ceux
+// que ce message annonce.
+function _hcPrevenirEspaceClient() {
+  if (!_hcModeIntegre()) return;
+  try {
+    window.parent.postMessage({ type: 'hc-demande-enregistree' }, window.location.origin);
+  } catch (e) {}
+}
+
 async function _hcDemarrerDepuisEspaceClient() {
   var params = new URLSearchParams(window.location.search || '');
   if (params.get('nouvelle-demande') !== '1') return false;
+  _hcActiverModeIntegre();
   await _hcChargerSessionClient();
   if (!_hcSessionClient) {
     // Pas de session : on ne prétend pas être connecté. Le parcours
@@ -16606,6 +16700,45 @@ async function terminerReinitialisation() {
   openModal('connexion');
 }
 
+// ══════════════════════════════════════════════════════════════
+// LOT B2 — LA CONFIRMATION D'ADRESSE MENE QUELQUE PART
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : l'e-mail « Confirm your email address » etait
+// en anglais, et son lien ramenait sur la page d'accueil sans la
+// moindre confirmation lisible. Le modele francais est desormais
+// versionne (supabase/templates/confirmation-adresse.html) ; il reste a
+// le recopier dans Supabase, ce que le dossier de recette indique.
+//
+// COTE CODE, la page doit reconnaitre l'arrivee et le dire. Le succes
+// n'est JAMAIS affirme sur la seule presence d'un fragment d'URL : il
+// faut que Supabase ait reellement etabli la session, ou emis
+// l'evenement de connexion.
+function _hcFragmentConfirmation() {
+  try {
+    var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    var t = p.get('type');
+    return t === 'signup' || t === 'email_change' || t === 'magiclink';
+  } catch (e) { return false; }
+}
+
+var _hcConfirmationAnnoncee = false;
+function _hcAnnoncerAdresseConfirmee(avecSession) {
+  if (_hcConfirmationAnnoncee) return;
+  _hcConfirmationAnnoncee = true;
+  _hcNettoyerFragmentRecuperation();
+  if (avecSession) {
+    // Une session existe : on mene la personne a son espace, sans lui
+    // redemander quoi que ce soit.
+    try { window.location.href = _hcUrlRetourReinitialisation(); } catch (e) {}
+    return;
+  }
+  // Pas de session : on ouvre la connexion avec un message neutre. Il
+  // ne dit rien de plus que ce qui est certain.
+  if (typeof openModal === 'function') openModal('connexion');
+  _hcNote('connexion-message',
+    'Adresse e-mail confirmée, vous pouvez vous connecter.', 'info');
+}
+
 // Branchement : un seul ecouteur, pose une fois.
 (function _hcBrancherRecuperation() {
   var erreurLien = _hcErreurLienRecuperation();
@@ -16630,8 +16763,30 @@ async function terminerReinitialisation() {
     try { enCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
     if ((enCours || _hcFragmentRecuperation()) && session && session.user) {
       ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    // LOT B2 — confirmation d'adresse. On n'annonce le succes qu'apres
+    // un evenement REEL de Supabase, jamais sur le seul fragment d'URL.
+    if (_hcFragmentConfirmation()
+        && (evenement === 'SIGNED_IN' || evenement === 'INITIAL_SESSION'
+            || evenement === 'USER_UPDATED')) {
+      _hcAnnoncerAdresseConfirmee(!!(session && session.user));
     }
   });
+
+  // Le lien peut aussi arriver SANS session — Supabase a confirme
+  // l'adresse, mais la personne doit se connecter. Aucun evenement
+  // n'est alors emis : on le dit, apres avoir laisse a la bibliotheque
+  // le temps d'etablir une session si elle le peut.
+  if (_hcFragmentConfirmation() && !_hcErreurLienRecuperation()) {
+    setTimeout(function () {
+      if (_hcConfirmationAnnoncee) return;
+      if (!_sb || !_sb.auth) { _hcAnnoncerAdresseConfirmee(false); return; }
+      _sb.auth.getSession().then(function (r) {
+        _hcAnnoncerAdresseConfirmee(!!(r && r.data && r.data.session));
+      }).catch(function () { _hcAnnoncerAdresseConfirmee(false); });
+    }, 900);
+  }
 })();
 
 // Message TOUJOURS identique, que l'adresse existe ou non.
@@ -16728,6 +16883,13 @@ function showSuccess(type) {
   var successEl = document.getElementById('modal-' + type + '-success');
   var overlay = document.getElementById('modal-' + type);
   if (!successEl || !overlay) return;
+  // LOT C1 — dans l'espace client, l'ecran de succes n'est pas la
+  // bonne reponse : la place de la demande est dans SA liste, avec sa
+  // reference et son statut relus depuis la base.
+  if (type === 'client' && typeof _hcModeIntegre === 'function' && _hcModeIntegre()) {
+    _hcPrevenirEspaceClient();
+    return;
+  }
   // Recupere le contenu du succes
   var successHTML = successEl.innerHTML;
   // Vide TOUT l'overlay et le remplace par un modal propre avec juste le succes

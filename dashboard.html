@@ -2068,6 +2068,41 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- CLIENT: Mes missions -->
+      <!-- ══════════════════════════════════════════════════════════
+           LOT C1 — NOUVELLE DEMANDE, DANS L'ESPACE CLIENT
+           ══════════════════════════════════════════════════════════
+           « Faire une nouvelle demande » quittait le Dashboard pour la
+           vitrine : la navigation disparaissait, et le client se
+           retrouvait devant la grosse modale publique.
+
+           La demande se fait desormais ICI, sans quitter l'espace, avec
+           la barre laterale et la barre du haut toujours visibles.
+
+           Le formulaire reste LE VRAI formulaire : c'est exactement le
+           meme code, charge en mode integre. Aucune copie, aucune regle
+           recopiee, aucun payload parallele — c'est precisement ce
+           qu'il ne fallait pas faire. Meme origine, donc meme session
+           Supabase : rien n'est transmis par le navigateur, et le
+           rattachement reste decide par le serveur. -->
+      <div class="page" id="page-client-nouvelle-demande">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Nouvelle demande</div>
+              <div style="font-size:.85rem;color:#555;margin-top:4px">
+                Vos informations de compte sont déjà connues : elles ne vous seront pas redemandées.
+              </div>
+            </div>
+            <button class="btn" onclick="fermerNouvelleDemande()">← Retour à mes demandes</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <iframe id="client-demande-cadre" title="Nouvelle demande HelixCar"
+                  style="width:100%;border:0;display:block;min-height:70vh"
+                  loading="lazy"></iframe>
+        </div>
+      </div>
+
       <div class="page" id="page-client-missions">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div></div>
@@ -3020,12 +3055,61 @@ const LIB_STATUT_INFO = {
   a_corriger: 'À corriger'
 };
 
+// LOT C1 — la demande se fait DANS l'espace client.
+//
+// Le cadre charge le VRAI formulaire en mode intégré : même code, mêmes
+// questions, mêmes règles conditionnelles, mêmes compteurs, mêmes
+// accordéons, mêmes calendriers, mêmes validations, même récapitulatif
+// et même payload. Aucune copie n'est faite ici — une seconde
+// implémentation divergerait le jour même.
+//
+// Même origine : la session Supabase est partagée, rien n'est transmis
+// par le navigateur, et le rattachement de la demande reste décidé par
+// le serveur à partir de auth.uid().
 function ouvrirNouvelleDemande() {
-  // La session Supabase est partagée entre les deux pages (même
-  // origine) : rien à transmettre, et aucune identité à faire confiance
-  // côté navigateur.
-  window.location.href = 'index.html?nouvelle-demande=1';
+  const cadre = document.getElementById('client-demande-cadre');
+  if (!cadre) { window.location.href = 'index.html?nouvelle-demande=1'; return; }
+  // Rechargé à chaque ouverture : le brouillon et la reprise restent
+  // ceux du formulaire lui-même, jamais un état gardé ici.
+  if (!cadre.getAttribute('src')) {
+    cadre.setAttribute('src', 'index.html?nouvelle-demande=1&integre=1');
+  }
+  showPage('client-nouvelle-demande');
 }
+
+function fermerNouvelleDemande() {
+  showPage('client-dashboard');
+}
+
+// Le formulaire intégré parle à son espace : hauteur réelle, et surtout
+// référence de la demande dès qu'elle est enregistrée.
+//
+// Le message n'est accepté QUE s'il vient de notre propre origine et de
+// notre propre cadre : un autre onglet, une autre page ou une extension
+// ne peuvent rien injecter ici.
+window.addEventListener('message', function (ev) {
+  try {
+    if (ev.origin !== window.location.origin) return;
+    const cadre = document.getElementById('client-demande-cadre');
+    if (!cadre || ev.source !== cadre.contentWindow) return;
+    const m = ev.data;
+    if (!m || typeof m !== 'object') return;
+
+    if (m.type === 'hc-demande-hauteur' && typeof m.hauteur === 'number') {
+      cadre.style.height = Math.max(520, Math.min(4000, m.hauteur)) + 'px';
+      return;
+    }
+    if (m.type === 'hc-demande-enregistree') {
+      // La liste est rechargée depuis la base : la référence et le
+      // statut affichés sont ceux que le SERVEUR a enregistrés, jamais
+      // ceux que le cadre annonce.
+      if (typeof chargerDemandesClient === 'function') chargerDemandesClient();
+      showPage('client-dashboard');
+      const zone = document.getElementById('client-demandes-liste');
+      if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+    }
+  } catch (e) { console.warn('Message du formulaire intégré ignoré :', e); }
+});
 
 function ouvrirCompletionDemande(id) {
   window.location.href = 'index.html?completer=' + encodeURIComponent(id);
@@ -3434,6 +3518,7 @@ const PAGE_TITLES = {
   'convoyeur-recompenses':['Récompenses', 'Challenge mensuel & fidélité'],
   'convoyeur-profil':     ['Mon profil', 'Gérez vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue Marc'],
+  'client-nouvelle-demande': ['Nouvelle demande', 'Convoyage, stockage, nettoyage ou recherche d\'un professionnel'],
   'client-missions':     ['Mes missions', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],

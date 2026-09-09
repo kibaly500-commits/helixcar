@@ -354,6 +354,55 @@ function etatEcran(page) {
     }
   }
 
+  // ══ H bis. LOT B2 — LA CONFIRMATION D'ADRESSE ══
+  {
+    // Arrivée AVEC session : on mène la personne à son espace.
+    // La navigation elle-même ne peut pas aboutir ici — l'isolement
+    // réseau coupe toute sortie, et une page ouverte en file:// n'a pas
+    // d'origine http exploitable. On observe donc la DESTINATION
+    // réellement demandée par le navigateur.
+    const page = await pageVitrine(navigateur, '#access_token=jwt&type=signup');
+    const destinations = [];
+    page.on('framenavigated', f => { try { destinations.push(f.url()); } catch (e) {} });
+    page.on('request', r => { try { destinations.push(r.url()); } catch (e) {} });
+    await page.evaluate(() => window.__emettre('SIGNED_IN',
+      { access_token: 'jwt', user: { id: 'u-test-qa', email: 'test-qa@example.invalid' } }));
+    await page.waitForTimeout(500);
+    check('B2-1 : avec une session, la confirmation mène à l\'espace',
+      destinations.some(u => /\/dashboard\.html$/.test(String(u))),
+      JSON.stringify(destinations.slice(-4)));
+    await page.close();
+
+    // Arrivée SANS session : connexion + message neutre.
+    const page2 = await pageVitrine(navigateur, '#type=signup');
+    await page2.waitForTimeout(1400);
+    const sansSession = await page2.evaluate(() => ({
+      connexionOuverte: !!document.getElementById('modal-connexion')
+        && document.getElementById('modal-connexion').classList.contains('open'),
+      message: ((document.getElementById('connexion-message') || {}).textContent || '').trim(),
+      hash: window.location.hash
+    }));
+    check('B2-2 : sans session, la connexion s\'ouvre',
+      sansSession.connexionOuverte === true, JSON.stringify(sansSession));
+    check('B2-3 : avec le message neutre exactement demandé',
+      /Adresse e-mail confirmée, vous pouvez vous connecter\./.test(sansSession.message),
+      sansSession.message);
+    check('B2-4 : et le jeton ne reste pas dans la barre d\'adresse',
+      sansSession.hash === '', sansSession.hash);
+    await page2.close();
+
+    // Un simple fragment SANS confirmation réelle n'annonce rien.
+    const page3 = await pageVitrine(navigateur);
+    await page3.waitForTimeout(400);
+    const sansRien = await page3.evaluate(() => ({
+      annonce: window._hcConfirmationAnnoncee,
+      message: ((document.getElementById('connexion-message') || {}).textContent || '').trim()
+    }));
+    check('B2-5 : sans lien de confirmation, aucun succès n\'est annoncé',
+      sansRien.annonce !== true && sansRien.message === '', JSON.stringify(sansRien));
+    await page3.close();
+  }
+
   // ══ I. LES DEUX PAGES PARTAGENT LES MÊMES GARANTIES ══
   check('I1 : les deux pages reconnaissent PASSWORD_RECOVERY',
     /PASSWORD_RECOVERY/.test(idx) && /PASSWORD_RECOVERY/.test(dash));
@@ -361,6 +410,9 @@ function etatEcran(page) {
     /auth\.updateUser\(/.test(idx) && /auth\.updateUser\(/.test(dash));
   check('I3 : aucune des deux ne code en dur le déploiement d\'aperçu',
     !/helixcar-i89b/.test(idx) && !/helixcar-i89b/.test(dash));
+  check('I4 : le succès de confirmation n\'est jamais déduit du seul fragment d\'URL',
+    /evenement === 'SIGNED_IN' \|\| evenement === 'INITIAL_SESSION'/.test(idx)
+    && /getSession\(\)\.then/.test(idx));
 
   await navigateur.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
