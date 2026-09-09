@@ -5299,7 +5299,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <div class="service-card reveal">
       <svg class="service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4.5 4V16H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/></svg>
       <h3 class="service-title">Service client ultra-réactif</h3>
-      <p class="service-desc">Disponible 7j/7, réponse garantie en moins de 2h. Notre équipe est là pour vous accompagner à chaque étape — avant, pendant et après chaque mission.</p>
+      <p class="service-desc">Disponible 7j/7, réponse garantie sous 1 heure. Notre équipe est là pour vous accompagner à chaque étape — avant, pendant et après chaque mission.</p>
     </div>
 
   </div>
@@ -6915,33 +6915,35 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
           </div>
 
-          <div class="modal-form-group">
-            <label>Quelle est la date souhaitée ? <span class="field-required">*</span></label>
-            <input type="date" id="nett-date" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-          </div>
-
-          <div class="modal-form-group" id="nett-dispo-group">
-            <label>Quelle est votre disponibilité ? <span class="field-required">*</span></label>
-            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="precise" onclick="nettOnDispoChange()"><span>Heure précise</span></label>
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="creneau" onclick="nettOnDispoChange()"><span>Créneau horaire</span></label>
-              <label class="radio-opt"><input type="radio" name="nett-dispo" value="flexible" onclick="nettOnDispoChange()"><span>Flexible</span></label>
+          <!-- Une intervention de nettoyage s'étale souvent sur
+               plusieurs jours : elle a un DÉBUT et une FIN. La question
+               « Quelle est votre disponibilité ? » (Heure précise /
+               Créneau horaire / Flexible) a été retirée : elle
+               conditionnait l'horaire à un choix supplémentaire sans
+               rapport avec la période. -->
+          <div class="modal-row">
+            <div class="modal-form-group">
+              <label>Date de début <span class="field-required">*</span></label>
+              <input type="date" id="nett-date" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+            </div>
+            <div class="modal-form-group">
+              <label>Date de fin <span class="field-required">*</span></label>
+              <input type="date" id="nett-date-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
             </div>
           </div>
 
-          <div class="modal-form-group" id="nett-heure-precise-bloc" style="display:none">
-            <label>Heure souhaitée <span class="field-required">*</span></label>
-            <input type="time" id="nett-heure" readonly style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-          </div>
-
-          <div id="nett-creneau-bloc" style="display:none">
+          <!-- L'horaire ne dépend plus d'aucun choix préalable : c'est
+               une plage sur place, facultative, cohérente avec la
+               période ci-dessus. Si elle manque, elle est réclamée plus
+               tard par le mécanisme des informations nécessaires. -->
+          <div id="nett-creneau-bloc">
             <div class="modal-row">
               <div class="modal-form-group">
-                <label>Début du créneau <span class="field-required">*</span></label>
+                <label>Horaire de début sur place <span class="field-optional-hint">(facultatif)</span></label>
                 <input type="time" id="nett-creneau-debut" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
-                <label>Fin du créneau <span class="field-required">*</span></label>
+                <label>Horaire de fin sur place <span class="field-optional-hint">(facultatif)</span></label>
                 <input type="time" id="nett-creneau-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
@@ -7169,18 +7171,22 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
 
-        <!-- Transport mode -->
+        <!-- Mode de transport : RETIRE d'ici, volontairement.
 
-        <div class="modal-form-group">
+             Il existait deux mecanismes concurrents pour la meme
+             question. Celui-ci etait GLOBAL au dossier : trois
+             elements — des boutons radio, un <select> masque
+             « Standard / Sur plateau », et une case a cocher masquee —
+             qui alimentaient un champ unique pour tous les vehicules.
 
-          <label>Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></label>
-          <div style="display:flex;flex-direction:column;gap:7px" id="mode-transport-group">
-            <label class="radio-opt"><input type="radio" name="mode-transport" value="standard" checked onclick="onModeTransport()"><span>Convoyage par la route</span></label>
-            <label class="radio-opt"><input type="radio" name="mode-transport" value="plateau" onclick="onModeTransport()"><span>Transport sur plateau</span></label>
-          </div>
-          <select id="client-mode" style="display:none"><option value="standard">Standard</option><option value="plateau">Sur plateau</option></select>
+             Il entrait en conflit avec le choix porte par chaque
+             vehicule, s'affichait sous la fiche des que le bloc du
+             vehicule manquait, et donnait au Dashboard un mode
+             different de celui saisi.
 
-        </div>
+             Le mode de transport appartient au VEHICULE : c'est la
+             seule source de verite, du formulaire au devis, a la base
+             et au Dashboard. Voir rendreFichesVehicules(). -->
 
 
 
@@ -7192,7 +7198,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
           <div style="display:flex;flex-direction:column;gap:7px">
 
-            <label class="radio-opt" style="display:none"><input type="checkbox" id="client-plateau" onchange="clientQuoteCalc()" style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0"><span>Transport sur plateau</span></label>
+            <!-- La case masquee « Transport sur plateau » vivait ici,
+                 dans le bloc DELAI SOUHAITE auquel elle n'appartient
+                 pas. Retiree : le mode de transport est porte par
+                 chaque vehicule. Le delai, lui, reste global. -->
 
             <div style="display:flex;flex-direction:column;gap:7px" id="delai-group">
               <label class="radio-opt"><input type="radio" name="delai" value="standard" checked onclick="onDelai()"><span>Standard</span></label>
@@ -7471,6 +7480,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div id="conv-recap"></div>
 
+        <div id="conv-erreur-envoi" style="display:none;white-space:pre-line;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-top:16px;font-size:.8rem;color:#991B1B"></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:16px 24px;font-size:.92rem" onclick="submitConvoyeurForm()">Envoyer ma candidature →</button>
 
       </div>
@@ -7680,9 +7690,24 @@ function supabaseInsert(table, data) {
     .then(function(r) {
       if (!r.ok) {
         return r.text().then(function(txt) {
+          // LE DETAIL TECHNIQUE RESTE DANS LA CONSOLE, JAMAIS A L'ECRAN.
+          //
+          // Cette fonction ecrivait la reponse brute de PostgREST dans
+          // #supabase-debug. Deux consequences, toutes deux constatees :
+          //
+          //   * le client lisait « code 23514 — new row for relation
+          //     "convoyeurs" violates check constraint », qui ne lui dit
+          //     rien et expose le schema ;
+          //   * ce bandeau vit DANS la fenetre « Devenir client », juste
+          //     au-dessus de « Creer mon compte ». Une candidature
+          //     partenaire en echec y laissait donc son erreur, et la
+          //     personne qui passait ensuite a la creation de compte
+          //     voyait une erreur [convoyeurs] sans aucun rapport avec
+          //     ce qu'elle etait en train de faire.
+          //
+          // C'est desormais a l'appelant d'afficher une phrase
+          // comprehensible, au bon endroit.
           console.error('Supabase [' + table + '] erreur ' + r.status + ':', txt);
-          var dbg = document.getElementById('supabase-debug');
-          if (dbg) { dbg.style.display='block'; dbg.innerHTML = '<b>Erreur ' + r.status + ' [' + table + ']:</b> ' + txt; }
           resolve({ error: txt, status: r.status });
         });
       }
@@ -7691,8 +7716,6 @@ function supabaseInsert(table, data) {
     })
     .catch(function(e) {
       console.error('Supabase network error:', e);
-      var dbg = document.getElementById('supabase-debug');
-      if (dbg) { dbg.style.display='block'; dbg.innerHTML = '<b>Erreur reseau:</b> ' + e.message; }
       resolve(null);
     });
   });
@@ -8321,13 +8344,16 @@ function _nettAdresseApplicable() {
 function _nettDate() {
   return ((document.getElementById('nett-date') || {}).value || '').trim();
 }
-function _nettTypeDispo() {
-  var el = document.querySelector('input[name="nett-dispo"]:checked');
-  return el ? el.value : '';
+// La date de FIN de la période d'intervention. Une prestation de
+// nettoyage s'étale souvent sur plusieurs jours ; début = fin est
+// parfaitement valide.
+function _nettDateFin() {
+  return ((document.getElementById('nett-date-fin') || {}).value || '').trim();
 }
-function _nettHeure() {
-  return ((document.getElementById('nett-heure') || {}).value || '').trim();
-}
+
+// _nettTypeDispo() et _nettHeure() sont supprimées avec la question
+// « Quelle est votre disponibilité ? ». L'horaire sur place est
+// désormais une simple plage, facultative, lue directement.
 function _nettCreneauDebut() {
   return ((document.getElementById('nett-creneau-debut') || {}).value || '').trim();
 }
@@ -8398,7 +8424,7 @@ function _nettMajBoutonContinuer() {
 // et surtout elle ne doit plus peser sur la navigation.
 var CLIENT_BRANCHES_SERVICE = {
   nettoyage: ['nett-eligibilite-group', 'nett-repartition-group', 'nett-type-group',
-              'nett-lieu-group', 'nett-dispo-group', 'nett-delai-group'],
+              'nett-lieu-group', 'nett-delai-group'],
   professionnel: ['pro-categorie-group', 'pro-specialite-group', 'pro-mission-group'],
   convoyage: ['trajet-type-group', 'service-mode-group'],
   stockage: ['stockage-group']
@@ -8446,21 +8472,8 @@ function nettOnLieuChange() {
   _clearGroupError('nett-lieu-group');
 }
 
-function nettOnDispoChange() {
-  var t = _nettTypeDispo();
-  var bp = document.getElementById('nett-heure-precise-bloc');
-  var bc = document.getElementById('nett-creneau-bloc');
-  if (bp) bp.style.display = (t === 'precise') ? 'block' : 'none';
-  if (bc) bc.style.display = (t === 'creneau') ? 'block' : 'none';
-  // Une heure precise et un creneau ne coexistent JAMAIS.
-  if (t !== 'precise') { var h = document.getElementById('nett-heure'); if (h) h.value = ''; _clearFieldError('nett-heure'); }
-  if (t !== 'creneau') {
-    ['nett-creneau-debut', 'nett-creneau-fin'].forEach(function (id) {
-      var e = document.getElementById(id); if (e) e.value = ''; _clearFieldError(id);
-    });
-  }
-  _clearGroupError('nett-dispo-group');
-}
+// nettOnDispoChange() est supprimée : plus aucun choix ne pilote
+// l'affichage de l'horaire, qui est toujours visible et facultatif.
 
 // ══════════════════════════════════════════════════════════════
 // CONTACT SUR PLACE — composant transversal
@@ -9214,23 +9227,30 @@ function _validateNettoyageEtape4() {
     }
   }
 
-  var td = _nettTypeDispo();
-  if (!td) { _showGroupError('nett-dispo-group', 'S\u00e9lectionnez votre disponibilit\u00e9.'); fail('nett-dispo-group'); }
+  // DATE DE FIN. Une periode a deux bornes. Une intervention d'une
+  // seule journee se declare avec debut = fin : c'est accepte.
+  if (!_checkDate('nett-date-fin', true)) fail('nett-date-fin');
   else {
-    _clearGroupError('nett-dispo-group');
-    if (td === 'precise') {
-      if (!_checkRequiredText('nett-heure', null, true)) fail('nett-heure');
-    } else if (td === 'creneau') {
-      var d1 = !_checkRequiredText('nett-creneau-debut', null, true);
-      var d2 = !_checkRequiredText('nett-creneau-fin', null, true);
-      if (d1) fail('nett-creneau-debut');
-      if (d2) fail('nett-creneau-fin');
-      var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
-      if (deb && fin && fin <= deb) {
-        _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
-        fail('nett-creneau-fin');
+    var vf = _nettDateFin(), vd = _nettDate();
+    if (vf) {
+      var auj2 = new Date(); auj2.setHours(0, 0, 0, 0);
+      var df = new Date(vf + 'T00:00:00');
+      if (df < auj2) { _showFieldError('nett-date-fin', 'La date ne peut pas \u00eatre dans le pass\u00e9.'); fail('nett-date-fin'); }
+      else if (vd && vf < vd) {
+        _showFieldError('nett-date-fin', 'La fin ne peut pas pr\u00e9c\u00e9der le d\u00e9but.');
+        fail('nett-date-fin');
       }
     }
+  }
+
+  // HORAIRE SUR PLACE : facultatif. On ne verifie que sa coherence
+  // interne — jamais sa presence.
+  var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
+  if (deb && fin && fin <= deb) {
+    _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
+    fail('nett-creneau-fin');
+  } else {
+    _clearFieldError('nett-creneau-fin');
   }
 
   if (!_nettDelai()) { _showGroupError('nett-delai-group', 'S\u00e9lectionnez un d\u00e9lai.'); fail('nett-delai-group'); }
@@ -9260,9 +9280,13 @@ function _construireDetailsNettoyage() {
     adresse_rue: null,
     adresse_cp: null,
     adresse_ville: null,
+    // date_souhaitee reste la date de DEBUT : la cle ne change pas, les
+    // demandes deja enregistrees et le Dashboard continuent de la lire.
     date_souhaitee: _nettDate() || null,
-    dispo_type: _nettTypeDispo() || null,
-    heure_precise: _nettHeure() || null,
+    date_fin: _nettDateFin() || null,
+    // dispo_type et heure_precise ne sont plus produits : la question
+    // qui les alimentait a ete retiree. Les anciennes demandes les
+    // conservent dans leur JSON, et le Dashboard sait encore les lire.
     creneau_debut: _nettCreneauDebut() || null,
     creneau_fin: _nettCreneauFin() || null,
     delai: _nettDelai() || null,
@@ -9319,9 +9343,9 @@ function construireRecapNettoyage() {
   // Libelle unique, identique au dashboard et au PDF.
   orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
   orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
-  if (d.dispo_type === 'precise') orga += _recapLigne('Heure', d.heure_precise);
-  else if (d.dispo_type === 'creneau') orga += _recapLigne('Cr\u00e9neau', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
-  else if (d.dispo_type === 'flexible') orga += _recapLigne('Disponibilit\u00e9', 'Flexible');
+  if (d.creneau_debut || d.creneau_fin) {
+    orga += _recapLigne('Horaire sur place', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
+  }
   orga += _recapLigne('D\u00e9lai', NETT_DELAI[d.delai] || '');
   html += _recapBloc('Organisation de l\'intervention', orga, 4);
 
@@ -11829,11 +11853,8 @@ function construireRecap() {
     }
     if (g) html += _recapBloc(_avecStockage() ? 'Convoyage HelixCar' : (multi ? 'Trajet commun' : 'Trajet'), g, sc.pc ? 3 : 4);
 
-    var modeEl = document.querySelector('input[name="mode-transport"]:checked');
-    if (_avecConvoyage() && modeEl) {
-      html += _recapBloc('Transport',
-        _recapLigne('Mode', modeEl.value === 'plateau' ? 'Transport sur plateau' : 'Convoyage par la route'), 4);
-    }
+    // Le mode de transport n'apparaît plus ici : il est propre à chaque
+    // véhicule et figure déjà dans sa fiche du récapitulatif.
   }
 
   // Le délai est une propriété GLOBALE de la demande. Il doit apparaître
@@ -11909,7 +11930,11 @@ function construireRecap() {
                    _recapLigne('Durée réelle du stockage', jEffectifVeh > 0 ? jEffectifVeh + (jEffectifVeh > 1 ? ' jours' : ' jour') : '');
         }
       }
-      if (!commun && (sc.pc || sc.liv) && v.mode_transport) {
+      // MEME CONDITION QUE LE FORMULAIRE, mot pour mot. Elle testait
+      // « !commun && ... » : le formulaire et le recapitulatif pouvaient
+      // donc diverger, et le client repondait a une question qui
+      // n'apparaissait jamais dans son propre recapitulatif.
+      if ((sc.pc || sc.liv) && v.mode_transport) {
         corps += _recapLigne('Mode de transport',
           v.mode_transport === 'plateau' ? 'Transport sur plateau' : 'Convoyage par la route');
       }
@@ -12085,15 +12110,22 @@ function onNbVehiculesChange() {
 // Les colonnes mode_transport, plateau et urgence conservent
 // exactement leur signification actuelle : on se contente de les
 // alimenter depuis les nouveaux boutons radio.
-function onModeTransport() {
-  var el = document.querySelector('input[name="mode-transport"]:checked');
-  var val = el ? el.value : 'standard';
-  var select = document.getElementById('client-mode');
-  if (select) select.value = val;
-  var plateau = document.getElementById('client-plateau');
-  if (plateau) plateau.checked = (val === 'plateau');
-  if (typeof clientQuoteCalc === 'function') clientQuoteCalc();
+// LE MODE DE TRANSPORT EST LU SUR LES VEHICULES, ET NULLE PART AILLEURS.
+//
+// Retourne true des qu'au moins un vehicule part sur plateau. C'est la
+// regle du devis : le supplement s'applique au dossier des lors qu'un
+// plateau est necessaire.
+function _hcPlateauDemande() {
+  var n = (typeof _nbVehicules === 'function') ? _nbVehicules() : 0;
+  for (var i = 0; i < n; i++) {
+    var el = document.querySelector('input[name="veh-' + i + '-mode"]:checked');
+    if (el && el.value === 'plateau') return true;
+  }
+  return false;
 }
+
+// onModeTransport() est supprimee : elle recopiait le choix global dans
+// un <select> masque et une case a cocher masquee, tous deux retires.
 
 function onDelai() {
   var el = document.querySelector('input[name="delai"]:checked');
@@ -12316,19 +12348,14 @@ function majInfoLieuStockage() {
 
 // Les questions de transport n'ont de sens que si HelixCar convoie réellement.
 function _majBlocsTransport() {
-  // DEUX RÈGLES DISTINCTES, volontairement séparées.
-  //   MODE de transport : masqué en trajets individuels, car chaque
-  //     véhicule porte le sien ; un choix global le contredirait.
-  //   DÉLAI souhaité   : donnée GLOBALE du dossier, visible dès que
-  //     HelixCar transporte, y compris en trajets individuels.
-  // Les traiter dans la même boucle faisait disparaître le délai avec
-  // le mode : c'était la régression constatée par la QA.
-  var trajetsIndividuels = (_nbVehicules() >= 2 && !_trajetCommun());
+  // Il ne reste ici qu'une règle : le DÉLAI SOUHAITÉ, donnée GLOBALE du
+  // dossier, visible dès que HelixCar transporte — y compris en trajets
+  // individuels.
+  //
+  // Le MODE DE TRANSPORT n'est plus traité ici : il n'existe plus de
+  // bloc global à montrer ou à cacher. Chaque véhicule porte le sien,
+  // dans sa propre fiche.
   var transporte = _avecConvoyage();
-
-  var modeEl = document.getElementById('mode-transport-group');
-  var modeGrp = modeEl && modeEl.closest('.modal-form-group');
-  if (modeGrp) modeGrp.style.display = (transporte && !trajetsIndividuels) ? 'block' : 'none';
 
   var delaiEl = document.getElementById('delai-group');
   var delaiGrp = delaiEl && delaiEl.closest('.modal-form-group');
@@ -13252,10 +13279,8 @@ function _validateClientStep(n) {
       mark(_checkSelect('client-vtype'), 'client-vtype');
       mark(_checkRequiredText('client-marque'), 'client-marque');
     }
-    // Mode de transport : contrôlé seulement s'il est global et visible.
-    if (!(_nbVehicules() >= 2 && !_trajetCommun())) {
-      mark(_checkSelect('client-mode'), 'client-mode');
-    }
+    // Le mode de transport n'est plus validé ici : il n'existe plus de
+    // champ global. Chaque fiche véhicule valide le sien.
 
     // Restitution : tous les champs deviennent obligatoires dès que le client
     // demande une restitution. L'adresse de restitution est masquée quand
@@ -13372,7 +13397,7 @@ function _attacherEcouteursClient() {
     'client-from','client-from-rue','client-from-cp','client-contact-pc-nom','client-contact-pc-tel',
     'client-date-pc','client-heure-pc','client-to','client-to-rue','client-to-cp','client-contact-liv-nom','client-contact-liv-tel',
     'client-date-livraison','client-heure-liv','client-marque','client-immat','client-vin',
-    'client-type','client-vtype','client-mode',
+    'client-type','client-vtype',
     'client-restit-rue','client-restit-cp','client-restit-ville','client-restit-contact-nom','client-restit-contact-tel',
     'client-date-restit','client-heure-restit','client-restit-cdeb','client-restit-cfin','client-restit-vtype',
     'client-restit-marque','client-restit-immat','client-restit-vin'];
@@ -15263,7 +15288,7 @@ function clientQuoteCalc() {
 
   const clean   = document.getElementById('client-clean')?.checked || false;
 
-  const plateau = document.getElementById('client-plateau')?.checked || false;
+  const plateau = _hcPlateauDemande();
 
   const restit  = document.getElementById('client-restit')?.checked || false;
 
@@ -15742,9 +15767,7 @@ async function _submitClientFormInterne() {
   var marque_val  = (document.getElementById('client-marque') || {}).value || '';
   var immat_val   = (document.getElementById('client-immat') || {}).value || '';
   var vin_val     = (document.getElementById('client-vin') || {}).value || '';
-  var mode_val    = (document.getElementById('client-mode') || {}).value || '';
   var clean_val   = document.getElementById('client-clean') ? document.getElementById('client-clean').checked : false;
-  var plateau_val = document.getElementById('client-plateau') ? document.getElementById('client-plateau').checked : false;
   var urgence_val = document.getElementById('client-urgence') ? document.getElementById('client-urgence').checked : false;
   var restit_val  = document.getElementById('client-restit') ? document.getElementById('client-restit').checked : false;
   var notes_val   = (document.getElementById('client-notes') || {}).value || '';
@@ -15863,9 +15886,14 @@ async function _submitClientFormInterne() {
     marque_modele:          marque_val || null,
     immatriculation:        immat_val || null,
     vin:                    vin_val || null,
-    mode_transport:         mode_val || null,
+    // mode_transport et plateau ne sont plus envoyés au niveau du
+    // DOSSIER : ils décrivaient un choix global qui contredisait celui
+    // de chaque véhicule. La donnée vit desormais sur vehicules.
+    // mode_transport, écrit par la même transaction (migration 92).
+    // Les colonnes clients.mode_transport et clients.plateau restent en
+    // base, inchangées : les demandes déjà enregistrées les conservent,
+    // et le Dashboard continue de les lire pour celles-là.
     nettoyage:              clean_val ? 'Oui' : 'Non',
-    plateau:                plateau_val ? 'Oui' : 'Non',
     urgence:                urgence_val ? 'Oui' : 'Non',
     restitution:            restitActif ? 'Oui' : 'Non',
     adresse_restitution:    (restitActif ? restit_addr : '') || null,
@@ -15944,26 +15972,71 @@ async function _submitClientFormInterne() {
   // indisponible, la demande est enregistrée sans rattachement. On ne
   // rattache jamais une demande à un compte sur la seule foi d'une
   // adresse e-mail : cela exposerait la demande d'un tiers.
-  var _compteCree = false;
+  // ── L'ISSUE RÉELLE DE LA CRÉATION DE COMPTE ──
+  //
+  // Ce bloc ne renvoyait qu'un booléen, et l'écran de succès ne le
+  // regardait même pas : il annonçait « Votre compte HelixCar est
+  // maintenant créé » dès que la DEMANDE était écrite. Un signUp en
+  // échec — adresse déjà prise, mot de passe refusé, coupure réseau —
+  // produisait donc un succès affiché pour un compte inexistant, et la
+  // connexion échouait ensuite.
+  //
+  // On distingue désormais quatre issues, et l'écran dit chacune telle
+  // qu'elle est :
+  //
+  //   'non_demande' : aucun mot de passe saisi, ou dépôt depuis un
+  //                   compte déjà connecté — il n'y a rien à créer ;
+  //   'cree'        : le serveur a bien créé le compte ;
+  //   'existe_deja' : l'adresse est déjà inscrite. Ce n'est pas un
+  //                   échec : le nouvel essai avec la même adresse doit
+  //                   rester possible et sans effet de bord ;
+  //   'echec'       : le serveur a refusé, ou n'a pas répondu.
+  var _compteEtat = 'non_demande';
+  var _compteSession = false;
   if (!_idCompteDepot && _sb && _sb.auth && email_val) {
     var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
     if (mdpSaisi) {
+      _compteEtat = 'echec';
       try {
         var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
-        _compteCree = !rCompte.error && !!(utilisateur && utilisateur.id);
-        var sessionCreation = rCompte && rCompte.data && rCompte.data.session;
-        if (_compteCree && !sessionCreation) {
+        var msgErr = String((rCompte && rCompte.error && rCompte.error.message) || '');
+        // Supabase signale une adresse déjà inscrite de deux façons
+        // selon la configuration du projet : par une erreur explicite,
+        // ou par un utilisateur SANS identité rattachée.
+        var dejaInscrit = /already\s*registered|already\s*exists|user\s*already/i.test(msgErr)
+          || !!(utilisateur && Array.isArray(utilisateur.identities)
+                && utilisateur.identities.length === 0);
+        if (dejaInscrit) {
+          _compteEtat = 'existe_deja';
+        } else if (!rCompte.error && utilisateur && utilisateur.id) {
+          _compteEtat = 'cree';
+        } else if (rCompte && rCompte.error) {
+          console.error('Création du compte refusée par le serveur :', msgErr);
+          _compteEtat = 'echec';
+        }
+        _compteSession = !!(rCompte && rCompte.data && rCompte.data.session);
+        if (!_compteSession && (_compteEtat === 'cree' || _compteEtat === 'existe_deja')) {
           // Pas de session : on tente d'en ouvrir une. Elle n'aboutira
-          // que si la confirmation d'e-mail est désactivée.
-          try { await _sb.auth.signInWithPassword({ email: email_val, password: mdpSaisi }); }
+          // que si la confirmation d'e-mail est désactivée. C'est aussi
+          // ce qui rend le NOUVEL ESSAI utile avec la même adresse :
+          // le compte existe déjà, la session s'ouvre, et la demande
+          // part alors rattachée.
+          try {
+            var rConn = await _sb.auth.signInWithPassword({ email: email_val, password: mdpSaisi });
+            _compteSession = !!(rConn && rConn.data && rConn.data.session);
+          }
           catch (e2) { /* confirmation requise : on reste anonyme */ }
         }
       } catch (e) {
-        console.warn('Création du compte impossible, la demande est conservée :', e);
+        console.error('Création du compte impossible, la demande est conservée :', e);
+        _compteEtat = 'echec';
       }
     }
   }
+  // Conservé pour la lisibilité du reste de la fonction : « un compte a
+  // réellement été créé à l'instant ».
+  var _compteCree = (_compteEtat === 'cree');
 
   // ── ÉCRITURE ATOMIQUE : LA DEMANDE ET SES VÉHICULES ENSEMBLE ──
   // L'ancienne version écrivait la demande, PUIS les véhicules, en deux
@@ -16049,32 +16122,43 @@ async function _submitClientFormInterne() {
 
   inserer(5)
     .then(function(r) {
-      var dbg = document.getElementById('supabase-debug');
       if (!r || r.error) {
         // Le détail technique reste dans la console du navigateur, à
         // l'usage du développeur. Le client, lui, lit une phrase qu'il
         // peut comprendre et suivre.
         console.error('Echec de creation de la demande :', r && r.error);
-        if (dbg) {
-          dbg.style.display = 'block';
-          dbg.textContent = 'Votre demande n\'a pas pu être enregistrée. '
-            + 'Rien n\'a été validé et vos informations sont conservées : '
-            + 'vérifiez votre connexion internet puis réessayez. '
-            + 'Si le problème persiste, contactez HelixCar.';
-        }
+        _hcAfficherBandeauErreur(
+          'Votre demande n\'a pas pu être enregistrée. '
+          + 'Rien n\'a été validé et vos informations sont conservées : '
+          + 'vérifiez votre connexion internet puis réessayez. '
+          + 'Si le problème persiste, contactez HelixCar.');
         return;
       }
       // Succes
+      // Le bandeau d'erreur d'un essai précédent n'a plus lieu d'être.
+      _hcEffacerBandeauErreur();
+
       // Une simple création de compte n'est pas une demande de devis.
       var missionReelle = (type_service_val !== 'compte')
         && ((val !== 'pas-maintenant') || (_clientSkipMission === false) || aDuStockage);
 
-      // Numéro client dominant, parrainage en retrait, puis filet fin.
+      // ── LE NUMÉRO AFFICHÉ EST CELUI QUE LE SERVEUR A ENREGISTRÉ ──
+      //
+      // clientNum et parrCode sont tirés par le navigateur AVANT
+      // l'écriture. Le serveur peut en imposer d'autres — c'est lui qui
+      // détient la contrainte d'unicité. On affiche donc ce qu'il
+      // renvoie, et on ne montre le code de parrainage que s'il existe
+      // réellement : promettre une réduction sur un code qui n'a pas
+      // été enregistré serait un mensonge de plus.
+      var _retourSrv = (r && r.retour) || {};
+      var _numeroReel = _retourSrv.numero_client || clientNum;
       var html = '<div class="hc-succes-numlabel">Votre numéro client</div>' +
-        '<div class="hc-succes-num">' + clientNum + '</div>' +
-        '<div class="hc-succes-parr">Code de parrainage : <b>' + parrCode + '</b>' +
-        '<span>Votre filleul bénéficie de 10 % de réduction.</span></div>' +
-        '<div class="hc-succes-filet"></div>';
+        '<div class="hc-succes-num">' + _attr(_numeroReel) + '</div>';
+      if (parrCode) {
+        html += '<div class="hc-succes-parr">Code de parrainage : <b>' + _attr(parrCode) + '</b>' +
+          '<span>Votre filleul bénéficie de 10 % de réduction.</span></div>';
+      }
+      html += '<div class="hc-succes-filet"></div>';
 
       if (missionReelle) {
         html += '<div class="hc-succes-txt">' +
@@ -16083,8 +16167,33 @@ async function _submitClientFormInterne() {
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
           '</div>' +
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
-      } else {
+      } else if (_compteEtat === 'cree' || _compteEtat === 'existe_deja' || _compteEtat === 'non_demande') {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
+      }
+
+      // ── CE QUI EST ANNONCÉ EST CE QUI S'EST RÉELLEMENT PASSÉ ──
+      //
+      // La phrase « Votre compte HelixCar est maintenant créé » était
+      // écrite sans jamais regarder l'issue du signUp. Un refus du
+      // serveur — adresse déjà prise, mot de passe trop court, coupure —
+      // affichait donc un succès pour un compte qui n'existait pas, et
+      // la connexion échouait ensuite. C'est le défaut signalé.
+      if (_compteEtat === 'echec') {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + '<strong>Votre compte n\'a pas pu être créé.</strong> '
+          + (missionReelle
+             ? 'Votre demande, elle, est bien enregistrée et notre équipe la traite. '
+             : '')
+          + 'Reprenez la création de compte avec la même adresse depuis la page '
+          + 'de connexion : rien ne sera enregistré en double.'
+          + '</div>';
+      } else if (_compteEtat === 'existe_deja') {
+        html += '<div class="hc-succes-note" style="margin-top:10px">'
+          + 'Un compte existait déjà avec cette adresse : '
+          + (_compteSession
+             ? 'vous y êtes connecté, rien n\'a été créé en double.'
+             : 'connectez-vous avec votre mot de passe habituel. Rien n\'a été créé en double.')
+          + '</div>';
       }
 
       // ── CE QU'ON ANNONCE DOIT ÊTRE CE QUI S'EST PASSÉ ──
@@ -16096,15 +16205,14 @@ async function _submitClientFormInterne() {
       //
       // Sans ce contrôle, un client dont la confirmation d'e-mail est
       // requise lisait « votre espace client » et n'y trouvait rien.
-      var _retour = (r && r.retour) || {};
-      var _rattachee = _retour.rattachee === true;
+      var _rattachee = _retourSrv.rattachee === true;
       // Demande enregistrée SANS propriétaire : on garde de quoi la
       // réclamer une fois l'adresse confirmée. C'est ce qui rend vraie
       // la phrase affichée juste en dessous.
       // On ne garde JAMAIS le secret de création : seulement celui de
       // réclamation, qui ne vaut rien sans le compte confirmé.
       if (!_rattachee) _hcMemoriserReclamation(payload.id, cleReclamation, email_val);
-      if (_compteCree && !_rattachee) {
+      if ((_compteEtat === 'cree') && !_rattachee) {
         html += '<div class="hc-succes-note" style="margin-top:10px">'
           + '<strong>Confirmez votre adresse e-mail</strong> pour activer votre '
           + 'espace client : un message vient de vous être envoyé. '
@@ -16176,9 +16284,13 @@ async function _submitClientFormInterne() {
             if (_dN.lieu) lignesAdmin.push('Lieu d\'intervention : ' + (NETT_LIEUX[_dN.lieu] || _dN.lieu));
             if (_dN.adresse_ville) lignesAdmin.push('Ville : ' + [_dN.adresse_cp, _dN.adresse_ville].filter(Boolean).join(' '));
             if (_dN.date_souhaitee) {
-              var _hN = _dN.dispo_type === 'precise' ? (' \u00e0 ' + _dN.heure_precise)
-                : (_dN.dispo_type === 'creneau' ? (' entre ' + _dN.creneau_debut + ' et ' + _dN.creneau_fin) : ' (flexible)');
-              lignesAdmin.push('Date souhait\u00e9e : ' + _dN.date_souhaitee + _hN);
+              var _periode = _dN.date_fin && _dN.date_fin !== _dN.date_souhaitee
+                ? ('du ' + _dN.date_souhaitee + ' au ' + _dN.date_fin)
+                : ('le ' + _dN.date_souhaitee);
+              var _hN = (_dN.creneau_debut || _dN.creneau_fin)
+                ? (', entre ' + (_dN.creneau_debut || '?') + ' et ' + (_dN.creneau_fin || '?'))
+                : '';
+              lignesAdmin.push('Intervention ' + _periode + _hN);
             }
             if (_dN.delai) lignesAdmin.push('D\u00e9lai : ' + (NETT_DELAI[_dN.delai] || _dN.delai));
           } else if (_avecConvoyage()) {
@@ -16289,9 +16401,31 @@ function setLang(lang) {
 
 
 
+// Le bandeau d'erreur de la fenetre client. Il ne doit JAMAIS survivre
+// a la tentative qui l'a produit : ni d'une fenetre a l'autre, ni d'un
+// essai au suivant, ni apres un rechargement.
+function _hcEffacerBandeauErreur() {
+  var dbg = document.getElementById('supabase-debug');
+  if (!dbg) return;
+  dbg.style.display = 'none';
+  dbg.textContent = '';
+}
+
+// Message lisible par le client. Le detail technique n'y figure jamais.
+function _hcAfficherBandeauErreur(texte) {
+  var dbg = document.getElementById('supabase-debug');
+  if (!dbg) return;
+  dbg.style.display = 'block';
+  dbg.textContent = texte;
+}
+
 function openModal(type) {
 
   event && event.preventDefault();
+
+  // Aucune erreur d'une tentative precedente ne doit accueillir la
+  // suivante — surtout pas celle d'une AUTRE fenetre.
+  _hcEffacerBandeauErreur();
 
   document.getElementById('modal-' + type).classList.add('open');
 
@@ -17738,6 +17872,55 @@ async function uploadFichier(inputId, prefixe) {
   }
 }
 
+// Message d'echec de la candidature. Il vit DANS la fenetre partenaire,
+// jamais dans celle du client : une erreur ne doit pas suivre
+// l'utilisateur d'un formulaire a l'autre.
+function _convAfficherEchecCandidature(texte) {
+  var zone = document.getElementById('conv-erreur-envoi');
+  if (zone) {
+    zone.textContent = texte;
+    zone.style.display = 'block';
+    try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    return;
+  }
+  alert(texte);
+}
+function _convEffacerEchecCandidature() {
+  var zone = document.getElementById('conv-erreur-envoi');
+  if (zone) { zone.style.display = 'none'; zone.textContent = ''; }
+}
+
+// SUPPRESSION D'UN FICHIER DEVENU ORPHELIN.
+//
+// Les trois documents partent AVANT l'ecriture de la candidature. Si
+// cette ecriture echoue — c'est exactement ce qui arrivait avec la
+// contrainte des activites — les fichiers restent dans le bucket sans
+// qu'aucune ligne ne les reference : personne ne saura jamais qu'ils
+// sont la, ni a qui ils appartiennent.
+//
+// Best effort assume : si la suppression echoue a son tour, on n'en
+// fait pas une erreur visible pour le candidat, dont la candidature n'a
+// de toute facon pas ete enregistree. La trace reste dans la console.
+async function _supprimerFichierTeleverse(url) {
+  if (!url || typeof url !== 'string') return false;
+  var marqueur = '/storage/v1/object/public/document/';
+  var i = url.indexOf(marqueur);
+  if (i === -1) return false;
+  var chemin = url.slice(i + marqueur.length);
+  if (!chemin) return false;
+  try {
+    var resp = await fetch(SUPABASE_URL + '/storage/v1/object/document/' + chemin, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!resp.ok) { console.warn('Fichier orphelin non supprime :', chemin, resp.status); return false; }
+    return true;
+  } catch (e) {
+    console.warn('Fichier orphelin non supprime :', chemin, e && e.message);
+    return false;
+  }
+}
+
 async function submitConvoyeurForm() {
   var prenom = (document.getElementById('conv-prenom') || {}).value || '';
   var nom    = (document.getElementById('conv-nom') || {}).value || '';
@@ -17806,6 +17989,10 @@ async function submitConvoyeurForm() {
     if (zoneV) { try { zoneV.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
     return;
   }
+
+  // Un nouvel essai commence : l'echec du precedent n'a plus lieu d'etre
+  // affiche.
+  _convEffacerEchecCandidature();
 
   // Indiquer le chargement
   var btn = document.querySelector('#modal-convoyeur-form button.btn-primary');
@@ -17885,7 +18072,18 @@ async function submitConvoyeurForm() {
   var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
   if (!rInsert || rInsert.error) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    alert('Erreur lors de envoi. ' + (rInsert && rInsert.error ? JSON.stringify(rInsert.error) : 'Reessayez.'));
+    // Les trois documents sont deja partis : sans candidature pour les
+    // referencer, ce sont des orphelins. On les retire.
+    await Promise.all([id_url, permis_url, rc_pro_url].map(_supprimerFichierTeleverse));
+    // Le detail technique est deja dans la console (supabaseInsert).
+    // Le candidat, lui, lit une phrase qu'il peut comprendre et suivre —
+    // jamais un code SQL ni un nom de table.
+    _convAfficherEchecCandidature(
+      "Votre candidature n'a pas pu etre enregistree.\n\n"
+      + "Rien n'a ete valide et vos informations sont conservees : "
+      + "verifiez votre connexion internet puis reessayez.\n"
+      + "Si le probleme persiste, contactez HelixCar."
+    );
     return;
   }
 
@@ -18747,8 +18945,39 @@ function rendreFichesVehicules() {
 
     if (livraison) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
 
-    // Le mode de transport vient toujours APRÈS livraison/restitution.
-    if ((pcIndiv || livIndiv) && livActive===true) {
+    // ── LE MODE DE TRANSPORT, TOUJOURS PRESENT, TOUJOURS ICI ──
+    //
+    // Il vient APRES livraison/restitution, et il est genere pour CHAQUE
+    // vehicule, sans condition.
+    //
+    // DEFAUT CORRIGE. Ce bloc n'etait produit que si livActive===true,
+    // c'est-a-dire si la LIVRAISON APRES STOCKAGE de ce vehicule etait
+    // deja choisie. Or livActive vient de la fiche memorisee : il vaut
+    // null tant que le client n'a rien decide, et reste a la valeur
+    // laissee par un passage precedent dans le Stockage. Consequences
+    // observees, toutes expliquees par cette seule ligne :
+    //
+    //   * sur le vehicule 3 sur 3, jamais ouvert, le bloc n'existait
+    //     pas du tout — et le Dashboard n'affichait donc aucun mode de
+    //     transport pour V3 alors que V1 et V2 en avaient un ;
+    //   * la sequence Convoyage -> Stockage -> Livraison apres stockage
+    //     -> retour Convoyage le faisait reapparaitre, puisqu'elle
+    //     posait livActive=true ;
+    //   * et comme la rubrique disparaissait, le controle GLOBAL
+    //     « Standard / Sur plateau » restait seul visible sous la fiche,
+    //     donnant l'impression que le bloc s'etait deplace.
+    //
+    // LA BONNE REGLE. Un vehicule est convoye par la route ou transporte
+    // sur plateau : cela ne depend d'aucune AUTRE reponse — mais cela
+    // suppose que HelixCar le transporte. Dans un stockage ou le client
+    // depose ET vient rechercher son vehicule lui-meme, la question n'a
+    // pas d'objet : on ne la pose pas.
+    //
+    // La condition porte donc sur le FAIT METIER (sc.pc || sc.liv), et
+    // non sur la mise en page (pcIndiv || livIndiv) : si le trajet
+    // redevenait un jour commun, la rubrique ne disparaitrait pas pour
+    // autant. Le recapitulatif applique exactement la meme regle.
+    if (sc.pc || sc.liv) {
       var mode='<div class="veh-sstitre">Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></div><div style="display:flex;flex-direction:column;gap:7px">'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='plateau'?'':'checked')+'><span>Convoyage par la route</span></label>'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="plateau" '+(v.mode_transport==='plateau'?'checked':'')+'><span>Transport sur plateau</span></label></div>';
@@ -18950,6 +19179,9 @@ function _hcContexteChamp(id) {
   // globalement au rendu, subsiste : aujourd'hui et le futur sont
   // acceptes, le passe est refuse. C'est exactement la regle demandee.
   if (id === 'nett-date') return { type: 'nettoyage', prefixe: 'nett-date' };
+  // La date de FIN d'intervention : meme famille, avec la seule borne
+  // metier qui existe ici — elle ne precede jamais le debut.
+  if (id === 'nett-date-fin') return { type: 'nettoyage', prefixe: 'nett-date-fin' };
   // Trouver un professionnel : periode reelle debut -> fin, colorable
   // comme celle du Convoyage/Stockage, avec la seule borne metier qui
   // existe vraiment ici (la fin ne precede jamais le debut).
@@ -19017,7 +19249,16 @@ function _hcPeriodePourChamp(id) {
   if (!ctx) return { debut: null, finLiv: null, finRestit: null };
   // V76 — le nettoyage n'a aucune periode a colorer : ni stockage, ni
   // convoyage, ni restitution.
-  if (ctx.type === 'nettoyage') return { debut: null, finLiv: null, finRestit: null };
+  // Periode d'intervention du nettoyage : debut et fin colores comme
+  // ceux du Convoyage/Stockage et du Professionnel. Aucune regle de
+  // coloration dupliquee — seule la source des deux dates change.
+  if (ctx.type === 'nettoyage') {
+    return {
+      debut: _hcParserYMD((document.getElementById('nett-date') || {}).value),
+      finLiv: _hcParserYMD((document.getElementById('nett-date-fin') || {}).value),
+      finRestit: null
+    };
+  }
   // Periode d'intervention du professionnel : memes bornes visuelles que
   // Convoyage/Stockage (debut et fin en rouge, jours intermediaires en
   // teinte plus legere, demi-teintes si debut et fin le meme jour) —
@@ -19056,6 +19297,9 @@ function _hcDateMinimaleChamp(id) {
   // La fin d'intervention ne precede jamais son debut.
   if (ctx.prefixe === 'pro-date-fin') {
     return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
+  }
+  if (ctx.prefixe === 'nett-date-fin') {
+    return _hcParserYMD((document.getElementById('nett-date') || {}).value);
   }
   if (ctx.prefixe === 'liv') {
     if (_avecStockage()) {
@@ -19279,7 +19523,10 @@ function _hcDateDebutLiee(id) {
   if (ctx.type === 'professionnel') {
     return _hcParserYMD((document.getElementById('pro-date-debut') || {}).value);
   }
-  return null;   // nettoyage : aucune date liee
+  if (ctx.type === 'nettoyage') {
+    return _hcParserYMD((document.getElementById('nett-date') || {}).value);
+  }
+  return null;
 }
 
 // V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
@@ -19288,7 +19535,7 @@ function _hcDateDebutLiee(id) {
 var _hcCalTempNettoyage = null;
 
 function _hcEstCalendrierNettoyage() {
-  return _hcCalChampActif === 'nett-date';
+  return _hcCalChampActif === 'nett-date' || _hcCalChampActif === 'nett-date-fin';
 }
 
 // Confirme la selection temporaire puis ferme (bouton OK).
@@ -20007,8 +20254,9 @@ document.addEventListener('click', function (e) {
 #modal-client label.radio-opt:hover,
 #modal-client label.radio-opt:has(input[type="radio"]:checked),
 #modal-client label.radio-opt.selected { background:#fff !important; }
-/* Les deux anciens services cachés restent VRAIMENT cachés malgré display:grid !important. */
-#modal-client label.radio-opt:has(#client-plateau),
+/* L'ancien service caché reste VRAIMENT caché malgré display:grid !important.
+   (#client-plateau a été retiré : le mode de transport est porté par
+   chaque véhicule.) */
 #modal-client label.radio-opt:has(#client-urgence) { display:none !important; }
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
@@ -20262,7 +20510,6 @@ document.addEventListener('click', function (e) {
 #modal-client .field-required{display:inline-block;vertical-align:middle;line-height:1;}
 /* Délai souhaité : respiration forte et uniquement les deux niveaux utiles. */
 #modal-client .hc-delai-group{margin-top:42px !important;padding-top:16px !important;border-top:1px solid rgba(21,27,33,.08) !important;}
-#modal-client #client-plateau,
 #modal-client #client-urgence{display:none !important;}
 /* Créneau : rendu plus lisible. */
 .hp-picker--creneau{width:460px !important;}
@@ -20322,7 +20569,7 @@ document.addEventListener('click', function (e) {
     var dup=document.querySelector('#modal-client #bloc-nb-vehicules .hc-step2-acc-body > .modal-section-title'); if(dup)dup.style.display='none';
   }
   function cleanDelai(){
-    ['client-plateau','client-urgence'].forEach(function(id){var el=document.getElementById(id);if(el){el.checked=false;var lab=el.closest('label');if(lab)lab.style.setProperty('display','none','important');}});
+    ['client-urgence'].forEach(function(id){var el=document.getElementById(id);if(el){el.checked=false;var lab=el.closest('label');if(lab)lab.style.setProperty('display','none','important');}});
     var dg=document.getElementById('delai-group');if(dg){var g=dg.closest('.modal-form-group');if(g)g.classList.add('hc-delai-group');}
   }
   function msTime(v){var m=/^(\d{1,2}):(\d{2})$/.exec(v||'');return m?(parseInt(m[1],10)*60+parseInt(m[2],10)):null;}

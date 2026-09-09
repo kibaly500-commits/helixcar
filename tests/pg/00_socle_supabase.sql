@@ -81,6 +81,46 @@ create table if not exists public.convoyeurs (
   created_at   timestamptz not null default now()
 );
 
+-- CONTRAINTE RÉELLEMENT DÉPLOYÉE, ET QUE CE SOCLE NE REPRODUISAIT PAS.
+--
+-- La production porte sur convoyeurs.activites une contrainte
+-- d'énumération créée bien avant ce dépôt : elle n'est donc dans aucun
+-- fichier de migrations/, et les tests ne la voyaient pas. C'est elle
+-- qui refuse les candidatures depuis que la migration 95 a ajouté des
+-- métiers relevant de l'activité 'technicien' :
+--
+--   code 23514 — new row for relation "convoyeurs" violates check
+--   constraint "convoyeurs_activites_valides"
+--
+-- Le socle doit reproduire l'environnement réel, pas un environnement
+-- commode. On la déclare donc ici, avec les trois seules valeurs
+-- qu'elle connaissait, exactement comme en production.
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.convoyeurs'::regclass
+       and conname  = 'convoyeurs_activites_valides'
+  ) then
+    alter table public.convoyeurs
+      add constraint convoyeurs_activites_valides
+      check (activites is null
+             or activites <@ array['convoyage','nettoyage','renfort']::text[]);
+  end if;
+end $$;
+
+-- Les devis, tels qu'ils existent en production : la table est
+-- antérieure à ce dépôt et n'apparaît dans aucun fichier de migrations/.
+-- Le socle doit la reproduire, sans quoi la migration 102 ne pourrait
+-- pas être éprouvée.
+create table if not exists public.devis (
+  id              uuid primary key default gen_random_uuid(),
+  reference       text,
+  client_id       uuid,
+  prix            numeric,
+  statut          text not null default 'brouillon',
+  date_generation timestamptz not null default now()
+);
+
 create table if not exists public.missions (
   id           uuid primary key default gen_random_uuid(),
   convoyeur_id uuid references public.convoyeurs(id),

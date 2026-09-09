@@ -769,7 +769,9 @@ check "X1 : REPRODUCTION — la colonne des métiers n'existe pas encore" "0" \
 sql "insert into auth.users (id, email) values ('88888888-8888-8888-8888-888888888888','tech@helixcar.test');
 insert into public.convoyeurs (id, auth_user_id, prenom, nom, email, activites, statut) values
  ('aaaaaaaa-0000-0000-0000-00000000000e','88888888-8888-8888-8888-888888888888','TEST-QA','Technicien',
-  'tech@helixcar.test','{technicien,renfort}','en_attente');" >/dev/null
+  'tech@helixcar.test','{renfort}','en_attente');" >/dev/null
+# (l'activite technicien lui sera ajoutee plus bas : la contrainte de
+# production, reproduite par le socle, la refuse encore a ce stade.)
 check "X2 : REPRODUCTION — l'activité technicien est refusée par la base" "refuse" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
    insert into public.convoyeur_decisions (convoyeur_id, activite, decision)
@@ -790,6 +792,30 @@ sql "alter table public.convoyeur_decisions
 
 errX=$(appliquer migrations/95_metiers_partenaires.sql)
 check "X3 : migrations/95 s'applique sans erreur" "" "$errX"
+
+# ── CE QUE 95 NE SUFFIT PAS À FAIRE ────────────────────────────────
+# 95 a ouvert l'activité 'technicien' du côté des DÉCISIONS. Mais la
+# table convoyeurs porte, depuis bien avant ce dépôt, sa propre
+# contrainte d'énumération — absente de migrations/, et que le socle
+# reproduit désormais. Avec 95 seule, aucune candidature de technicien
+# ne peut être enregistrée : c'est le blocage constaté en production.
+check "X3 bis : REPRODUCTION — avec 95 seule, se déclarer technicien est refusé (23514)" "refuse" \
+  "$(sql "update public.convoyeurs set activites='{technicien,renfort}'
+      where id='aaaaaaaa-0000-0000-0000-00000000000e';" \
+   | grep -qiE '23514|violates check constraint' && echo refuse || echo passe)"
+check "X3 ter : REPRODUCTION — sa candidature reste sans l'activité technicien" "0" \
+  "$(sql "select count(*) from public.convoyeurs
+      where id='aaaaaaaa-0000-0000-0000-00000000000e' and 'technicien' = any(activites);")"
+
+errX100=$(appliquer migrations/100_activites_partenaire.sql)
+check "X3 quater : migrations/100 s'applique sans erreur" "" "$errX100"
+
+# Le candidat peut enfin se déclarer technicien ; 95 rejouée lui crée
+# alors les décisions qui manquaient, sans en accepter aucune d'office.
+sql "update public.convoyeurs set activites='{technicien,renfort}'
+      where id='aaaaaaaa-0000-0000-0000-00000000000e';" >/dev/null
+errX95b=$(appliquer migrations/95_metiers_partenaires.sql)
+check "X3 quinquies : 95 rejouée après 100 rattrape les décisions manquantes" "" "$errX95b"
 
 check "X4 : la colonne des métiers existe et accepte un tableau" "1" \
   "$(sql "select count(*) from information_schema.columns where table_schema='public' and table_name='convoyeurs' and column_name='metiers' and data_type='ARRAY';")"
@@ -1466,6 +1492,429 @@ check "R47 : empreinte_secret n'est offerte à personne de l'extérieur" "0" \
   "$(sql "select count(*) from information_schema.role_routine_grants
      where routine_name='empreinte_secret' and grantee in ('anon','authenticated');")"
 
+
+echo
+echo "── S. LES ACTIVITÉS QUE LE FORMULAIRE PROPOSE RÉELLEMENT ──"
+# La migration 95 a ajouté l'activité 'technicien' et trois métiers qui
+# la portent (mécanique, carrosserie, diagnostic). Elle a élargi la
+# contrainte de convoyeur_decisions.activite — mais PAS celle de
+# convoyeurs.activites, qui existe en production depuis bien avant ce
+# dépôt et n'apparaît dans aucun fichier de migrations/.
+#
+# Résultat en production : plus AUCUNE candidature de technicien ne
+# passe. Le socle de tests ne reproduisait pas cette contrainte : il la
+# déclare désormais, et voici ce qu'elle fait AVANT le correctif.
+
+# On remet un instant la contrainte telle qu'elle est en production
+# AVANT le correctif, pour montrer le refus sur pièce, puis on
+# réapplique la migration 100 — qui est idempotente.
+# NOT VALID : la contrainte ne contrôle que les NOUVELLES lignes. Sans
+# cela, elle refuserait de se poser — une candidature de technicien a
+# déjà été enregistrée en section X. C'est exactement le comportement
+# d'une contrainte posée en production avant l'apparition du technicien.
+sql "alter table public.convoyeurs drop constraint if exists convoyeurs_activites_valides;
+ alter table public.convoyeurs add constraint convoyeurs_activites_valides
+   check (activites is null or activites <@ array['convoyage','nettoyage','renfort']::text[])
+   not valid;" >/dev/null
+
+check "S1 : REPRODUCTION — une candidature de technicien est refusée (23514)" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites, metiers)
+     values ('TEST-QA-CLAUDE-POSTPR2','tech1@helixcar.test',
+             array['technicien'], array['mecanique']);" \
+   | grep -qiE '23514|violates check constraint' && echo refuse || echo passe)"
+check "S2 : REPRODUCTION — et rien n'a été enregistré" "0" \
+  "$(sql "select count(*) from public.convoyeurs where email='tech1@helixcar.test';")"
+
+errS=$(appliquer migrations/100_activites_partenaire.sql)
+check "S3 : migrations/100 se rejoue sans erreur et rétablit la nomenclature" "" "$errS"
+
+check "S4 : la source de vérité énumère EXACTEMENT quatre activités" "convoyage|nettoyage|renfort|technicien" \
+  "$(sql "select array_to_string(public.activites_partenaire(), '|');")"
+
+# ── CHAQUE ACTIVITÉ SEULE ──
+for a in convoyage nettoyage renfort technicien; do
+  sql "delete from public.convoyeurs where email='seule-$a@helixcar.test';" >/dev/null
+  check "S5.$a : l'activité « $a » seule est acceptée" "1" \
+    "$(sql "insert into public.convoyeurs (prenom, email, activites)
+       values ('TEST-QA-CLAUDE-POSTPR2','seule-$a@helixcar.test', array['$a']);
+       select count(*) from public.convoyeurs where email='seule-$a@helixcar.test';" | tail -1)"
+done
+
+# ── TOUTES LES COMBINAISONS AUTORISÉES ──
+# 15 sous-ensembles non vides de 4 activités : aucun ne doit être refusé.
+NB_OK=$(sql "with a as (select unnest(public.activites_partenaire()) v),
+ combi as (
+   select array_agg(v order by v) c
+     from (select v, generate_series(1,15) g from a) x
+    where (g >> (case v when 'convoyage' then 0 when 'nettoyage' then 1
+                        when 'renfort' then 2 else 3 end)) & 1 = 1
+    group by g)
+ select count(*) from combi where c <@ public.activites_partenaire();")
+check "S6 : les 15 combinaisons non vides sont toutes acceptables" "15" "$NB_OK"
+
+# ── CE QUI DOIT RESTER REFUSÉ ──
+check "S7 : une valeur INCONNUE est refusée" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites)
+     values ('TEST-QA-CLAUDE-POSTPR2','inconnue@helixcar.test', array['livraison_drone']);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S8 : une ANCIENNE valeur hors nomenclature est refusée" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites)
+     values ('TEST-QA-CLAUDE-POSTPR2','ancienne@helixcar.test', array['jockey']);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S9 : un tableau VIDE est refusé — il ne dit rien du candidat" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites)
+     values ('TEST-QA-CLAUDE-POSTPR2','vide@helixcar.test', array[]::text[]);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S10 : une valeur FORGÉE est refusée" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites)
+     values ('TEST-QA-CLAUDE-POSTPR2','forge@helixcar.test',
+             array['convoyage'',''admin']);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S11 : une valeur valide MÉLANGÉE à une inconnue est refusée en bloc" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites)
+     values ('TEST-QA-CLAUDE-POSTPR2','melange@helixcar.test',
+             array['convoyage','livraison_drone']);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S12 : NULL reste accepté — les candidatures antérieures restent valides" "1" \
+  "$(sql "insert into public.convoyeurs (prenom, email) values
+     ('TEST-QA-CLAUDE-POSTPR2','ancienne-nulle@helixcar.test');
+     select count(*) from public.convoyeurs where email='ancienne-nulle@helixcar.test';" | tail -1)"
+
+# ── LA CANDIDATURE QUI ÉCHOUAIT PASSE MAINTENANT ──
+check "S13 : la candidature de technicien est ENFIN enregistrée" "1" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites, metiers)
+     values ('TEST-QA-CLAUDE-POSTPR2','tech1@helixcar.test',
+             array['technicien'], array['mecanique']);
+     select count(*) from public.convoyeurs where email='tech1@helixcar.test';" | tail -1)"
+check "S14 : les trois activités visibles à l'écran passent ensemble" "1" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites, metiers)
+     values ('TEST-QA-CLAUDE-POSTPR2','trois@helixcar.test',
+             array['convoyage','nettoyage','renfort'],
+             array['convoyage','nettoyage','jockey']);
+     select count(*) from public.convoyeurs where email='trois@helixcar.test';" | tail -1)"
+
+# ── LES MÉTIERS AUSSI SONT ÉNUMÉRÉS ──
+check "S15 : un métier INVENTÉ est refusé" "refuse" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites, metiers)
+     values ('TEST-QA-CLAUDE-POSTPR2','metier-faux@helixcar.test',
+             array['renfort'], array['pilote_essai']);" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+check "S16 : les huit métiers du formulaire sont tous acceptés" "1" \
+  "$(sql "insert into public.convoyeurs (prenom, email, activites, metiers)
+     values ('TEST-QA-CLAUDE-POSTPR2','metiers-tous@helixcar.test',
+             public.activites_partenaire(), public.metiers_partenaire());
+     select count(*) from public.convoyeurs where email='metiers-tous@helixcar.test';" | tail -1)"
+
+# ── LES DEUX CONTRAINTES S'ACCORDENT ENFIN ──
+check "S17 : convoyeur_decisions accepte les mêmes quatre activités" "4" \
+  "$(sql "select count(*) from unnest(public.activites_partenaire()) a
+     where pg_get_constraintdef(
+             (select oid from pg_constraint
+               where conrelid='public.convoyeur_decisions'::regclass
+                 and conname='convoyeur_decisions_activite_check')) like '%'||a||'%';")"
+check "S18 : une décision sur une activité inconnue reste refusée" "refuse" \
+  "$(sql "insert into public.convoyeur_decisions (convoyeur_id, activite, decision)
+     select id, 'livraison_drone', 'en_attente' from public.convoyeurs
+      where email='tech1@helixcar.test';" \
+   | grep -qiE 'violates check constraint' && echo refuse || echo passe)"
+
+# MÉNAGE. Les candidatures d'essai sont préfixées TEST-QA-CLAUDE-POSTPR2
+# et retirées ici : sans cela, le rejeu de 95 en section F leur créerait
+# des décisions et fausserait l'invariant d'idempotence.
+sql "delete from public.convoyeur_decisions where convoyeur_id in
+      (select id from public.convoyeurs where prenom='TEST-QA-CLAUDE-POSTPR2');
+     delete from public.convoyeurs where prenom='TEST-QA-CLAUDE-POSTPR2';" >/dev/null
+check "S19 : les candidatures d'essai sont retirées, la base reste propre" "0" \
+  "$(sql "select count(*) from public.convoyeurs where prenom='TEST-QA-CLAUDE-POSTPR2';")"
+
+echo
+echo "── T. LES INFORMATIONS DE MISSION NE DOIVENT PLUS TOMBER SUR UN TYPE ──"
+# Le Dashboard affichait, sur un dossier réel :
+#   Informations indisponibles : COALESCE types date and text cannot be matched
+#
+# informations_demande() rassemblait la date portée par le VÉHICULE et,
+# à défaut, celle portée par la DEMANDE quand le trajet est commun.
+# COALESCE exige un type commun ; ces deux colonnes n'en ont pas le même
+# en production. PostgreSQL refuse alors la requête ENTIÈRE : plus une
+# seule rubrique ne s'affiche, pour aucun véhicule.
+#
+# Le socle déclarait les deux colonnes en `date` et ne pouvait donc pas
+# voir le défaut. On reproduit ici la divergence réelle.
+
+# Un dossier de convoyage à trajet COMMUN, avec un véhicule : c'est la
+# combinaison qui atteint l'expression fautive.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, trajet_commun,
+       adresse_depart_rue, ville_depart, adresse_arrivee_rue, ville_arrivee,
+       date_prise_en_charge, statut)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f1','TEST-QA-CLAUDE-POSTPR2-T1',
+             'typet@helixcar.test','convoyage', true,
+             '1 rue du Test','Lyon','2 rue de la Recette','Nice',
+             '2026-10-01','nouveau')
+     on conflict (id) do nothing;
+     insert into public.vehicules (dossier_id, position, marque_modele)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f1', 1, 'TEST-QA Peugeot')
+     on conflict do nothing;" >/dev/null
+
+check "T0 : le dossier d'essai est en place, avec son véhicule" "1|1" \
+  "$(sql "select (select count(*) from public.clients where id='eeeeeeee-0000-0000-0000-00000000f0f1')
+              ||'|'||
+                 (select count(*) from public.vehicules where dossier_id='eeeeeeee-0000-0000-0000-00000000f0f1');")"
+
+# La divergence de types, telle qu'elle existe en production. C'est la
+# colonne du VÉHICULE qui est déplacée ici : celle de la demande est
+# citée par la vue v_mes_demandes et ne peut pas changer de type sans
+# la reconstruire. Le conflit produit est le même, et le message aussi —
+# seul l'ordre des deux types cités par PostgreSQL diffère.
+sql "alter table public.vehicules alter column date_prise_en_charge type text;" >/dev/null
+check "T0 bis : les deux colonnes ont bien des types différents" "date|text" \
+  "$(sql "select (select data_type from information_schema.columns
+                   where table_schema='public' and table_name='clients'
+                     and column_name='date_prise_en_charge')
+              ||'|'||
+                 (select data_type from information_schema.columns
+                   where table_schema='public' and table_name='vehicules'
+                     and column_name='date_prise_en_charge');")"
+
+check "T1 : REPRODUCTION — la lecture échoue sur le conflit de types" "42804" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1');" \
+   | grep -qiE 'COALESCE types .* cannot be matched' && echo 42804 || echo passe)"
+check "T2 : REPRODUCTION — et AUCUNE rubrique ne remonte" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1');" \
+   | grep -cE '^[0-9]+$')"
+
+errT=$(appliquer migrations/101_informations_types_coherents.sql)
+check "T3 : migrations/101 s'applique sans erreur" "" "$errT"
+
+check "T4 : les informations reviennent, malgré les deux types différents" "oui" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1');" \
+   | grep -qE '^[1-9][0-9]*$' && echo oui || echo non)"
+check "T5 : plus aucun message SQL dans la réponse" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1');" \
+   | grep -ciE 'ERROR|COALESCE' || true)"
+check "T6 : la date portée par la DEMANDE compte bien pour le véhicule" "fournie" \
+  "$(sqlAdmin "select statut from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1')
+      where cle like 'vehicule\\_%\\_date_prise_en_charge';" | tail -1)"
+check "T7 : et une donnée réellement absente reste attendue" "attendue" \
+  "$(sqlAdmin "select statut from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f1')
+      where cle like 'vehicule\\_%\\_immatriculation';" | tail -1)"
+
+# ── LES RÈGLES MÉTIER, VÉHICULE PAR VÉHICULE ──
+# Une adresse de prise en charge ne se demande QUE si HelixCar vient
+# chercher le véhicule ; une adresse de livraison QUE si HelixCar le
+# rapporte. Un dépôt ou une récupération par le client ne doit rien
+# réclamer du tout.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, trajet_commun,
+       stockage_acheminement, stockage_sortie, stockage_ville, stockage_date_debut, statut)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f2','TEST-QA-CLAUDE-POSTPR2-T2',
+             'typet2@helixcar.test','stockage', false,
+             'client','client','Lyon','2026-10-01','nouveau')
+     on conflict (id) do nothing;
+     insert into public.vehicules (dossier_id, position, marque_modele)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f2', 1, 'TEST-QA Clio')
+     on conflict do nothing;" >/dev/null
+
+check "T8 : dépôt par le client — AUCUNE adresse de prise en charge demandée" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f2')
+      where cle like '%adresse_depart%';" | tail -1)"
+check "T9 : récupération par le client — AUCUNE adresse de livraison demandée" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f2')
+      where cle like '%adresse_arrivee%';" | tail -1)"
+check "T10 : ni contact de prise en charge, ni contact de livraison" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f2')
+      where cle like '%contact_pc%' or cle like '%contact_liv%';" | tail -1)"
+check "T11 : mais la prestation de stockage, elle, reste demandée" "oui" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f2')
+      where cle like 'stockage%';" | grep -qE '^[1-9]' && echo oui || echo non)"
+
+# Stockage avec acheminement ET sortie HelixCar : là, tout se demande.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, trajet_commun,
+       stockage_acheminement, stockage_sortie, stockage_ville, stockage_date_debut, statut)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f3','TEST-QA-CLAUDE-POSTPR2-T3',
+             'typet3@helixcar.test','stockage', false,
+             'helixcar','helixcar','Lyon','2026-10-01','nouveau')
+     on conflict (id) do nothing;
+     insert into public.vehicules (dossier_id, position, marque_modele, livraison_apres_stockage)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f3', 1, 'TEST-QA Golf', true)
+     on conflict do nothing;
+     insert into public.vehicules (dossier_id, position, marque_modele, livraison_apres_stockage)
+     values ('eeeeeeee-0000-0000-0000-00000000f0f3', 2, 'TEST-QA Twingo', false)
+     on conflict do nothing;" >/dev/null
+
+check "T12 : acheminement HelixCar — l'adresse de prise en charge est demandée pour les 2" "2" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
+      where cle like '%adresse_depart%';" | tail -1)"
+check "T13 : le manque d'un véhicule ne se reporte PAS sur l'autre" "1" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
+      where cle like '%adresse_arrivee%';" | tail -1)"
+check "T14 : et c'est bien celui que HelixCar livre" "1" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
+      where cle = 'vehicule_1_adresse_arrivee';" | tail -1)"
+check "T15 : le véhicule que le client vient rechercher n'en demande aucune" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
+      where cle = 'vehicule_2_adresse_arrivee';" | tail -1)"
+check "T16 : aucune restitution n'est réclamée si aucun véhicule n'est concerné" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f0f3')
+      where cle like '%restit%';" | tail -1)"
+
+echo "── U. NETTOYAGE : UNE PERIODE, ET UNE SEULE MISSION ──"
+# La mission de nettoyage se creait a la main, par un bouton. Deux
+# clics, un rechargement au mauvais moment, un rejeu : rien n'empechait
+# STRUCTURELLEMENT deux missions pour la meme demande, et rien ne
+# verifiait cote serveur que le devis avait ete accepte.
+
+errU=$(appliquer migrations/102_nettoyage_periode_et_mission.sql)
+check "U1 : migrations/102 s'applique sans erreur" "" "$errU"
+
+check "U2 : la mission porte desormais une date de fin" "1" \
+  "$(sql "select count(*) from information_schema.columns
+     where table_schema='public' and table_name='missions'
+       and column_name='date_fin_intervention';")"
+check "U3 : l'unicite d'une mission par demande est posee EN BASE" "1" \
+  "$(sql "select count(*) from pg_indexes
+     where schemaname='public' and indexname='missions_nettoyage_une_par_demande';")"
+check "U4 : creer_mission_nettoyage_si_prete n'est pas offerte a anon" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='creer_mission_nettoyage_si_prete' and grantee='anon';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff01','TEST-QA-CLAUDE-POSTPR2-N1',
+             'nett1@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','preparation_complete',
+               'lieu','locaux_client',
+               'adresse_rue','12 rue du Test','adresse_cp','69000','adresse_ville','Lyon',
+               'date_souhaitee','2026-11-02','date_fin','2026-11-04',
+               'creneau_debut','09:00','creneau_fin','17:00',
+               'nombre_vehicules_approx', 8,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Karim','telephone','+33600000001')))
+     on conflict (id) do nothing;" >/dev/null
+
+check "U5 : plus aucune information n'est attendue pour cette demande" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff01') where statut='attendue';" | tail -1)"
+check "U6 : SANS devis accepte, aucune mission n'est creee" "DEVIS_NON_ACCEPTE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+check "U7 : ... et la table des missions reste vide pour elle" "0" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+
+sql "insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-POSTPR2-D1','eeeeeeee-0000-0000-0000-00000000ff01', 900, 'refuse');" >/dev/null
+check "U8 : un devis REFUSE ne cree aucune mission" "DEVIS_NON_ACCEPTE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+
+sql "update public.devis set statut='accepte' where reference='TEST-QA-CLAUDE-POSTPR2-D1';" >/dev/null
+check "U9 : devis accepte et rien qui manque : la mission est creee" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+check "U10 : elle est bien typee « nettoyage » et en attente d'un partenaire" "nettoyage|en_attente" \
+  "$(sql "select type_mission||'|'||statut from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U11 : elle reprend la PERIODE complete, debut et fin" "2026-11-02|2026-11-04" \
+  "$(sql "select date_intervention||'|'||date_fin_intervention from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U12 : elle reprend l'adresse, le contact et l'horaire" "12 rue du Test|Lyon|TEST-QA Karim|09:00 – 17:00" \
+  "$(sql "select adresse_intervention||'|'||ville_intervention||'|'||contact_nom||'|'||heure_intervention
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+
+check "U13 : rejouer l'appel renvoie la mission existante" "DEJA_CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code';" | tail -1)"
+sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01');" >/dev/null
+check "U14 : cinq rejeux de plus, et toujours UNE seule mission" "1" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff01';")"
+check "U15 : et meme une insertion DIRECTE en double est refusee par la base" "refuse" \
+  "$(sql "insert into public.missions (reference, type_mission, statut, client_id)
+     values ('TEST-QA-CLAUDE-POSTPR2-DOUBLE','nettoyage','en_attente',
+             'eeeeeeee-0000-0000-0000-00000000ff01');" \
+   | grep -qiE 'duplicate key|unique' && echo refuse || echo passe)"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff02','TEST-QA-CLAUDE-POSTPR2-N2',
+             'nett2@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object('schema_version',2,'type_nettoyage','preparation_complete',
+                                'lieu','locaux_client','date_souhaitee','2026-11-02'))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-POSTPR2-D2','eeeeeeee-0000-0000-0000-00000000ff02', 700, 'accepte');" >/dev/null
+check "U16 : la date de FIN manquante est reclamee au client" "1" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff02')
+      where cle='nettoyage_date_fin' and statut='attendue';" | tail -1)"
+check "U17 : et tant qu'il manque quelque chose, aucune mission" "INFORMATIONS_MANQUANTES" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff02') ->> 'code';" | tail -1)"
+check "U18 : rien n'a ete cree pour elle" "0" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff02';")"
+
+check "U19 : un client ne peut pas creer une mission" "NON_AUTORISE" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code'; commit;" | tail -1)"
+check "U20 : un partenaire non plus" "NON_AUTORISE" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+   select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code'; commit;" | tail -1)"
+
+# ── U bis. DEUX CREATIONS SIMULTANEES : LA REFERENCE ──
+# Le Dashboard appelle la fonction EN PARALLELE pour toutes les demandes
+# pretes (Promise.all). Deux appels concurrents lisent donc le meme
+# « dernier numero » avant qu'aucun des deux n'ait insere : sans
+# precaution, ils forgent la MEME reference.
+#
+# On synchronise deux sessions psql sur un meme instant, a la
+# milliseconde, pour que la course ait vraiment lieu.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     select ('eeeeeeee-0000-0000-0000-00000000fc0' || g)::uuid,
+            'TEST-QA-CLAUDE-POSTPR2-C' || g,
+            'conc' || g || '@helixcar.test','nettoyage','nouveau',
+            jsonb_build_object(
+              'schema_version', 2, 'type_nettoyage','interieur',
+              'lieu','locaux_client',
+              'adresse_rue','1 rue Course','adresse_cp','75001','adresse_ville','Paris',
+              'date_souhaitee','2026-12-01','date_fin','2026-12-02',
+              'creneau_debut','08:00','creneau_fin','12:00',
+              'nombre_vehicules_approx', 2,
+              'contact_sur_place', jsonb_build_object('nom','TEST-QA Course','telephone','+33600000009'))
+       from generate_series(1,2) g
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     select 'TEST-QA-CLAUDE-POSTPR2-DC' || g,
+            ('eeeeeeee-0000-0000-0000-00000000fc0' || g)::uuid, 500, 'accepte'
+       from generate_series(1,2) g;" >/dev/null
+
+INSTANT=$(sql "select (now() + interval '2 seconds')::text;" | tail -1)
+for g in 1 2; do
+  printf '%s\n' "begin;
+select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+select pg_sleep(greatest(0, extract(epoch from (timestamptz '$INSTANT' - clock_timestamp()))));
+select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000fc0$g');
+commit;" > "$BASE/course$g.sql"
+  chown postgres:postgres "$BASE/course$g.sql"
+done
+su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course1.sql" >/dev/null 2>&1 &
+su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course2.sql" >/dev/null 2>&1 &
+wait
+
+check "U21 : les deux missions concurrentes sont bien creees" "2" \
+  "$(sql "select count(*) from public.missions
+     where client_id in ('eeeeeeee-0000-0000-0000-00000000fc01','eeeeeeee-0000-0000-0000-00000000fc02');")"
+check "U22 : REPRODUCTION — elles ne portent JAMAIS la meme reference" "2" \
+  "$(sql "select count(distinct reference) from public.missions
+     where client_id in ('eeeeeeee-0000-0000-0000-00000000fc01','eeeeeeee-0000-0000-0000-00000000fc02');")"
+check "U23 : aucune reference de nettoyage n'est en double, nulle part" "0" \
+  "$(sql "select count(*) from (select reference from public.missions
+      where type_mission='nettoyage' and reference is not null
+      group by reference having count(*) > 1) d;")"
+check "U24 : et la base le refuse structurellement" "refuse" \
+  "$(sql "insert into public.missions (reference, type_mission, statut, client_id)
+     select reference, 'nettoyage', 'en_attente', 'eeeeeeee-0000-0000-0000-00000000ff02'
+       from public.missions where type_mission='nettoyage' limit 1;" \
+   | grep -qiE 'duplicate key|unique' && echo refuse || echo passe)"
+
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")
@@ -1480,6 +1929,9 @@ err96=$(appliquer migrations/96_missions_nettoyage.sql)
 err97=$(appliquer migrations/97_missions_verrou_serveur.sql)
 err98=$(appliquer migrations/98_photos_justificatives_reelles.sql)
 err99=$(appliquer migrations/99_reclamation_demande.sql)
+err100=$(appliquer migrations/100_activites_partenaire.sql)
+err101=$(appliquer migrations/101_informations_types_coherents.sql)
+err102=$(appliquer migrations/102_nettoyage_periode_et_mission.sql)
 check "F1 : 05 se rejoue sans erreur" "" "$err5"
 check "F2 : 90 se rejoue sans erreur" "" "$err9"
 check "F3 : 04 se rejoue sans erreur" "" "$err4"
@@ -1490,6 +1942,9 @@ check "F3e : 96 se rejoue sans erreur" "" "$err96"
 check "F3f : 97 se rejoue sans erreur" "" "$err97"
 check "F3g : 98 se rejoue sans erreur" "" "$err98"
 check "F3h : 99 se rejoue sans erreur" "" "$err99"
+check "F3i : 100 se rejoue sans erreur" "" "$err100"
+check "F3j : 101 se rejoue sans erreur" "" "$err101"
+check "F3k : 102 se rejoue sans erreur" "" "$err102"
 check "F4 : aucune décision dupliquée" "$DEC_AVANT" "$(sql "select count(*) from public.convoyeur_decisions;")"
 check "F5 : aucune ligne d'historique inventée par un rejeu" "$HIST_AVANT" \
   "$(sql "select count(*) from public.convoyeur_decisions_historique;")"
@@ -1502,6 +1957,12 @@ check "F7 : aucun trigger en double sur convoyeurs" "0" \
 # refuserait de choisir, ce qui casserait TOUTES les créations.
 check "F8 : aucune signature en double pour creer_demande_avec_vehicules" "1" \
   "$(sql "select count(*) from pg_proc where proname='creer_demande_avec_vehicules';")"
+check "F9 : une seule contrainte d'activités sur convoyeurs" "1" \
+  "$(sql "select count(*) from pg_constraint
+     where conrelid='public.convoyeurs'::regclass and contype='c'
+       and pg_get_constraintdef(oid) ilike '%activites%';")"
+check "F10 : une seule signature pour informations_demande" "1" \
+  "$(sql "select count(*) from pg_proc where proname='informations_demande';")"
 
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="

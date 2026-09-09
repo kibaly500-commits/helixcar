@@ -25,8 +25,9 @@ const DEMANDE = {
   created_at: '2026-09-01T09:00:00Z',
   nettoyage_details: {
     schema_version: 2, type_nettoyage: 'interieur_exterieur', lieu: 'parc_client',
-    nombre_vehicules_approx: 12, date_souhaitee: '2026-11-02',
-    dispo_type: 'precise', heure_precise: '09:00',
+    nombre_vehicules_approx: 12,
+    date_souhaitee: '2026-11-02', date_fin: '2026-11-04',
+    creneau_debut: '09:00', creneau_fin: '17:00',
     adresse_rue: '3 rue des Lilas', adresse_cp: '69003', adresse_ville: 'Lyon',
     repartition_categories: [{ categorie: 'citadine', quantite: 12, precision: null }],
     contact_sur_place: { type: 'autre', nom: 'TEST-QA Martin', telephone: '+33600000020' },
@@ -44,7 +45,8 @@ const INCOMPLETE = Object.assign({}, DEMANDE, {
 });
 
 const INIT = `
-window.__db = { missions: [], mission_photos: [], objets: [] };
+window.__db = { missions: [], mission_photos: [], objets: [], devis: [] };
+window.__demandes = [];
 window.__ecritures = [];
 window.__signatures = [];
 window.__emails = [];
@@ -84,9 +86,67 @@ function _table(nom) {
   };
   return api;
 }
+// DOUBLE DU SERVEUR — creer_mission_nettoyage_si_prete (migration 102).
+// Il applique EXACTEMENT les memes regles : administrateur, devis
+// accepte, aucune information attendue, et idempotence stricte.
+window.__rpc = [];
+async function _rpcMissionNettoyage(params) {
+  const cid = String((params || {}).p_client_id);
+  const deja = (window.__db.missions || []).filter(function (m) {
+    return String(m.client_id) === cid && m.type_mission === 'nettoyage' && m.statut !== 'annulee';
+  })[0];
+  if (deja) return { ok: true, code: 'DEJA_CREEE', id: deja.id, reference: deja.reference };
+
+  const dv = (window.__db.devis || []).filter(function (d) {
+    return String(d.client_id) === cid && d.statut === 'accepte';
+  })[0];
+  if (!dv) return { ok: false, code: 'DEVIS_NON_ACCEPTE' };
+
+  const dem = (window.__demandes || []).filter(function (c) { return String(c.id) === cid; })[0];
+  const nd = (dem && dem.nettoyage_details) || {};
+  const contact = nd.contact_sur_place || {};
+  const manque = [
+    nd.type_nettoyage, nd.lieu, nd.date_souhaitee, nd.date_fin,
+    contact.nom, contact.telephone,
+    (nd.lieu === 'locaux_client' || nd.lieu === 'parc_client') ? nd.adresse_rue : 'ok',
+    (nd.lieu === 'locaux_client' || nd.lieu === 'parc_client') ? nd.adresse_ville : 'ok'
+  ].filter(function (x) { return !x; }).length;
+  if (manque) return { ok: false, code: 'INFORMATIONS_MANQUANTES', manquantes: manque };
+
+  const n = (window.__db.missions || []).length + 1;
+  const ligne = {
+    id: 'mis-' + n,
+    reference: 'HC-NET-' + new Date().getFullYear() + '-' + String(n).padStart(4, '0'),
+    type_mission: 'nettoyage', statut: 'en_attente', client_id: cid,
+    prestation: ({
+      interieur: 'Nettoyage intérieur', exterieur: 'Nettoyage extérieur',
+      interieur_exterieur: 'Nettoyage intérieur et extérieur',
+      preparation_complete: 'Préparation complète — intérieur et extérieur',
+      conseil: 'Client à conseiller'
+    })[nd.type_nettoyage] || nd.type_nettoyage,
+    nb_vehicules: nd.nombre_vehicules_approx,
+    adresse_intervention: nd.adresse_rue || (nd.lieu === 'helixcar' ? 'Locaux HelixCar' : null),
+    code_postal_intervention: nd.adresse_cp || null,
+    ville_intervention: nd.adresse_ville || null,
+    contact_nom: contact.nom || null, contact_tel: contact.telephone || null,
+    date_intervention: nd.date_souhaitee || null,
+    date_fin_intervention: nd.date_fin || null,
+    heure_intervention: [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ') || null,
+    prix_ttc: dv.prix
+  };
+  window.__db.missions.push(ligne);
+  window.__ecritures.push({ table: 'missions', op: 'rpc', ligne: ligne });
+  return { ok: true, code: 'CREEE', id: ligne.id, reference: ligne.reference };
+}
+
 window.supabase = { createClient: function(){ return {
   auth: { onAuthStateChange:function(){ return { data:{ subscription:{ unsubscribe(){} } } }; },
           getSession: async function(){ return { data:{ session:{ access_token:'jwt-test' } } }; } },
+  rpc: async function (nom, params) {
+    window.__rpc.push({ nom: nom, params: params });
+    if (nom !== 'creer_mission_nettoyage_si_prete') return { data: null, error: null };
+    return { data: await _rpcMissionNettoyage(params), error: null };
+  },
   from: _table,
   storage: { from: function(b){ return {
     upload: async function(chemin, fichier, opts){
@@ -160,7 +220,16 @@ window.fetch = function(u, o){
 
   await page.evaluate(([d, ko]) => {
     _demandesDevisListe = [d, ko];
-    _devisParClient = { 'qa-nett': { reference: 'DEV-QA-N', client_id: 'qa-nett', prix: 480, statut: 'accepte' } };
+    window.__demandes = [d, ko];
+    _devisParClient = {
+      'qa-nett':    { reference: 'DEV-QA-N',  client_id: 'qa-nett',    prix: 480, statut: 'accepte' },
+      'qa-nett-ko': { reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte' }
+    };
+    // Le SERVEUR ne lit pas _devisParClient : il lit la table.
+    window.__db.devis = [
+      { id: 'dev-1', reference: 'DEV-QA-N', client_id: 'qa-nett', prix: 480, statut: 'accepte' },
+      { id: 'dev-2', reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte' }
+    ];
     _missionsParDemande = {};
   }, [DEMANDE, INCOMPLETE]);
 
@@ -205,9 +274,14 @@ window.fetch = function(u, o){
     && mission.ville_intervention === 'Lyon', JSON.stringify(mission && mission.adresse_intervention));
   check('B6 : le contact sur place',
     mission && mission.contact_nom === 'TEST-QA Martin' && mission.contact_tel === '+33600000020');
-  check('B7 : la date et l\'horaire',
-    mission && mission.date_intervention === '2026-11-02' && mission.heure_intervention === '09:00',
-    JSON.stringify(mission && [mission.date_intervention, mission.heure_intervention]));
+  check('B7 : la PERIODE complete et l\'horaire sur place',
+    mission && mission.date_intervention === '2026-11-02'
+    && mission.date_fin_intervention === '2026-11-04'
+    && mission.heure_intervention === '09:00 – 17:00',
+    JSON.stringify(mission && [mission.date_intervention, mission.date_fin_intervention, mission.heure_intervention]));
+  check('B7 bis : la mission est creee par le SERVEUR, jamais par une insertion directe',
+    (await page.evaluate(() => (window.__rpc || []).some(r => r.nom === 'creer_mission_nettoyage_si_prete'))),
+    JSON.stringify(await page.evaluate(() => (window.__rpc || []).map(r => r.nom))));
   check('B8 : la prestation attendue',
     mission && /intérieur et extérieur/i.test(mission.prestation || ''), mission && mission.prestation);
   check('B9 : le nombre de véhicules',

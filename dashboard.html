@@ -7772,14 +7772,34 @@ var PRO_LIB_TYPE_VEHICULE = {
   'autre-vl': 'Autre véhicule léger'
 };
 
-// Horaire réellement porté par une demande de nettoyage : heure précise,
-// créneau, ou disponibilité flexible. Jamais une valeur reconstituée.
+// Horaire réellement porté par une demande de nettoyage. Jamais une
+// valeur reconstituée.
+//
+// Le formulaire ne pose plus la question « Quelle est votre
+// disponibilité ? » : l'horaire est une simple plage sur place. Les
+// demandes ANTÉRIEURES portent encore dispo_type / heure_precise dans
+// leur JSON : elles restent lues telles quelles, sans être réécrites.
 function _nettHoraireTexte(nd) {
   if (!nd) return '';
+  var plage = [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
+  if (plage) return plage;
+  // Demandes antérieures uniquement.
   if (nd.dispo_type === 'precise') return nd.heure_precise || '';
-  if (nd.dispo_type === 'creneau') return [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
   if (nd.dispo_type === 'flexible') return 'Flexible';
-  return '';
+  return nd.heure_precise || '';
+}
+
+// Période d'intervention : une date de début, et une date de fin depuis
+// la stabilisation. Une intervention d'un seul jour n'affiche qu'une
+// date. Les demandes antérieures n'ont pas de date_fin : elles se
+// lisent exactement comme avant.
+function _nettPeriodeTexte(nd, formateurDate) {
+  if (!nd || !nd.date_souhaitee) return '';
+  var f = formateurDate || function (x) { return x; };
+  if (nd.date_fin && nd.date_fin !== nd.date_souhaitee) {
+    return 'du ' + f(nd.date_souhaitee) + ' au ' + f(nd.date_fin);
+  }
+  return f(nd.date_souhaitee);
 }
 function _nettAdresseTexte(nd) {
   if (!nd) return '';
@@ -8285,6 +8305,18 @@ function loadDemandesDevis() {
 
     _rendreTableDemandesDevis(_demandesDevisListe);
 
+    // CREATION AUTOMATIQUE des missions de nettoyage pretes. Silencieuse
+    // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
+    // l'index unique empeche tout doublon. Ne bloque jamais l'affichage.
+    try {
+      _tenterMissionsNettoyageAuto().then(function (creees) {
+        if (creees) {
+          _rendreTableDemandesDevis(_demandesDevisListe);
+          if (typeof loadMissions === 'function') loadMissions();
+        }
+      }).catch(function () {});
+    } catch (e) { console.warn('Missions de nettoyage automatiques :', e); }
+
     // Recalage du compteur à partir des données réellement chargées
     // (source la plus fiable, et gratuite ici puisque déjà en mémoire).
     // Si la colonne vue_admin_at n'existe pas encore en base, on ne
@@ -8436,12 +8468,24 @@ function _blocMissionNettoyageHtml(c) {
       + 'Voir dans les missions →</button>';
   } else {
     var nd = _nettDetails(c) || {};
-    var prete = !!(nd.date_souhaitee && (nd.adresse_rue || nd.lieu === 'helixcar')
+    var dvNett = _devisParClient[String(c.id)];
+    var devisAccepte = !!(dvNett && dvNett.statut === 'accepte');
+    // Le serveur reste seul juge de ce qui manque : ce test n'est qu'un
+    // repere d'affichage, jamais une autorisation.
+    var prete = !!(nd.date_souhaitee && nd.date_fin
+                   && (nd.adresse_rue || nd.lieu === 'helixcar')
                    && _contactSurPlaceTexte(nd.contact_sur_place));
-    if (!prete) {
-      html += '<div style="font-size:.82rem;color:#8a6d3b">Il manque encore des informations '
-        + 'd\'intervention (adresse, date ou contact sur place). Elles sont listées ci-dessus, '
-        + 'dans « Informations nécessaires à la mission ».</div>';
+    if (!devisAccepte) {
+      html += '<div style="font-size:.82rem;color:#555">La mission sera créée '
+        + '<b>automatiquement</b> dès que le client aura accepté son devis et que '
+        + 'toutes les informations nécessaires seront réunies. Un devis refusé ne '
+        + 'crée aucune mission.</div>';
+    } else if (!prete) {
+      html += '<div style="font-size:.82rem;color:#8a6d3b">Le devis est accepté. '
+        + 'Il manque encore des informations d\'intervention (période, adresse ou '
+        + 'contact sur place) : elles sont listées ci-dessus, dans « Informations '
+        + 'nécessaires à la mission ». La mission se créera <b>toute seule</b> dès '
+        + 'que le client les aura fournies.</div>';
     } else {
       html += '<div style="font-size:.82rem;color:#555;margin-bottom:10px">'
         + 'La mission reprendra l\'adresse, le contact, la date, l\'horaire, la prestation et '
@@ -8454,68 +8498,86 @@ function _blocMissionNettoyageHtml(c) {
   return html;
 }
 
-function _referenceMissionNettoyage() {
-  var annee = new Date().getFullYear();
-  return sbFetchToutePage('missions?select=reference&type_mission=eq.nettoyage')
-    .then(function (rows) {
-      var max = 0;
-      (rows || []).forEach(function (r) {
-        var mm = /^HC-NET-(\d{4})-(\d+)$/.exec(r.reference || '');
-        if (mm && parseInt(mm[1], 10) === annee) {
-          var n = parseInt(mm[2], 10);
-          if (n > max) max = n;
-        }
+// _referenceMissionNettoyage() est SUPPRIMEE.
+//
+// Elle calculait la reference par un « dernier numero + 1 » lu dans le
+// navigateur : deux creations simultanees auraient forge la meme. Le
+// serveur la tire desormais dans une sequence (migration 102), qui ne
+// rend jamais deux fois la meme valeur. Laisser ce second generateur en
+// place, meme inutilise, aurait invite a le reutiliser.
+
+// ── CREATION DE LA MISSION DE NETTOYAGE : LE SERVEUR DECIDE ──
+//
+// Cette fonction inserait directement dans `missions` apres quelques
+// verifications faites dans le navigateur. Deux clics, un rechargement
+// au mauvais moment, un rejeu : rien n'empechait STRUCTURELLEMENT deux
+// missions pour la meme demande, et rien ne verifiait cote serveur que
+// le devis avait bien ete accepte.
+//
+// Tout passe desormais par creer_mission_nettoyage_si_prete (migration
+// 102), qui exige un administrateur, un devis ACCEPTE et aucune
+// information encore attendue. L'appel est idempotent, et un index
+// unique en base garantit l'unicite meme si la fonction etait
+// contournee. On peut donc l'appeler autant de fois qu'on veut.
+function creerMissionNettoyage(clientId) {
+  return _tenterMissionNettoyage(clientId, true).then(function (r) {
+    if (r && r.ok) {
+      return chargerMissionsParDemande().then(function () {
+        ouvrirFicheDemande(clientId);
+        if (typeof loadMissions === 'function') loadMissions();
       });
-      return 'HC-NET-' + annee + '-' + String(max + 1).padStart(4, '0');
-    })
-    .catch(function () { return 'HC-NET-' + annee + '-0001'; });
+    }
+    if (r && r.code === 'DEVIS_NON_ACCEPTE') {
+      alert('La mission ne peut pas etre creee : le devis n\'a pas encore ete accepte par le client.');
+    } else if (r && r.code === 'INFORMATIONS_MANQUANTES') {
+      alert('La mission ne peut pas encore etre creee : il manque '
+        + (r.manquantes || 'des') + ' information(s). Elles sont listees dans '
+        + '« Informations necessaires a la mission ».');
+    } else if (r && r.code === 'NON_AUTORISE') {
+      alert('Seul un administrateur peut creer une mission.');
+    } else {
+      alert('La mission n\'a pas pu etre creee.');
+    }
+  });
 }
 
-function creerMissionNettoyage(clientId) {
-  var c = (_demandesDevisListe || []).filter(function (x) { return String(x.id) === String(clientId); })[0];
-  if (!c) { alert('Demande introuvable.'); return; }
-  if (_missionNettoyageDe(c)) { alert('Une mission existe déjà pour cette demande.'); return; }
-
-  var nd = _nettDetails(c) || {};
-  var contact = nd.contact_sur_place || {};
-  var horaire = nd.dispo_type === 'creneau'
-    ? ((nd.creneau_debut || '') + ' — ' + (nd.creneau_fin || ''))
-    : (nd.heure_precise || '');
-  var dv = _devisParClient[String(c.id)];
-
-  if (!confirm('Créer la mission de nettoyage pour '
-      + ((c.prenom || '') + ' ' + (c.nom || '')).trim() + ' ?\n\n'
-      + 'Elle sera proposée aux partenaires nettoyage. Aucun e-mail n\'est envoyé.')) return;
-
-  _referenceMissionNettoyage().then(function (reference) {
-    // Le prix client vient du devis réellement établi, jamais d'une
-    // estimation : sans devis, la mission part sans montant.
-    return sbAuth.from('missions').insert({
-      reference: reference,
-      type_mission: 'nettoyage',
-      statut: 'en_attente',
-      client_id: c.id,
-      prestation: NETT_LIB_TYPE[nd.type_nettoyage] || nd.type_nettoyage || null,
-      nb_vehicules: nd.nombre_vehicules_approx || null,
-      adresse_intervention: nd.adresse_rue || (nd.lieu === 'helixcar' ? 'Locaux HelixCar' : null),
-      code_postal_intervention: nd.adresse_cp || null,
-      ville_intervention: nd.adresse_ville || null,
-      contact_nom: contact.nom || null,
-      contact_tel: contact.telephone || null,
-      date_intervention: nd.date_souhaitee || null,
-      heure_intervention: horaire || null,
-      consignes: nd.instructions || null,
-      prix_ttc: dv ? dv.prix : null
-    }).then(function (res) {
-      if (res.error) throw new Error(res.error.message);
-      return chargerMissionsParDemande();
-    }).then(function () {
-      ouvrirFicheDemande(c.id);
-      if (typeof loadMissions === 'function') loadMissions();
+// Demande au serveur de creer la mission SI elle est prete. Silencieuse
+// par defaut : c'est ce qui permet de l'appeler automatiquement, sans
+// jamais deranger l'administrateur quand il manque encore quelque chose.
+function _tenterMissionNettoyage(clientId, bruyante) {
+  if (!clientId || !_sbAuthPret()) return Promise.resolve(null);
+  return sbAuth.rpc('creer_mission_nettoyage_si_prete', { p_client_id: clientId })
+    .then(function (res) {
+      if (res && res.error) {
+        console.error('creer_mission_nettoyage_si_prete :', res.error.message);
+        return { ok: false, code: 'ERREUR' };
+      }
+      return res && res.data ? res.data : null;
+    })
+    .catch(function (e) {
+      console.error('creer_mission_nettoyage_si_prete :', e && e.message);
+      return { ok: false, code: 'ERREUR' };
     });
-  }).catch(function (e) {
-    console.error('creerMissionNettoyage:', e);
-    alert('La mission n\'a pas pu être créée.\n\n' + (e && e.message ? e.message : ''));
+}
+
+// CREATION AUTOMATIQUE. Passee sur toutes les demandes de nettoyage
+// affichees : celles qui sont pretes recoivent leur mission, les autres
+// ne bougent pas. Rejouee a chaque chargement de la liste et apres
+// chaque information fournie par le client — l'idempotence du serveur
+// fait qu'aucun doublon n'est possible.
+function _tenterMissionsNettoyageAuto() {
+  var aTenter = (_demandesDevisListe || []).filter(function (c) {
+    if (!c || c.type_service !== 'nettoyage') return false;
+    if (_missionNettoyageDe(c)) return false;              // deja creee
+    var dv = _devisParClient[String(c.id)];
+    return !!(dv && dv.statut === 'accepte');              // devis accepte seulement
+  });
+  if (!aTenter.length) return Promise.resolve(0);
+  return Promise.all(aTenter.map(function (c) {
+    return _tenterMissionNettoyage(c.id, false);
+  })).then(function (rs) {
+    var creees = rs.filter(function (r) { return r && r.ok && r.code === 'CREEE'; }).length;
+    return creees ? chargerMissionsParDemande().then(function () { return creees; }) : creees;
   });
 }
 
@@ -8667,10 +8729,10 @@ function ouvrirFicheDemande(clientId) {
     // Clés d'avant V75 : affichées uniquement si la demande les porte.
     if (nd.acces_eau) org += L('Accès à l\'eau (demande antérieure)', NETT_LIB_OUINON[nd.acces_eau] || nd.acces_eau);
     if (nd.acces_electricite) org += L('Prise électrique (demande antérieure)', NETT_LIB_OUINON[nd.acces_electricite] || nd.acces_electricite);
-    org += L('Date souhaitée', _dvDate ? _dvDate(nd.date_souhaitee) : nd.date_souhaitee);
-    if (nd.dispo_type === 'precise') org += L('Heure', nd.heure_precise);
-    else if (nd.dispo_type === 'creneau') org += L('Créneau', (nd.creneau_debut || '') + ' — ' + (nd.creneau_fin || ''));
-    else if (nd.dispo_type === 'flexible') org += L('Disponibilité', 'Flexible');
+    org += L(nd.date_fin && nd.date_fin !== nd.date_souhaitee ? 'Période' : 'Date souhaitée',
+             _nettPeriodeTexte(nd, _dvDate));
+    var _horaireNett = _nettHoraireTexte(nd);
+    if (_horaireNett) org += L('Horaire sur place', _horaireNett);
     org += L('Délai', NETT_LIB_DELAI[nd.delai] || nd.delai);
     // V77 — la cle instructions n'est plus ecrite ; conservee en lecture
     // pour les demandes anterieures.
@@ -9699,14 +9761,37 @@ function _construirePdfDevis(c, d) {
   var _nbVehPdfRespiration = Number(c.nb_vehicules || (c._vehicules && c._vehicules.length) || 1);
   var _pdfMultiRespiration = _nbVehPdfRespiration > 1;
   var ESPACE_AVANT_TITRE_GLOBAL = _pdfMultiRespiration ? 3.4 : 3.2;
+
+  // AÉRATION LOCALE DE QUELQUES TITRES.
+  //
+  // Le design du devis n'est pas retouché : ni la charte, ni les
+  // contenus, ni les alignements. Seuls quelques titres arrivaient trop
+  // près de la carte grise qui les précède, ce qui les faisait paraître
+  // collés. Ils reçoivent 2,6 mm de respiration supplémentaire — et eux
+  // seuls.
+  //
+  // La valeur est utilisée AUSSI pour mesurer la place nécessaire avant
+  // un saut de page : sans cela, la pagination se déciderait sur une
+  // hauteur qui n'est plus la bonne.
+  var TITRES_A_AERER = [
+    'Mission sur site', 'Intervention',
+    'Informations complémentaires',
+    'Prestation', 'Prestations',
+    "Lieu d'intervention", 'Véhicules à nettoyer'
+  ];
+  function _espaceAvantTitre(titre) {
+    return ESPACE_AVANT_TITRE_GLOBAL
+      + (TITRES_A_AERER.indexOf(String(titre)) !== -1 ? 2.6 : 0);
+  }
   // Hauteur totale titre = 2 (avant, Objectif 1) + 2.3 (soulignement) + 1.5
   // (après, V50.4I) = 5.8mm — jamais dessiner avant de mesurer, jamais
   // mesurer avec une valeur obsolète.
   var HAUTEUR_TITRE_SECTION = ESPACE_AVANT_TITRE_GLOBAL + 7.2;
   function sectionAvecBloc(titre, contenu) {
     var h = contenu(false);
-    if (y + HAUTEUR_TITRE_SECTION + h > BAS_PAGE) { doc.addPage(); y = M; }
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    var espace = _espaceAvantTitre(titre);
+    if (y + (espace + 7.2) + h > BAS_PAGE) { doc.addPage(); y = M; }
+    y += espace;
     sectionTitre(titre);
     var y0 = y;
     // ══ V50.6 PREMIUM ══ Carte gris très clair et froid (au lieu de
@@ -11159,13 +11244,14 @@ function _construirePdfDevis(c, d) {
   var _hauteurTarifFinal = 18;
   var _margeTarifFinal = 2;
   var _limitePhysiqueFinale = 291;
-  var _besoinPaquetFinal = HAUTEUR_TITRE_SECTION + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
+  var _espacePrestations = _espaceAvantTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
+  var _besoinPaquetFinal = (_espacePrestations + 7.2) + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
 
   if (y + _besoinPaquetFinal <= _limitePhysiqueFinale) {
     // Dessin direct sur la page courante : même design que sectionAvecBloc,
     // mais sans son ancien seuil générique à 270 mm trop conservateur pour
     // ce paquet final court.
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    y += _espacePrestations;
     sectionTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
     var _yPrest0 = y;
     doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
@@ -11181,7 +11267,7 @@ function _construirePdfDevis(c, d) {
     // espacement, style ou contenu du devis n'est modifié.
     doc.addPage();
     y = M;
-    y += ESPACE_AVANT_TITRE_GLOBAL;
+    y += _espacePrestations;
     sectionTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
     var _yPrestNouvellePage = y;
     doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
@@ -12075,7 +12161,18 @@ function _acqCarte(titre, valeur, note) {
 // re-rendu, donc tout scintillement).
 var _badgeDemandesAffiche = null;
 var _dernierComptageMs = 0;
-var DELAI_MIN_RECOMPTAGE_MS = 300000; // 5 min entre deux comptages serveur
+// DÉLAI ENTRE DEUX COMPTAGES SERVEUR.
+//
+// Il était de 5 minutes. Ce n'est pas un détail de confort : une
+// nouvelle demande n'apparaissait pas avant l'expiration de ce délai,
+// alors même que l'administrateur venait de changer d'onglet ou
+// d'actualiser la page. C'est ce qui donnait l'impression d'un compteur
+// « qui ne s'actualise plus ».
+//
+// Le comptage est pourtant gratuit : limit=0 + Prefer: count=exact ne
+// renvoie AUCUNE ligne, seulement un total dans un en-tête. Trente
+// secondes suffisent largement à protéger d'une rafale de clics.
+var DELAI_MIN_RECOMPTAGE_MS = 30000;
 
 // Même définition que la liste des demandes.
 // Critère UNIQUE d'une vraie demande de devis.
@@ -12133,13 +12230,23 @@ function majBadgeDemandes(forcer) {
     + 'or(type_service.not.is.null,ville_depart.not.is.null,ville_arrivee.not.is.null,marque_modele.not.is.null))'
     + '&limit=0';
 
-  return fetch(SUPABASE_URL + '/rest/v1/' + filtre, {
-    method: 'GET',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Prefer': 'count=exact'
-    }
+  // LE JETON DE LA SESSION, JAMAIS LA CLÉ ANONYME.
+  //
+  // Ce comptage partait avec la clé anonyme. Depuis que la RLS est
+  // active sur `clients` (migrations 90 et 91), un appel anonyme ne voit
+  // AUCUNE ligne : le serveur répond 200, l'en-tête annonce 0, et le
+  // badge affichait donc zéro — sans la moindre erreur visible. C'est le
+  // même défaut que celui déjà corrigé sur _compterLignes ; il restait
+  // ici.
+  return _jetonSessionSupabase().then(function (jetonSession) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + filtre, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + (jetonSession || SUPABASE_KEY),
+        'Prefer': 'count=exact'
+      }
+    });
   }).then(function (r) {
     if (!r.ok) throw new Error('Comptage HTTP ' + r.status);
     var plage = r.headers.get('content-range') || '';
@@ -12217,7 +12324,10 @@ function marquerDemandeNonLue(clientId) {
 //   • une fois à la connexion admin
 //   • à chaque ouverture de la page "Demandes de devis" (données déjà chargées, gratuit)
 //   • localement à la consultation d'une demande
-//   • au retour sur l'onglet, au maximum une fois toutes les 5 minutes
+//   • au RETOUR SUR L'ONGLET, en forçant le comptage : c'est
+//     précisément le moment où l'administrateur s'attend à voir le
+//     chiffre à jour. Le laisser passer par le délai d'anti-rafale
+//     donnait un badge figé pendant plusieurs minutes.
 var _surveillanceDemarree = false;
 function demarrerSurveillanceDemandes() {
   if (_surveillanceDemarree) return;         // garde contre un double branchement
@@ -12228,7 +12338,7 @@ function demarrerSurveillanceDemandes() {
 
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) {
-      majBadgeDemandes(false);
+      majBadgeDemandes(true);
       if (typeof majBadgeCandidatures === 'function') majBadgeCandidatures();
     }
   });

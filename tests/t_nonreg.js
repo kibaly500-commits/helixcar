@@ -183,16 +183,42 @@ const futur = dansNJours;
     const m = /^(if \(!_check\w+\(\s*'[^']+'|_showFieldError\(\s*'[^']+'|_showGroupError\(\s*'[^']+')/.exec(l);
     return m ? m[1] : null;
   };
+  // RETRAITS DÉLIBÉRÉS, ÉNUMÉRÉS UN PAR UN.
+  //
+  // Ce garde-fou existe pour attraper une validation supprimée par
+  // inadvertance. Quand un retrait est au contraire DEMANDÉ, il est
+  // nommé ici — jamais dilué dans un assouplissement de la règle. Tout
+  // ce qui n'y figure pas continue de faire échouer le test.
+  //
+  // La question « Quelle est votre disponibilité ? » (Heure précise /
+  // Créneau horaire / Flexible) a été retirée du parcours Nettoyage sur
+  // demande explicite. Le champ d'heure précise disparaissait avec elle,
+  // et sa validation avec lui.
+  const RETRAITS_DELIBERES = [
+    "if (!_checkRequiredText('nett-heure'",
+    "_showGroupError('nett-dispo-group'"
+  ];
   const validationsRetirees = diff.split('\n')
     .filter(l => l.startsWith('-') && !l.startsWith('---'))
     .map(l => l.slice(1).trim())
     .filter(l => /^(if \(!_check|_showFieldError|_showGroupError)/.test(l))
     .map(l => ({ ligne: l, sig: signatureControle(l) }))
+    .filter(o => !RETRAITS_DELIBERES.some(r => (o.sig || o.ligne).indexOf(r) === 0))
     .filter(o => o.sig ? sourceActuelle.indexOf(o.sig) === -1
                        : sourceActuelle.indexOf(o.ligne) === -1)
     .map(o => o.ligne);
   L.check('E5 : aucune suppression de validation métier existante',
     validationsRetirees.length === 0, validationsRetirees.slice(0, 3).join(' | '));
+  // Le garde-fou ne doit pas devenir un fourre-tout : chaque retrait
+  // délibéré est compensé par une validation qui, elle, DOIT exister.
+  L.check('E5b : les retraits délibérés restent une liste courte et nommée',
+    RETRAITS_DELIBERES.length <= 4);
+  L.check('E5c : la période de nettoyage est validée à la place',
+    /_checkDate\('nett-date-fin', true\)/.test(sourceActuelle)
+    && /La fin ne peut pas pr/.test(sourceActuelle),
+    'validation de la date de fin absente');
+  L.check('E5d : et la cohérence de l\'horaire sur place aussi',
+    /_showFieldError\('nett-creneau-fin'/.test(sourceActuelle));
 
   const fichiers = execSync('git diff origin/main --name-only', { cwd: RACINE }).toString().trim().split('\n');
   // creer-compte-convoyeur.html est entré dans le périmètre avec
@@ -219,6 +245,8 @@ const futur = dansNJours;
     '.gitignore',
     // Le dossier de recette et de mise en production.
     'RECETTE-LOT.md',
+    // Celui de la stabilisation qui a suivi la PR nº 2.
+    'RECETTE-STABILISATION-POST-PR2.md',
   ];
   L.check('E6 : périmètre de fichiers maîtrisé',
     fichiers.every(f => PERIMETRE.indexOf(f) !== -1
