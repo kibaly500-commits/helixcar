@@ -20,13 +20,8 @@ async function ouvrirRubrique(page, cle) {
   await page.waitForTimeout(40);
 }
 
-async function remplirVehicule(page, i, type, marque) {
-  await page.evaluate(idx => proBasculerVehicule(idx), i);
-  await page.waitForTimeout(30);
-  await page.selectOption('#pro-veh-' + i + '-type', type);
-  await page.fill('#pro-veh-' + i + '-marque', marque);
-  await page.waitForTimeout(40);
-}
+// LOT D4 — le helper de saisie des vehicules a ete retire avec la
+// rubrique elle-meme.
 
 (async () => {
   const browser = await L.launch();
@@ -38,7 +33,7 @@ async function remplirVehicule(page, i, type, marque) {
 
   let etat = await page.evaluate(() => {
     const b = document.getElementById('bloc-socle-professionnel');
-    const accs = ['besoin', 'vehicules', 'lieu', 'periode', 'mission']
+    const accs = ['besoin', 'lieu', 'periode', 'mission']
       .map(k => document.getElementById('pro-acc-' + k));
     return {
       visible: b && b.style.display !== 'none',
@@ -74,7 +69,7 @@ async function remplirVehicule(page, i, type, marque) {
   // Un clic n'ouvre QUE la rubrique choisie
   await ouvrirRubrique(page, 'besoin');
   await ouvrirRubrique(page, 'lieu');
-  let ouv = await page.evaluate(() => ['besoin', 'vehicules', 'lieu', 'periode', 'mission']
+  let ouv = await page.evaluate(() => ['besoin', 'lieu', 'periode', 'mission']
     .filter(k => { const a = document.getElementById('pro-acc-' + k); return a && a.classList.contains('ouvert'); }));
   L.check('A8 : un clic n\'ouvre que la rubrique choisie',
     ouv.length === 1 && ouv[0] === 'lieu', JSON.stringify(ouv));
@@ -86,11 +81,23 @@ async function remplirVehicule(page, i, type, marque) {
   etat = await page.evaluate(() => ({
     spec: (document.getElementById('pro-specialite-group') || {}).style.display,
     miss: (document.getElementById('pro-mission-group') || {}).style.display,
-    veh: (document.getElementById('pro-acc-vehicules') || {}).style.display
+    veh: !!document.getElementById('pro-acc-vehicules'),
+    rubriques: PRO_RUBRIQUES.slice()
   }));
   L.check('B1 : Technicien affiche la spécialité', etat.spec === 'block');
   L.check('B2 : Technicien masque la mission renfort', etat.miss === 'none');
-  L.check('B3 : Technicien affiche la rubrique véhicules', etat.veh === 'block');
+  // ══ RÈGLE INVERSÉE SUR DEMANDE EXPLICITE (lot D4) ══
+  // La rubrique « Informations sur les véhicules » n'existait QUE pour
+  // le technicien. Le propriétaire demande son retrait complet : un
+  // besoin de technicien porte sur des PERSONNES et sur une période,
+  // jamais sur un parc. Le contrôle n'est pas supprimé, il est retourné
+  // — et il devient plus strict : la rubrique ne doit plus exister DU
+  // TOUT, pour aucune catégorie.
+  L.check('B3 : la rubrique véhicules n\'existe plus, même pour le technicien',
+    etat.veh === false, JSON.stringify(etat.veh));
+  L.check('B3 bis : les quatre rubriques conservées sont exactement celles demandées',
+    JSON.stringify(etat.rubriques) === JSON.stringify(['besoin', 'lieu', 'periode', 'mission']),
+    JSON.stringify(etat.rubriques));
 
   await page.click('input[name="pro-specialite"][value="diagnostic"]');
   await page.waitForTimeout(50);
@@ -102,27 +109,29 @@ async function remplirVehicule(page, i, type, marque) {
   L.check('B5 : pas de précision demandée hors « autre »', etat.prec === 'none');
 
   // ── C. Compteurs ──
-  await ouvrirRubrique(page, 'vehicules');
-  let nb = await page.evaluate(() => _proNbVehicules());
-  L.check('C1 : 1 véhicule par défaut', nb === 1);
-  let titre = await page.evaluate(() => document.getElementById('pro-vehicules-titre').textContent);
-  L.check('C2 : libellé singulier à 1 véhicule', /Information sur le véhicule/.test(titre), titre);
-
-  for (let i = 0; i < 5; i++) { await page.click('#pro-acc-vehicules .btn-compteur:last-of-type'); await page.waitForTimeout(30); }
-  nb = await page.evaluate(() => _proNbVehicules());
-  L.check('C3 : maximum 3 véhicules, impossible d\'en créer 4', nb === 3, 'nb=' + nb);
-  titre = await page.evaluate(() => document.getElementById('pro-vehicules-titre').textContent);
-  L.check('C4 : libellé pluriel au-delà de 1', /Informations sur les véhicules/.test(titre), titre);
-  let cartes = await page.evaluate(() => document.querySelectorAll('#pro-vehicules-liste .pro-veh-acc').length);
-  L.check('C5 : 3 cartes Véhicule 1/2/3 rendues', cartes === 3, 'cartes=' + cartes);
+  // LOT D4 — le compteur de véhicules et ses cartes ont disparu. Le
+  // compteur de PROFESSIONNELS, lui, est conservé : il porte sur des
+  // personnes, pas sur des véhicules.
+  const plusAucunVehicule = await page.evaluate(() => ({
+    compteur: !!document.getElementById('pro-nb-vehicules'),
+    liste: !!document.getElementById('pro-vehicules-liste'),
+    titre: !!document.getElementById('pro-vehicules-titre'),
+    cartes: document.querySelectorAll('.pro-veh-acc').length,
+    fonctions: ['proMajNbVehicules', 'proRendreVehicules', '_proNbVehicules',
+                '_proVehiculesApplicables', '_proVehiculesRetenus']
+      .filter(f => typeof window[f] === 'function')
+  }));
+  L.check('C1 : plus de compteur, plus de liste, plus de titre, plus de carte',
+    plusAucunVehicule.compteur === false && plusAucunVehicule.liste === false
+    && plusAucunVehicule.titre === false && plusAucunVehicule.cartes === 0,
+    JSON.stringify(plusAucunVehicule));
+  L.check('C2 : et plus aucune fonction ne les pilote',
+    plusAucunVehicule.fonctions.length === 0, JSON.stringify(plusAucunVehicule.fonctions));
 
   const nbPros = await page.evaluate(() => { proMajNbPros(1); proMajNbPros(1); return _proNbPros(); });
   L.check('C6 : compteur professionnels moins/plus fonctionne', nbPros === 3, 'nbPros=' + nbPros);
 
   // ── D. Saisie complète Technicien ──
-  await remplirVehicule(page, 0, 'berline', 'BMW Série 3');
-  await remplirVehicule(page, 1, 'suv', 'Audi Q5');
-  await page.evaluate(() => { proMajNbVehicules(-1); });   // retour à 2
   await page.waitForTimeout(50);
 
   await ouvrirRubrique(page, 'lieu');
@@ -154,7 +163,10 @@ async function remplirVehicule(page, i, type, marque) {
   let recap = await page.evaluate(() => (document.getElementById('recap-demande') || {}).textContent.replace(/\s+/g, ' '));
   L.check('E2 : récap contient le besoin', /Technicien automobile/.test(recap), recap.slice(0, 300));
   L.check('E3 : récap contient la spécialité', /Diagnostic/.test(recap));
-  L.check('E4 : récap contient les 2 véhicules', /BMW Série 3/.test(recap) && /Audi Q5/.test(recap));
+  // LOT D4 — et le récapitulatif ne montre plus aucun véhicule.
+  L.check('E4 : le récapitulatif ne contient aucun véhicule',
+    !/Informations? sur les? véhicules?|Nombre de véhicules|Véhicule 1/.test(recap),
+    recap.slice(0, 400));
   L.check('E5 : récap contient le contact sur place', /Contact sur place/.test(recap) && /TEST-QA Dupont/.test(recap));
   L.check('E6 : récap contient la période', /Durée/.test(recap) && /2 jours/.test(recap), recap.slice(0, 600));
   L.check('E7 : récap sans informations complémentaires vides',
@@ -165,7 +177,11 @@ async function remplirVehicule(page, i, type, marque) {
   L.check('F1 : payload catégorie technicien', d.categorie === 'technicien');
   L.check('F2 : payload spécialité diagnostic', d.specialite === 'diagnostic');
   L.check('F3 : payload mission renfort absente', d.mission === null);
-  L.check('F4 : payload 2 véhicules', d.nombre_vehicules === 2 && d.vehicules.length === 2, JSON.stringify(d.vehicules));
+  // LOT D4 — plus AUCUNE quantité ni fiche de véhicule dans le payload,
+  // et surtout aucun véhicule inventé : jamais 1 par défaut.
+  L.check('F4 : le payload ne porte plus aucun véhicule',
+    d.nombre_vehicules === null && Array.isArray(d.vehicules) && d.vehicules.length === 0,
+    JSON.stringify({ n: d.nombre_vehicules, v: d.vehicules }));
   L.check('F5 : payload contact sur place résolu', d.contact_sur_place && d.contact_sur_place.type === 'moi');
   L.check('F6 : payload durée calculée, jamais demandée', d.duree_jours === 2, 'duree=' + d.duree_jours);
   L.check('F7 : payload informations complémentaires nulles si vides', d.informations_complementaires === null);
@@ -179,23 +195,23 @@ async function remplirVehicule(page, i, type, marque) {
 
   let apres = await page.evaluate(() => ({
     specCochee: !!document.querySelector('input[name="pro-specialite"]:checked'),
-    vehVisible: (document.getElementById('pro-acc-vehicules') || {}).style.display,
+    vehVisible: !!document.getElementById('pro-acc-vehicules'),
     missVisible: (document.getElementById('pro-mission-group') || {}).style.display,
-    payload: _construireDetailsProfessionnel(),
-    memoire: Object.keys(_proMemoireVehicules).length
+    payload: _construireDetailsProfessionnel()
   }));
   L.check('G1 : changement de catégorie décoche l\'ancien métier', apres.specCochee === false);
-  L.check('G2 : rubrique véhicules disparaît pour le renfort', apres.vehVisible === 'none');
+  L.check('G2 : aucune rubrique véhicules ne réapparaît pour le renfort',
+    apres.vehVisible === false);
   L.check('G3 : question mission affichée pour le renfort', apres.missVisible === 'block');
   L.check('G4 : PAYLOAD purgé de l\'ancienne spécialité', apres.payload.specialite === null);
-  L.check('G5 : PAYLOAD purgé des anciens véhicules',
+  L.check('G5 : PAYLOAD sans aucun véhicule',
     apres.payload.nombre_vehicules === null && apres.payload.vehicules.length === 0,
     JSON.stringify(apres.payload.vehicules));
-  L.check('G6 : mémoire véhicules réellement vidée', apres.memoire === 0, 'mem=' + apres.memoire);
 
   // Récap ne doit plus contenir l'ancienne valeur
   const recapApres = await page.evaluate(() => { construireRecapProfessionnel(); return (document.getElementById('recap-demande') || {}).textContent; });
-  L.check('G7 : RÉCAP purgé des anciens véhicules', !/BMW Série 3|Audi Q5/.test(recapApres));
+  L.check('G7 : RÉCAP sans aucun véhicule',
+    !/BMW Série 3|Audi Q5|Véhicule 1|véhicule\(s\)/.test(recapApres));
 
   // ── H. Option « Je souhaite être conseillé » ──
   await page.click('input[name="pro-mission"][value="conseil"]');

@@ -465,6 +465,33 @@ body.scroll-verrouille { overflow: hidden; }
   overflow-wrap: anywhere;
 }
 .hc-note.visible { display: block; }
+
+/* LOT E2 — le fond bleu de l'autoremplissage, neutralise sur les
+   ecrans d'authentification du Dashboard exactement comme sur la
+   vitrine. `background-clip: text` limite le fond peint par le
+   navigateur aux seules glyphes ; l'autocompletion, les suggestions et
+   les gestionnaires de mots de passe continuent de fonctionner. */
+#login-email:-webkit-autofill,
+#login-email:-webkit-autofill:hover,
+#login-email:-webkit-autofill:focus,
+#login-pw:-webkit-autofill,
+#login-pw:-webkit-autofill:hover,
+#login-pw:-webkit-autofill:focus,
+#modal-reinit-mdp input:-webkit-autofill,
+#modal-reinit-mdp input:-webkit-autofill:hover,
+#modal-reinit-mdp input:-webkit-autofill:focus {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+  caret-color: #3A3F45;
+  transition: background-color 100000s ease-in-out 0s;
+}
+#login-email:autofill,
+#login-pw:autofill,
+#modal-reinit-mdp input:autofill {
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+}
 .hc-note--succes { border-left-color: #2F7D5B; }
 .hc-note--info   { border-left-color: rgba(16,24,32,.22); }
 
@@ -9830,7 +9857,11 @@ function _construirePdfDevis(c, d) {
     'Mission sur site', 'Intervention',
     'Informations complémentaires',
     'Prestation', 'Prestations',
-    "Lieu d'intervention", 'Véhicules à nettoyer'
+    "Lieu d'intervention", 'Véhicules à nettoyer',
+    // LOT F1/F2 — la carte de periode et d'horaires du nettoyage suit
+    // immediatement le bandeau : sans cette respiration, son titre
+    // touche la zone grise qui le precede.
+    'Période et horaires'
   ];
   function _espaceAvantTitre(titre) {
     return ESPACE_AVANT_TITRE_GLOBAL
@@ -9971,17 +10002,51 @@ function _construirePdfDevis(c, d) {
   // Ligne « Libellé : valeur » — la valeur est posée JUSTE APRÈS le
   // libellé, à partir de sa largeur réellement mesurée : petit
   // espacement, jamais une grande colonne vide.
+  // LOT F2 — LE TEXTE NE DEBORDE PLUS DE SA CARTE.
+  //
+  // L'ancienne version posait la valeur juste apres le libelle, sans
+  // aucune limite de largeur : un libelle long — « Horaire de debut sur
+  // place » — additionne a une valeur longue depassait la carte grise,
+  // touchait la marge, et pouvait chevaucher ce qui suit.
+  //
+  // La valeur est desormais decoupee sur la largeur REELLEMENT
+  // disponible, et ses lignes suivantes sont alignees sous elle. La
+  // hauteur est MESUREE avec exactement le meme calcul que le dessin :
+  // aucune carte ne peut plus etre trop courte pour son contenu.
+  var HAUTEUR_LIGNE_LV = 4.9;
+  function _lignesValeurLV(label, valeur) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
+    var l = String(label) + ' :';
+    var w = doc.getTextWidth(l);
+    // Largeur restante dans la carte, marge interieure droite comprise.
+    var dispo = (LARGEUR - 14) - w - 2.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
+    // Un libelle si long qu'il ne laisse plus de place : la valeur
+    // passe entierement a la ligne suivante plutot que d'etre ecrasee.
+    if (dispo < 18) {
+      return { w: w, dispo: LARGEUR - 14, sousLibelle: true,
+               lignes: doc.splitTextToSize(String(valeur), LARGEUR - 14) };
+    }
+    return { w: w, dispo: dispo, sousLibelle: false,
+             lignes: doc.splitTextToSize(String(valeur), dispo) };
+  }
+  function _hauteurLigneLV(label, valeur) {
+    var m = _lignesValeurLV(label, valeur);
+    return (m.lignes.length + (m.sousLibelle ? 1 : 0)) * HAUTEUR_LIGNE_LV + 1.6;
+  }
   function ligneLV(label, valeur, x, yy, dess) {
+    var m = _lignesValeurLV(label, valeur);
     if (dess) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
       doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
-      var l = String(label) + ' :';
-      T(l, x, yy);
-      var w = doc.getTextWidth(l);
+      T(String(label) + ' :', x, yy);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
       doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
-      T(String(valeur), x + w + 2.6, yy);
+      var yv = m.sousLibelle ? yy + HAUTEUR_LIGNE_LV : yy;
+      var xv = m.sousLibelle ? x : x + m.w + 2.6;
+      m.lignes.forEach(function (lg, i) { T(lg, xv, yv + i * HAUTEUR_LIGNE_LV); });
     }
+    return (m.lignes.length + (m.sousLibelle ? 1 : 0)) * HAUTEUR_LIGNE_LV + 1.6;
   }
 
   // Carte de lignes « libellé : valeur ». Une ligne par donnée
@@ -9992,12 +10057,15 @@ function _construirePdfDevis(c, d) {
     });
     if (!utiles.length) return;
     sectionAvecBloc(titre, function (dess) {
-      var y0 = y, cur = y0 + 7.4;
+      var y0 = y, cur = y0 + 7.4, dernier = 0;
       utiles.forEach(function (l) {
+        dernier = _hauteurLigneLV(l[0], l[1]);
         ligneLV(l[0], l[1], xG, cur, dess);
-        cur += 6.5;
+        cur += Math.max(6.5, dernier);
       });
-      return (cur - y0) - 6.5 + 7.4;
+      // Meme calcul que le dessin : hauteur avancee, moins le dernier
+      // interligne, plus la marge basse de la carte.
+      return (cur - y0) - Math.max(6.5, dernier) + 7.4;
     });
   }
 
@@ -10061,8 +10129,20 @@ function _construirePdfDevis(c, d) {
     bandeauIndicateurs([
       ['Véhicules', ndPdf.nombre_vehicules_approx || ''],
       ['Formule', NETT_LIB_TYPE[ndPdf.type_nettoyage] || ''],
-      ['Date', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Période', _nettPeriodeTexte(ndPdf, _dvDate)],
       ['Horaire', _nettHoraireTexte(ndPdf)]
+    ]);
+    // LOT F2 — la periode et les DEUX horaires, avec exactement les
+    // libelles du formulaire, dans une carte placee juste apres le
+    // bandeau : le client retrouve mot pour mot ce qu'il a saisi.
+    // La carte est mesuree avant d'etre dessinee (sectionAvecBloc) :
+    // un titre ne peut pas rester seul en bas de page, et une valeur
+    // longue passe a la ligne dans la carte au lieu d'en deborder.
+    carteLignes('Période et horaires', [
+      ['Date de début', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Date de fin', ndPdf.date_fin ? _dvDate(ndPdf.date_fin) : ''],
+      ['Horaire de début sur place', ndPdf.creneau_debut || ''],
+      ['Horaire de fin sur place', ndPdf.creneau_fin || '']
     ]);
     carteLignes("Lieu d'intervention", [
       ['Adresse', _nettAdresseTexte(ndPdf)],
@@ -10082,11 +10162,14 @@ function _construirePdfDevis(c, d) {
     var estTechPdf = (pdPdf.categorie === 'technicien');
     y += ESPACE_AVANT_TITRE_GLOBAL;
     sectionTitre('Trouver un professionnel automobile');
+    // LOT D4 — le devis d'un TECHNICIEN se lit sur la periode, la duree
+    // et le nombre de professionnels. Plus aucun vehicule : ni compte
+    // reel, ni vehicule fictif.
     bandeauIndicateurs(estTechPdf ? [
       ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
       ['Spécialité', _proLibelleMetier(pdPdf)],
-      ['Véhicules', pdPdf.nombre_vehicules || ''],
-      ['Professionnels', pdPdf.nombre_professionnels || '']
+      ['Professionnels', pdPdf.nombre_professionnels || ''],
+      ['Durée', _proDureeTexte(pdPdf)]
     ] : [
       ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
       ['Mission', _proLibelleMetier(pdPdf)],
@@ -11565,8 +11648,13 @@ function _nbVehiculesDossier(c) {
     return nd.nombre_vehicules_approx || 1;
   }
   if (_estDemandeProfessionnel(c)) {
+    // LOT D4 — un besoin de professionnel porte sur des PERSONNES et
+    // sur une periode, jamais sur un parc. On ne se replie plus sur 1 :
+    // afficher « 1 vehicule » la ou le client n'en a declare aucun
+    // serait inventer une donnee. Un ancien dossier qui en porte encore
+    // garde la sienne.
     var pd = _proDetails(c) || {};
-    return pd.nombre_vehicules || 1;
+    return pd.nombre_vehicules || 0;
   }
   return c.nb_vehicules || (_vehiculesDuDossier(c) || []).length || 1;
 }

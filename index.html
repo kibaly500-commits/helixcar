@@ -6575,30 +6575,16 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           </div>
         </div>
 
-        <!-- RUBRIQUE — Véhicules (technicien uniquement) -->
-        <div class="veh-sous-accordeon" id="pro-acc-vehicules" style="display:none">
-          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('vehicules')">
-            <span class="veh-sous-num" data-pro-num="vehicules">2</span><span class="veh-sous-titre" id="pro-vehicules-titre">Informations sur les véhicules</span><span class="veh-sous-chevron">&rsaquo;</span>
-          </button>
-          <div class="veh-sous-contenu">
-
-            <div class="modal-form-group">
-              <label>Combien de véhicules sont concernés ? <span class="field-required">*</span></label>
-              <div style="display:flex;align-items:center;gap:12px">
-                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(-1)" aria-label="Retirer un véhicule">&minus;</button>
-                <input type="number" id="pro-nb-vehicules" value="1" min="1" max="3" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
-                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(1)" aria-label="Ajouter un véhicule">+</button>
-              </div>
-            </div>
-
-            <div id="pro-vehicules-liste"></div>
-
-            <div class="veh-sous-ok">
-              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('vehicules')">Effacer</button>
-              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('vehicules')">OK</button>
-            </div>
-          </div>
-        </div>
+        <!-- LOT D4 — LA RUBRIQUE « INFORMATIONS SUR LES VEHICULES »
+             A ETE SUPPRIMEE.
+             Elle n'existait QUE pour la categorie « Technicien
+             automobile » (_proVehiculesApplicables() valait
+             `_proCategorie() === 'technicien'`). Le besoin porte sur
+             des PERSONNES et sur une periode d'intervention, jamais
+             sur un parc : le nombre de professionnels demandes est
+             conserve, la quantite et les fiches de vehicules ne le
+             sont pas. Le « Renfort automobile sur site » n'a jamais eu
+             cette rubrique et n'est donc en rien modifie. -->
 
         <!-- RUBRIQUE — Lieu d'intervention (+ contact sur place) -->
         <div class="veh-sous-accordeon" id="pro-acc-lieu">
@@ -6990,11 +6976,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div id="nett-creneau-bloc">
             <div class="modal-row">
               <div class="modal-form-group">
-                <label>Horaire de début sur place <span class="field-optional-hint">(facultatif)</span></label>
+                <label>Horaire de début sur place <span class="field-required">*</span></label>
                 <input type="time" id="nett-creneau-debut" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
-                <label>Horaire de fin sur place <span class="field-optional-hint">(facultatif)</span></label>
+                <label>Horaire de fin sur place <span class="field-required">*</span></label>
                 <input type="time" id="nett-creneau-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
@@ -9306,6 +9292,21 @@ function _validateNettoyageEtape2() {
   return { ok: ok, first: first };
 }
 
+// LOT D3 — chronologie de l'intervention de nettoyage.
+// Compare des COUPLES date+heure, jamais deux heures nues : une
+// intervention qui commence a 17:00 le lundi et finit a 09:00 le
+// mercredi est valide. Sur une seule journee, la fin doit etre
+// strictement posterieure au debut.
+// Renvoie true si l'on ne peut pas encore conclure (dates absentes) :
+// c'est la validation des DATES qui les reclame, pas celle-ci.
+function _nettChronologieOk(dateDebut, heureDebut, dateFin, heureFin) {
+  if (!heureDebut || !heureFin) return true;
+  if (!dateDebut || !dateFin) return heureFin > heureDebut;
+  if (dateFin > dateDebut) return true;
+  if (dateFin < dateDebut) return false;
+  return heureFin > heureDebut;
+}
+
 function _validateNettoyageEtape4() {
   var ok = true, first = null;
   function fail(id) { ok = false; if (!first) first = id; }
@@ -9359,11 +9360,31 @@ function _validateNettoyageEtape4() {
     }
   }
 
-  // HORAIRE SUR PLACE : facultatif. On ne verifie que sa coherence
-  // interne — jamais sa presence.
+  // ══════════════════════════════════════════════════════════════
+  // LOT D3 — L'HORAIRE SUR PLACE DEVIENT OBLIGATOIRE
+  // ══════════════════════════════════════════════════════════════
+  // Une intervention de nettoyage se planifie : sans heure d'arrivee ni
+  // heure de fin, ni le partenaire ni le client ne savent quand elle a
+  // lieu. Les deux champs sont donc exiges — et rien n'est preremplí :
+  // une heure inventee serait pire qu'une heure absente.
+  //
+  // CHRONOLOGIE. Sur UNE seule journee (debut = fin), la fin doit etre
+  // posterieure au debut. Sur PLUSIEURS jours, ce sont les couples
+  // date+heure complets qui sont compares : finir a 09:00 le surlendemain
+  // apres avoir commence a 17:00 est parfaitement valide.
   var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
-  if (deb && fin && fin <= deb) {
-    _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
+  if (!deb) {
+    _showFieldError('nett-creneau-debut', 'Ce champ est obligatoire.');
+    fail('nett-creneau-debut');
+  } else _clearFieldError('nett-creneau-debut');
+  if (!fin) {
+    _showFieldError('nett-creneau-fin', 'Ce champ est obligatoire.');
+    fail('nett-creneau-fin');
+  } else if (deb && !_nettChronologieOk(_nettDate(), deb, _nettDateFin(), fin)) {
+    _showFieldError('nett-creneau-fin',
+      (_nettDate() && _nettDateFin() && _nettDate() === _nettDateFin())
+        ? 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.'
+        : 'La fin de l\'intervention ne peut pas pr\u00e9c\u00e9der son d\u00e9but.');
     fail('nett-creneau-fin');
   } else {
     _clearFieldError('nett-creneau-fin');
@@ -9458,10 +9479,13 @@ function construireRecapNettoyage() {
   if (d.adresse_cp || d.adresse_ville) orga += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
   // Libelle unique, identique au dashboard et au PDF.
   orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
-  orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
-  if (d.creneau_debut || d.creneau_fin) {
-    orga += _recapLigne('Horaire sur place', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
-  }
+  // LOTS A2 et D3 — la PERIODE complete et les DEUX horaires, avec
+  // exactement les libelles du formulaire. Le recapitulatif ne peut pas
+  // montrer moins que ce qui a ete demande, ni le nommer autrement.
+  orga += _recapLigne('Date de d\u00e9but', _formaterDateFr(d.date_souhaitee));
+  orga += _recapLigne('Date de fin', _formaterDateFr(d.date_fin));
+  orga += _recapLigne('Horaire de d\u00e9but sur place', d.creneau_debut || '');
+  orga += _recapLigne('Horaire de fin sur place', d.creneau_fin || '');
   orga += _recapLigne('D\u00e9lai', NETT_DELAI[d.delai] || '');
   html += _recapBloc('Organisation de l\'intervention', orga, 4);
 
@@ -9501,7 +9525,6 @@ var PRO_LIB_MISSION = {
   soutien_administratif: 'Soutien administratif',
   autre: 'Autre mission', conseil: 'Client à conseiller'
 };
-var PRO_MAX_VEHICULES = 3;
 var PRO_MAX_PROS = 20;
 
 // ── LECTEURS ────────────────────────────────────────
@@ -9535,13 +9558,6 @@ function _proNbPros() {
   var n = Number((document.getElementById('pro-nb-pros') || {}).value);
   return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_PROS) : 1;
 }
-// Les vehicules n'existent QUE pour le technicien : un renfort sur site
-// n'est jamais rattache a une liste de vehicules.
-function _proVehiculesApplicables() { return _proCategorie() === 'technicien'; }
-function _proNbVehicules() {
-  var n = Number((document.getElementById('pro-nb-vehicules') || {}).value);
-  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_VEHICULES) : 1;
-}
 function _proAdresseRue() { return ((document.getElementById('pro-adresse-rue') || {}).value || '').trim(); }
 function _proAdresseCp() { return ((document.getElementById('pro-adresse-cp') || {}).value || '').trim(); }
 function _proAdresseVille() { return ((document.getElementById('pro-adresse-ville') || {}).value || '').trim(); }
@@ -9564,195 +9580,6 @@ function _proDureeJours() {
 // Meme principe que _nettQuantites : la MEMOIRE JS est la source de
 // verite, jamais le DOM. Les cartes sont re-rendues sans perdre une
 // saisie, et une carte retiree disparait reellement du payload.
-var _proMemoireVehicules = {};
-
-function _reinitialiserVehiculesProfessionnel() { _proMemoireVehicules = {}; }
-
-function _proMemoriserVehicule(i) {
-  _proMemoireVehicules[i] = {
-    type_vehicule: (document.getElementById('pro-veh-' + i + '-type') || {}).value || '',
-    marque_modele: ((document.getElementById('pro-veh-' + i + '-marque') || {}).value || '').trim()
-  };
-  _formulaireClientSale = true;
-  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
-  if (typeof _masquerNoticeBrouillonDesReprise === 'function') _masquerNoticeBrouillonDesReprise();
-  // Une modification peut rendre ce véhicule incomplet : son numéro
-  // doit alors repasser au rouge immédiatement.
-  if (typeof _proMajEtatVehicules === 'function') _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// Vehicules destines au brouillon / au payload : uniquement ceux qui
-// existent reellement dans le compteur courant.
-function _proVehiculesRetenus() {
-  var out = [];
-  if (!_proVehiculesApplicables()) return out;
-  var n = _proNbVehicules();
-  for (var i = 0; i < n; i++) {
-    var m = _proMemoireVehicules[i] || {};
-    out.push({
-      position: i + 1,
-      type_vehicule: m.type_vehicule || null,
-      marque_modele: m.marque_modele || null
-    });
-  }
-  return out;
-}
-function _proVehiculesPourBrouillon() {
-  var out = {};
-  Object.keys(_proMemoireVehicules).forEach(function (k) {
-    var m = _proMemoireVehicules[k];
-    if (m && typeof m === 'object') {
-      out[k] = { type_vehicule: m.type_vehicule || '', marque_modele: m.marque_modele || '' };
-    }
-  });
-  return out;
-}
-function _proRestaurerVehiculesDepuisBrouillon(source) {
-  _proMemoireVehicules = {};
-  if (!source || typeof source !== 'object') return;   // ancien brouillon : aucune erreur
-  Object.keys(source).forEach(function (k) {
-    var m = source[k];
-    if (m && typeof m === 'object') {
-      _proMemoireVehicules[k] = {
-        type_vehicule: String(m.type_vehicule || ''),
-        marque_modele: String(m.marque_modele || '')
-      };
-    }
-  });
-}
-
-function proRendreVehicules() {
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (!zone) return;
-  var n = _proNbVehicules();
-  var html = '';
-  for (var i = 0; i < n; i++) {
-    var mem = _proMemoireVehicules[i] || {};
-    var options = '<option value="">— Sélectionnez —</option>';
-    // Reutilise la liste de gabarits DEJA existante : aucune nouvelle
-    // nomenclature de vehicules creee pour ce parcours.
-    TYPES_VEHICULE.forEach(function (t) {
-      options += '<option value="' + t[0] + '"' + (mem.type_vehicule === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
-    });
-    html += '<div class="pro-veh-acc" id="pro-veh-acc-' + i + '">' +
-      '<button type="button" class="pro-veh-barre" onclick="proBasculerVehicule(' + i + ')">' +
-        '<span class="pro-veh-num">' + (i + 1) + '</span>' +
-        '<span class="pro-veh-titre">Véhicule ' + (i + 1) + '</span>' +
-        '<span class="pro-veh-chevron">&rsaquo;</span>' +
-      '</button>' +
-      '<div class="pro-veh-contenu">' +
-        '<div class="modal-form-group"><label>Type de véhicule <span class="field-required">*</span></label>' +
-        '<select id="pro-veh-' + i + '-type" onchange="_proMemoriserVehicule(' + i + ');_clearFieldError(\'pro-veh-' + i + '-type\')">' + options + '</select></div>' +
-        '<div class="modal-form-group"><label>Marque et modèle <span class="field-required">*</span></label>' +
-        '<input type="text" id="pro-veh-' + i + '-marque" value="' + _attr(mem.marque_modele || '') + '" placeholder="Ex : BMW Série 3" autocomplete="off" oninput="_proMemoriserVehicule(' + i + ')" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box"></div>' +
-        // Chaque véhicule porte SES propres actions. Elles ne touchent
-        // jamais un autre véhicule : l'index est passé explicitement.
-        '<div class="veh-sous-actions">' +
-          '<button type="button" class="veh-sous-effacer" onclick="proEffacerVehicule(' + i + ')">Effacer</button>' +
-          '<button type="button" class="veh-sous-valider" onclick="proOkVehicule(' + i + ')">OK</button>' +
-        '</div>' +
-      '</div></div>';
-  }
-  zone.innerHTML = html;
-  _proMajLibelleVehicules();
-  _proMajEtatVehicules();
-}
-
-// ── UN VÉHICULE EST-IL COMPLET ? ──
-// Mêmes champs obligatoires que la validation de la rubrique, lus
-// depuis la mémoire : aucune règle recopiée.
-function _proVehiculeComplet(i) {
-  var m = _proMemoireVehicules[i] || {};
-  return !!(String(m.type_vehicule || '').trim() && String(m.marque_modele || '').trim());
-}
-
-// Effacer : vide UNIQUEMENT ce véhicule.
-function proEffacerVehicule(i) {
-  var t = document.getElementById('pro-veh-' + i + '-type');
-  var mq = document.getElementById('pro-veh-' + i + '-marque');
-  if (t) t.value = '';
-  if (mq) mq.value = '';
-  _clearFieldError('pro-veh-' + i + '-type');
-  _clearFieldError('pro-veh-' + i + '-marque');
-  _proMemoriserVehicule(i);
-  var carte = document.getElementById('pro-veh-acc-' + i);
-  if (carte) { carte.classList.remove('termine'); delete carte.dataset.proValide; }
-  _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// OK : valide UNIQUEMENT ce véhicule. Le numéro ne passe au vert que si
-// ses informations obligatoires sont réellement renseignées.
-function proOkVehicule(i) {
-  var carte = document.getElementById('pro-veh-acc-' + i);
-  if (!carte) return;
-  if (!_proVehiculeComplet(i)) {
-    if (!String((_proMemoireVehicules[i] || {}).type_vehicule || '').trim()) {
-      _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.');
-    }
-    if (!String((_proMemoireVehicules[i] || {}).marque_modele || '').trim()) {
-      _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.');
-    }
-    delete carte.dataset.proValide;
-    _proMajEtatVehicules();
-    return;
-  }
-  carte.dataset.proValide = '1';
-  carte.classList.remove('ouvert');
-  _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// Recalcule le vert/rouge de CHAQUE véhicule. Un numéro n'est vert que
-// si l'utilisateur a validé ce véhicule ET qu'il est encore complet :
-// ouvrir une carte ne suffit jamais, et modifier une valeur jusqu'à la
-// rendre incomplète le fait repasser au rouge.
-function _proMajEtatVehicules() {
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (!zone) return;
-  Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
-    var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
-    var vert = carte.dataset.proValide === '1' && _proVehiculeComplet(i);
-    carte.classList.toggle('termine', vert);
-  });
-}
-
-function proBasculerVehicule(i) {
-  var el = document.getElementById('pro-veh-acc-' + i);
-  if (!el) return;
-  var vaSouvrir = !el.classList.contains('ouvert');
-  // Un clic ouvre UNIQUEMENT la carte choisie.
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (zone) {
-    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (x) {
-      if (x !== el) x.classList.remove('ouvert');
-    });
-  }
-  el.classList.toggle('ouvert', vaSouvrir);
-}
-
-// Libelle dynamique : singulier a 1 vehicule, pluriel au-dela.
-function _proMajLibelleVehicules() {
-  var t = document.getElementById('pro-vehicules-titre');
-  if (t) t.textContent = (_proNbVehicules() > 1) ? 'Informations sur les véhicules' : 'Information sur le véhicule';
-}
-
-function proMajNbVehicules(delta) {
-  var el = document.getElementById('pro-nb-vehicules');
-  if (!el) return;
-  var avant = _proNbVehicules();
-  var apres = Math.min(PRO_MAX_VEHICULES, Math.max(1, avant + delta));
-  if (apres === avant) return;
-  el.value = apres;
-  // Une carte retiree ne doit plus jamais reapparaitre dans le payload.
-  for (var i = apres; i < PRO_MAX_VEHICULES; i++) delete _proMemoireVehicules[i];
-  proRendreVehicules();
-  _formulaireClientSale = true;
-  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
-  _proMajBoutonContinuer();
-}
-
 function proMajNbPros(delta) {
   var el = document.getElementById('pro-nb-pros');
   if (!el) return;
@@ -9763,7 +9590,10 @@ function proMajNbPros(delta) {
 }
 
 // ── RUBRIQUES ───────────────────────────────────────
-var PRO_RUBRIQUES = ['besoin', 'vehicules', 'lieu', 'periode', 'mission'];
+// LOT D4 — « vehicules » a disparu de la liste : la rubrique n'existe
+// plus. Les quatre rubriques conservees sont exactement celles
+// demandees.
+var PRO_RUBRIQUES = ['besoin', 'lieu', 'periode', 'mission'];
 
 // Accordeons fermes par defaut : AUCUN ne s'ouvre automatiquement, et
 // un clic n'ouvre que celui qui a ete choisi.
@@ -9781,16 +9611,7 @@ function proEffacerToutLeFormulaire() {
   PRO_RUBRIQUES.forEach(function (cle) {
     try { proEffacerRubrique(cle); } catch (e) {}
   });
-  // Les véhicules ont leur propre effacement, individuel par carte.
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (zone) {
-    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
-      var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
-      if (!isNaN(i)) { try { proEffacerVehicule(i); } catch (e) {} }
-    });
-  }
   _proMajEtatRubriques();
-  _proMajEtatVehicules();
   _proMajBoutonContinuer();
   if (typeof construireRecapProfessionnel === 'function') {
     try { construireRecapProfessionnel(); } catch (e) {}
@@ -9855,10 +9676,6 @@ function proEffacerRubrique(cle) {
     var nbp = document.getElementById('pro-nb-pros'); if (nbp) nbp.value = 1;
     _clearGroupError('pro-categorie-group'); _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
     proOnCategorieChange();
-  } else if (cle === 'vehicules') {
-    _reinitialiserVehiculesProfessionnel();
-    var nbv = document.getElementById('pro-nb-vehicules'); if (nbv) nbv.value = 1;
-    proRendreVehicules();
   } else if (cle === 'lieu') {
     viderChamps(['pro-adresse-rue', 'pro-adresse-cp', 'pro-adresse-ville']);
     decocher('pro-contact-sp');
@@ -9905,18 +9722,8 @@ function proOnCategorieChange() {
   _clearGroupError('pro-mission-group');
   _clearGroupError('pro-categorie-group');
 
-  // Les vehicules n'appartiennent qu'au technicien : en renfort, la
-  // rubrique disparait et sa memoire est reellement videe.
-  var accVeh = document.getElementById('pro-acc-vehicules');
-  if (accVeh) accVeh.style.display = (c === 'technicien') ? 'block' : 'none';
-  if (c !== 'technicien') {
-    _reinitialiserVehiculesProfessionnel();
-    var nbv = document.getElementById('pro-nb-vehicules');
-    if (nbv) nbv.value = 1;
-    if (accVeh) accVeh.classList.remove('ouvert');
-  } else {
-    proRendreVehicules();
-  }
+  // LOT D4 — plus aucune rubrique de vehicules a montrer ni a masquer :
+  // elle n'existe plus pour aucune categorie.
 
   var titreMission = document.getElementById('pro-mission-titre');
   if (titreMission) titreMission.textContent = (c === 'renfort') ? 'Type de mission' : 'Mission';
@@ -10008,19 +9815,6 @@ function _proValiderRubrique(cle, fail) {
     return ok;
   }
 
-  if (cle === 'vehicules') {
-    if (!_proVehiculesApplicables()) return true;   // renfort : rubrique absente
-    var n = _proNbVehicules();
-    for (var i = 0; i < n; i++) {
-      var m = _proMemoireVehicules[i] || {};
-      if (!m.type_vehicule) { _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-type'); }
-      else _clearFieldError('pro-veh-' + i + '-type');
-      if (!m.marque_modele) { _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-marque'); }
-      else _clearFieldError('pro-veh-' + i + '-marque');
-    }
-    return ok;
-  }
-
   if (cle === 'lieu') {
     if (!_checkRequiredText('pro-adresse-rue', null, true)) ko('pro-adresse-rue');
     if (!_checkCodePostal('pro-adresse-cp', true)) ko('pro-adresse-cp');
@@ -10068,8 +9862,6 @@ function _validateProfessionnelEtape2() {
     var champ = document.getElementById(first);
     var acc = champ && champ.closest ? champ.closest('.veh-sous-accordeon') : null;
     if (acc) acc.classList.add('ouvert');
-    var carte = champ && champ.closest ? champ.closest('.pro-veh-acc') : null;
-    if (carte) carte.classList.add('ouvert');
   }
   return { ok: ok, first: first };
 }
@@ -10090,15 +9882,6 @@ function _proRubriqueComplete(cle) {
   if (cle === 'besoin') {
     if (!_proCategorie() || !_proMetier()) return false;
     if (_proPrecisionApplicable() && !_proMetierPrecision()) return false;
-    return true;
-  }
-  if (cle === 'vehicules') {
-    if (!_proVehiculesApplicables()) return true;
-    var n = _proNbVehicules();
-    for (var i = 0; i < n; i++) {
-      var m = _proMemoireVehicules[i] || {};
-      if (!m.type_vehicule || !m.marque_modele) return false;
-    }
     return true;
   }
   if (cle === 'lieu') {
@@ -10152,8 +9935,13 @@ function _construireDetailsProfessionnel() {
     // En mode conseil, le nombre de professionnels n'est pas demande :
     // il ne doit donc jamais partir avec une valeur par defaut.
     nombre_professionnels: conseil ? null : _proNbPros(),
-    nombre_vehicules: _proVehiculesApplicables() ? _proNbVehicules() : null,
-    vehicules: _proVehiculesRetenus(),
+    // LOT D4 — plus AUCUNE quantite ni fiche de vehicule n'est envoyee.
+    // Les cles restent presentes et NULLES plutot qu'absentes : le
+    // Dashboard, le devis et les informations necessaires distinguent
+    // ainsi une demande recente (rien a afficher) d'une demande
+    // ancienne, qui porte encore ses vehicules et reste lisible.
+    nombre_vehicules: null,
+    vehicules: [],
     adresse_rue: _proAdresseRue() || null,
     adresse_cp: _proAdresseCp() || null,
     adresse_ville: _proAdresseVille() || null,
@@ -10199,14 +9987,10 @@ function construireRecapProfessionnel() {
   if (d.nombre_professionnels) besoin += _recapLigne('Professionnels', String(d.nombre_professionnels));
   html += _recapBloc('Votre besoin', besoin, 2);
 
-  if (d.nombre_vehicules) {
-    var veh = _recapLigne('Nombre de véhicules', String(d.nombre_vehicules));
-    (d.vehicules || []).forEach(function (v, idx) {
-      var libelle = [_libelleTypeVehicule(v.type_vehicule), v.marque_modele].filter(Boolean).join(' — ');
-      veh += _recapLigne('Véhicule ' + (idx + 1), libelle);
-    });
-    html += _recapBloc(d.nombre_vehicules > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', veh, 2);
-  }
+  // LOT D4 — le recapitulatif d'une demande en cours ne montre plus
+  // aucun vehicule : la rubrique n'existe plus, et rien ne doit
+  // reapparaitre ici. Les anciens dossiers, eux, restent lisibles dans
+  // le Dashboard, qui affiche ce qu'ils portent reellement.
 
   var lieu = _recapLigne('Adresse', d.adresse_rue);
   if (d.adresse_cp || d.adresse_ville) lieu += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
@@ -13618,7 +13402,9 @@ function _construireBrouillonClient() {
     // V77.1 - copie (jamais la reference) des quantites Nettoyage, qui
     // ne sont portees par aucun champ HTML serialisable.
     nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {},
-    professionnelVehicules: (typeof _proVehiculesPourBrouillon === 'function') ? _proVehiculesPourBrouillon() : {}
+    // LOT D4 — plus aucun vehicule n'est memorise : un ancien brouillon
+    // qui en contient encore ne peut donc plus les reinjecter.
+    professionnelVehicules: {}
   };
 }
 
@@ -13914,13 +13700,10 @@ function _restaurerBrouillonClientSiPresent() {
   if (typeof _nettRestaurerQuantitesDepuisBrouillon === 'function') {
     _nettRestaurerQuantitesDepuisBrouillon(brouillon.nettoyageQuantites);
   }
-  // Meme principe pour les vehicules du parcours Professionnel :
-  // restaures AVANT onChoixService(), qui declenche proRendreVehicules().
-  // Un ancien brouillon depourvu de professionnelVehicules laisse
-  // simplement la memoire vide, sans erreur.
-  if (typeof _proRestaurerVehiculesDepuisBrouillon === 'function') {
-    _proRestaurerVehiculesDepuisBrouillon(brouillon.professionnelVehicules);
-  }
+  // LOT D4 — un ancien brouillon peut encore porter
+  // `professionnelVehicules` : il n'est plus jamais relu. La rubrique
+  // n'existe plus, elle ne doit donc pas pouvoir revenir par une
+  // reprise de brouillon.
 
   if (typeof onChoixService === 'function') onChoixService();
   if (typeof nettRendreRepartition === 'function') nettRendreRepartition();
@@ -14046,9 +13829,6 @@ function resetClientForm() {
   // vraie reinitialisation (jamais lors d'un simple Retour ni d'une
   // bascule temporaire de service).
   _reinitialiserQuantitesNettoyage();
-  // Meme raison : _proMemoireVehicules est une variable JS persistante
-  // que la restauration du HTML d'origine ne remet pas a zero.
-  if (typeof _reinitialiserVehiculesProfessionnel === 'function') _reinitialiserVehiculesProfessionnel();
   var _mc = document.getElementById('modal-client');
   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
@@ -20625,28 +20405,75 @@ document.addEventListener('click', function (e) {
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
 /* Sous-accordéons véhicule : deux actions équilibrées. */
-/* Cartes véhicule du parcours « Trouver un professionnel ».
-   Classes DÉDIÉES volontairement : ces cartes sont imbriquées dans une
-   rubrique .veh-sous-accordeon, et la règle existante
-   « .veh-sous-accordeon.ouvert .veh-sous-contenu » est un sélecteur
-   DESCENDANT — réutiliser littéralement ces classes aurait ouvert
-   toutes les cartes dès l'ouverture de la rubrique. Le rendu visuel
-   reste strictement celui des sous-accordéons existants. */
-#modal-client .pro-veh-acc { border:1px solid rgba(16,24,32,.11); border-radius:12px; margin:10px 0; overflow:hidden; background:#fff; }
-#modal-client .pro-veh-barre { width:100%; border:0; background:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; text-align:left; font-family:var(--font-body); }
-#modal-client .pro-veh-num { width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#f4eeee;color:var(--accent);font-size:.7rem;font-weight:700;flex:0 0 25px; }
-#modal-client .pro-veh-titre { flex:1; color:var(--ink); font-size:.88rem; font-weight:660; }
-#modal-client .pro-veh-chevron { color:#8A8F93; font-size:1.15rem; transform:rotate(90deg); transition:transform .18s ease; }
-#modal-client .pro-veh-acc.ouvert .pro-veh-chevron { transform:rotate(-90deg); }
-/* Numéro vert UNIQUEMENT quand le véhicule a été validé et reste
-   complet. Le rouge (fond rosé) est l'état par défaut ci-dessus. */
-#modal-client .pro-veh-acc.termine .pro-veh-num { background:#edf5ef; color:#247443; }
-#modal-client .pro-veh-contenu { display:none; padding:0 16px 14px; }
-#modal-client .pro-veh-acc.ouvert > .pro-veh-contenu { display:block; }
+/* LOT D4 — les styles des cartes « vehicule » du parcours
+   Professionnel ont ete supprimes avec la rubrique elle-meme. */
 
 #modal-client .veh-sous-ok { gap:9px; align-items:center; }
-#modal-client .veh-sous-ok .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
-#modal-client .veh-sous-ok .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
+/* ══════════════════════════════════════════════════════════════
+   LOT E3 — « EFFACER / OK », TOUJOURS LE MEME COUPLE DE BOUTONS
+   ══════════════════════════════════════════════════════════════
+   CE QUI ETAIT CONSTATE : sous l'identite d'un vehicule, ces deux
+   boutons apparaissaient en HTML brut, colles a gauche.
+   CAUSE : le style n'etait pose que sur `.veh-sous-ok .veh-sous-*`.
+   Les cartes qui utilisaient un AUTRE conteneur (`.veh-sous-actions`)
+   n'heritaient donc de rien du tout.
+   Le style suit desormais la CLASSE DU BOUTON, quel que soit son
+   conteneur : le couple ne peut plus se retrouver non style. Et tout
+   conteneur d'actions aligne a droite, comme le composant de
+   reference. */
+#modal-client .veh-sous-ok,
+#modal-client .veh-sous-actions {
+  display:flex; justify-content:flex-end; gap:9px; align-items:center; margin-top:14px;
+}
+#modal-client .veh-sous-effacer,
+#modal-client .veh-sous-valider {
+  border:0; border-radius:8px; padding:10px 18px;
+  font:600 .8rem var(--font-body); cursor:pointer;
+}
+#modal-client .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
+#modal-client .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
+#modal-client .veh-sous-valider:hover { opacity:.9; }
+
+/* ══════════════════════════════════════════════════════════════
+   LOT E2 — LE FOND BLEU DE L'AUTOREMPLISSAGE
+   ══════════════════════════════════════════════════════════════
+   Quand le navigateur propose une adresse enregistree, il peint
+   LUI-MEME un fond bleu (ou jaune) sur le champ, par-dessus le style
+   HelixCar. `background-clip: text` limite ce fond aux seules
+   glyphes : il devient invisible, et le fond de l'auteur reprend la
+   main. La longue transition couvre le bref instant ou certains
+   navigateurs repeignent malgre tout.
+
+   Ce qui n'est PAS fait, volontairement : desactiver
+   l'autocompletion, masquer les suggestions ou gener un gestionnaire
+   de mots de passe. Seule la couleur est neutralisee. Le contour de
+   focus clavier reste intact — il est defini ailleurs et n'est pas
+   touche ici. */
+#modal-client input:-webkit-autofill,
+#modal-client input:-webkit-autofill:hover,
+#modal-client input:-webkit-autofill:focus,
+#modal-client input:-webkit-autofill:active,
+#modal-connexion input:-webkit-autofill,
+#modal-connexion input:-webkit-autofill:hover,
+#modal-connexion input:-webkit-autofill:focus,
+#modal-connexion input:-webkit-autofill:active,
+#modal-reinit input:-webkit-autofill,
+#modal-reinit input:-webkit-autofill:hover,
+#modal-reinit input:-webkit-autofill:focus,
+#modal-reinit input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+  caret-color: #3A3F45;
+  transition: background-color 100000s ease-in-out 0s;
+}
+/* Firefox : meme intention, propriete standardisee. */
+#modal-client input:autofill,
+#modal-connexion input:autofill,
+#modal-reinit input:autofill {
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+}
 #modal-client .veh-sous-accordeon:not(.termine) > .veh-sous-barre .veh-sous-num { background:#f4eeee !important; color:var(--accent) !important; }
 #modal-client .hc-group-error { outline:1px solid rgba(158,63,70,.48); outline-offset:4px; border-radius:10px; }
 /* Accordéons de l'étape 02 */
