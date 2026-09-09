@@ -80,8 +80,28 @@ fonctions retirées                              :   4
 fonctions ajoutées par la stabilisation         :   7
 ```
 
-Les **quatre** fonctions retirées sont exactement celles dont la
-suppression était demandée :
+> **Le comptage ne prouve rien à lui seul** — une fonction peut exister
+> et ne plus rien faire. C'est pourquoi le § 12.6 en fait un
+> **manifeste fonctionnel** : chaque nouveauté y est vérifiée par un
+> comportement réellement observé (section **N** de
+> `tests/t_stabilisation.js`), et le § 12.7 vérifie qu'aucun libellé
+> historique n'a disparu sans raison nommée (section **O**).
+
+Inventaire **re-mesuré** au terme de la revue, règle d'extraction
+explicite (`^function nom(` en début de ligne, doublons fusionnés) :
+
+```
+index.html      : 446 fonctions dans le main fusionné
+                  442 encore présentes · 4 retirées · 6 ajoutées
+dashboard.html  : 1 retirée · 4 ajoutées
+```
+
+La fonction retirée du Dashboard est `_referenceMissionNettoyage()` :
+**code mort** qui portait la même course que le défaut nº 2 du § 12.0.
+Supprimée plutôt que laissée en embuscade.
+
+Les **quatre** fonctions retirées de `index.html` sont exactement celles
+dont la suppression était demandée :
 
 | Fonction retirée | Pourquoi |
 |---|---|
@@ -396,8 +416,8 @@ modifié de ce côté.
 
 | Suite | Commande | Contre le `main` `8b86148` | Après correction |
 |---|---|---|---|
-| `t_rls.sh` | `bash tests/t_rls.sh` | **22 FAIL** (sans les migrations `100` et `101`) | **360 PASS / 0 FAIL** |
-| `t_stabilisation.js` | `node tests/t_stabilisation.js` | **28 FAIL** | **71 PASS / 0 FAIL** |
+| `t_rls.sh` | `bash tests/t_rls.sh` | **22 FAIL** (sans les migrations `100` et `101`) | **364 PASS / 0 FAIL** |
+| `t_stabilisation.js` | `node tests/t_stabilisation.js` | **28 FAIL** | **160 PASS / 0 FAIL** |
 
 Les échecs les plus parlants, tels qu'ils sont sortis :
 
@@ -410,23 +430,39 @@ Les échecs les plus parlants, tels qu'ils sont sortis :
 | `F6` — ouvrir « Devenir client » efface l'erreur précédente | `{"affiche":"block","texte":"Erreur 400 [convoyeurs]: 23514"}` |
 | `H-nettoyage3` — titres non collés | écart de `3.20 mm` |
 
+Et les **deux défauts trouvés en revue** (§ 12.0), reproduits de la même
+manière avant d'être corrigés :
+
+| Contrôle | Ce qu'il a obtenu contre le code de la PR, avant correction |
+|---|---|
+| `Dquater2` — aucun mode demandé quand HelixCar ne transporte pas | `[2, 2]` blocs rendus |
+| `Dquater3` — et rien de tel en base | `["standard", "standard"]` |
+| `U22` — deux appels simultanés, deux références | **2 missions, 1 seule référence distincte** |
+
+Ces trois reproductions ont été **rejouées** sur une copie mutante après
+correction, pour vérifier que les contrôles mordent toujours (§ 12.6 et
+§ 12.7 en font autant pour le manifeste et pour les libellés).
+
 ### Après correction — la campagne complète, depuis zéro
 
 ```
 npm test
 ```
 
-**31 suites, 1 705 contrôles, 1 705 PASS, 0 FAIL — en 300 secondes.**
+**31 suites, 1 798 contrôles, 1 798 PASS, 0 FAIL — en 360 secondes.**
 
 | Suite | PASS | Ce qu'elle couvre ici |
 |---|---|---|
-| `t_rls` | **360** | migrations réelles sur PostgreSQL 16 jetable — sections S (activités), T (types et règles métier), U (période et mission unique) |
+| `t_rls` | **364** | migrations réelles sur PostgreSQL 16 jetable — sections S (activités), T (types et règles métier), U (période et mission unique), **U bis** (course sur la référence) |
+| `t_stabilisation` | **160** | la suite créée pour ce chantier, sections A → O |
 | `t_rattachement` | 73 | rattachement après confirmation, inchangé |
 | `t_mission_nettoyage` | 73 | cycle devis → mission, désormais piloté par le serveur |
-| `t_stabilisation` | **71** | la suite créée pour ce chantier |
+| `t_video` | 70 | vidéo de candidature, limite de 300 Mo comprise |
+| `t_tus` | 59 | envoi reprenable |
+| `t_durcissement` | 59 | absence de handlers JS dynamiques |
 | `t_nonreg` | 44 | périmètre de fichiers et validations métier |
 | `t_nettoyage` | 33 | période, disponibilité retirée, horaire libre |
-| *(24 autres suites)* | | non-régression |
+| *(22 autres suites)* | | non-régression |
 
 **Portabilité des dates**, vérifiée dans les deux fuseaux :
 
@@ -491,6 +527,18 @@ Ce que ces tests **ne** couvrent **pas** :
 * **MP4 et MOV** : le Chromium de test est dépourvu des codecs
   propriétaires (limite déjà connue).
 
+### 8 bis. Ce que la revue de la PR nº 3 n'a **pas** pu prouver seule
+
+Dit franchement, avec le test manuel **exact** qui le remplace.
+
+| Point de la revue | Ce qui est prouvé automatiquement | Ce qui ne peut pas l'être ici | Test manuel exact |
+|---|---|---|---|
+| **3** — le compte particulier existe vraiment | l'écran de succès n'est affiché **qu'après** relecture du compte, et les quatre issues sont distinctes (section G bis) | l'écriture dans le **vrai** Supabase Auth : `tests/env.js` coupe toute requête sortante, le double `window.__comptes` tient lieu de serveur | créer un compte avec une adresse `test-qa-claude-postpr2+<horodatage>@example.invalid`, puis, dans Supabase → Authentication → Users, vérifier que la ligne existe ; recommencer avec la **même** adresse et vérifier le message « adresse déjà utilisée » |
+| **2** — la mission de nettoyage ne dérape pas | index unique, séquence, `est_admin()`, devis accepté, aucune information attendue — sur PostgreSQL 16 **jetable**, avec les vrais fichiers de migration | le comportement sur la base **réelle** : aucune migration n'a été appliquée | après application de `100` → `101` → `102`, exécuter les requêtes de contrôle en fin de chaque fichier, puis `select reference, count(*) from public.missions where type_mission = 'nettoyage' group by 1 having count(*) > 1;` → **aucune ligne** |
+| **9** — le sens réel de la divergence de types | l'erreur `42804` est reproduite et supprimée, quel que soit le sens | laquelle des deux colonnes est `text` **en production** | `select table_name, column_name, data_type from information_schema.columns where table_name in ('clients','vehicules') and column_name like 'date%' order by 1, 2;` |
+| **§ 14** — aération des devis PDF | la **géométrie** (jsPDF instrumenté, section H) | l'**aspect** : jsPDF vient d'un CDN, coupé pendant les tests | générer un devis Professionnel **et** un devis Nettoyage depuis le Dashboard, ouvrir les deux PDF, vérifier à l'œil les marges, la respiration des titres et la pagination |
+| **11** — les protections de la PR nº 2 | 14 marques vivantes, plus les suites qui les exercent (section M) | le comportement des politiques RLS sur le **vrai** projet Supabase | rejouer, sur la base réelle et avec un compte de test, les scénarios de `tests/t_rls.sh` sections V à Z — **jamais** sur des données réelles |
+
 ---
 
 ## 9. Application des migrations — à faire à la main, dans cet ordre
@@ -502,7 +550,7 @@ idempotentes.
 |---|---|---|---|
 | 1 | `100_activites_partenaire.sql` | débloque les candidatures de technicien | `select public.activites_partenaire();` → 4 valeurs |
 | 2 | `101_informations_types_coherents.sql` | rétablit les informations de mission | `select * from public.informations_demande('<uuid>');` → des lignes, aucune erreur `42804` |
-| 3 | `102_nettoyage_periode_et_mission.sql` | période de nettoyage, mission unique | `select count(*) from pg_indexes where indexname='missions_nettoyage_une_par_demande';` → 1 |
+| 3 | `102_nettoyage_periode_et_mission.sql` | période de nettoyage, mission unique, **référence sans course** | `select count(*) from pg_indexes where indexname='missions_nettoyage_une_par_demande';` → 1, puis `select last_value from public.missions_nettoyage_numero;` → une valeur **au moins égale** au plus grand numéro de référence déjà émis |
 
 `101` doit venir **après** `100` uniquement pour la clarté du dossier :
 les deux sont indépendantes. `102` dépend de `101` (elle interroge
@@ -520,8 +568,12 @@ les deux sont indépendantes. `102` dépend de `101` (elle interroge
    néfaste : l'ancienne page les ignore.
 3. **Retirer `102`** : `drop function if exists
    public.creer_mission_nettoyage_si_prete(uuid);` puis
-   `drop index if exists public.missions_nettoyage_une_par_demande;`
+   `drop index if exists public.missions_nettoyage_une_par_demande;` et
+   `drop index if exists public.missions_nettoyage_reference_unique;`
    — plus rien n'empêche alors deux missions pour la même demande.
+   ⚠️ Laisser la **séquence** `public.missions_nettoyage_numero` en
+   place : elle ne coûte rien, et la supprimer puis la recréer plus tard
+   ferait repartir les numéros de référence en arrière.
 4. **Retirer `101`** : réappliquer `94_informations_selon_scenario.sql`.
    ⚠️ Cela **remet** l'erreur `COALESCE types date and text` et le
    Dashboard cesse à nouveau d'afficher les informations de mission.
@@ -543,7 +595,7 @@ Le détail complet est en fin de chaque fichier de migration.
 | A1 — candidature vidéo impossible (`23514`) | **FAIT** — migration `100`, socle corrigé, 18 contrôles offensifs |
 | A2 — création de compte particulier « bloquée » | **FAIT** — ce n'était pas une écriture, mais un bandeau d'erreur partagé entre deux fenêtres |
 | B — faux succès de création de compte | **FAIT** — quatre issues distinctes, dites telles quelles |
-| C — structure instable du mode de transport | **FAIT** — un bloc par véhicule, sans condition ; contrôle global supprimé |
+| C — structure instable du mode de transport | **FAIT** — un bloc par véhicule, posé sur le **fait métier** (`sc.pc \|\| sc.liv`) et non sur la mise en page ; contrôle global supprimé. La première version, *inconditionnelle*, était une sur-correction : corrigée en revue (§ 12.0) |
 | D — erreur SQL des informations de mission | **FAIT** — migration `101`, logique booléenne |
 | §10 — logique métier des informations manquantes | **FAIT** — règles conservées, désormais éprouvées (T8 → T16) |
 | §11 — Nettoyage : date de fin, disponibilités retirées | **FAIT** |
@@ -552,3 +604,245 @@ Le détail complet est en fin de chaque fichier de migration.
 | §14 — aération des devis PDF | **FAIT** (géométrie mesurée) — relecture visuelle : **contrôle manuel** |
 | §15 — texte commercial « sous 1 heure » | **FAIT** |
 | §16 — e-mails et adresses `.invalid` | **NON APPLICABLE** — aucun défaut du produit reproduit |
+| Revue — mode de transport sans objet | **CORRIGÉ** — section D quater, rouge puis vert (§ 12.0) |
+| Revue — course sur la référence de mission | **CORRIGÉ** — séquence, section U bis, rouge puis vert (§ 12.0) |
+| Revue — manifeste fonctionnel des nouveautés | **FAIT** — section N, 22 contrôles de comportement (§ 12.6) |
+| Revue — fidélité des formulaires historiques | **FAIT** — section O, 12 contrôles, 140 libellés de référence (§ 12.7) |
+
+---
+
+## 12. Revue critique de la Pull Request nº 3
+
+Cette section rend compte de la **dernière revue critique**, menée avant
+toute fusion et avant toute application de migration. Elle ne se
+contente pas des tests déjà verts : chaque point a été **re-vérifié en
+exécutant du code**, et deux défauts **réels, de mon propre fait**, ont
+été trouvés puis corrigés sur la même branche, avec un test rouge avant
+et vert après.
+
+### 12.0 Les deux défauts trouvés en revue
+
+#### Défaut nº 1 — une question posée sans objet, et un récapitulatif qui la contredisait
+
+Le lot C avait remplacé le contrôle global « Standard / Sur plateau » par
+un bloc **par véhicule**, rendu **sans aucune condition**. C'était une
+**sur-correction**. Dans un stockage où le client dépose lui-même son
+véhicule **et** vient le rechercher, HelixCar ne le transporte à aucun
+moment : la question « Mode de transport » n'a alors pas d'objet.
+
+Pire : la réponse partait quand même en base, alors que le
+récapitulatif, lui, testait **une autre condition** et n'affichait rien.
+Le client répondait donc à une question absente de son propre
+récapitulatif.
+
+La règle juste n'est ni « toujours », ni « seulement si une autre
+réponse a été donnée » : c'est **« seulement si HelixCar transporte
+réellement ce véhicule »** — le fait métier `sc.pc || sc.liv`, appliqué
+**mot pour mot** dans le formulaire et dans le récapitulatif.
+
+* Reproduit puis corrigé : `t_stabilisation.js`, section **D quater**
+  (`Dquater1` → `Dquater5`).
+* Contre le code de la PR avant correction : `Dquater2` obtenait
+  `[2, 2]` blocs rendus là où HelixCar ne transporte rien, et
+  `Dquater3` obtenait `["standard", "standard"]` envoyés en base.
+
+#### Défaut nº 2 — deux missions de nettoyage pouvaient porter la même référence
+
+La migration `102` calculait la référence de mission par un
+`select max(...)` **juste avant** d'insérer. Deux appels simultanés
+lisaient le même « dernier numéro » avant qu'aucun n'ait inséré, et
+forgeaient **la même référence**.
+
+Ce n'était pas un cas de laboratoire : le Dashboard appelle la fonction
+**en parallèle** (`Promise.all`) pour toutes les demandes prêtes.
+
+* Reproduit sur PostgreSQL 16 avec deux sessions synchronisées :
+  **2 missions, 1 seule référence distincte**.
+* Corrigé par une **séquence** (`public.missions_nettoyage_numero`), qui
+  ne rend jamais deux fois la même valeur, alignée sans jamais reculer,
+  plus un index d'unicité défensif posé **seulement** si les données
+  existantes le permettent.
+* Preuve : `t_rls.sh`, section **U bis** (`U21` → `U24`).
+
+Un troisième nettoyage, sans défaut observable mais dangereux : le
+générateur de référence **mort** `_referenceMissionNettoyage()` du
+Dashboard, qui portait la même course, a été supprimé plutôt que laissé
+en embuscade.
+
+### 12.1 Migrations 100, 101 et 102 — contenu, utilité, idempotence, ordre
+
+| Migration | Ce qu'elle fait | Pourquoi elle est nécessaire | Idempotence |
+|---|---|---|---|
+| `100_activites_partenaire.sql` | ajoute `technicien` aux activités autorisées | sans elle **aucune** candidature de technicien ne passe (`23514`) | `drop constraint if exists` avant `add`, ciblage **précis** de la seule contrainte d'énumération sur `convoyeurs.activites` |
+| `101_informations_types_coherents.sql` | recrée `informations_demande(uuid)` avec une **logique booléenne** au lieu d'un `COALESCE` entre deux colonnes de types différents | sans elle le Dashboard répond `COALESCE types date and text cannot be matched` (`42804`) et n'affiche plus **aucune** information de mission | `create or replace function`, corps entier réécrit à chaque exécution |
+| `102_nettoyage_periode_et_mission.sql` | colonne `date_fin_intervention`, index d'unicité, séquence de référence, fonction `creer_mission_nettoyage_si_prete` | sans elle la période de nettoyage n'est pas stockable et rien n'empêche **structurellement** deux missions pour la même demande | `add column if not exists`, `create unique index if not exists`, `create sequence if not exists`, `setval` qui **ne recule jamais**, `create or replace function` |
+
+**`101` expliquée** — c'est le point qui n'avait jamais été détaillé.
+La migration `94` comparait, pour sept rubriques, une valeur propre au
+véhicule et une valeur commune à la demande, avec un
+`coalesce(a, b) is null`. Or **`a` et `b` n'ont pas le même type** :
+l'une des deux colonnes est `date`, l'autre `text`. PostgreSQL refuse le
+`COALESCE` avant même de regarder les données. `101` remplace donc
+chacune des sept expressions par une **logique booléenne** qui ne
+compare jamais les deux types entre eux :
+
+```sql
+(a is not null or (commun and b is not null))
+```
+
+Le correctif est **indifférent au sens de la divergence** : il
+fonctionne que ce soit `clients.date_*` ou `vehicules.date_*` qui soit
+`text` en production. `101` ajoute au passage la rubrique
+`nettoyage_date_fin`, qu'exige la période du § 5.1.
+
+**Ordre.** `100` et `101` sont indépendantes ; `102` **dépend de `101`**
+(elle interroge `informations_demande`). L'ordre `100 → 101 → 102` est
+donc le seul sûr.
+
+**Aucune des migrations `92` à `99` n'a été retouchée** — vérifié par
+empreinte, et re-vérifié dans cette revue.
+
+### 12.2 La mission de nettoyage ne peut pas déraper
+
+| Danger | Ce qui l'empêche | Preuve |
+|---|---|---|
+| deux missions pour le même devis | index unique partiel `missions_nettoyage_une_par_demande`, **côté base** | `t_rls.sh` U7, U8 |
+| déclenchement sans acceptation réelle du devis | la fonction exige un `devis` au statut **`accepte`** | `t_rls.sh` U3, U4 |
+| contournement d'autorisation | la fonction exige `est_admin()`, et elle est `security definer` avec `search_path` fixé | `t_rls.sh` U1, U2 |
+| mission incomplète | zéro ligne `attendue` dans `informations_demande` exigée avant création | `t_rls.sh` U5, U6 |
+| rejeu | retour `DEJA_CREEE`, plus `exception when unique_violation` | `t_rls.sh` U9 → U12 |
+| **référence dupliquée** | **séquence** non transactionnelle | `t_rls.sh` **U21 → U24** |
+
+### 12.3 Création d'un compte particulier — jusqu'à l'existence vérifiable
+
+Section **G bis** de `t_stabilisation.js`, 13 contrôles. L'écran de
+succès n'est plus une déclaration : le compte est **relu côté serveur**
+dans le double de test (`window.__comptes`) avant que le succès ne soit
+affirmé. Sont couverts : le parcours simple, le basculement
+professionnel → particulier, l'échec puis la reprise, le rechargement,
+et l'adresse déjà utilisée. Quatre issues distinctes sont dites telles
+quelles : `non_demande`, `cree`, `existe_deja`, `echec`.
+
+### 12.4 Le mode de transport, de 1 à 5 véhicules
+
+Sections **B**, **C**, **D**, **D bis**, **D ter**, **D quater**, **E**
+et **K**. Couvert : ouverture, duplication, modification indépendante,
+allers-retours Convoyage → Stockage → Convoyage, brouillon
+(`radios['veh-i-mode']`), rechargement, reprise, validation,
+enregistrement, Dashboard et devis. **Exactement quatre rubriques par
+véhicule**, jamais hors de la fiche, jamais dupliquées — et, depuis la
+revue, **jamais posées quand HelixCar ne transporte pas** le véhicule.
+
+### 12.5 Le contrôle parasite a disparu, le « Délai souhaité » est resté
+
+Section **A** : `#client-mode`, `#client-plateau`,
+`name="mode-transport"` et `onModeTransport` n'existent plus (A1 → A6),
+et `A7` exige que le « Délai souhaité » **Standard / Prioritaire** soit
+toujours là.
+
+### 12.6 Manifeste **fonctionnel** des nouveautés
+
+> « Le simple comptage des fonctions n'est pas une preuve suffisante. »
+
+C'est exact : une fonction peut exister et ne plus rien faire. La
+section **N** de `t_stabilisation.js` (22 contrôles) vérifie donc chaque
+nouveauté par un **comportement réellement observé**.
+
+| Nouveauté | Preuve exécutée | Suite qui la couvre |
+|---|---|---|
+| multi-véhicules, fiches indépendantes | trois fiches rendues ; écrire dans la 2 laisse la 1 et la 3 **vides** | N1, N2 · `t_multivehicules` |
+| calendriers de période | le calendrier s'ouvre, propose **Effacer** et **OK**, écrit une date **civile**, et « Effacer » la retire | N3, N4, N5 · `t_dates`, `t_periode` |
+| limite vidéo de 300 Mo | un fichier de **300 Mo + 1 octet** est refusé, message à l'appui | N6 · `t_video` |
+| contrôle de format vidéo | un `text/plain` est refusé par le **même** chemin | N7 · `t_video` |
+| envoi vidéo reprenable | deux envois reçoivent deux **jetons distincts** | N8 · `t_tus` |
+| parcours « Trouver un professionnel » | catégorie et métier réellement sélectionnés, payload construit | N9 · `t_pro`, `t_pro_ui` |
+| métier « Soutien administratif » | sélectionnable, et son libellé revient exact | N10 · `t_metiers` |
+| étapes du parcours professionnel | l'étape 4 ne lui est **pas** applicable, « Continuer » mène au récapitulatif | N11 · `t_etapes` |
+| huit métiers de candidature | huit boutons proposés, dont `soutien_administratif` | N12 · `t_metiers` |
+| déduction des activités | ajouter un métier déduit bien l'activité `renfort` | N13 · `t_metiers`, `t_decisions` |
+| parcours Nettoyage professionnel | ses blocs sont montés, `_nettEstProfessionnel()` vrai | N14 · `t_nettoyage` |
+| période de nettoyage | deux bornes civiles, fin **après** début | N15 · `t_nettoyage`, `t_periode` |
+| contact sur place transversal | le contact saisi se retrouve **dans le payload** | N16 · `t_contact` |
+| devis commun aux quatre services | `_construirePdfDevis` + les quatre services déclarés | N17 · `t_devis`, `t_devis_commun` |
+| informations nécessaires à la mission | `informations_demande` des deux côtés | N18 · `t_infos` |
+| trois espaces (admin, client, partenaire) | marques vivantes, dont `v_mes_demandes` | N19 · `t_client`, `t_pro_ui`, `t_blocage` |
+| charte Dashboard fond blanc | fond blanc déclaré | N20 · `t_charte` |
+| décisions multi-activités et blocage | marques vivantes | N21 · `t_decisions`, `t_blocage` |
+| missions de nettoyage au Dashboard | `_tenterMissionNettoyage` + l'appel RPC serveur | N22 · `t_mission_nettoyage`, `t_nettoyage_dashboard` |
+
+**Le manifeste mord vraiment.** Pour ne pas se payer de mots, la limite
+vidéo a été **desserrée dans une copie** de l'index
+(`300 Mo` → `3 000 Mo`) : `N6` est alors passé au **rouge**, exactement
+comme il le devait, alors que le nom de la fonction n'avait pas bougé
+d'un caractère. La copie a été supprimée aussitôt.
+
+### 12.7 Fidélité des formulaires historiques
+
+Section **O**. Le relevé mécanique des libellés `<label>` de l'ancien
+index validé est **versionné** dans `tests/reference_ancien_index.js`
+(**140 libellés**). La règle est stricte **dans les deux sens** :
+
+* aucun libellé historique ne peut disparaître sans une raison
+  **nommée** ;
+* et chaque raison nommée doit correspondre à un libellé qui a
+  **réellement** disparu — une liste d'excuses qui grossirait sans objet
+  serait, elle aussi, un échec.
+
+**Onze** libellés ont disparu, et **onze** seulement. Chacun a une
+raison :
+
+| Libellé disparu | Raison |
+|---|---|
+| `Quelle est votre disponibilité ? *` | retrait **explicitement demandé** (§ 11) |
+| `Heure souhaitée *` | idem — champ de la branche « Heure précise » |
+| `Créneau horaire` | idem — choix de la question retirée |
+| `Flexible` | idem — choix de la question retirée |
+| `Début du créneau *` | devenu **facultatif** : « Début (facultatif) » |
+| `Fin du créneau *` | devenu **facultatif** : « Fin (facultatif) » |
+| `Quelle est la date souhaitée ? *` | remplacé par une **période** : « Date de début » / « Date de fin » |
+| `Mode de transport i *` | contrôle **global** explicitement à supprimer ; la question vit désormais dans chaque fiche véhicule (`.veh-sstitre`, pas un `<label>`) |
+| `Quelles activités souhaitez-vous exercer avec HelixCar ? *` | remplacé par les **huit métiers** de la PR nº 2 |
+| `Nettoyage automobile` | ancienne case d'activité → métier « Nettoyage » |
+| `Renfort automobile` | ancienne case d'activité → cinq métiers de renfort, dont « Soutien administratif » |
+
+L'index actuel propose **158 libellés** contre 140 : les nouveautés ne
+sont pas écrasées, elles s'ajoutent. Et les parcours **nouveaux**
+restent bâtis sur le code actuel : `O11` et `O12` refusent tout retour
+de l'ancien code dans « Nettoyage » et « Trouver un professionnel ».
+
+**La règle mord vraiment.** Le libellé `Immatriculation` a été retiré
+d'une copie de l'index : `O2` et `O4` sont passés au **rouge**
+(`Immatriculation` non expliqué, 12 disparitions au lieu de 11).
+
+### 12.8 La plage horaire n'a rien ressuscité
+
+Section **L**, 10 contrôles : ni la question « Quelle est votre
+disponibilité ? », ni ses trois choix, ni le champ « Heure précise », ni
+les trois fonctions qui les pilotaient. Et **aucune validation cachée** :
+sans plage, l'étape 4 est **valide** ; seule une plage **incohérente**
+est refusée. Le payload ne porte plus `dispo_type` ni `heure_precise`.
+
+### 12.9 L'erreur `COALESCE`, et le SQL brut
+
+Reproduite (`t_rls.sh` T1 contre le socle non migré : `42804`), puis
+supprimée par `101`. Section **F** de `t_stabilisation.js` : **aucun**
+message technique brut n'atteint l'utilisateur — plus d'écriture dans
+`#supabase-debug`, et les bandeaux d'erreur sont nettoyés à l'ouverture
+d'une autre fenêtre.
+
+### 12.10 Le compteur de demandes
+
+Section **I** : jeton de session réel, délai de re-comptage ramené à
+**30 s**, et re-comptage **forcé** au retour d'onglet
+(`visibilitychange`). Une nouvelle demande est donc visible sans
+attendre.
+
+### 12.11 Les protections de la PR nº 2 sont intactes
+
+Section **M**, 14 contrôles, chacun par une **marque vivante** et non
+par une déclaration : RLS, rattachement après confirmation, **deux
+secrets distincts**, absence de handlers JS dynamiques, photos de
+mission réellement existantes, verrou serveur des missions,
+autorisation interne de `informations_demande`, envoi vidéo reprenable
+et Edge Function, `verify_jwt` versionné, isolement réseau des tests,
+intégration continue en deux tâches.
