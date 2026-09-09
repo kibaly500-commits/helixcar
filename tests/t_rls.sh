@@ -2076,6 +2076,120 @@ check "V-D3-21 : elle laisse simplement les colonnes vides" "true" \
   "$(sql "select (heure_debut_intervention is null and heure_fin_intervention is null)::text
       from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff41';")"
 
+# ----------------------------------------------------------------
+# V-D3-30 a V-D3-35 — LA CONVERSION DEFENSIVE DOIT L'ETRE VRAIMENT
+# ----------------------------------------------------------------
+# REPRODUCTION. Le filtre par expression reguliere laisse passer des
+# valeurs qui franchissent la forme mais qui ne se convertissent PAS :
+#
+#   '25:30'       ~ '^[0-2][0-9]:[0-5][0-9]$'   -> vrai, ::time  ECHOUE
+#   '2026-02-30'  ~ '^\d{4}-\d{2}-\d{2}$'      -> vrai, ::date  ECHOUE
+#   '99999999999' ~ '^[0-9]+$'                  -> vrai, ::integer ECHOUE
+#
+# Le commentaire de la migration promet qu'une donnee inattendue
+# « laisse la colonne vide plutot que de faire echouer la creation ».
+# V-D3-20 ne l'avait pas prouve : '25:99' est REJETE par le filtre, donc
+# n'atteignait jamais la conversion. Ces controles visent la fenetre
+# reellement dangereuse — celle que le filtre accepte.
+#
+# Consequence si elle n'est pas fermee : un dossier portant une telle
+# valeur fait echouer creer_mission_nettoyage_si_prete par une erreur
+# SQL brute, et l'administrateur ne peut plus creer la mission du tout.
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff42','TEST-QA-CLAUDE-PR4-H3',
+             'nett-h3@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','interieur',
+               'lieu','locaux_client',
+               'adresse_rue','5 rue Hors Plage','adresse_cp','69000','adresse_ville','Lyon',
+               'date_souhaitee','2026-12-01','date_fin','2026-12-02',
+               'creneau_debut','25:30','creneau_fin','17:00',
+               'nombre_vehicules_approx', 2,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Hors Plage','telephone','+33600000044')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH3','eeeeeeee-0000-0000-0000-00000000ff42', 310, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-30 : une heure hors plage (25:30) n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff42') ->> 'code';" | tail -1)"
+check "V-D3-31 : elle laisse le debut vide et garde la fin valide" "|17:00:00" \
+  "$(sql "select coalesce(heure_debut_intervention::text,'')||'|'||coalesce(heure_fin_intervention::text,'')
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff42';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff43','TEST-QA-CLAUDE-PR4-H4',
+             'nett-h4@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','exterieur',
+               'lieu','locaux_client',
+               'adresse_rue','7 rue Date Impossible','adresse_cp','31000','adresse_ville','Toulouse',
+               'date_souhaitee','2026-02-30','date_fin','2026-12-05',
+               'creneau_debut','09:00','creneau_fin','12:00',
+               'nombre_vehicules_approx', 1,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Date','telephone','+33600000045')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH4','eeeeeeee-0000-0000-0000-00000000ff43', 320, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-32 : une date impossible (30 fevrier) n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff43') ->> 'code';" | tail -1)"
+check "V-D3-33 : elle laisse la date de debut vide et garde la fin valide" "|2026-12-05" \
+  "$(sql "select coalesce(date_intervention::text,'')||'|'||coalesce(date_fin_intervention::text,'')
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff43';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff44','TEST-QA-CLAUDE-PR4-H5',
+             'nett-h5@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','interieur_exterieur',
+               'lieu','locaux_client',
+               'adresse_rue','11 rue Trop Grand','adresse_cp','44000','adresse_ville','Nantes',
+               'date_souhaitee','2026-12-08','date_fin','2026-12-09',
+               'creneau_debut','07:00','creneau_fin','19:00',
+               'nombre_vehicules_approx', 99999999999,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Grand','telephone','+33600000046')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH5','eeeeeeee-0000-0000-0000-00000000ff44', 330, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-34 : un nombre de vehicules hors bornes n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff44') ->> 'code';" | tail -1)"
+check "V-D3-35 : il laisse simplement la colonne vide" "true" \
+  "$(sql "select (nb_vehicules is null)::text
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff44';")"
+
+# Les trois convertisseurs, pris isolement : ils convertissent ce qui
+# est convertible et rendent NULL — jamais une erreur — pour le reste.
+check "V-D3-36 : hc_vers_heure convertit une heure valide" "08:30:00" \
+  "$(sql "select public.hc_vers_heure('08:30')::text;")"
+check "V-D3-37 : et rend NULL sans erreur sur une heure impossible" "true" \
+  "$(sql "select (public.hc_vers_heure('25:30') is null)::text;")"
+check "V-D3-38 : hc_vers_date convertit une date valide" "2026-12-01" \
+  "$(sql "select public.hc_vers_date('2026-12-01')::text;")"
+check "V-D3-39 : et rend NULL sans erreur sur un 30 fevrier" "true" \
+  "$(sql "select (public.hc_vers_date('2026-02-30') is null)::text;")"
+check "V-D3-40 : hc_vers_entier convertit un entier valide" "3" \
+  "$(sql "select public.hc_vers_entier('3')::text;")"
+check "V-D3-41 : et rend NULL sans erreur au-dela des bornes" "true" \
+  "$(sql "select (public.hc_vers_entier('99999999999') is null)::text;")"
+check "V-D3-42 : les trois sont strictes — NULL entre, NULL sort" "true" \
+  "$(sql "select (public.hc_vers_heure(null) is null
+              and public.hc_vers_date(null) is null
+              and public.hc_vers_entier(null) is null)::text;")"
+check "V-D3-43 : une seule signature pour chaque convertisseur" "3" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('hc_vers_heure','hc_vers_date','hc_vers_entier');")"
+check "V-D3-44 : aucun n'est security definer" "0" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('hc_vers_heure','hc_vers_date','hc_vers_entier') and prosecdef;")"
+
 echo "── V ter. LOT D2 : LE SCENARIO REELLEMENT CHOISI COMMANDE ──"
 # Un stockage ou le client depose ET recupere lui-meme : HelixCar
 # n'intervient sur aucun trajet. Rien de tel ne doit lui etre reclame.

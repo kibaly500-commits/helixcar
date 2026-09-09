@@ -374,6 +374,65 @@ Un ancien dossier sans horaire reste **lisible** et passe par le
 mécanisme des informations manquantes. Une heure illisible n'empêche
 jamais la création : la colonne reste simplement vide.
 
+#### D3 bis — La conversion « défensive » ne l'était pas vraiment
+
+**Trouvé lors de la revue critique finale de la PR, dans mon propre
+code.** La création de mission convertissait les valeurs de
+`nettoyage_details` — un JSONB écrit par le navigateur — en filtrant
+d'abord leur **forme** par une expression régulière. Une forme n'est pas
+une valeur. Mesuré sur PostgreSQL 16 :
+
+| Valeur | Passe le filtre | Conversion |
+|---|---|---|
+| `25:30` | oui (`^[0-2][0-9]:[0-5][0-9]$`) | `::time` → **erreur** |
+| `2026-02-30` | oui (`^\d{4}-\d{2}-\d{2}$`) | `::date` → **erreur** |
+| `99999999999` | oui (`^[0-9]+$`) | `::integer` → **erreur** |
+
+L'erreur remontait jusqu'à l'appelant :
+`creer_mission_nettoyage_si_prete` échouait sur une erreur SQL brute, et
+l'administrateur **ne pouvait plus créer la mission du tout** pour ce
+dossier. Le commentaire de la migration promettait pourtant l'inverse.
+
+Le contrôle `V-D3-20` ne l'avait pas vu : il utilisait `25:99`, que le
+filtre **rejette**, donc la conversion n'était jamais atteinte. La
+fenêtre dangereuse est exactement celle que le filtre **accepte**.
+
+**Reproduction d'abord** — six contrôles écrits contre le code en place,
+tous en échec :
+
+```
+FAIL - V-D3-30 : une heure hors plage (25:30) n'empeche pas la creation
+       [attendu: CREEE | obtenu: PL/pgSQL function
+        creer_mission_nettoyage_si_prete(uuid) line 61 at SQL statement]
+FAIL - V-D3-32 : une date impossible (30 fevrier) n'empeche pas la creation
+FAIL - V-D3-34 : un nombre de vehicules hors bornes n'empeche pas la creation
+```
+
+**Correction** — le filtre par forme est remplacé par une conversion qui
+**tente réellement** et rend `NULL` quand elle échoue
+(`§ 2 bis` de la migration `103`) :
+
+```sql
+create or replace function public.hc_vers_heure(p text)
+returns time language plpgsql immutable strict set search_path = pg_temp
+as $$ begin return p::time; exception when others then return null; end $$;
+```
+
+Trois fonctions du même modèle — `hc_vers_heure`, `hc_vers_date`,
+`hc_vers_entier`. Elles ne lisent aucune donnée, ne décident d'aucune
+autorisation et ne sont donc **pas** `security definer` — c'est
+vérifié (`V-D3-44`).
+
+Les deux conversions de **date** et celle du **nombre de véhicules**
+étaient héritées telles quelles de la migration `102`, déjà appliquée en
+production : le défaut existe donc **aussi aujourd'hui**, et `103` le
+referme sans jamais retoucher le fichier `102`.
+
+Après correction : **15 contrôles ajoutés** (`V-D3-30` → `V-D3-44`),
+`t_rls` passe de 424 à **439 PASS / 0 FAIL**. Aucun contrôle existant
+n'a été modifié, affaibli ni supprimé — `V-D3-20` et `V-D3-21` restent
+mot pour mot ce qu'ils étaient.
+
 ### D4 — Technicien : les informations véhicules retirées
 
 La rubrique n'existait **que** pour cette catégorie
@@ -451,6 +510,9 @@ c'est une donnée, et elle garde son code couleur.
 | `V-D3-2` — rubriques d'horaire | `1` seule |
 | `W-B1-1` — moyen de connaître ses rôles | fonction inexistante |
 | `W-B1-2` — index empêchant deux fiches par identité | `0` |
+| `V-D3-30` — création de mission avec une heure `25:30` | erreur SQL brute, **aucune mission créée** |
+| `V-D3-32` — création de mission avec la date `2026-02-30` | erreur SQL brute |
+| `V-D3-34` — création de mission avec `99999999999` véhicules | erreur SQL brute |
 
 ### Après correction — la campagne complète, depuis zéro
 
@@ -458,11 +520,12 @@ c'est une donnée, et elle garde son code couleur.
 npm test
 ```
 
-**35 suites, 2 056 contrôles, 2 056 PASS, 0 FAIL — en 472 secondes.**
+**35 suites, 2 071 contrôles, 2 071 PASS, 0 FAIL — en 437 secondes
+pour les suites navigateur, plus la suite SQL.**
 
 | Suite | PASS | Ce qu'elle couvre ici |
 |---|---|---|
-| `t_rls` | **424** | migrations réelles sur PostgreSQL 16 jetable — dont V bis (lot D3), V ter (lot D2/D4) et W bis (lot B1) |
+| `t_rls` | **439** | migrations réelles sur PostgreSQL 16 jetable — dont V bis (lot D3, avec les 15 contrôles de la revue finale), V ter (lot D2/D4) et W bis (lot B1) |
 | `t_stabilisation` | **162** | les acquis de la PR nº 3, sections A → O |
 | `t_mdp_ui` | 88 | affichage des mots de passe |
 | `t_lots_de` | **87** | lots D, E, F et G — la suite créée pour ce chantier |
@@ -571,6 +634,15 @@ select count(*) from pg_proc
  where proname in ('informations_demande','creer_mission_nettoyage_si_prete',
                    'roles_utilisateur','ajouter_role_partenaire');
 -- attendu : 4  (une seule signature par nom)
+
+-- après 103 également : les trois convertisseurs défensifs
+select public.hc_vers_heure('25:30')        is null   -- attendu : true
+     , public.hc_vers_date('2026-02-30')    is null   -- attendu : true
+     , public.hc_vers_entier('99999999999') is null   -- attendu : true
+     , public.hc_vers_heure('08:30')                  -- attendu : 08:30:00
+     , public.hc_vers_date('2026-12-01')              -- attendu : 2026-12-01
+     , public.hc_vers_entier('3');                    -- attendu : 3
+-- AUCUNE erreur ne doit remonter : c'est tout l'objet du contrôle.
 ```
 
 ### 2. Configurer les modèles d'e-mail et les URL de redirection

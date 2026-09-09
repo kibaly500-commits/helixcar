@@ -4,9 +4,10 @@
 -- Dépend de : 96_missions_nettoyage.sql, 101_informations_types_coherents.sql,
 --             102_nettoyage_periode_et_mission.sql
 -- Idempotente : peut être rejouée sans effet de bord.
--- Purement ADDITIVE : une colonne nullable, et deux fonctions
--- remplacées par « create or replace ». Aucune donnée modifiée, aucune
--- RLS désactivée, aucun bucket ouvert.
+-- Purement ADDITIVE : deux colonnes nullables, trois convertisseurs
+-- sans effet de bord, et deux fonctions remplacées par « create or
+-- replace ». Aucune donnée modifiée, aucune RLS désactivée, aucun
+-- bucket ouvert.
 --
 -- LES MIGRATIONS 92 À 102 NE SONT PAS RETOUCHÉES. Elles sont déjà
 -- appliquées en production : toute évolution passe par ce fichier.
@@ -410,6 +411,76 @@ comment on function public.informations_demande(uuid) is
 --   * une seule mission par demande, garantie par l'index unique de
 --     102, et rejeu idempotent (`DEJA_CREEE`) ;
 --   * la référence tirée d'une SÉQUENCE, jamais d'un `max()` relu.
+-- ------------------------------------------------------------
+-- 2 bis. CONVERTIR SANS JAMAIS FAIRE ÉCHOUER
+-- ------------------------------------------------------------
+-- La création de mission lisait `nettoyage_details`, un JSONB écrit par
+-- le navigateur, et convertissait ses valeurs en filtrant d'abord leur
+-- FORME par une expression régulière. Une forme n'est pas une valeur :
+--
+--   '25:30'       passe '^[0-2][0-9]:[0-5][0-9]$'  et ::time  ÉCHOUE
+--   '2026-02-30'  passe '^\d{4}-\d{2}-\d{2}$'     et ::date  ÉCHOUE
+--   '99999999999' passe '^[0-9]+$'                 et ::integer ÉCHOUE
+--
+-- Dans ces trois cas, l'erreur remontait jusqu'à l'appelant : la
+-- mission n'était pas créée, et l'administrateur restait bloqué sur un
+-- dossier qu'il ne pouvait plus débloquer. Le filtre par forme est donc
+-- remplacé par une conversion qui tente vraiment, et qui rend NULL
+-- quand elle échoue — ce que le commentaire d'origine promettait déjà.
+--
+-- Ces trois fonctions ne lisent aucune donnée, ne prennent aucune
+-- décision d'autorisation et n'ont donc pas besoin d'être `security
+-- definer`. Elles sont `strict` : une entrée NULL ressort NULL sans
+-- rien exécuter.
+create or replace function public.hc_vers_heure(p text)
+returns time
+language plpgsql
+immutable
+strict
+set search_path = pg_temp
+as $$
+begin
+  return p::time;
+exception when others then
+  return null;
+end $$;
+
+create or replace function public.hc_vers_date(p text)
+returns date
+language plpgsql
+immutable
+strict
+set search_path = pg_temp
+as $$
+begin
+  return p::date;
+exception when others then
+  return null;
+end $$;
+
+create or replace function public.hc_vers_entier(p text)
+returns integer
+language plpgsql
+immutable
+strict
+set search_path = pg_temp
+as $$
+begin
+  return p::integer;
+exception when others then
+  return null;
+end $$;
+
+comment on function public.hc_vers_heure(text) is
+  'Heure convertie depuis un texte, ou NULL si la conversion échoue. '
+  'Ne lève jamais d''erreur : une donnée inattendue laisse la colonne vide.';
+comment on function public.hc_vers_date(text) is
+  'Date convertie depuis un texte, ou NULL si la conversion échoue. '
+  'Ne lève jamais d''erreur : une donnée inattendue laisse la colonne vide.';
+comment on function public.hc_vers_entier(text) is
+  'Entier converti depuis un texte, ou NULL si la conversion échoue. '
+  'Ne lève jamais d''erreur : une donnée inattendue laisse la colonne vide.';
+
 create or replace function public.creer_mission_nettoyage_si_prete(
   p_client_id uuid
 ) returns jsonb
@@ -498,33 +569,29 @@ begin
       when 'conseil'               then 'Client à conseiller'
       else nullif(btrim(coalesce(nd ->> 'type_nettoyage', '')), '')
     end,
-    -- Conversions DÉFENSIVES. Une demande ancienne, ou une donnée
-    -- inattendue, ne doit pas faire échouer la création : ce qui n'est
-    -- pas convertible est simplement laissé vide.
-    case when coalesce(nd ->> 'nombre_vehicules_approx', '') ~ '^[0-9]+$'
-         then (nd ->> 'nombre_vehicules_approx')::integer end,
+    -- Conversions DÉFENSIVES (§ 2 bis). Une demande ancienne, ou une
+    -- donnée inattendue, ne doit pas faire échouer la création : ce qui
+    -- n'est pas convertible est simplement laissé vide. La tentative de
+    -- conversion est RÉELLE, jamais un simple contrôle de forme.
+    public.hc_vers_entier(nullif(btrim(coalesce(nd ->> 'nombre_vehicules_approx', '')), '')),
     coalesce(nullif(btrim(coalesce(nd ->> 'adresse_rue', '')), ''),
              case when nd ->> 'lieu' = 'helixcar' then 'Locaux HelixCar' end),
     nullif(btrim(coalesce(nd ->> 'adresse_cp', '')), ''),
     nullif(btrim(coalesce(nd ->> 'adresse_ville', '')), ''),
     nullif(btrim(coalesce(v_contact ->> 'nom', '')), ''),
     nullif(btrim(coalesce(v_contact ->> 'telephone', '')), ''),
-    case when coalesce(nd ->> 'date_souhaitee', '') ~ '^\d{4}-\d{2}-\d{2}$'
-         then (nd ->> 'date_souhaitee')::date end,
-    case when coalesce(nd ->> 'date_fin', '') ~ '^\d{4}-\d{2}-\d{2}$'
-         then (nd ->> 'date_fin')::date end,
+    public.hc_vers_date(nullif(btrim(coalesce(nd ->> 'date_souhaitee', '')), '')),
+    public.hc_vers_date(nullif(btrim(coalesce(nd ->> 'date_fin', '')), '')),
     nullif(btrim(
       coalesce(nd ->> 'creneau_debut', '')
       || case when coalesce(nd ->> 'creneau_fin', '') <> '' then ' – ' || (nd ->> 'creneau_fin') else '' end
     ), ''),
-    -- LOT D3 — les deux bornes, chacune dans sa colonne. Conversions
-    -- DÉFENSIVES, comme pour les dates : une donnée ancienne ou
-    -- inattendue laisse la colonne vide plutôt que de faire échouer la
-    -- création de la mission.
-    case when coalesce(nd ->> 'creneau_debut', '') ~ '^[0-2][0-9]:[0-5][0-9]$'
-         then (nd ->> 'creneau_debut')::time end,
-    case when coalesce(nd ->> 'creneau_fin', '') ~ '^[0-2][0-9]:[0-5][0-9]$'
-         then (nd ->> 'creneau_fin')::time end
+    -- LOT D3 — les deux bornes, chacune dans sa colonne. Même
+    -- conversion réellement défensive que pour les dates : une donnée
+    -- ancienne ou inattendue laisse la colonne vide plutôt que de faire
+    -- échouer la création de la mission.
+    public.hc_vers_heure(nullif(btrim(coalesce(nd ->> 'creneau_debut', '')), '')),
+    public.hc_vers_heure(nullif(btrim(coalesce(nd ->> 'creneau_fin', '')), ''))
   )
   returning * into m;
 
@@ -574,13 +641,22 @@ comment on function public.creer_mission_nettoyage_si_prete(uuid) is
 --   -- attendu : 2  (une seule signature par nom, aucune ambiguïté
 --   --               PostgREST)
 --
+--   select public.hc_vers_heure('25:30')  is null   -- attendu : true
+--        , public.hc_vers_date('2026-02-30') is null -- attendu : true
+--        , public.hc_vers_entier('99999999999') is null -- attendu : true
+--        , public.hc_vers_heure('08:30')     -- attendu : 08:30:00
+--        , public.hc_vers_date('2026-12-01') -- attendu : 2026-12-01
+--        , public.hc_vers_entier('3');       -- attendu : 3
+--   -- AUCUNE erreur ne doit remonter : c'est tout l'objet du § 2 bis.
+--
 -- ------------------------------------------------------------
 -- RETOUR ARRIÈRE
 -- ------------------------------------------------------------
 -- Du moins destructeur au plus destructeur :
 --
---   1. Ne rien faire. Ce fichier n'ajoute que deux colonnes nullables
---      et affine deux fonctions. Aucune donnée n'est modifiée.
+--   1. Ne rien faire. Ce fichier n'ajoute que deux colonnes nullables,
+--      trois convertisseurs sans effet de bord, et affine deux
+--      fonctions. Aucune donnée n'est modifiée.
 --
 --   2. Revenir aux fonctions de 101 et 102 : réappliquer
 --      migrations/101_informations_types_coherents.sql puis
