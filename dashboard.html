@@ -442,6 +442,32 @@ body.scroll-verrouille { overflow: hidden; }
 .alert-success { background: rgba(31,122,77,0.08); color: #1F7A4D; border: 1px solid rgba(31,122,77,0.2); }
 .alert-warning { background: rgba(201,123,46,0.08); color: #A65E22; border: 1px solid rgba(201,123,46,0.2); }
 
+/* ══════════════════════════════════════════════════════════════
+   LOT E1 — LE MESSAGE HELIXCAR DES ECRANS D'AUTHENTIFICATION
+   ══════════════════════════════════════════════════════════════
+   Strictement le meme composant que celui d'index.html : fond blanc,
+   texte discret, petit repere vertical rouge pour une erreur. Il
+   remplace les grands encadres rouges et verts de la connexion et de
+   la reinitialisation du mot de passe. */
+.hc-note {
+  display: none;
+  position: relative;
+  margin: 10px 0;
+  padding: 2px 0 2px 12px;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid #DC2626;
+  border-radius: 0;
+  color: #4A5056;
+  font-size: .82rem;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.hc-note.visible { display: block; }
+.hc-note--succes { border-left-color: #2F7D5B; }
+.hc-note--info   { border-left-color: rgba(16,24,32,.22); }
+
 /* ── FRAIS UPLOAD ── */
 .upload-zone {
   border: 2px dashed #ddd; border-radius: 10px; padding: 20px;
@@ -906,9 +932,7 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
     </div>
 
-    <div id="login-alert" style="display:none" class="alert alert-warning">
-      ⚠️ Identifiants incorrects. Réessayez.
-    </div>
+    <div id="login-alert" class="hc-note" role="alert">Identifiants incorrects. Réessayez.</div>
 
     <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="doLogin()">
       Se connecter →
@@ -2362,7 +2386,7 @@ body.scroll-verrouille { overflow: hidden; }
       Choisissez un nouveau mot de passe pour votre compte HelixCar.
     </p>
 
-    <div id="reinit-alert" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;color:#991B1B"></div>
+    <div id="reinit-alert" class="hc-note" role="alert"></div>
 
     <div id="reinit-formulaire">
       <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Nouveau mot de passe</label>
@@ -2388,9 +2412,7 @@ body.scroll-verrouille { overflow: hidden; }
     </div>
 
     <div id="reinit-succes" style="display:none">
-      <div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:4px;padding:12px 14px;font-size:.85rem;color:#065F46;margin-bottom:14px">
-        Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.
-      </div>
+      <div class="hc-note hc-note--succes visible" role="status">Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.</div>
       <button class="btn btn-primary btn-full" onclick="terminerReinitialisation()">Aller à la connexion</button>
     </div>
   </div>
@@ -2532,7 +2554,7 @@ async function doLogin() {
     if (!emailEl || !pwEl) { alert('Erreur : champs introuvables'); return; }
     const email = emailEl.value.trim().toLowerCase();
     const pw    = pwEl.value;
-    if (alertEl) alertEl.style.display = 'none';
+    if (alertEl) _hcNoteEl(alertEl, '');
 
     if (loginRole === 'convoyeur') {
       await doLoginConvoyeur(email, pw, alertEl);
@@ -2569,17 +2591,17 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
   const conv = (rows || [])[0];
 
   if (!conv) {
-    if (alertEl) { alertEl.textContent = '⚠️ Aucun dossier convoyeur trouvé pour cet email.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Aucun dossier convoyeur trouvé pour cet email.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
   if (conv.bloque) {
-    if (alertEl) { alertEl.textContent = '⚠️ Ton accès a été bloqué. Contacte HelixCar.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ton accès a été bloqué. Contacte HelixCar.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
   if (conv.statut !== 'actif') {
-    if (alertEl) { alertEl.textContent = '⚠️ Ton dossier n\'est pas encore validé.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ton dossier n\'est pas encore validé.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
@@ -2652,12 +2674,12 @@ async function doLoginConvoyeur(email, pw, alertEl) {
   try {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
-      if (alertEl) { alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); alertEl.style.display = 'flex'; }
+      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
     await finaliserSessionConvoyeur(email, alertEl, data.user ? data.user.id : null);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2679,12 +2701,12 @@ async function doLoginAdmin(email, pw, alertEl) {
   try {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
-      if (alertEl) { alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); alertEl.style.display = 'flex'; }
+      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
     await finaliserSessionAdmin(email, alertEl, data.user ? data.user.id : null);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2698,15 +2720,14 @@ async function doLoginClient(email, pw, alertEl) {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
       if (alertEl) {
-        alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials'
-          ? 'Email ou mot de passe incorrect.' : error.message);
-        alertEl.style.display = 'flex';
+        _hcNoteEl(alertEl, '' + (error.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.' : error.message));
       }
       return;
     }
     await finaliserSessionClient(email, alertEl, data.user ? data.user.id : null);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2754,7 +2775,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
   // même distinction que pour l'administrateur.
   if (erreurTechnique) {
     console.error('Erreur technique lors de l\'ouverture de l\'espace client :', erreurTechnique);
-    if (alertEl) { alertEl.textContent = '⚠️ Impossible d\'ouvrir votre espace client.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Impossible d\'ouvrir votre espace client.');
     return false;
   }
 
@@ -3128,12 +3149,12 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
   // est admin ou non, une déconnexion serait une décision arbitraire.
   if (erreurTechnique) {
     console.error('Erreur technique lors de la vérification admin:', erreurTechnique);
-    if (alertEl) { alertEl.textContent = '⚠️ Impossible de vérifier les droits administrateur.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Impossible de vérifier les droits administrateur.');
     return false;
   }
 
   if (!admin) {
-    if (alertEl) { alertEl.textContent = '⚠️ Ce compte n\'a pas les droits administrateur.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ce compte n\'a pas les droits administrateur.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
@@ -3465,15 +3486,22 @@ async function envoyerLienReinitialisation(email) {
 // Entrée depuis l'écran de connexion du Dashboard.
 async function ouvrirMotDePasseOublie(e) {
   if (e) e.preventDefault();
+  // LOT E1 — ni prompt(), ni alert() : le champ e-mail de l'ecran de
+  // connexion est deja la, et le message s'affiche dans le composant
+  // discret partage, juste sous le formulaire.
   const champ = document.getElementById('login-email');
-  let adresse = champ ? champ.value.trim() : '';
+  const adresse = champ ? champ.value.trim() : '';
   if (!adresse) {
-    adresse = (prompt('Votre adresse e-mail, pour recevoir un lien de réinitialisation :') || '').trim();
-    if (!adresse) return;
+    _hcNote('login-alert',
+      'Renseignez votre adresse e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié ? ».',
+      'info');
+    if (champ) champ.focus();
+    return;
   }
+  _hcNote('login-alert', 'Envoi en cours…', 'info');
   const r = await envoyerLienReinitialisation(adresse);
   if (r.enCours) return;
-  alert(r.message);
+  _hcNote('login-alert', r.message, r.ok ? 'info' : 'erreur');
 }
 
 // ------------------------------------------------------------
@@ -3481,12 +3509,22 @@ async function ouvrirMotDePasseOublie(e) {
 // ------------------------------------------------------------
 let _enregistrementMdpEnCours = false;
 
-function _reinitAfficherErreur(texte) {
-  const el = document.getElementById('reinit-alert');
-  if (!el) return;
-  if (!texte) { el.style.display = 'none'; return; }
-  el.style.display = 'block';
+// LOT E1 — point de passage unique des messages d'authentification.
+// ton : 'erreur' (defaut), 'succes' ou 'info'.
+function _hcNoteEl(el, texte, ton) {
+  if (!el) return null;
+  el.className = 'hc-note'
+    + (ton === 'succes' ? ' hc-note--succes' : (ton === 'info' ? ' hc-note--info' : ''));
+  if (!texte) { el.classList.remove('visible'); el.textContent = ''; el.style.display = ''; return el; }
   el.textContent = texte;
+  el.classList.add('visible');
+  el.style.display = '';
+  return el;
+}
+function _hcNote(id, texte, ton) { return _hcNoteEl(document.getElementById(id), texte, ton); }
+
+function _reinitAfficherErreur(texte) {
+  _hcNote('reinit-alert', texte, 'erreur');
 }
 
 function ouvrirFormulaireNouveauMotDePasse() {

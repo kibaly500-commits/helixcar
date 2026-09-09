@@ -71,7 +71,27 @@ const FENETRE_ENVOI_MINUTES = 120;
 // et ne peut pas être transformée en droit d'écriture général.
 const VALIDITE_URL_ENVOI_SECONDES = 30 * 60;
 
-const ORIGINES_AUTORISEES = ["https://helixcar-i89b.vercel.app"];
+// Origines autorisées — LISTE EXPLICITE, jamais un joker.
+//
+// DÉFAUT CORRIGÉ (lot A1). Seul le domaine d'aperçu figurait ici. Le
+// site RÉELLEMENT utilisé par les candidats, https://helixcar.vercel.app,
+// n'y était pas : enTetesCors() n'accordait donc aucun
+// Access-Control-Allow-Origin, le preflight OPTIONS était refusé (403),
+// et le navigateur bloquait le POST avant même de l'émettre. Côté
+// candidat : « L'envoi de votre vidéo a échoué ». Côté console :
+//   « Response to preflight request doesn't pass access control check:
+//     No 'Access-Control-Allow-Origin' header is present. » puis
+//   net::ERR_FAILED.
+//
+// Rien d'autre n'est élargi : la comparaison reste une égalité stricte
+// de chaîne, donc le schéma, le port et le sous-domaine comptent. Ni
+// « * », ni renvoi en miroir de l'origine demandée, ni correspondance
+// par préfixe ou par suffixe — un https://helixcar.vercel.app.pirate.tld
+// reste refusé.
+const ORIGINES_AUTORISEES = [
+  "https://helixcar.vercel.app",       // site de production
+  "https://helixcar-i89b.vercel.app",  // déploiement d'aperçu
+];
 if (typeof Deno !== "undefined" && Deno.env?.get("ALLOW_LOCALHOST_CORS") === "true") {
   ORIGINES_AUTORISEES.push("http://localhost:3000", "http://127.0.0.1:3000");
 }

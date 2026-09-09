@@ -204,7 +204,20 @@ window.fetch = function (url, options) {
     societe: (document.getElementById('client-societe') || {}).value,
     emailVerrouille: (document.getElementById('client-email') || {}).readOnly,
     mdpRequis: (document.getElementById('client-password') || {}).required,
-    bandeau: (document.getElementById('hc-bandeau-connecte') || {}).style.display
+    // LOT E1 — la visibilite ne passe plus par un style en ligne mais
+    // par le composant partage. On verifie donc la GARANTIE (le bandeau
+    // est reellement visible et porte un texte), pas le mecanisme.
+    bandeau: (function () {
+      var b = document.getElementById('hc-bandeau-connecte');
+      if (!b) return null;
+      var st = getComputedStyle(b);
+      return {
+        visible: b.classList.contains('visible') && st.display !== 'none',
+        texte: (b.textContent || '').trim(),
+        fond: st.backgroundColor,
+        bordureGauche: st.borderLeftWidth
+      };
+    })()
   }));
   check('B1 : le parcours s\'ouvre directement', modeConnecte.modaleOuverte);
   check('B2 : il démarre sur « Comment pouvons-nous vous accompagner ? »',
@@ -215,7 +228,17 @@ window.fetch = function (url, options) {
   check('B4 : l\'e-mail déjà vérifié n\'est pas redemandé',
     modeConnecte.email === 'clientA@helixcar.test' && modeConnecte.emailVerrouille === true);
   check('B5 : la création de compte n\'est pas redemandée', modeConnecte.mdpRequis === false);
-  check('B6 : le client sait qu\'il est reconnu', modeConnecte.bandeau === 'block');
+  check('B6 : le client sait qu\'il est reconnu',
+    !!modeConnecte.bandeau && modeConnecte.bandeau.visible === true
+    && /Vous êtes connecté/.test(modeConnecte.bandeau.texte),
+    JSON.stringify(modeConnecte.bandeau));
+  // LOT E1 — et ce n'est plus un grand encadre vert : fond transparent,
+  // seul un filet vertical le signale.
+  check('B6 bis : le bandeau n\'est plus un grand encadré vert',
+    !!modeConnecte.bandeau
+    && /rgba\(0, 0, 0, 0\)|transparent/.test(modeConnecte.bandeau.fond)
+    && parseFloat(modeConnecte.bandeau.bordureGauche) >= 2,
+    JSON.stringify(modeConnecte.bandeau));
   check('B6b : le statut professionnel du profil est repris',
     modeConnecte.typeClient === 'pro' && modeConnecte.societe === 'TEST-QA Flotte SAS',
     JSON.stringify(modeConnecte));

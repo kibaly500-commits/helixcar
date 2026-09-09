@@ -2076,6 +2076,31 @@
   /* Période 1 — Prise en charge → Livraison (rouge HelixCar) */
   .hc-cal-jour--p1-borne { background: var(--accent); color: #fff !important; }
   .hc-cal-jour--p1-inter { background: #FBDEDF; color: var(--ink); }
+  /* LOT E4 — le calendrier du NETTOYAGE garde son langage visuel :
+     un rond rouge plein sur chacune des deux bornes, et un rond
+     beaucoup plus clair et discret sur chaque jour intermediaire.
+     Marqueur pose uniquement sur la grille du nettoyage : le rendu
+     carre du Convoyage et du Stockage reste strictement inchange. */
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-borne {
+    border-radius: 50%;
+  }
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-inter {
+    background: transparent;
+    color: var(--ink);
+    position: relative;
+  }
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-inter::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: .32;
+  }
   /* Période 2 — Livraison → Restitution (teinte chaude complémentaire) */
   .hc-cal-jour--p2-borne { background: #6B1E3C; color: #fff !important; }
   .hc-cal-jour--p2-inter { background: #E9D3DC; color: var(--ink); }
@@ -2751,6 +2776,39 @@
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     LOT E1 — LE MESSAGE HELIXCAR, PARTAGE PAR TOUS LES FORMULAIRES
+     ══════════════════════════════════════════════════════════════
+     Plus aucun grand rectangle rouge ou vert. Le fond reste BLANC,
+     le texte est discret et integre a l'interface, et une erreur se
+     signale par le meme petit repere vertical rouge que
+     « Ce champ est obligatoire » — exactement le rendu demande.
+
+     Trois tons, un seul composant : erreur, succes, information. Seule
+     la couleur du filet de gauche change ; jamais le fond. */
+  .hc-note {
+    display: none;
+    position: relative;
+    margin: 10px 0;
+    padding: 2px 0 2px 12px;
+    background: transparent;
+    border: 0;
+    border-left: 3px solid #DC2626;
+    border-radius: 0;
+    color: #4A5056;
+    font-family: var(--font-body, inherit);
+    font-size: .82rem;
+    line-height: 1.45;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .hc-note.visible { display: block; }
+  .hc-note--succes { border-left-color: #2F7D5B; }
+  .hc-note--info   { border-left-color: rgba(16,24,32,.22); }
+  /* Meme composant, posé sur la section sombre « Être recontacté » :
+     seul le contraste du texte change, jamais la forme. */
+  .hc-note--sombre { color: rgba(255,255,255,.86); }
 
   #modal-client .modal-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px;
@@ -4735,14 +4793,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   #modal-client .nett-rep-btn { width: 28px; height: 28px; min-width: 28px; }
 }
 
-/* 9 — Jour sélectionné du calendrier Nettoyage : cercle rouge plein,
-   chiffre blanc. Classe posée uniquement en contexte nettoyage. */
-.hc-cal-jour--sel-nett {
-  background: var(--accent) !important;
-  color: #fff !important;
-  border-radius: 50%;
-}
-
 /* Description courte sous un libellé d'option de service. */
 #modal-client .hc-opt-desc {
   display: block;
@@ -6114,6 +6164,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
+      <div id="rc-message-zone" class="hc-note hc-note--sombre" role="alert"></div>
+
       <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitRecontact()" id="rc-btn">Demander à être recontacté →</button>
 
     </div>
@@ -6297,8 +6349,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
-      <div id="hc-bandeau-connecte"
-           style="display:none;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#065F46"></div>
+      <div id="hc-bandeau-connecte" class="hc-note hc-note--succes" role="status"></div>
 
       <div class="modal-form-group">
 
@@ -7250,7 +7301,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <input type="text" id="parr-code-input" placeholder="Ex : HC0042" style="text-transform:uppercase;letter-spacing:.06em" oninput="this.value=this.value.toUpperCase()">
         <div id="parr-code-msg" style="font-size:.73rem;margin-top:4px;display:none"></div>
       </div>
-      <div id="supabase-debug" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:12px;font-size:.8rem;color:#991B1B;word-break:break-all"></div>
+      <div id="supabase-debug" class="hc-note" role="alert"></div>
       <button class="btn btn-primary" id="client-submit-btn" style="width:100%;justify-content:center;margin-top:12px;padding:16px 24px;font-size:.92rem" onclick="submitClientForm()">Créer mon compte →</button>
 
       </div>
@@ -7480,7 +7531,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div id="conv-recap"></div>
 
-        <div id="conv-erreur-envoi" style="display:none;white-space:pre-line;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-top:16px;font-size:.8rem;color:#991B1B"></div>
+        <div id="conv-erreur-envoi" class="hc-note" role="alert"></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:16px 24px;font-size:.92rem" onclick="submitConvoyeurForm()">Envoyer ma candidature →</button>
 
       </div>
@@ -7532,8 +7583,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <h2>Compléter mes informations</h2>
     <p id="completer-sous-titre">Ces éléments nous manquent pour organiser votre prestation.</p>
 
-    <div id="completer-message"
-         style="display:none;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem"></div>
+    <div id="completer-message" class="hc-note" role="status"></div>
 
     <div id="completer-progression"
          style="display:none;font-size:.8rem;color:#4B5563;margin-bottom:14px"></div>
@@ -7577,7 +7627,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
       </div>
 
-      <div id="connexion-message" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#991B1B"></div>
+      <div id="connexion-message" class="hc-note" role="status"></div>
 
       <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;font-size:.92rem" onclick="submitConnexionForm()">Se connecter →</button>
 
@@ -8806,13 +8856,9 @@ function _hcAppliquerModeConnecte() {
     courriel.setAttribute('aria-readonly', 'true');
     courriel.style.background = '#F3F4F6';
   }
-  var banniere = document.getElementById('hc-bandeau-connecte');
-  if (banniere) {
-    banniere.style.display = 'block';
-    banniere.textContent = 'Vous êtes connecté'
-      + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
-      + '. Vos informations de compte sont déjà renseignées.';
-  }
+  _hcNote('hc-bandeau-connecte', 'Vous êtes connecté'
+    + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
+    + '. Vos informations de compte sont déjà renseignées.', 'succes');
 }
 
 // Entrée « Faire une nouvelle demande » depuis l'espace client :
@@ -8862,15 +8908,9 @@ var _completerRubriques = [];
 var _completerEnvoiEnCours = false;
 
 function _completerAfficherMessage(texte, type) {
-  var el = document.getElementById('completer-message');
-  if (!el) return;
-  if (!texte) { el.style.display = 'none'; return; }
-  var vert = (type === 'ok');
-  el.style.display = 'block';
-  el.style.background = vert ? '#ECFDF5' : '#FEF2F2';
-  el.style.border = '1.5px solid ' + (vert ? '#6EE7B7' : '#FCA5A5');
-  el.style.color = vert ? '#065F46' : '#991B1B';
-  el.textContent = texte;
+  // LOT E1 — plus de fond vert ni de fond rouge : le meme composant
+  // discret que partout ailleurs, seul le filet de gauche change.
+  _hcNote('completer-message', texte, (type === 'ok') ? 'succes' : 'erreur');
 }
 
 function _completerChampId(cle) { return 'completer-champ-' + cle; }
@@ -14171,7 +14211,7 @@ async function convOuvrirEnregistreur() {
       natif.click();
       return;
     }
-    alert("Votre navigateur ne permet pas d'enregistrer une vidéo dans la page.\n\n"
+    _convEnrMessage("Votre navigateur ne permet pas d'enregistrer une vidéo dans la page. "
         + "Utilisez « Choisir une vidéo existante ».");
     convOuvrirSelecteurVideo('fichier');
     return;
@@ -15614,7 +15654,7 @@ async function _submitClientFormInterne() {
   email_val  = email_val.trim();
 
   if (!prenom_val || !email_val) {
-    alert('Veuillez remplir au moins votre prenom et email.');
+    _hcAfficherBandeauErreur('Renseignez au moins votre prénom et votre adresse e-mail.');
     return;
   }
 
@@ -16401,22 +16441,42 @@ function setLang(lang) {
 
 
 
+// ══════════════════════════════════════════════════════════════
+// LOT E1 — LE SEUL POINT DE PASSAGE DES MESSAGES D'INTERFACE
+// ══════════════════════════════════════════════════════════════
+// Un unique composant, partage par TOUS les formulaires et tous les
+// ecrans d'authentification. Fond blanc, texte discret, et pour une
+// erreur le meme petit repere vertical rouge que « Ce champ est
+// obligatoire ». Plus aucun grand rectangle rouge ou vert, plus aucune
+// alerte native, plus aucun message technique brut.
+//
+// ton : 'erreur' (defaut), 'succes' ou 'info'.
+function _hcNote(id, texte, ton) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  el.className = 'hc-note'
+    + (ton === 'succes' ? ' hc-note--succes' : (ton === 'info' ? ' hc-note--info' : ''));
+  if (!texte) { el.classList.remove('visible'); el.textContent = ''; el.style.display = ''; return el; }
+  // textContent, jamais innerHTML : aucun contenu recu ne peut devenir
+  // du balisage.
+  el.textContent = texte;
+  el.classList.add('visible');
+  // Une regle en ligne heritee ne doit pas continuer a masquer la zone.
+  el.style.display = '';
+  return el;
+}
+function _hcNoteEffacer(id) { return _hcNote(id, '', null); }
+
 // Le bandeau d'erreur de la fenetre client. Il ne doit JAMAIS survivre
 // a la tentative qui l'a produit : ni d'une fenetre a l'autre, ni d'un
 // essai au suivant, ni apres un rechargement.
 function _hcEffacerBandeauErreur() {
-  var dbg = document.getElementById('supabase-debug');
-  if (!dbg) return;
-  dbg.style.display = 'none';
-  dbg.textContent = '';
+  _hcNoteEffacer('supabase-debug');
 }
 
 // Message lisible par le client. Le detail technique n'y figure jamais.
 function _hcAfficherBandeauErreur(texte) {
-  var dbg = document.getElementById('supabase-debug');
-  if (!dbg) return;
-  dbg.style.display = 'block';
-  dbg.textContent = texte;
+  _hcNote('supabase-debug', texte, 'erreur');
 }
 
 function openModal(type) {
@@ -16531,10 +16591,7 @@ var HC_REINIT_MESSAGE_NEUTRE =
 
 async function demanderReinitialisationMotDePasse() {
   if (event) event.preventDefault();
-  var msg = document.getElementById('connexion-message');
-  var afficher = function (texte) {
-    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
-  };
+  var afficher = function (texte, ton) { _hcNote('connexion-message', texte, ton || 'erreur'); };
 
   // Double clic : le second appel ne renvoie pas un deuxième e-mail.
   if (_reinitEnvoiEnCours) return;
@@ -16558,7 +16615,7 @@ async function demanderReinitialisationMotDePasse() {
   }
 
   _reinitEnvoiEnCours = true;
-  afficher('Envoi en cours…');
+  afficher('Envoi en cours…', 'info');
   try {
     var res = await _sb.auth.resetPasswordForEmail(email, {
       redirectTo: _hcUrlRetourReinitialisation()
@@ -16575,7 +16632,7 @@ async function demanderReinitialisationMotDePasse() {
     // Toute autre erreur reste silencieuse : la distinguer d'un succès
     // révélerait l'existence du compte.
     if (erreur) console.error('resetPasswordForEmail:', erreur);
-    afficher(HC_REINIT_MESSAGE_NEUTRE);
+    afficher(HC_REINIT_MESSAGE_NEUTRE, 'info');
   } catch (e) {
     afficher('L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.');
   } finally {
@@ -16585,10 +16642,7 @@ async function demanderReinitialisationMotDePasse() {
 
 async function submitConnexionForm() {
   event && event.preventDefault();
-  var msg = document.getElementById('connexion-message');
-  var afficher = function (texte) {
-    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
-  };
+  var afficher = function (texte, ton) { _hcNote('connexion-message', texte, ton || 'erreur'); };
   var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
   var mdp   = ((document.getElementById('connexion-password') || {}).value || '');
   if (!email || !mdp) {
@@ -16599,7 +16653,7 @@ async function submitConnexionForm() {
     afficher('La connexion est momentanément indisponible. Réessayez dans quelques instants.');
     return;
   }
-  afficher('Connexion en cours…');
+  afficher('Connexion en cours…', 'info');
   var res = null;
   try {
     res = await _sb.auth.signInWithPassword({ email: email, password: mdp });
@@ -17876,18 +17930,14 @@ async function uploadFichier(inputId, prefixe) {
 // jamais dans celle du client : une erreur ne doit pas suivre
 // l'utilisateur d'un formulaire a l'autre.
 function _convAfficherEchecCandidature(texte) {
-  var zone = document.getElementById('conv-erreur-envoi');
-  if (zone) {
-    zone.textContent = texte;
-    zone.style.display = 'block';
-    try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
-    return;
-  }
-  alert(texte);
+  // Plus aucun repli sur alert() : une alerte native n'est ni au design
+  // HelixCar, ni lisible par un lecteur d'ecran dans le flux du
+  // formulaire, ni effacable quand l'utilisateur corrige.
+  var zone = _hcNote('conv-erreur-envoi', texte, 'erreur');
+  if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
 }
 function _convEffacerEchecCandidature() {
-  var zone = document.getElementById('conv-erreur-envoi');
-  if (zone) { zone.style.display = 'none'; zone.textContent = ''; }
+  _hcNoteEffacer('conv-erreur-envoi');
 }
 
 // SUPPRESSION D'UN FICHIER DEVENU ORPHELIN.
@@ -17937,7 +17987,7 @@ async function submitConvoyeurForm() {
   prenom = prenom.trim(); nom = nom.trim(); email = email.trim(); tel = tel.trim();
 
   if (!email || !tel) {
-    alert('Veuillez renseigner au moins votre email et votre téléphone.');
+    _convAfficherEchecCandidature('Renseignez au moins votre adresse e-mail et votre téléphone.');
     return;
   }
 
@@ -18015,10 +18065,10 @@ async function submitConvoyeurForm() {
   if (!rc_pro_url) echecs.push('la RC professionnelle');
   if (echecs.length) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    alert(
-      "L'envoi de " + echecs.join(', ') + " a échoué.\n\n" +
-      "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion " +
-      "et le format des fichiers (PDF, JPG ou PNG), puis réessayez."
+    _convAfficherEchecCandidature(
+      "L'envoi de " + echecs.join(', ') + " a échoué.\n"
+      + "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion "
+      + "et le format des fichiers (PDF, JPG ou PNG), puis réessayez."
     );
     return;
   }
@@ -18061,7 +18111,7 @@ async function submitConvoyeurForm() {
     catch (e) { empreinteJeton = null; }
     if (!empreinteJeton) {
       if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-      alert("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n\n"
+      _convAfficherEchecCandidature("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n"
         + "Votre candidature n'a pas été enregistrée. Essayez depuis un navigateur à jour.");
       return;
     }
@@ -18121,9 +18171,10 @@ async function submitConvoyeurForm() {
       _renderFormStep('convoyeur');
       var zoneErr = document.getElementById('conv-zone-video');
       if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
-      alert(
-        "L'envoi de votre vidéo a échoué.\n\n" +
-        "Votre candidature n'est pas finalisée. Vérifiez votre connexion, puis réessayez."
+      _convAfficherEchecCandidature(
+        "L'envoi de votre vidéo a échoué.\n"
+        + "Votre candidature n'est pas finalisée : rien n'a été perdu, et la vidéo "
+        + "peut être renvoyée. Vérifiez votre connexion, puis réessayez."
       );
       return;
     }
@@ -18171,7 +18222,7 @@ function submitParrainage() {
   var numClient = document.getElementById('parr-num-client').value.trim().toUpperCase();
 
   if (!prenom || !email || !fPrenom || !fEmail) {
-    alert('Veuillez remplir tous les champs obligatoires (*).');
+    _hcNote('parr-message', 'Renseignez tous les champs obligatoires (*).', 'erreur');
     return;
   }
 
@@ -18263,7 +18314,10 @@ function submitRecontact() {
 
   console.log('RC submit:', prenom, nom, tel, email, motif, profil);
 
-  if (!tel && !email) { alert('Veuillez renseigner au moins votre téléphone ou email.'); return; }
+  if (!tel && !email) {
+    _hcNote('rc-message-zone', 'Renseignez au moins votre téléphone ou votre adresse e-mail.', 'erreur');
+    return;
+  }
 
   supabaseInsert('recontacts', {
     prenom: prenom,
@@ -18540,6 +18594,7 @@ document.addEventListener('DOMContentLoaded', () => { initAutocomplete(); });
 
     <div id="parrainage-form">
       <h2>Parrainer un proche</h2>
+      <div id="parr-message" class="hc-note" role="alert"></div>
       <p>Votre filleul et vous bénéficiez chacun de <strong>10% de réduction</strong> sur votre prochain convoyage, dès sa 1ère mission réalisée.</p>
 
       <!-- Parrain -->
@@ -19358,9 +19413,28 @@ function _hcDateMaximaleChamp(id) {
 // La liste ci-dessous est la SEULE chose à compléter pour qu'une
 // nouvelle période bénéficie du même calendrier — aucune règle de
 // coloration, de borne ni de navigation n'est dupliquée.
+// ══════════════════════════════════════════════════════════════
+// LOT A2 — LE NETTOYAGE UTILISE LE MEME COMPOSANT QUE LES AUTRES
+// ══════════════════════════════════════════════════════════════
+// DEFAUT CORRIGE. La periode de nettoyage ne figurait PAS ici : ses
+// deux champs etaient donc traites comme deux dates isolees, et
+// _hcValiderCalendrier() ecrivait TOUJOURS dans #nett-date. Ouvrir le
+// calendrier depuis « Date de fin », choisir un jour puis valider
+// ecrasait donc la date de DEBUT et laissait la fin vide — exactement
+// ce qui etait constate : 25/09/2026 en debut, « jj/mm/aaaa » en fin.
+//
+// En rejoignant HC_PERIODES_CALENDRIER, le nettoyage herite du
+// composant de periode deja eprouve par le Stockage et par « Trouver un
+// professionnel » : ouverture depuis l'un OU l'autre champ, sous-etape
+// debut/fin explicite, borne « la fin ne precede jamais le debut »
+// appliquee au rendu (comparaison stricte : le meme jour reste
+// selectionnable), effacement des deux bornes, et coloration de la
+// plage. Aucune logique dupliquee.
 var HC_PERIODES_CALENDRIER = [
   { debut: 'stock-debut',    fin: 'stock-fin',     legende: 'Début → fin du stockage' },
-  { debut: 'pro-date-debut', fin: 'pro-date-fin',  legende: 'Début → fin de l\'intervention' }
+  { debut: 'pro-date-debut', fin: 'pro-date-fin',  legende: 'Début → fin de l\'intervention' },
+  { debut: 'nett-date',      fin: 'nett-date-fin', legende: 'Début → fin du nettoyage',
+    marque: 'nettoyage' }
 ];
 
 function _hcPeriodeDeuxBornes(id) {
@@ -19405,7 +19479,6 @@ function _hcConstruireOverlay() {
   overlay.querySelector('#hc-cal-prec').addEventListener('click', function () { _hcNaviguerMois(-1); });
   overlay.querySelector('#hc-cal-suiv').addEventListener('click', function () { _hcNaviguerMois(1); });
   overlay.querySelector('#hc-cal-effacer').addEventListener('click', function () {
-    _hcCalTempNettoyage = null;   // V77
     _hcEffacerActionBar();
   });
   overlay.querySelector('#hc-cal-ok').addEventListener('click', _hcValiderCalendrier);
@@ -19476,8 +19549,6 @@ function _hcOuvrirCalendrier(champ) {
     _hcCalChampActif = champ.id;
     _hcCalSousEtapePeriode = null;
     dateReference = _hcParserYMD(champ.value);
-    // V77 - reprend la date deja saisie comme selection temporaire.
-    _hcCalTempNettoyage = (champ.id === 'nett-date') ? dateReference : null;
   }
   var overlay = _hcConstruireOverlay();
   var auj = _hcAujourdhui();
@@ -19529,29 +19600,17 @@ function _hcDateDebutLiee(id) {
   return null;
 }
 
-// V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
-// un jour ne fait que memoriser la date ici ; le champ n'est ecrit
-// qu'au clic sur OK. Aucun autre calendrier n'est concerne.
-var _hcCalTempNettoyage = null;
-
-function _hcEstCalendrierNettoyage() {
-  return _hcCalChampActif === 'nett-date' || _hcCalChampActif === 'nett-date-fin';
-}
-
-// Confirme la selection temporaire puis ferme (bouton OK).
+// LOT A2 — la selection temporaire specifique au nettoyage a ete
+// SUPPRIMEE avec le defaut qu'elle portait : elle memorisait un jour
+// puis, au clic sur OK, l'ecrivait TOUJOURS dans #nett-date, quel que
+// soit le champ reellement ouvert. La date de fin ne pouvait donc
+// jamais etre renseignee, et choisir une fin ecrasait le debut.
+//
+// Le nettoyage passe desormais par le composant de periode commun
+// (HC_PERIODES_CALENDRIER), ou chaque clic ecrit dans la BONNE borne.
+// OK ne fait donc plus que fermer, comme pour le Stockage et pour
+// « Trouver un professionnel ».
 function _hcValiderCalendrier() {
-  if (_hcEstCalendrierNettoyage() && _hcCalTempNettoyage) {
-    var champ = document.getElementById('nett-date');
-    if (champ) {
-      champ.value = _hcFormaterYMD(_hcCalTempNettoyage);
-      try {
-        var evtIn = (typeof Event === 'function') ? new Event('input', { bubbles: true }) : null;
-        if (evtIn) champ.dispatchEvent(evtIn);
-      } catch (e) {}
-      _hcDeclencherChange(champ);
-      if (typeof _clearFieldError === 'function') _clearFieldError('nett-date');
-    }
-  }
   _hcFermerCalendrier();
 }
 
@@ -19560,7 +19619,6 @@ function _hcFermerCalendrier() {
   _hcCalChampActif = null;
   _hcCalPeriode = null;
   _hcCalSousEtapePeriode = null;
-  _hcCalTempNettoyage = null;
 }
 
 function _hcClasseJour(date, periode) {
@@ -19623,12 +19681,16 @@ function _hcRendreCalendrier() {
     var estInterdit = date < borneReelle || (borneMaxMetier && date > borneMaxMetier);
     var estAuj = _hcMemeJour(date, auj);
     var classe = _hcClasseJour(date, periode);
-    var estSelNett = _hcCalTempNettoyage && _hcMemeJour(date, _hcCalTempNettoyage);
-    var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '') + (estSelNett ? ' hc-cal-jour--sel-nett' : '');
+    var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '');
     html += '<button type="button" class="' + classesFinales + '" data-jour="' + j + '"' +
       (estInterdit ? ' disabled aria-disabled="true" tabindex="-1"' : '') + '>' + j + '</button>';
   }
-  overlay.querySelector('#hc-cal-grille').innerHTML = html;
+  var grille = overlay.querySelector('#hc-cal-grille');
+  // LOT E4 — marqueur de famille de periode, lu par la seule feuille de
+  // style du nettoyage. Retire des qu'un autre calendrier s'ouvre.
+  if (_hcCalPeriode && _hcCalPeriode.marque) grille.setAttribute('data-hc-periode', _hcCalPeriode.marque);
+  else grille.removeAttribute('data-hc-periode');
+  grille.innerHTML = html;
 
   Array.prototype.forEach.call(overlay.querySelectorAll('.hc-cal-jour[data-jour]'), function (btn) {
     btn.addEventListener('click', function () {
@@ -19685,14 +19747,6 @@ function _hcSelectionnerJour(j) {
       // Reste en mode "fin" : un nouveau clic redéfinit simplement la
       // fin, cohérent avec « modifier une période existante ».
     }
-    _hcRendreCalendrier();
-    return;
-  }
-
-  // V77 - NETTOYAGE : on memorise seulement, le calendrier reste ouvert
-  // et le champ n'est ecrit qu'au clic sur OK.
-  if (_hcEstCalendrierNettoyage()) {
-    _hcCalTempNettoyage = date;
     _hcRendreCalendrier();
     return;
   }
