@@ -1858,6 +1858,63 @@ check "U20 : un partenaire non plus" "NON_AUTORISE" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff01') ->> 'code'; commit;" | tail -1)"
 
+# ── U bis. DEUX CREATIONS SIMULTANEES : LA REFERENCE ──
+# Le Dashboard appelle la fonction EN PARALLELE pour toutes les demandes
+# pretes (Promise.all). Deux appels concurrents lisent donc le meme
+# « dernier numero » avant qu'aucun des deux n'ait insere : sans
+# precaution, ils forgent la MEME reference.
+#
+# On synchronise deux sessions psql sur un meme instant, a la
+# milliseconde, pour que la course ait vraiment lieu.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     select ('eeeeeeee-0000-0000-0000-00000000fc0' || g)::uuid,
+            'TEST-QA-CLAUDE-POSTPR2-C' || g,
+            'conc' || g || '@helixcar.test','nettoyage','nouveau',
+            jsonb_build_object(
+              'schema_version', 2, 'type_nettoyage','interieur',
+              'lieu','locaux_client',
+              'adresse_rue','1 rue Course','adresse_cp','75001','adresse_ville','Paris',
+              'date_souhaitee','2026-12-01','date_fin','2026-12-02',
+              'creneau_debut','08:00','creneau_fin','12:00',
+              'nombre_vehicules_approx', 2,
+              'contact_sur_place', jsonb_build_object('nom','TEST-QA Course','telephone','+33600000009'))
+       from generate_series(1,2) g
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     select 'TEST-QA-CLAUDE-POSTPR2-DC' || g,
+            ('eeeeeeee-0000-0000-0000-00000000fc0' || g)::uuid, 500, 'accepte'
+       from generate_series(1,2) g;" >/dev/null
+
+INSTANT=$(sql "select (now() + interval '2 seconds')::text;" | tail -1)
+for g in 1 2; do
+  printf '%s\n' "begin;
+select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+select pg_sleep(greatest(0, extract(epoch from (timestamptz '$INSTANT' - clock_timestamp()))));
+select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000fc0$g');
+commit;" > "$BASE/course$g.sql"
+  chown postgres:postgres "$BASE/course$g.sql"
+done
+su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course1.sql" >/dev/null 2>&1 &
+su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course2.sql" >/dev/null 2>&1 &
+wait
+
+check "U21 : les deux missions concurrentes sont bien creees" "2" \
+  "$(sql "select count(*) from public.missions
+     where client_id in ('eeeeeeee-0000-0000-0000-00000000fc01','eeeeeeee-0000-0000-0000-00000000fc02');")"
+check "U22 : REPRODUCTION — elles ne portent JAMAIS la meme reference" "2" \
+  "$(sql "select count(distinct reference) from public.missions
+     where client_id in ('eeeeeeee-0000-0000-0000-00000000fc01','eeeeeeee-0000-0000-0000-00000000fc02');")"
+check "U23 : aucune reference de nettoyage n'est en double, nulle part" "0" \
+  "$(sql "select count(*) from (select reference from public.missions
+      where type_mission='nettoyage' and reference is not null
+      group by reference having count(*) > 1) d;")"
+check "U24 : et la base le refuse structurellement" "refuse" \
+  "$(sql "insert into public.missions (reference, type_mission, statut, client_id)
+     select reference, 'nettoyage', 'en_attente', 'eeeeeeee-0000-0000-0000-00000000ff02'
+       from public.missions where type_mission='nettoyage' limit 1;" \
+   | grep -qiE 'duplicate key|unique' && echo refuse || echo passe)"
+
 echo
 echo "── F. IDEMPOTENCE : rejouer les migrations ne duplique rien ──"
 DEC_AVANT=$(sql "select count(*) from public.convoyeur_decisions;")

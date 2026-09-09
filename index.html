@@ -11930,7 +11930,11 @@ function construireRecap() {
                    _recapLigne('Durée réelle du stockage', jEffectifVeh > 0 ? jEffectifVeh + (jEffectifVeh > 1 ? ' jours' : ' jour') : '');
         }
       }
-      if (!commun && (sc.pc || sc.liv) && v.mode_transport) {
+      // MEME CONDITION QUE LE FORMULAIRE, mot pour mot. Elle testait
+      // « !commun && ... » : le formulaire et le recapitulatif pouvaient
+      // donc diverger, et le client repondait a une question qui
+      // n'apparaissait jamais dans son propre recapitulatif.
+      if ((sc.pc || sc.liv) && v.mode_transport) {
         corps += _recapLigne('Mode de transport',
           v.mode_transport === 'plateau' ? 'Transport sur plateau' : 'Convoyage par la route');
       }
@@ -18963,10 +18967,17 @@ function rendreFichesVehicules() {
     //     « Standard / Sur plateau » restait seul visible sous la fiche,
     //     donnant l'impression que le bloc s'etait deplace.
     //
-    // Un vehicule est convoye par la route ou transporte sur plateau :
-    // cela ne depend d'aucune autre reponse. La rubrique est donc
-    // inconditionnelle, et elle appartient a son vehicule.
-    {
+    // LA BONNE REGLE. Un vehicule est convoye par la route ou transporte
+    // sur plateau : cela ne depend d'aucune AUTRE reponse — mais cela
+    // suppose que HelixCar le transporte. Dans un stockage ou le client
+    // depose ET vient rechercher son vehicule lui-meme, la question n'a
+    // pas d'objet : on ne la pose pas.
+    //
+    // La condition porte donc sur le FAIT METIER (sc.pc || sc.liv), et
+    // non sur la mise en page (pcIndiv || livIndiv) : si le trajet
+    // redevenait un jour commun, la rubrique ne disparaitrait pas pour
+    // autant. Le recapitulatif applique exactement la meme regle.
+    if (sc.pc || sc.liv) {
       var mode='<div class="veh-sstitre">Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></div><div style="display:flex;flex-direction:column;gap:7px">'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='plateau'?'':'checked')+'><span>Convoyage par la route</span></label>'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="plateau" '+(v.mode_transport==='plateau'?'checked':'')+'><span>Transport sur plateau</span></label></div>';

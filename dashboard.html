@@ -8498,22 +8498,13 @@ function _blocMissionNettoyageHtml(c) {
   return html;
 }
 
-function _referenceMissionNettoyage() {
-  var annee = new Date().getFullYear();
-  return sbFetchToutePage('missions?select=reference&type_mission=eq.nettoyage')
-    .then(function (rows) {
-      var max = 0;
-      (rows || []).forEach(function (r) {
-        var mm = /^HC-NET-(\d{4})-(\d+)$/.exec(r.reference || '');
-        if (mm && parseInt(mm[1], 10) === annee) {
-          var n = parseInt(mm[2], 10);
-          if (n > max) max = n;
-        }
-      });
-      return 'HC-NET-' + annee + '-' + String(max + 1).padStart(4, '0');
-    })
-    .catch(function () { return 'HC-NET-' + annee + '-0001'; });
-}
+// _referenceMissionNettoyage() est SUPPRIMEE.
+//
+// Elle calculait la reference par un « dernier numero + 1 » lu dans le
+// navigateur : deux creations simultanees auraient forge la meme. Le
+// serveur la tire desormais dans une sequence (migration 102), qui ne
+// rend jamais deux fois la meme valeur. Laisser ce second generateur en
+// place, meme inutilise, aurait invite a le reutiliser.
 
 // ── CREATION DE LA MISSION DE NETTOYAGE : LE SERVEUR DECIDE ──
 //

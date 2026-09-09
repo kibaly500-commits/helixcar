@@ -46,6 +46,64 @@ create unique index if not exists missions_nettoyage_une_par_demande
   where type_mission = 'nettoyage' and statut <> 'annulee';
 
 -- ------------------------------------------------------------
+-- 2 bis. LA RÉFÉRENCE NE PEUT PLUS ÊTRE TIRÉE DEUX FOIS
+-- ------------------------------------------------------------
+-- DÉFAUT CORRIGÉ, trouvé en revue. La première version calculait la
+-- référence par un `select max(...)` juste avant d'insérer. Deux appels
+-- SIMULTANÉS lisaient donc le même « dernier numéro » avant qu'aucun des
+-- deux n'ait inséré, et forgeaient la MÊME référence.
+--
+-- Ce n'était pas un cas de laboratoire : le Dashboard appelle la
+-- fonction EN PARALLÈLE pour toutes les demandes prêtes. Reproduit sur
+-- PostgreSQL 16 avec deux sessions synchronisées à la milliseconde :
+-- deux missions, UNE seule référence distincte.
+--
+-- Une séquence règle le problème par construction : elle est
+-- non transactionnelle et ne rend jamais deux fois la même valeur, quel
+-- que soit le nombre d'appels concurrents.
+create sequence if not exists public.missions_nettoyage_numero;
+
+-- Alignement sur les références déjà émises. La séquence ne recule
+-- JAMAIS : un rejeu de cette migration la laisse où elle est.
+do $$
+declare
+  v_max     bigint;
+  v_courant bigint;
+begin
+  select coalesce(max((regexp_match(reference, '^HC-NET-\d{4}-(\d+)$'))[1]::bigint), 0)
+    into v_max
+    from public.missions
+   where type_mission = 'nettoyage'
+     and reference ~ '^HC-NET-\d{4}-\d+$';
+  select last_value into v_courant from public.missions_nettoyage_numero;
+  if v_max > v_courant then
+    perform setval('public.missions_nettoyage_numero', v_max, true);
+  end if;
+end $$;
+
+-- Filet supplémentaire : deux missions de nettoyage ne peuvent pas
+-- porter la même référence. Posé seulement si l'existant le permet —
+-- une migration ne doit pas échouer sur des données antérieures qu'elle
+-- n'a pas produites. Le cas échéant, elle le DIT plutôt que de se taire.
+do $$
+declare v_doublons integer;
+begin
+  select count(*) into v_doublons from (
+    select reference from public.missions
+     where type_mission = 'nettoyage' and reference is not null
+     group by reference having count(*) > 1) d;
+  if v_doublons > 0 then
+    raise notice
+      'Index d''unicité des références de nettoyage NON posé : % référence(s) '
+      'déjà en double. Les traiter, puis rejouer cette migration.', v_doublons;
+  else
+    create unique index if not exists missions_nettoyage_reference_unique
+      on public.missions (reference)
+      where type_mission = 'nettoyage' and reference is not null;
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
 -- 3. LA CRÉATION, DÉCIDÉE PAR LE SERVEUR
 -- ------------------------------------------------------------
 -- Le navigateur ne décide plus s'il faut créer une mission : il demande,
@@ -75,7 +133,7 @@ declare
   v_devis    integer;
   v_ref      text;
   v_annee    integer := extract(year from now())::integer;
-  v_num      integer;
+  v_num      bigint;
   v_contact  jsonb;
 begin
   if not public.est_admin() then
@@ -121,12 +179,10 @@ begin
   nd       := coalesce(d.nettoyage_details, '{}'::jsonb);
   v_contact := coalesce(nd -> 'contact_sur_place', '{}'::jsonb);
 
-  select coalesce(max((regexp_match(mm.reference, '^HC-NET-' || v_annee || '-(\d+)$'))[1]::integer), 0)
-    into v_num
-    from public.missions mm
-   where mm.type_mission = 'nettoyage'
-     and mm.reference like 'HC-NET-' || v_annee || '-%';
-  v_ref := 'HC-NET-' || v_annee || '-' || lpad((v_num + 1)::text, 4, '0');
+  -- Séquence, jamais un max() : deux appels simultanés obtiennent deux
+  -- numéros différents (voir § 2 bis).
+  v_num := nextval('public.missions_nettoyage_numero');
+  v_ref := 'HC-NET-' || v_annee || '-' || lpad(v_num::text, 4, '0');
 
   insert into public.missions (
     reference, type_mission, statut, client_id,
@@ -149,15 +205,21 @@ begin
       when 'conseil'               then 'Client à conseiller'
       else nullif(btrim(coalesce(nd ->> 'type_nettoyage', '')), '')
     end,
-    nullif(btrim(coalesce(nd ->> 'nombre_vehicules_approx', '')), '')::integer,
+    -- Conversions DÉFENSIVES. Une demande ancienne, ou une donnée
+    -- inattendue, ne doit pas faire échouer la création : ce qui n'est
+    -- pas convertible est simplement laissé vide.
+    case when coalesce(nd ->> 'nombre_vehicules_approx', '') ~ '^[0-9]+$'
+         then (nd ->> 'nombre_vehicules_approx')::integer end,
     coalesce(nullif(btrim(coalesce(nd ->> 'adresse_rue', '')), ''),
              case when nd ->> 'lieu' = 'helixcar' then 'Locaux HelixCar' end),
     nullif(btrim(coalesce(nd ->> 'adresse_cp', '')), ''),
     nullif(btrim(coalesce(nd ->> 'adresse_ville', '')), ''),
     nullif(btrim(coalesce(v_contact ->> 'nom', '')), ''),
     nullif(btrim(coalesce(v_contact ->> 'telephone', '')), ''),
-    nullif(btrim(coalesce(nd ->> 'date_souhaitee', '')), '')::date,
-    nullif(btrim(coalesce(nd ->> 'date_fin', '')), '')::date,
+    case when coalesce(nd ->> 'date_souhaitee', '') ~ '^\d{4}-\d{2}-\d{2}$'
+         then (nd ->> 'date_souhaitee')::date end,
+    case when coalesce(nd ->> 'date_fin', '') ~ '^\d{4}-\d{2}-\d{2}$'
+         then (nd ->> 'date_fin')::date end,
     nullif(btrim(
       coalesce(nd ->> 'creneau_debut', '')
       || case when coalesce(nd ->> 'creneau_fin', '') <> '' then ' – ' || (nd ->> 'creneau_fin') else '' end
@@ -216,10 +278,12 @@ grant execute on function public.creer_mission_nettoyage_si_prete(uuid) to authe
 --   2. retirer la fonction, en gardant l'unicité :
 --        drop function if exists public.creer_mission_nettoyage_si_prete(uuid);
 --      la création manuelle depuis le Dashboard redevient le seul chemin ;
---   3. retirer l'index d'unicité :
+--   3. retirer les garanties d'unicité :
 --        drop index if exists public.missions_nettoyage_une_par_demande;
+--        drop index if exists public.missions_nettoyage_reference_unique;
+--        drop sequence if exists public.missions_nettoyage_numero;
 --      ATTENTION : plus rien n'empêche alors DEUX missions pour la même
---      demande ;
+--      demande, ni deux missions portant la MÊME référence ;
 --   4. retirer la colonne de période :
 --        alter table public.missions drop column if exists date_fin_intervention;
 --      DESTRUCTIF : les dates de fin déjà saisies seraient perdues. À ne
