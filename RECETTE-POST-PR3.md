@@ -483,6 +483,28 @@ TZ=UTC           t_periode  →  40 PASS / 0 FAIL
 TZ=Europe/Paris  t_periode  →  40 PASS / 0 FAIL
 ```
 
+### GitHub Actions — observé, jamais prédit
+
+Exécutions nº 33 (poussée) et nº 34 (Pull Request) sur le commit de tête
+**`39fe993`**, terminées et relues :
+
+| Tâche | Résultat |
+|---|---|
+| Politiques RLS sur PostgreSQL 16 | ✅ **success** |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 632 PASS / 0 FAIL en 240 s** |
+
+1 632 (CI, 34 suites avec `--sans-sql`) + 424 (`t_rls`, seconde tâche)
+= **2 056**, exactement le chiffre mesuré en local.
+
+**Un échec réel, à la première poussée, et ce qu'il prouve.** L'exécution
+nº 31 avait échoué sur `E6 : périmètre de fichiers maîtrisé
+[anciens_labels.json]`. Un fichier de travail — une sortie intermédiaire
+du script de comparaison des libellés — était entré dans le dépôt parce
+que le script l'écrivait avec un chemin **relatif** depuis la racine.
+Le garde-fou a fait exactement son travail : rien n'entre sans être
+nommé dans le périmètre. Le fichier a été **retiré**, pas la règle
+assouplie.
+
 **Hygiène du dépôt** : `git diff --check` — aucune anomalie ; arbre de
 travail propre.
 
