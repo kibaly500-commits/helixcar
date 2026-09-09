@@ -548,16 +548,21 @@ TZ=Europe/Paris  t_periode  →  40 PASS / 0 FAIL
 
 ### GitHub Actions — observé, jamais prédit
 
-Exécutions nº 33 (poussée) et nº 34 (Pull Request) sur le commit de tête
-**`39fe993`**, terminées et relues :
+Exécutions nº 37 (poussée) et nº 38 (Pull Request) sur le commit de tête
+**`7892a5d`**, terminées et relues :
 
 | Tâche | Résultat |
 |---|---|
-| Politiques RLS sur PostgreSQL 16 | ✅ **success** |
-| Suites navigateur et sécurité serveur | ✅ **success** — **1 632 PASS / 0 FAIL en 240 s** |
+| Politiques RLS sur PostgreSQL 16 | ✅ **success** — **439 PASS / 0 FAIL** |
+| Suites navigateur et sécurité serveur | ✅ **success** — **1 632 PASS / 0 FAIL en 257 s** |
 
-1 632 (CI, 34 suites avec `--sans-sql`) + 424 (`t_rls`, seconde tâche)
-= **2 056**, exactement le chiffre mesuré en local.
+1 632 (CI, 34 suites avec `--sans-sql`) + 439 (`t_rls`, seconde tâche)
+= **2 071**, exactement le chiffre mesuré en local.
+
+Les exécutions nº 33 et nº 34, sur le commit `39fe993`, étaient déjà
+vertes avec 424 contrôles SQL. Les 15 contrôles de la revue critique
+finale (`V-D3-30` → `V-D3-44`) s'y ajoutent : c'est toute la différence
+entre 2 056 et 2 071.
 
 **Un échec réel, à la première poussée, et ce qu'il prouve.** L'exécution
 nº 31 avait échoué sur `E6 : périmètre de fichiers maîtrisé
