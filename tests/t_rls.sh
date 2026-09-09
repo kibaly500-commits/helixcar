@@ -2420,6 +2420,175 @@ check "W-B1-26 : une seule signature par fonction" "2" \
   "$(sql "select count(*) from pg_proc
      where proname in ('roles_utilisateur','ajouter_role_partenaire');")"
 
+
+echo
+echo "── VID. LOT V01 : LA VIDÉO DE CANDIDATURE EN DEUX PHASES ──"
+# Le bucket et les colonnes vidéo viennent de la migration 03, jamais
+# appliquée jusqu'ici par ce script ; 93 relève la limite du bucket.
+errVid03=$(appliquer migrations/03_videos_candidature.sql)
+check "VID-0 : 03 s'applique sans erreur sur le socle" "" "$errVid03"
+errVid93=$(appliquer migrations/93_bucket_video_300mo.sql)
+check "VID-0b : 93 s'applique sans erreur" "" "$errVid93"
+check "VID-0c : le bucket est PRIVÉ et limité à 314 572 800 octets" "false|314572800" \
+  "$(sql "select public::text || '|' || file_size_limit from storage.buckets where id='candidatures-videos';")"
+
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut, video_upload_jeton_hash)
+     values ('a0a0a0a0-0000-4000-8000-000000000101', 'TEST-QA-CLAUDE-HELIXCAR', 'Video',
+             'video-v01@helixcar.test', '{convoyage,renfort}', 'video_attendue', repeat('a', 64))
+     on conflict (id) do nothing;" >/dev/null
+check "VID-1 : la candidature de recette existe, en attente de vidéo" "video_attendue" \
+  "$(sql "select statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# ── REPRODUCTION DU DÉFAUT DE PRODUCTION (avant 105) ──
+# L'ancienne action « autoriser » écrivait chemin + MIME + taille en
+# laissant la date d'envoi nulle. Exactement ce que la contrainte de 03
+# refuse : code 23514, convoyeurs_video_coherente.
+ANCIENNE=$(sql "update public.convoyeurs
+     set video_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/x.mov',
+         video_mime='video/quicktime', video_taille_octets=225024410,
+         video_duree_secondes=119, video_envoyee_le=null
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1)
+check "VID-2 : REPRODUCTION — l'ancienne écriture partielle est refusée par la base" "1" \
+  "$(printf '%s' "$ANCIENNE" | grep -c 'convoyeurs_video_coherente' || true)"
+check "VID-3 : ... et la ligne n'a pas bougé" "" \
+  "$(sql "select coalesce(video_chemin,'') from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# SECOND DÉFAUT, LATENT : sans session, le garde-fou de 90 refuse le
+# changement de statut que la confirmation doit faire. La fonction
+# serveur (service_role, auth.uid() nul) aurait donc échoué juste après.
+GARDE_AVANT=$(sql "update public.convoyeurs set statut='en_attente'
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1)
+check "VID-4 : REPRODUCTION — avant 105, la finalisation sans session est refusée par le garde-fou de 90" "1" \
+  "$(printf '%s' "$GARDE_AVANT" | grep -ci 'réservée à un administrateur\|reservee a un administrateur' || true)"
+sql "update public.convoyeurs set statut='video_attendue' where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null 2>&1
+
+# ── CORRECTIF ──
+errVid105=$(appliquer migrations/105_video_envoi_en_deux_phases.sql)
+check "VID-5 : 105 s'applique sans erreur" "" "$errVid105"
+check "VID-6 : les six colonnes d'envoi en cours existent" "6" \
+  "$(sql "select count(*) from information_schema.columns where table_name='convoyeurs'
+     and column_name in ('video_envoi_chemin','video_envoi_mime','video_envoi_taille_octets',
+                         'video_envoi_duree_secondes','video_envoi_commence_le','video_upload_jeton_consomme_le');")"
+check "VID-7 : la contrainte de 03 est TOUJOURS là, intacte" "1" \
+  "$(sql "select count(*) from pg_constraint where conname='convoyeurs_video_coherente'
+     and pg_get_constraintdef(oid) ilike '%video_envoyee_le IS NOT NULL%';")"
+check "VID-8 : l'écriture partielle reste refusée APRÈS 105 (rien n'a été relâché)" "1" \
+  "$(sql "update public.convoyeurs
+     set video_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/x.mov',
+         video_mime='video/quicktime', video_taille_octets=225024410, video_envoyee_le=null
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_coherente' || true)"
+
+# PHASE 1 — ce que la fonction serveur écrit désormais : l'envoi en
+# cours, dans ses colonnes. La contrainte de 03 n'est pas concernée.
+PHASE1=$(su postgres -c "psql -U postgres -d verif -c \"update public.convoyeurs
+     set video_envoi_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov',
+         video_envoi_mime='video/quicktime', video_envoi_taille_octets=225024410,
+         video_envoi_duree_secondes=119, video_envoi_commence_le=now()
+   where id='a0a0a0a0-0000-4000-8000-000000000101';\"" 2>&1 | grep -E '^UPDATE|ERROR')
+check "VID-9 : PHASE 1 — l'envoi en cours s'enregistre sans violer aucune contrainte" "UPDATE 1" "$PHASE1"
+check "VID-10 : ... les colonnes FINALES sont restées nulles (vidéo pas déclarée reçue)" "|||" \
+  "$(sql "select coalesce(video_chemin,'')||'|'||coalesce(video_mime,'')||'|'||coalesce(video_taille_octets::text,'')||'|'||coalesce(video_envoyee_le::text,'')
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-11 : un envoi en cours sans MIME est refusé lui aussi (cohérence de 105)" "1" \
+  "$(sql "update public.convoyeurs set video_envoi_mime=null where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_envoi_coherent' || true)"
+check "VID-11b : un envoi en cours de plus de 120 s est refusé" "1" \
+  "$(sql "update public.convoyeurs set video_envoi_duree_secondes=121 where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_envoi_duree_plafond' || true)"
+
+# PHASE 2 — finalisation par la fonction SQL, sans session (service).
+check "VID-12 : une taille réelle différente de la taille annoncée ne finalise RIEN" "TAILLE_INCOHERENTE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 1000) ->> 'code';")"
+check "VID-12b : ... la ligne est toujours un envoi en cours" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov|" \
+  "$(sql "select coalesce(video_envoi_chemin,'')||'|'||coalesce(video_chemin,'') from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-13 : PHASE 2 — la finalisation avec la taille réelle réussit" "FINALISEE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 225024410) ->> 'code';")"
+check "VID-14 : les QUATRE colonnes finales sont écrites ENSEMBLE, cohérentes" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov|video/quicktime|225024410|119.00|true" \
+  "$(sql "select video_chemin||'|'||video_mime||'|'||video_taille_octets||'|'||video_duree_secondes||'|'||(video_envoyee_le is not null)::text
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-15 : l'envoi en cours est vidé" "0" \
+  "$(sql "select count(*) from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101'
+     and (video_envoi_chemin is not null or video_envoi_mime is not null or video_envoi_taille_octets is not null
+          or video_envoi_duree_secondes is not null or video_envoi_commence_le is not null);")"
+check "VID-16 : la candidature passe en attente d'étude (jamais validée automatiquement)" "en_attente" \
+  "$(sql "select statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-17 : le jeton est consommé, son empreinte conservée pour l'idempotence" "true|true" \
+  "$(sql "select (video_upload_jeton_consomme_le is not null)::text||'|'||(video_upload_jeton_hash is not null)::text
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-18 : la date d'envoi est celle de la finalisation (maintenant), pas une date fournie" "true" \
+  "$(sql "select (now() - video_envoyee_le < interval '1 minute')::text from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-19 : rejouer la finalisation est IDEMPOTENT (DEJA_FINALISEE, rien réécrit)" "DEJA_FINALISEE|candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select (public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 225024410)) ->> 'code'
+     || '|' || video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-20 : finaliser une candidature sans envoi en cours ni vidéo -> AUCUN_ENVOI" "AUCUN_ENVOI" \
+  "$(sql "select public.finaliser_video_candidature('aaaaaaaa-0000-0000-0000-000000000001', null) ->> 'code';")"
+check "VID-21 : finaliser une candidature inexistante -> INTROUVABLE" "INTROUVABLE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-0000000009ff', null) ->> 'code';")"
+
+# REMPLACEMENT : un nouvel envoi en cours n'efface pas la vidéo reçue
+# tant qu'il n'est pas finalisé ; à la finalisation, l'ancien chemin
+# est renvoyé pour que le fichier devenu orphelin soit supprimé.
+sql "update public.convoyeurs
+     set video_envoi_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4',
+         video_envoi_mime='video/mp4', video_envoi_taille_octets=7000,
+         video_envoi_duree_secondes=25, video_envoi_commence_le=now()
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null
+check "VID-22 : un remplacement en cours laisse la vidéo reçue INTACTE" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-23 : la finalisation du remplacement renvoie l'ancien chemin à nettoyer" "FINALISEE|candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select r ->> 'code' || '|' || (r ->> 'ancien_chemin') from public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 7000) r;")"
+check "VID-24 : la nouvelle vidéo est en place, le statut n'a pas été rétrogradé" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4|video/mp4|7000|en_attente" \
+  "$(sql "select video_chemin||'|'||video_mime||'|'||video_taille_octets||'|'||statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# ── AUTORISATIONS ──
+check "VID-25 : anon ne peut pas exécuter la finalisation" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='finaliser_video_candidature' and grantee in ('anon','authenticated','PUBLIC');")"
+FIN_ANON=$(sql "begin; select public.devenir_anon();
+  select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', null);
+  commit;" 2>&1)
+check "VID-26 : ... vérifié en situation : permission refusée" "1" \
+  "$(printf '%s' "$FIN_ANON" | grep -ci 'permission denied' || true)"
+# Le partenaire propriétaire authentifié ne peut pas écrire les colonnes
+# vidéo lui-même (elles sont réservées à la fonction serveur).
+sql "insert into auth.users (id, email) values ('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test') on conflict do nothing;
+     update public.convoyeurs set auth_user_id='a0a0a0a0-0000-4000-8000-0000000001aa' where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null
+PROPRIO=$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set video_chemin='candidatures/aaaaaaaa-0000-0000-0000-000000000001/vol.mp4'
+   where id='a0a0a0a0-0000-4000-8000-000000000101';
+  commit;" 2>&1)
+check "VID-27 : le propriétaire ne peut pas pointer sa fiche vers la vidéo d'un autre (garde-fou)" "1" \
+  "$(printf '%s' "$PROPRIO" | grep -ci 'gérée par le serveur\|geree par le serveur' || true)"
+check "VID-27b : ... la ligne n'a pas bougé" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4" \
+  "$(sql "select video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+PROPRIO2=$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set video_envoyee_le=now() where id='a0a0a0a0-0000-4000-8000-000000000101';
+  commit;" 2>&1)
+check "VID-28 : ... ni se déclarer lui-même « vidéo reçue »" "1" \
+  "$(printf '%s' "$PROPRIO2" | grep -ci 'gérée par le serveur\|geree par le serveur' || true)"
+check "VID-29 : le propriétaire garde ses autres droits (ex. téléphone)" "UPDATE 1" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set telephone='+33600000101' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "VID-30 : anon ne peut toujours rien modifier sur convoyeurs (RLS, indépendamment du garde-fou)" "UPDATE 0" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir_anon();
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "VID-31 : le garde-fou de 90 protège toujours le statut contre le propriétaire" "1" \
+  "$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;" 2>&1 \
+  | grep -ci 'réservée à un administrateur\|reservee a un administrateur' || true)"
+check "VID-32 : un administrateur peut toujours modifier le statut" "UPDATE 1" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+
+errVid105b=$(appliquer migrations/105_video_envoi_en_deux_phases.sql)
+check "VID-33 : 105 se rejoue sans erreur" "" "$errVid105b"
+check "VID-34 : une seule signature pour finaliser_video_candidature" "1" \
+  "$(sql "select count(*) from pg_proc where proname='finaliser_video_candidature';")"
+check "VID-35 : un seul trigger de garde-fou sur convoyeurs" "1" \
+  "$(sql "select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid
+     where c.relname='convoyeurs' and tgname='trg_garde_colonnes_sensibles_convoyeur';")"
+check "VID-36 : aucune politique Storage accordée à anon sur le bucket vidéo" "0" \
+  "$(sql "select count(*) from pg_policies where tablename='objects' and schemaname='storage'
+     and policyname ilike 'candidature video%' and 'anon' = any(roles);")"
+
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="
 for e in "${ECHECS[@]:-}"; do [ -n "$e" ] && echo "  - $e"; done

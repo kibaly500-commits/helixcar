@@ -5860,6 +5860,13 @@ function _celluleVideoCandidature(c) {
   if (!_videoAttenduePourActivites(c && c.activites)) {
     return '<span class="badge badge-pending">Non requise</span>';
   }
+  // LOT V01 — un envoi AUTORISÉ mais pas encore finalisé vit dans ses
+  // propres colonnes (migration 105). Ce n'est ni une vidéo reçue, ni
+  // une vidéo absente : le candidat a commencé, le fichier n'est pas
+  // confirmé. L'administrateur le lit tel quel, sans bouton de lecture.
+  if (c && c.video_envoi_chemin) {
+    return '<span class="badge badge-pending">⏳ Envoi en cours, non finalisé</span>';
+  }
   return '<span class="badge badge-pending">⏳ Manquante</span>';
 }
 

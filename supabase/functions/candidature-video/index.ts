@@ -2,7 +2,7 @@
 // ============================================================
 // HelixCar — Edge Function « candidature-video »
 // ============================================================
-// AUTORISATION D'ENVOI DE LA VIDÉO DE CANDIDATURE.
+// AUTORISATION D'ENVOI DE LA VIDÉO DE CANDIDATURE, EN DEUX PHASES.
 //
 // Raison d'être : une candidature partenaire est déposée SANS compte.
 // Il n'existe donc aucun auth.uid() au moment de l'envoi. Plutôt que
@@ -15,28 +15,52 @@
 // qu'une URL d'envoi signée, temporaire, liée à UN chemin précis que
 // le serveur a lui-même généré.
 //
-// Garanties :
+// ------------------------------------------------------------
+// LE DÉFAUT DE PRODUCTION CORRIGÉ ICI (lot V01, code 23514)
+// ------------------------------------------------------------
+// La version précédente écrivait, dès l'action « autoriser »,
+// video_chemin + video_mime + video_taille_octets en laissant
+// video_envoyee_le à NULL pour dire « pas encore reçue ». Or la
+// contrainte `convoyeurs_video_coherente` (migration 03) interdit
+// exactement cet état : un chemin sans date d'envoi est une écriture
+// partielle. La base refusait donc la PREMIÈRE écriture, avant tout
+// envoi, et le candidat lisait « Erreur serveur ».
+//
+// La contrainte est conservée telle quelle. Le flux respecte
+// désormais la cohérence À CHAQUE INSTANT :
+//
+//   PHASE 1 — « autoriser » : contrôles serveur (format, taille,
+//     durée selon les activités RÉELLEMENT enregistrées), chemin
+//     généré ici, URL signée courte. L'envoi EN COURS est noté dans
+//     ses propres colonnes (video_envoi_*, migration 105). Les quatre
+//     colonnes finales ne sont PAS touchées.
+//
+//   PHASE 2 — « confirmer » : présence réelle de l'objet dans le
+//     bucket privé, taille réelle comparée à la taille annoncée,
+//     en-tête binaire relu (MP4/MOV/WebM), puis finalisation ATOMIQUE
+//     par la fonction SQL finaliser_video_candidature : video_chemin,
+//     video_mime, video_taille_octets et video_envoyee_le sont écrits
+//     ENSEMBLE, avec la date réelle de finalisation. Les orphelins du
+//     dossier sont supprimés ensuite.
+//
+// Ce qui reste vrai, comme avant :
 //   * le chemin est calculé ici : 'candidatures/<id>/<uuid>.<ext>' ;
-//     le navigateur ne le propose ni ne l'influence jamais ;
-//   * l'appelant doit prouver son droit, soit par sa session
-//     authentifiée (propriétaire réel), soit par un jeton à usage
-//     unique lié à une candidature DÉJÀ créée ;
-//   * le jeton n'est jamais stocké en clair : la base ne contient que
-//     son SHA-256 (même convention que le token de devis) ;
-//   * format, taille et durée sont revérifiés ICI, jamais seulement
-//     dans le navigateur ;
-//   * aucune URL signée de LECTURE n'est délivrée par cette fonction :
-//     la lecture reste réservée aux administrateurs, via leur propre
-//     session (politique de select du bucket).
+//   * l'appelant prouve son droit par sa session (propriétaire réel)
+//     ou par un jeton à usage unique lié à une candidature déjà créée ;
+//   * la base ne contient que le SHA-256 du jeton ;
+//   * aucune URL signée de LECTURE n'est délivrée au candidat : la
+//     lecture reste réservée aux administrateurs et au propriétaire
+//     authentifié, via les politiques du bucket.
+//
+// Idempotence (lot V01) : une confirmation rejouée après succès —
+// réponse perdue, second clic — répond ok/deja_confirmee sans rien
+// réécrire ni recréer. Un jeton consommé ne peut plus autoriser AUCUNE
+// écriture : « autoriser » et « prolonger » le refusent.
 //
 // Déploiement (à faire par HelixCar, non exécuté ici) :
 //   supabase functions deploy candidature-video
 // Variables déjà présentes dans l'environnement des Edge Functions :
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-
-// L'import du client Supabase est fait DYNAMIQUEMENT, au démarrage
-// Deno seulement : la logique d'autorisation ci-dessous reste ainsi
-// importable et testable hors Deno, sans dépendance réseau.
 
 const BUCKET = "candidatures-videos";
 
@@ -49,61 +73,52 @@ const EXTENSION_PAR_MIME: Record<string, string> = {
 };
 // 300 Mo — aligné sur le navigateur, sur le bucket (migration 93) et
 // sur la limite globale Supabase Storage à régler manuellement.
-const TAILLE_MAX_OCTETS = 300 * 1024 * 1024;
+// 300 × 1024 × 1024 = 314 572 800 octets, exactement la valeur de 93.
+export const TAILLE_MAX_OCTETS = 300 * 1024 * 1024;
 
 // Fenêtre pendant laquelle une candidature tout juste créée peut
 // encore envoyer sa vidéo. Volontairement dérivée de created_at :
 // aucune colonne modifiable par le navigateur ne peut l'allonger.
 const FENETRE_ENVOI_MINUTES = 120;
 
-// Durée de validité de la signature d'envoi.
-//
-// 120 secondes suffisaient pour un envoi en UNE requête, mais rendaient
-// tout envoi reprenable impossible : 300 Mo sur une connexion mobile
-// dépassent largement deux minutes, et la signature expirait au milieu.
-// Portée à 30 minutes, et surtout RENOUVELABLE (action « prolonger »
-// ci-dessous) : le navigateur peut demander une signature fraîche sans
-// jamais recommencer l'envoi ni changer de chemin.
-//
-// Ce n'est pas un affaiblissement : une signature n'autorise l'écriture
-// que d'UN SEUL chemin, généré par le serveur, dans un bucket privé.
-// Elle ne donne aucun droit de lecture, aucun droit sur un autre objet,
-// et ne peut pas être transformée en droit d'écriture général.
+// Durée de validité de la signature d'envoi : 30 minutes, RENOUVELABLE
+// (action « prolonger »). Une signature n'autorise l'écriture que d'UN
+// SEUL chemin, généré par le serveur, dans un bucket privé.
 const VALIDITE_URL_ENVOI_SECONDES = 30 * 60;
 
 // Origines autorisées — LISTE EXPLICITE, jamais un joker.
 //
-// DÉFAUT CORRIGÉ (lot A1). Seul le domaine d'aperçu figurait ici. Le
-// site RÉELLEMENT utilisé par les candidats, https://helixcar.vercel.app,
-// n'y était pas : enTetesCors() n'accordait donc aucun
-// Access-Control-Allow-Origin, le preflight OPTIONS était refusé (403),
-// et le navigateur bloquait le POST avant même de l'émettre. Côté
-// candidat : « L'envoi de votre vidéo a échoué ». Côté console :
-//   « Response to preflight request doesn't pass access control check:
-//     No 'Access-Control-Allow-Origin' header is present. » puis
-//   net::ERR_FAILED.
+// Les deux domaines officiels. La comparaison est une égalité stricte
+// de chaîne : schéma, port et sous-domaine comptent. Ni « * », ni renvoi
+// en miroir de l'origine demandée, ni correspondance par préfixe ou
+// suffixe — https://helixcar.vercel.app.pirate.tld reste refusé.
 //
-// Rien d'autre n'est élargi : la comparaison reste une égalité stricte
-// de chaîne, donc le schéma, le port et le sous-domaine comptent. Ni
-// « * », ni renvoi en miroir de l'origine demandée, ni correspondance
-// par préfixe ou par suffixe — un https://helixcar.vercel.app.pirate.tld
-// reste refusé.
-const ORIGINES_AUTORISEES = [
+// Futur domaine (décision C07) : il s'ajoute par la variable
+// d'environnement HELIXCAR_ORIGINES_SUPPLEMENTAIRES (liste séparée par
+// des virgules), SANS retirer les origines Vercel pendant la
+// transition et SANS modifier ce fichier. Rien n'est activé tant que
+// la variable n'est pas définie par HelixCar.
+export const ORIGINES_AUTORISEES: string[] = [
   "https://helixcar.vercel.app",       // site de production
   "https://helixcar-i89b.vercel.app",  // déploiement d'aperçu
 ];
-if (typeof Deno !== "undefined" && Deno.env?.get("ALLOW_LOCALHOST_CORS") === "true") {
-  ORIGINES_AUTORISEES.push("http://localhost:3000", "http://127.0.0.1:3000");
+export function originesSupplementaires(valeur: string | null | undefined): string[] {
+  return String(valeur || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => /^https:\/\/[a-z0-9.-]+$/i.test(o));
+}
+if (typeof Deno !== "undefined" && Deno.env) {
+  for (const o of originesSupplementaires(Deno.env.get("HELIXCAR_ORIGINES_SUPPLEMENTAIRES"))) {
+    if (!ORIGINES_AUTORISEES.includes(o)) ORIGINES_AUTORISEES.push(o);
+  }
+  if (Deno.env.get("ALLOW_LOCALHOST_CORS") === "true") {
+    ORIGINES_AUTORISEES.push("http://localhost:3000", "http://127.0.0.1:3000");
+  }
 }
 
-// En-têtes que le navigateur est autorisé à envoyer.
-//
-// DÉFAUT CORRIGÉ : la liste ne contenait que `content-type` et
-// `authorization`. Or le navigateur envoie `apikey` — Supabase l'exige
-// sur toute requête vers le gateway. Le preflight OPTIONS échouait donc
-// AVANT le POST, et la requête réelle n'était jamais émise : côté
-// candidat, « Connexion interrompue », sans la moindre trace serveur.
-//
+// En-têtes que le navigateur est autorisé à envoyer. Le navigateur
+// envoie `apikey` — Supabase l'exige sur toute requête vers le gateway.
 // Les valeurs sont comparées en minuscules parce que le navigateur
 // envoie Access-Control-Request-Headers en minuscules.
 export const ENTETES_AUTORISES = [
@@ -129,8 +144,7 @@ export function enTetesCors(origine: string | null) {
 
 // Un preflight ne doit réussir que si TOUS les en-têtes demandés sont
 // autorisés. Répondre 204 en en oubliant un laisserait le navigateur
-// bloquer la requête réelle sans que le serveur n'en sache rien : on
-// préfère un refus explicite, visible dans les journaux.
+// bloquer la requête réelle sans que le serveur n'en sache rien.
 export function preflightAcceptable(demandes: string | null): boolean {
   if (!demandes) return true;
   return demandes.split(",")
@@ -145,9 +159,15 @@ function reponseJson(corps: unknown, statutHttp: number, entetesCors: Record<str
     headers: { "Content-Type": "application/json", ...entetesCors },
   });
 }
+// Codes métier STABLES (le navigateur peut s'y fier) et messages en
+// français, compréhensibles par le candidat — jamais un code SQL, un
+// nom de table ni un objet brut.
 function erreur(code: string, message: string, statutHttp: number, entetesCors: Record<string, string>) {
   return reponseJson({ ok: false, code, message }, statutHttp, entetesCors);
 }
+const MESSAGE_ERREUR_SERVEUR =
+  "Votre vidéo n'a pas pu être enregistrée pour le moment. Rien n'est perdu : " +
+  "réessayez dans un instant. Si le problème persiste, contactez HelixCar.";
 
 // Même convention de hachage que le token de devis déjà en place.
 export async function hasherJeton(jetonBrut: string): Promise<string> {
@@ -169,8 +189,75 @@ export function dureeMaxPourActivites(activites: unknown): number {
   return 0; // nettoyage seul : aucune vidéo attendue
 }
 
+// ------------------------------------------------------------
+// EN-TÊTE BINAIRE : le fichier reçu est-il bien une vidéo du format
+// annoncé ? Le MIME déclaré par le navigateur n'est qu'une déclaration ;
+// les premiers octets de l'objet, eux, ne mentent pas.
+//   * WebM (Matroska) : en-tête EBML 1A 45 DF A3 ;
+//   * MP4 / MOV (ISO BMFF, QuickTime) : un atome de tête aux octets
+//     4-7 — « ftyp » dans l'immense majorité des cas ; « wide »,
+//     « mdat », « moov », « free », « skip », « pnot » pour certains
+//     fichiers QuickTime anciens qui n'en sont pas moins valides.
+// Un fichier vide, tronqué avant son en-tête, ou d'un autre format
+// (AVI, MKV renommé, texte) est refusé.
+// ------------------------------------------------------------
+const ATOMES_ISO_BMFF = ["ftyp", "moov", "mdat", "wide", "free", "skip", "pnot"];
+export function enTeteCoherent(octets: Uint8Array | null | undefined, mime: string): boolean {
+  if (!octets || octets.length < 8) return false;
+  if (mime === "video/webm") {
+    return octets[0] === 0x1a && octets[1] === 0x45 && octets[2] === 0xdf && octets[3] === 0xa3;
+  }
+  if (mime === "video/mp4" || mime === "video/quicktime") {
+    const atome = String.fromCharCode(octets[4], octets[5], octets[6], octets[7]);
+    return ATOMES_ISO_BMFF.includes(atome);
+  }
+  return false;
+}
+
+// Lit les 64 premiers octets d'un objet du bucket privé, via une URL
+// signée de lecture TRÈS courte, créée et consommée ici même — jamais
+// renvoyée au navigateur. Le corps est interrompu après ces octets :
+// un fichier de 300 Mo n'est jamais téléchargé par la fonction.
+// Renvoie null en cas d'indisponibilité technique (jamais « vrai par
+// défaut » : une vérification impossible n'est pas une vérification).
+export async function lireEnTeteObjet(sb: any, chemin: string): Promise<Uint8Array | null> {
+  try {
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(chemin, 60);
+    const url = data?.signedUrl || data?.signedURL;
+    if (error || !url) return null;
+    const rep = await fetch(url, { headers: { Range: "bytes=0-63" } });
+    if (!rep.ok && rep.status !== 206) return null;
+    if (!rep.body) return null;
+    const lecteur = rep.body.getReader();
+    const morceaux: Uint8Array[] = [];
+    let total = 0;
+    while (total < 64) {
+      const { value, done } = await lecteur.read();
+      if (done) break;
+      if (value && value.length) { morceaux.push(value); total += value.length; }
+    }
+    try { await lecteur.cancel(); } catch { /* corps déjà terminé */ }
+    const sortie = new Uint8Array(Math.min(total, 64));
+    let pos = 0;
+    for (const m of morceaux) {
+      for (let i = 0; i < m.length && pos < sortie.length; i++) sortie[pos++] = m[i];
+    }
+    return sortie;
+  } catch (e) {
+    console.error("lecture en-tête objet :", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
 const CHAMPS_CANDIDATURE =
-  "id, activites, auth_user_id, created_at, statut, video_chemin, video_envoyee_le, video_upload_jeton_hash";
+  "id, activites, auth_user_id, created_at, statut, " +
+  "video_chemin, video_envoyee_le, video_upload_jeton_hash, video_upload_jeton_consomme_le, " +
+  "video_envoi_chemin, video_envoi_mime, video_envoi_taille_octets, " +
+  "video_envoi_duree_secondes, video_envoi_commence_le";
+
+function videoFinalisee(c: any): boolean {
+  return !!(c && c.video_chemin && c.video_envoyee_le);
+}
 
 // Identifie l'appelant et LA candidature sur laquelle il a un droit.
 // Deux chemins seulement, jamais un accès libre.
@@ -191,7 +278,7 @@ export async function resoudreCandidature(sb: any, req: Request, corps: any) {
     if (!ligne) {
       return { erreur: ["FORBIDDEN", "Aucune candidature rattachée à ce compte.", 403] as const };
     }
-    return { candidature: ligne, viaCompte: true };
+    return { candidature: ligne, viaCompte: true, jetonConsomme: false };
   }
 
   // 2) Jeton à usage unique, lié à une candidature DÉJÀ créée par ce
@@ -209,11 +296,17 @@ export async function resoudreCandidature(sb: any, req: Request, corps: any) {
   if (!ligne) {
     return { erreur: ["FORBIDDEN", "Autorisation d'envoi inconnue ou déjà utilisée.", 403] as const };
   }
+  // Jeton déjà consommé par une finalisation : il ne peut plus rien
+  // autoriser. Il sert seulement à répondre de façon IDEMPOTENTE à une
+  // confirmation rejouée — c'est l'appelant qui décide.
+  if (ligne.video_upload_jeton_consomme_le) {
+    return { candidature: ligne, viaCompte: false, jetonConsomme: true };
+  }
   const ageMinutes = (Date.now() - new Date(ligne.created_at).getTime()) / 60000;
   if (!isFinite(ageMinutes) || ageMinutes > FENETRE_ENVOI_MINUTES) {
     return { erreur: ["EXPIRED", "Autorisation d'envoi expirée.", 403] as const };
   }
-  return { candidature: ligne, viaCompte: false };
+  return { candidature: ligne, viaCompte: false, jetonConsomme: false };
 }
 
 // ============================================================
@@ -224,6 +317,16 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
   if ("erreur" in r) return erreur(r.erreur[0], r.erreur[1], r.erreur[2], cors);
   const c = r.candidature;
 
+  // Jeton consommé : la vidéo de cette candidature est déjà finalisée.
+  // Rejouer « autoriser » (réponse de confirmation perdue, second clic)
+  // ne doit ni rouvrir un envoi ni renvoyer une erreur trompeuse.
+  if (r.jetonConsomme) {
+    if (videoFinalisee(c)) {
+      return reponseJson({ ok: true, deja_confirmee: true, chemin: c.video_chemin }, 200, cors);
+    }
+    return erreur("FORBIDDEN", "Autorisation d'envoi déjà utilisée.", 403, cors);
+  }
+
   const mime = String(corps?.mime || "");
   const extension = EXTENSION_PAR_MIME[mime];
   if (!extension) {
@@ -231,8 +334,11 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
   }
 
   const taille = Number(corps?.taille_octets);
-  if (!Number.isFinite(taille) || taille <= 0 || taille > TAILLE_MAX_OCTETS) {
-    return erreur("TAILLE_REFUSEE", "Fichier trop volumineux.", 400, cors);
+  if (!Number.isFinite(taille) || taille <= 0 || Math.round(taille) !== taille) {
+    return erreur("TAILLE_REFUSEE", "Taille du fichier non vérifiable.", 400, cors);
+  }
+  if (taille > TAILLE_MAX_OCTETS) {
+    return erreur("TAILLE_REFUSEE", "Fichier trop volumineux (300 Mo maximum).", 400, cors);
   }
 
   // La règle de durée est réappliquée à partir des activités RÉELLEMENT
@@ -252,36 +358,39 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
   // CHEMIN GÉNÉRÉ ICI. Le navigateur n'en propose aucun et ne peut donc
   // pas viser le dossier d'une autre candidature.
   //
-  // ENVOI REPRENABLE : si un envoi est déjà en cours pour cette
+  // ENVOI REPRENABLE : si un envoi est déjà EN COURS pour cette
   // candidature, dans le même format, on REPREND le même chemin au lieu
-  // d'en créer un second. Sans cela, un rechargement de page pendant
-  // l'envoi laisserait un objet partiel orphelin et recommencerait tout
-  // depuis zéro. Le chemin reste décidé par le serveur dans les deux cas.
-  const cheminEnCours = (!c.video_envoyee_le && typeof c.video_chemin === "string"
-    && c.video_chemin.startsWith(`candidatures/${c.id}/`)
-    && c.video_chemin.endsWith(extension))
-    ? c.video_chemin : null;
+  // d'en créer un second. Le chemin reste décidé par le serveur dans
+  // les deux cas, et relu depuis les colonnes d'envoi en cours — jamais
+  // depuis les colonnes finales, qui ne changent qu'à la finalisation.
+  const cheminEnCours = (typeof c.video_envoi_chemin === "string"
+    && c.video_envoi_chemin.startsWith(`candidatures/${c.id}/`)
+    && c.video_envoi_chemin.endsWith(extension))
+    ? c.video_envoi_chemin : null;
   const chemin = cheminEnCours || `candidatures/${c.id}/${crypto.randomUUID()}${extension}`;
 
   const { data: signature, error: erreurSignature } = await sb
-    .storage.from(BUCKET).createSignedUploadUrl(chemin);
+    .storage.from(BUCKET).createSignedUploadUrl(chemin, { upsert: !!cheminEnCours });
   if (erreurSignature || !signature?.token) {
     console.error("createSignedUploadUrl:", erreurSignature);
-    return erreur("STOCKAGE_INDISPONIBLE", "Envoi momentanément indisponible.", 503, cors);
+    return erreur("STOCKAGE_INDISPONIBLE", "Envoi momentanément indisponible. Réessayez dans un instant.", 503, cors);
   }
 
-  // Le chemin attendu est enregistré AVANT l'envoi : la vidéo n'est
-  // considérée reçue qu'après confirmation (video_envoyee_le).
+  // L'ENVOI EN COURS est noté dans ses propres colonnes. video_chemin,
+  // video_mime, video_taille_octets et video_envoyee_le ne sont PAS
+  // touchées : la contrainte de cohérence de 03 est respectée, et la
+  // vidéo n'est considérée reçue qu'après confirmation.
   const { error: erreurMaj } = await sb.from("convoyeurs").update({
-    video_chemin: chemin,
-    video_mime: mime,
-    video_taille_octets: Math.round(taille),
-    video_duree_secondes: Math.round(duree * 100) / 100,
-    video_envoyee_le: null,
+    video_envoi_chemin: chemin,
+    video_envoi_mime: mime,
+    video_envoi_taille_octets: taille,
+    video_envoi_duree_secondes: Math.round(duree * 100) / 100,
+    video_envoi_commence_le: (cheminEnCours && c.video_envoi_commence_le)
+      ? c.video_envoi_commence_le : new Date().toISOString(),
   }).eq("id", c.id);
   if (erreurMaj) {
-    console.error("maj candidature:", erreurMaj);
-    return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
+    console.error("maj envoi en cours:", erreurMaj?.code || "", erreurMaj?.message || erreurMaj);
+    return erreur("INTERNAL_ERROR", MESSAGE_ERREUR_SERVEUR, 500, cors);
   }
 
   return reponseJson({
@@ -301,42 +410,35 @@ export async function actionAutoriser(sb: any, req: Request, corps: any, cors: R
 // ============================================================
 // Un envoi reprenable dure parfois plus longtemps que la signature qui
 // l'autorise. Cette action en délivre une nouvelle, pour le chemin DÉJÀ
-// enregistré et pour lui seul.
-//
-// Ce qu'elle ne fait pas, volontairement :
-//   * elle n'accepte aucun chemin venant du navigateur — elle relit
-//     celui que le serveur avait lui-même généré ;
-//   * elle ne consomme pas le jeton à usage unique : c'est « confirmer »
-//     qui le fait, une fois la vidéo réellement arrivée ;
-//   * elle ne rouvre rien sur une candidature dont la vidéo est déjà
-//     confirmée.
+// enregistré comme envoi en cours, et pour lui seul. Elle n'accepte
+// aucun chemin venant du navigateur et ne consomme pas le jeton.
 export async function actionProlonger(sb: any, req: Request, corps: any, cors: Record<string, string>) {
   const r = await resoudreCandidature(sb, req, corps);
   if ("erreur" in r) return erreur(r.erreur[0], r.erreur[1], r.erreur[2], cors);
   const c = r.candidature;
 
-  if (!c.video_chemin) {
-    return erreur("AUCUN_ENVOI", "Aucun envoi en cours pour cette candidature.", 400, cors);
-  }
-  if (c.video_envoyee_le) {
+  if (r.jetonConsomme) {
     return erreur("DEJA_CONFIRMEE", "Cette vidéo a déjà été reçue.", 409, cors);
+  }
+  if (!c.video_envoi_chemin) {
+    return erreur("AUCUN_ENVOI", "Aucun envoi en cours pour cette candidature.", 400, cors);
   }
   // Garde-fou : le chemin enregistré appartient forcément au dossier de
   // CETTE candidature. Une valeur inattendue n'est jamais resignée.
-  if (!String(c.video_chemin).startsWith(`candidatures/${c.id}/`)) {
+  if (!String(c.video_envoi_chemin).startsWith(`candidatures/${c.id}/`)) {
     return erreur("CHEMIN_INVALIDE", "Envoi non reconnu.", 409, cors);
   }
 
   const { data: signature, error: erreurSignature } = await sb
-    .storage.from(BUCKET).createSignedUploadUrl(c.video_chemin, { upsert: true });
+    .storage.from(BUCKET).createSignedUploadUrl(c.video_envoi_chemin, { upsert: true });
   if (erreurSignature || !signature?.token) {
     console.error("createSignedUploadUrl (prolonger):", erreurSignature);
-    return erreur("STOCKAGE_INDISPONIBLE", "Envoi momentanément indisponible.", 503, cors);
+    return erreur("STOCKAGE_INDISPONIBLE", "Envoi momentanément indisponible. Réessayez dans un instant.", 503, cors);
   }
 
   return reponseJson({
     ok: true,
-    chemin: c.video_chemin,
+    chemin: c.video_envoi_chemin,
     bucket: BUCKET,
     token: signature.token,
     validite_secondes: VALIDITE_URL_ENVOI_SECONDES,
@@ -344,35 +446,110 @@ export async function actionProlonger(sb: any, req: Request, corps: any, cors: R
 }
 
 // ============================================================
-// ACTION 2 — CONFIRMER : vérifie le dépôt et nettoie les orphelins
+// ACTION 2 — CONFIRMER : vérifie le dépôt, finalise, nettoie
 // ============================================================
 export async function actionConfirmer(sb: any, req: Request, corps: any, cors: Record<string, string>) {
   const r = await resoudreCandidature(sb, req, corps);
   if ("erreur" in r) return erreur(r.erreur[0], r.erreur[1], r.erreur[2], cors);
   const c = r.candidature;
 
-  if (!c.video_chemin) {
+  // IDEMPOTENCE : confirmation rejouée après succès. Rien n'est
+  // réécrit, rien n'est recréé, et la réponse est un succès — c'en est
+  // un. Un jeton consommé sans vidéo finalisée est, lui, refusé.
+  if (r.jetonConsomme) {
+    if (videoFinalisee(c)) {
+      return reponseJson({ ok: true, deja_confirmee: true, chemin: c.video_chemin, orphelins_supprimes: 0 }, 200, cors);
+    }
+    return erreur("FORBIDDEN", "Autorisation d'envoi déjà utilisée.", 403, cors);
+  }
+  if (!c.video_envoi_chemin) {
+    if (videoFinalisee(c)) {
+      return reponseJson({ ok: true, deja_confirmee: true, chemin: c.video_chemin, orphelins_supprimes: 0 }, 200, cors);
+    }
     return erreur("AUCUN_ENVOI", "Aucun envoi en cours pour cette candidature.", 400, cors);
   }
 
   const dossier = `candidatures/${c.id}`;
-  const attendu = String(c.video_chemin).slice(dossier.length + 1);
+  const cheminAttendu = String(c.video_envoi_chemin);
+  if (!cheminAttendu.startsWith(dossier + "/")) {
+    return erreur("CHEMIN_INVALIDE", "Envoi non reconnu.", 409, cors);
+  }
+  const attendu = cheminAttendu.slice(dossier.length + 1);
 
-  // La présence réelle de l'objet est vérifiée côté serveur : une
-  // candidature ne peut pas se déclarer complète sans fichier.
+  // 1) PRÉSENCE RÉELLE de l'objet, vérifiée côté serveur : une
+  //    candidature ne peut pas se déclarer complète sans fichier.
   const { data: objets, error: erreurListe } = await sb.storage.from(BUCKET).list(dossier);
   if (erreurListe) {
     console.error("list:", erreurListe);
-    return erreur("STOCKAGE_INDISPONIBLE", "Vérification impossible.", 503, cors);
+    return erreur("STOCKAGE_INDISPONIBLE", "Vérification impossible pour le moment. Réessayez dans un instant.", 503, cors);
   }
-  const present = (objets || []).some((o: any) => o?.name === attendu);
-  if (!present) {
-    return erreur("ENVOI_INCOMPLET", "La vidéo n'a pas été reçue entièrement.", 409, cors);
+  const objet = (objets || []).find((o: any) => o?.name === attendu);
+  if (!objet) {
+    return erreur("ENVOI_INCOMPLET", "La vidéo n'a pas été reçue entièrement. Relancez l'envoi.", 409, cors);
   }
 
-  // REMPLACEMENT PROPRE : tout ce qui traîne dans le dossier de cette
-  // candidature et qui n'est pas la vidéo confirmée est supprimé —
-  // ancienne vidéo remplacée comme dépôt abandonné. Aucun orphelin.
+  // 2) TAILLE RÉELLE, lue sur l'objet, comparée à la taille annoncée.
+  //    Un envoi tronqué (taille plus petite) ou un fichier substitué
+  //    (taille différente) ne devient jamais une vidéo reçue.
+  const tailleBrute = Number(objet?.metadata?.size);
+  const tailleReelle = Number.isFinite(tailleBrute) && tailleBrute >= 0 ? tailleBrute : null;
+  if (tailleReelle === 0) {
+    try { await sb.storage.from(BUCKET).remove([cheminAttendu]); } catch (e) { console.error("remove fichier vide:", e); }
+    return erreur("FICHIER_VIDE", "Le fichier reçu est vide. Choisissez une autre vidéo et relancez l'envoi.", 409, cors);
+  }
+  if (tailleReelle !== null && tailleReelle !== Number(c.video_envoi_taille_octets)) {
+    return erreur("TAILLE_INCOHERENTE",
+      "La vidéo reçue ne correspond pas au fichier annoncé (envoi incomplet ou fichier différent). Relancez l'envoi.",
+      409, cors);
+  }
+
+  // 3) EN-TÊTE BINAIRE : le contenu est-il bien une vidéo du format
+  //    annoncé ? Vérification impossible = refus temporaire, jamais un
+  //    passage en force.
+  const entete = await lireEnTeteObjet(sb, cheminAttendu);
+  if (entete === null) {
+    return erreur("STOCKAGE_INDISPONIBLE", "Vérification impossible pour le moment. Réessayez dans un instant.", 503, cors);
+  }
+  if (!enTeteCoherent(entete, String(c.video_envoi_mime || ""))) {
+    // Le fichier n'est pas une vidéo lisible du format annoncé : il est
+    // retiré du bucket, l'envoi en cours reste ouvert pour un nouveau
+    // fichier (même chemin, resigné à la prochaine autorisation).
+    try { await sb.storage.from(BUCKET).remove([cheminAttendu]); } catch (e) { console.error("remove fichier invalide:", e); }
+    return erreur("FORMAT_INCOHERENT",
+      "Le fichier reçu n'est pas une vidéo MP4, MOV ou WebM lisible. Choisissez une autre vidéo et relancez l'envoi.",
+      409, cors);
+  }
+
+  // 4) FINALISATION ATOMIQUE, côté base : les quatre colonnes finales
+  //    ensemble, la date réelle, l'envoi en cours vidé, le jeton
+  //    consommé, le statut. Une seule instruction SQL.
+  const { data: fin, error: erreurFin } = await sb.rpc("finaliser_video_candidature", {
+    p_convoyeur_id: c.id,
+    p_taille_reelle: tailleReelle,
+  });
+  if (erreurFin) {
+    console.error("finaliser_video_candidature:", erreurFin?.code || "", erreurFin?.message || erreurFin);
+    return erreur("INTERNAL_ERROR",
+      "Votre vidéo a bien été reçue mais n'a pas pu être enregistrée. Rien n'est perdu : réessayez dans un instant.",
+      500, cors);
+  }
+  if (!fin || fin.ok !== true) {
+    const code = String(fin?.code || "INTERNAL_ERROR");
+    if (code === "TAILLE_INCOHERENTE") {
+      return erreur("TAILLE_INCOHERENTE", "La vidéo reçue ne correspond pas au fichier annoncé. Relancez l'envoi.", 409, cors);
+    }
+    if (code === "AUCUN_ENVOI") {
+      return erreur("AUCUN_ENVOI", "Aucun envoi en cours pour cette candidature.", 400, cors);
+    }
+    console.error("finaliser_video_candidature a refusé :", code);
+    return erreur("INTERNAL_ERROR", MESSAGE_ERREUR_SERVEUR, 500, cors);
+  }
+
+  // 5) REMPLACEMENT PROPRE : tout ce qui traîne dans le dossier de cette
+  //    candidature et qui n'est pas la vidéo confirmée est supprimé —
+  //    ancienne vidéo remplacée comme dépôt abandonné. Aucun orphelin.
+  //    Fait APRÈS la finalisation : un échec ici ne remet pas en cause
+  //    une vidéo réellement reçue, il est journalisé et réconciliable.
   const aSupprimer = (objets || [])
     .filter((o: any) => o?.name && o.name !== attendu)
     .map((o: any) => `${dossier}/${o.name}`);
@@ -381,20 +558,13 @@ export async function actionConfirmer(sb: any, req: Request, corps: any, cors: R
     if (erreurSuppression) console.error("remove orphelins:", erreurSuppression);
   }
 
-  // Le jeton est à USAGE UNIQUE : il est effacé ici.
-  const maj: Record<string, unknown> = {
-    video_envoyee_le: new Date().toISOString(),
-    video_upload_jeton_hash: null,
-  };
-  if (c.statut === "video_attendue") maj.statut = "en_attente";
-
-  const { error: erreurMaj } = await sb.from("convoyeurs").update(maj).eq("id", c.id);
-  if (erreurMaj) {
-    console.error("maj confirmation:", erreurMaj);
-    return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
-  }
-
-  return reponseJson({ ok: true, orphelins_supprimes: aSupprimer.length }, 200, cors);
+  return reponseJson({
+    ok: true,
+    deja_confirmee: fin.code === "DEJA_FINALISEE",
+    chemin: fin.chemin || cheminAttendu,
+    statut: fin.statut || null,
+    orphelins_supprimes: aSupprimer.length,
+  }, 200, cors);
 }
 
 // ============================================================
@@ -434,7 +604,7 @@ export async function traiterRequete(sb: any, req: Request): Promise<Response> {
     return await ACTIONS[action](sb, req, corps, cors);
   } catch (e) {
     console.error(`Erreur action=${action}:`, e instanceof Error ? e.message : String(e));
-    return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
+    return erreur("INTERNAL_ERROR", MESSAGE_ERREUR_SERVEUR, 500, cors);
   }
 }
 
@@ -447,7 +617,7 @@ if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("Config manquante : SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY absente.");
       const { entetes } = enTetesCors(req.headers.get("origin"));
-      return erreur("SERVER_MISCONFIGURED", "Erreur serveur.", 500, entetes);
+      return erreur("SERVER_MISCONFIGURED", MESSAGE_ERREUR_SERVEUR, 500, entetes);
     }
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const sb = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });

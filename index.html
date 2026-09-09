@@ -14924,6 +14924,15 @@ function uploadVideoCandidature() {
       duree_secondes: _convVideo.duree
     }).then(function (autorisation) {
       if (autorisation.erreur) { resolve({ erreur: autorisation.erreur }); return; }
+      // LOT V01 — IDEMPOTENCE. La confirmation précédente a réussi côté
+      // serveur mais sa réponse s'est perdue (réseau coupé juste après,
+      // second clic) : le serveur le dit, et il n'y a rien à renvoyer.
+      // Aucun dépôt, aucune seconde confirmation, pas d'erreur trompeuse.
+      if (autorisation.deja_confirmee) {
+        _convJetonEnvoi = null;
+        resolve({ ok: true, chemin: autorisation.chemin, deja_confirmee: true });
+        return;
+      }
       if (!autorisation.chemin || !autorisation.token) {
         resolve({ erreur: 'Autorisation d\'envoi incomplète.' }); return;
       }
