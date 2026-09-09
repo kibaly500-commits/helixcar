@@ -177,16 +177,30 @@ window.fetch = function (url, options) {
   check('A6 : la demande réelle apparaît dans l\'espace client',
     /TEST-QA-A1/.test(accueil.liste) && /Convoyage automobile/.test(accueil.liste), accueil.liste.slice(0, 120));
 
-  // On laisse la navigation se produire réellement : c'est le
-  // comportement observable, pas une intention déclarée.
+  // ══ RÈGLE INVERSÉE SUR DEMANDE EXPLICITE (lot C1) ══
+  // Cette vérification exigeait que le bouton QUITTE le Dashboard pour
+  // la vitrine. Le propriétaire demande l'inverse : la demande doit se
+  // faire DANS l'espace client, navigation visible. Le contrôle n'est
+  // pas supprimé — il devient plus exigeant, puisqu'il faut désormais
+  // à la fois rester dans l'espace ET charger le vrai formulaire.
+  const urlAvant = page.url();
   await page.evaluate(() => {
     Array.from(document.querySelectorAll('#page-client-dashboard button'))
       .find(b => /Faire une nouvelle demande/.test(b.textContent)).click();
   });
   await page.waitForTimeout(500);
-  const cible = page.url();
-  check('A7 : elle ouvre le VRAI formulaire public, pas une copie',
-    /index\.html\?nouvelle-demande=1/.test(cible), cible);
+  const apresClic = await page.evaluate(() => ({
+    url: window.location.href,
+    pageActive: (document.querySelector('.page.active') || {}).id,
+    navVisible: document.querySelectorAll('#sidebar-nav .nav-item').length > 0,
+    src: (document.getElementById('client-demande-cadre') || {}).getAttribute('src')
+  }));
+  check('A7 : on reste dans l\'espace client, navigation visible',
+    apresClic.url === urlAvant && apresClic.navVisible === true
+    && apresClic.pageActive === 'page-client-nouvelle-demande', JSON.stringify(apresClic));
+  check('A7 bis : et c\'est bien le VRAI formulaire qui est chargé, pas une copie',
+    /index\.html\?nouvelle-demande=1&integre=1/.test(apresClic.src || ''),
+    String(apresClic.src));
 
   // ── B. MODE CONNECTÉ DANS LE FORMULAIRE PUBLIC ──
   await page.goto(urlFichier('index.html') + '?nouvelle-demande=1', { waitUntil: 'load' });
@@ -204,7 +218,20 @@ window.fetch = function (url, options) {
     societe: (document.getElementById('client-societe') || {}).value,
     emailVerrouille: (document.getElementById('client-email') || {}).readOnly,
     mdpRequis: (document.getElementById('client-password') || {}).required,
-    bandeau: (document.getElementById('hc-bandeau-connecte') || {}).style.display
+    // LOT E1 — la visibilite ne passe plus par un style en ligne mais
+    // par le composant partage. On verifie donc la GARANTIE (le bandeau
+    // est reellement visible et porte un texte), pas le mecanisme.
+    bandeau: (function () {
+      var b = document.getElementById('hc-bandeau-connecte');
+      if (!b) return null;
+      var st = getComputedStyle(b);
+      return {
+        visible: b.classList.contains('visible') && st.display !== 'none',
+        texte: (b.textContent || '').trim(),
+        fond: st.backgroundColor,
+        bordureGauche: st.borderLeftWidth
+      };
+    })()
   }));
   check('B1 : le parcours s\'ouvre directement', modeConnecte.modaleOuverte);
   check('B2 : il démarre sur « Comment pouvons-nous vous accompagner ? »',
@@ -215,7 +242,17 @@ window.fetch = function (url, options) {
   check('B4 : l\'e-mail déjà vérifié n\'est pas redemandé',
     modeConnecte.email === 'clientA@helixcar.test' && modeConnecte.emailVerrouille === true);
   check('B5 : la création de compte n\'est pas redemandée', modeConnecte.mdpRequis === false);
-  check('B6 : le client sait qu\'il est reconnu', modeConnecte.bandeau === 'block');
+  check('B6 : le client sait qu\'il est reconnu',
+    !!modeConnecte.bandeau && modeConnecte.bandeau.visible === true
+    && /Vous êtes connecté/.test(modeConnecte.bandeau.texte),
+    JSON.stringify(modeConnecte.bandeau));
+  // LOT E1 — et ce n'est plus un grand encadre vert : fond transparent,
+  // seul un filet vertical le signale.
+  check('B6 bis : le bandeau n\'est plus un grand encadré vert',
+    !!modeConnecte.bandeau
+    && /rgba\(0, 0, 0, 0\)|transparent/.test(modeConnecte.bandeau.fond)
+    && parseFloat(modeConnecte.bandeau.bordureGauche) >= 2,
+    JSON.stringify(modeConnecte.bandeau));
   check('B6b : le statut professionnel du profil est repris',
     modeConnecte.typeClient === 'pro' && modeConnecte.societe === 'TEST-QA Flotte SAS',
     JSON.stringify(modeConnecte));

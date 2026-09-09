@@ -135,6 +135,16 @@ function basculerMotDePasse(id, bouton) {
 // Conservé comme alias : d'anciens appels peuvent subsister.
 function togglePw(inputId, btn) { basculerMotDePasse(inputId, btn); }
 
+// LOT A3/B1 — l'origine officielle, construite, jamais codee en dur
+// sur le deploiement d'apercu.
+function _ccOrigineOfficielle() {
+  try {
+    var o = window.location.origin;
+    if (o && /^https:/.test(o)) return o;
+  } catch (e) {}
+  return 'https://helixcar.vercel.app';
+}
+
 function showError(msg) {
   var el = document.getElementById('cc-error');
   el.textContent = msg;
@@ -177,12 +187,76 @@ async function creerCompte() {
     return;
   }
 
-  btn.textContent = 'Création du compte…';
+  // ══════════════════════════════════════════════════════════════
+  // LOT B1 — UNE SEULE IDENTITE PAR ADRESSE
+  // ══════════════════════════════════════════════════════════════
+  // CE QUI ETAIT FAIT, ET QUI NE POUVAIT PAS MARCHER :
+  //
+  //   * on appelait signUp() sans jamais se demander si un compte
+  //     existait deja pour cette adresse. Une personne DEJA CLIENTE
+  //     chez HelixCar se voyait donc proposer un SECOND mot de passe
+  //     pour la meme adresse — ce que Supabase ne cree pas, et ce que
+  //     le lot B1 interdit explicitement ;
+  //
+  //   * puis on rattachait la fiche par un PATCH direct sur
+  //     `convoyeurs.auth_user_id` AVEC LA CLE ANON. La RLS refuse cette
+  //     ecriture : PostgREST repond 204 avec ZERO ligne modifiee. Le
+  //     rattachement n'avait donc jamais lieu, en silence — et s'il
+  //     avait ete accepte, n'importe qui aurait pu s'attribuer la fiche
+  //     d'un autre en connaissant son adresse.
+  //
+  // DESORMAIS : on essaie D'ABORD de se connecter avec l'adresse et le
+  // mot de passe saisis. Si le compte existe et que le mot de passe est
+  // le bon, on ne cree rien : on ajoute seulement le role manquant, par
+  // une fonction serveur qui verifie elle-meme l'adresse confirmee
+  // (migration 104). Sinon seulement, on cree le compte.
+  btn.textContent = 'Vérification du compte…';
   try {
+    var connexion = await sb.auth.signInWithPassword({ email: email, password: pw });
+    var dejaUnCompte = !!(connexion && connexion.data && connexion.data.session);
+
+    if (dejaUnCompte) {
+      // Le compte existe deja et le mot de passe est le bon : on
+      // n'en cree surtout pas un second. On ajoute le role.
+      btn.textContent = 'Ajout de ton espace convoyeur…';
+      var ajout = await sb.rpc('ajouter_role_partenaire', { p_convoyeur_id: convoyeurId });
+      var code = (ajout && ajout.data && ajout.data.code) || '';
+      if (ajout && ajout.error) {
+        showError('Ton espace convoyeur n\'a pas pu être ajouté. Réessaie dans quelques instants.');
+        btn.disabled = false; btn.textContent = 'Créer mon compte →';
+        return;
+      }
+      if (code === 'ADRESSE_NON_CONFIRMEE') {
+        showError('Confirme d\'abord ton adresse e-mail (regarde tes messages, et les spams), puis reviens ici.');
+        btn.disabled = false; btn.textContent = 'Créer mon compte →';
+        return;
+      }
+      if (code !== 'RATTACHEE' && code !== 'DEJA_RATTACHEE' && code !== 'ROLE_DEJA_PRESENT') {
+        showError('Ce dossier convoyeur ne correspond pas à ce compte. Contacte HelixCar.');
+        btn.disabled = false; btn.textContent = 'Créer mon compte →';
+        return;
+      }
+      document.getElementById('cc-error').style.display = 'none';
+      document.getElementById('form-zone').style.display = 'none';
+      document.getElementById('cc-sub').style.display = 'none';
+      var dejaEl = document.getElementById('cc-success');
+      dejaEl.innerHTML = 'Tu as déjà un compte HelixCar avec cette adresse : '
+        + 'ton espace convoyeur vient d\'y être ajouté. '
+        + 'Connecte-toi comme d\'habitude, avec le MÊME mot de passe.';
+      dejaEl.style.display = 'block';
+      return;
+    }
+
+    // Mot de passe refusé : soit le compte n'existe pas — et on le crée
+    // juste après — soit il existe avec un AUTRE mot de passe. Dans ce
+    // second cas, signUp() ne créera rien et l'on ne doit surtout pas
+    // annoncer un compte créé. Le message reste neutre : il ne dit
+    // jamais si l'adresse est déjà connue.
+    btn.textContent = 'Création du compte…';
     var result = await sb.auth.signUp({
       email: email,
       password: pw,
-      options: { emailRedirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html' }
+      options: { emailRedirectTo: _ccOrigineOfficielle() + '/dashboard.html' }
     });
     if (result.error) {
       showError('Erreur : ' + result.error.message);
@@ -190,21 +264,13 @@ async function creerCompte() {
       return;
     }
 
-    // Relie ce compte à SA fiche convoyeur précise (et pas une autre partageant le même
-    // email) — indispensable pour que la connexion retrouve toujours le bon dossier ensuite.
-    if (result.data && result.data.user && result.data.user.id) {
-      try {
-        await fetch(SUPABASE_URL + '/rest/v1/convoyeurs?id=eq.' + convoyeurId, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_KEY,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({ auth_user_id: result.data.user.id })
-        });
-      } catch (e) { console.error('Erreur liaison auth_user_id:', e); }
+    // Le rattachement de la fiche ne peut se faire QU'AVEC une session
+    // reelle : c'est la fonction serveur qui verifie l'adresse
+    // confirmee. Sans session (confirmation d'e-mail encore requise),
+    // il aura lieu a la premiere connexion.
+    if (result.data && result.data.session) {
+      try { await sb.rpc('ajouter_role_partenaire', { p_convoyeur_id: convoyeurId }); }
+      catch (e) { console.error('Rattachement du role partenaire :', e); }
     }
 
     document.getElementById('cc-error').style.display = 'none';

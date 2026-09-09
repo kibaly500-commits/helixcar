@@ -385,6 +385,43 @@ const JETON_B = 'b'.repeat(64);
     check('7.15 POST direct depuis une origine pirate -> 403',
       rPirate.statut === 403 && rPirate.json.code === 'ORIGIN_NOT_ALLOWED');
 
+    // ══ LOT A1 — LE DOMAINE DE PRODUCTION ══
+    //
+    // REPRODUCTION du blocage observé sur https://helixcar.vercel.app :
+    // « Response to preflight request doesn't pass access control check:
+    //   No 'Access-Control-Allow-Origin' header is present ».
+    // Le site officiel N'ÉTAIT PAS dans la liste blanche : le preflight
+    // était refusé, et aucune candidature avec vidéo ne pouvait aboutir.
+    const PRODUCTION = 'https://helixcar.vercel.app';
+    const APERCU = 'https://helixcar-i89b.vercel.app';
+
+    rep = await traiterRequete(sb, preflight('content-type, apikey', PRODUCTION));
+    check('7.16a Preflight depuis le domaine de PRODUCTION -> 204',
+      rep.status === 204, String(rep.status));
+    check('7.16b ... et il reçoit son Access-Control-Allow-Origin',
+      rep.headers.get('access-control-allow-origin') === PRODUCTION,
+      String(rep.headers.get('access-control-allow-origin')));
+    rep = await traiterRequete(sb, preflight('content-type, apikey', APERCU));
+    check('7.16c Le domaine d\'aperçu reste autorisé lui aussi',
+      rep.status === 204 && rep.headers.get('access-control-allow-origin') === APERCU,
+      String(rep.status) + ' / ' + String(rep.headers.get('access-control-allow-origin')));
+
+    // Aucun joker permissif, et aucune origine renvoyée en miroir.
+    const srcFn = lire('supabase/functions/candidature-video/index.ts');
+    check('7.16d Aucun joker « * » n\'est accordé',
+      !/Access-Control-Allow-Origin"\]?\s*[:=]\s*"\*"/.test(srcFn)
+      && !/"\*"/.test((srcFn.match(/ORIGINES_AUTORISEES[\s\S]{0,400}/) || [''])[0]));
+    for (const pirate of ['https://helixcar.vercel.app.pirate.invalid',
+                          'https://helixcarvercel.app',
+                          'http://helixcar.vercel.app',
+                          'https://helixcar.vercel.app:8443',
+                          'null']) {
+      rep = await traiterRequete(sb, preflight('content-type, apikey', pirate));
+      check('7.16e Origine hostile refusée : ' + pirate,
+        rep.status === 403 && !rep.headers.get('access-control-allow-origin'),
+        String(rep.status) + ' / ' + String(rep.headers.get('access-control-allow-origin')));
+    }
+
     check('7.16 preflightAcceptable refuse un en-tête hors liste',
       preflightAcceptable('content-type, apikey') === true &&
       preflightAcceptable('content-type, x-autre') === false);

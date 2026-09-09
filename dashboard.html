@@ -442,6 +442,71 @@ body.scroll-verrouille { overflow: hidden; }
 .alert-success { background: rgba(31,122,77,0.08); color: #1F7A4D; border: 1px solid rgba(31,122,77,0.2); }
 .alert-warning { background: rgba(201,123,46,0.08); color: #A65E22; border: 1px solid rgba(201,123,46,0.2); }
 
+/* ══════════════════════════════════════════════════════════════
+   LOT E1 — LE MESSAGE HELIXCAR DES ECRANS D'AUTHENTIFICATION
+   ══════════════════════════════════════════════════════════════
+   Strictement le meme composant que celui d'index.html : fond blanc,
+   texte discret, petit repere vertical rouge pour une erreur. Il
+   remplace les grands encadres rouges et verts de la connexion et de
+   la reinitialisation du mot de passe. */
+.hc-note {
+  display: none;
+  position: relative;
+  margin: 10px 0;
+  padding: 2px 0 2px 12px;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid #DC2626;
+  border-radius: 0;
+  color: #4A5056;
+  font-size: .82rem;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.hc-note.visible { display: block; }
+
+/* LOT B1 — selecteur d'espace : discret, dans la barre laterale. */
+.sb-roles { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
+.sb-roles button {
+  border: 1px solid rgba(23,28,33,.14); background: #fff; color: #4A5056;
+  border-radius: 999px; padding: 5px 12px; font-size: .74rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.sb-roles button:hover { border-color: var(--red); color: var(--red); }
+.sb-roles button[aria-current="true"] {
+  background: var(--navy); border-color: var(--navy); color: #fff; cursor: default;
+}
+
+/* LOT E2 — le fond bleu de l'autoremplissage, neutralise sur les
+   ecrans d'authentification du Dashboard exactement comme sur la
+   vitrine. `background-clip: text` limite le fond peint par le
+   navigateur aux seules glyphes ; l'autocompletion, les suggestions et
+   les gestionnaires de mots de passe continuent de fonctionner. */
+#login-email:-webkit-autofill,
+#login-email:-webkit-autofill:hover,
+#login-email:-webkit-autofill:focus,
+#login-pw:-webkit-autofill,
+#login-pw:-webkit-autofill:hover,
+#login-pw:-webkit-autofill:focus,
+#modal-reinit-mdp input:-webkit-autofill,
+#modal-reinit-mdp input:-webkit-autofill:hover,
+#modal-reinit-mdp input:-webkit-autofill:focus {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+  caret-color: #3A3F45;
+  transition: background-color 100000s ease-in-out 0s;
+}
+#login-email:autofill,
+#login-pw:autofill,
+#modal-reinit-mdp input:autofill {
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+}
+.hc-note--succes { border-left-color: #2F7D5B; }
+.hc-note--info   { border-left-color: rgba(16,24,32,.22); }
+
 /* ── FRAIS UPLOAD ── */
 .upload-zone {
   border: 2px dashed #ddd; border-radius: 10px; padding: 20px;
@@ -906,9 +971,7 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
     </div>
 
-    <div id="login-alert" style="display:none" class="alert alert-warning">
-      ⚠️ Identifiants incorrects. Réessayez.
-    </div>
+    <div id="login-alert" class="hc-note" role="alert">Identifiants incorrects. Réessayez.</div>
 
     <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="doLogin()">
       Se connecter →
@@ -966,6 +1029,15 @@ body.scroll-verrouille { overflow: hidden; }
         <span class="user-role role-admin" id="sb-role">Admin</span>
       </div>
     </div>
+
+    <!-- LOT B1 — SELECTEUR D'ESPACE.
+         N'apparait QUE si l'identite possede reellement au moins deux
+         roles, et ne propose QUE ceux que le serveur a confirmes
+         (public.roles_utilisateur()). Changer d'espace ne demande
+         aucune reconnexion et n'elargit aucun droit : les politiques
+         RLS restent les seules a decider ce qui est lisible. -->
+    <div id="sb-roles" class="sb-roles" style="display:none" role="group"
+         aria-label="Changer d'espace"></div>
 
     <nav class="sidebar-nav" id="sidebar-nav">
       <!-- injected by JS -->
@@ -1996,6 +2068,41 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- CLIENT: Mes missions -->
+      <!-- ══════════════════════════════════════════════════════════
+           LOT C1 — NOUVELLE DEMANDE, DANS L'ESPACE CLIENT
+           ══════════════════════════════════════════════════════════
+           « Faire une nouvelle demande » quittait le Dashboard pour la
+           vitrine : la navigation disparaissait, et le client se
+           retrouvait devant la grosse modale publique.
+
+           La demande se fait desormais ICI, sans quitter l'espace, avec
+           la barre laterale et la barre du haut toujours visibles.
+
+           Le formulaire reste LE VRAI formulaire : c'est exactement le
+           meme code, charge en mode integre. Aucune copie, aucune regle
+           recopiee, aucun payload parallele — c'est precisement ce
+           qu'il ne fallait pas faire. Meme origine, donc meme session
+           Supabase : rien n'est transmis par le navigateur, et le
+           rattachement reste decide par le serveur. -->
+      <div class="page" id="page-client-nouvelle-demande">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Nouvelle demande</div>
+              <div style="font-size:.85rem;color:#555;margin-top:4px">
+                Vos informations de compte sont déjà connues : elles ne vous seront pas redemandées.
+              </div>
+            </div>
+            <button class="btn" onclick="fermerNouvelleDemande()">← Retour à mes demandes</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <iframe id="client-demande-cadre" title="Nouvelle demande HelixCar"
+                  style="width:100%;border:0;display:block;min-height:70vh"
+                  loading="lazy"></iframe>
+        </div>
+      </div>
+
       <div class="page" id="page-client-missions">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div></div>
@@ -2362,7 +2469,7 @@ body.scroll-verrouille { overflow: hidden; }
       Choisissez un nouveau mot de passe pour votre compte HelixCar.
     </p>
 
-    <div id="reinit-alert" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;color:#991B1B"></div>
+    <div id="reinit-alert" class="hc-note" role="alert"></div>
 
     <div id="reinit-formulaire">
       <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Nouveau mot de passe</label>
@@ -2388,9 +2495,7 @@ body.scroll-verrouille { overflow: hidden; }
     </div>
 
     <div id="reinit-succes" style="display:none">
-      <div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:4px;padding:12px 14px;font-size:.85rem;color:#065F46;margin-bottom:14px">
-        Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.
-      </div>
+      <div class="hc-note hc-note--succes visible" role="status">Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.</div>
       <button class="btn btn-primary btn-full" onclick="terminerReinitialisation()">Aller à la connexion</button>
     </div>
   </div>
@@ -2532,7 +2637,7 @@ async function doLogin() {
     if (!emailEl || !pwEl) { alert('Erreur : champs introuvables'); return; }
     const email = emailEl.value.trim().toLowerCase();
     const pw    = pwEl.value;
-    if (alertEl) alertEl.style.display = 'none';
+    if (alertEl) _hcNoteEl(alertEl, '');
 
     if (loginRole === 'convoyeur') {
       await doLoginConvoyeur(email, pw, alertEl);
@@ -2569,17 +2674,17 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
   const conv = (rows || [])[0];
 
   if (!conv) {
-    if (alertEl) { alertEl.textContent = '⚠️ Aucun dossier convoyeur trouvé pour cet email.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Aucun dossier convoyeur trouvé pour cet email.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
   if (conv.bloque) {
-    if (alertEl) { alertEl.textContent = '⚠️ Ton accès a été bloqué. Contacte HelixCar.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ton accès a été bloqué. Contacte HelixCar.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
   if (conv.statut !== 'actif') {
-    if (alertEl) { alertEl.textContent = '⚠️ Ton dossier n\'est pas encore validé.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ton dossier n\'est pas encore validé.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
@@ -2652,12 +2757,14 @@ async function doLoginConvoyeur(email, pw, alertEl) {
   try {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
-      if (alertEl) { alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); alertEl.style.display = 'flex'; }
+      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
-    await finaliserSessionConvoyeur(email, alertEl, data.user ? data.user.id : null);
+    const uidConv = data.user ? data.user.id : null;
+    const okConv = await finaliserSessionConvoyeur(email, alertEl, uidConv);
+    if (okConv !== false) await _hcPreparerRoles('partenaire', email, uidConv);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2679,12 +2786,14 @@ async function doLoginAdmin(email, pw, alertEl) {
   try {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
-      if (alertEl) { alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message); alertEl.style.display = 'flex'; }
+      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
       return;
     }
-    await finaliserSessionAdmin(email, alertEl, data.user ? data.user.id : null);
+    const uidAdm = data.user ? data.user.id : null;
+    const okAdm = await finaliserSessionAdmin(email, alertEl, uidAdm);
+    if (okAdm !== false) await _hcPreparerRoles('admin', email, uidAdm);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2698,15 +2807,19 @@ async function doLoginClient(email, pw, alertEl) {
     const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
     if (error) {
       if (alertEl) {
-        alertEl.textContent = '⚠️ ' + (error.message === 'Invalid login credentials'
-          ? 'Email ou mot de passe incorrect.' : error.message);
-        alertEl.style.display = 'flex';
+        _hcNoteEl(alertEl, '' + (error.message === 'Invalid login credentials'
+          ? 'Email ou mot de passe incorrect.' : error.message));
       }
       return;
     }
-    await finaliserSessionClient(email, alertEl, data.user ? data.user.id : null);
+    const uid = data.user ? data.user.id : null;
+    const ok = await finaliserSessionClient(email, alertEl, uid);
+    // LOT B1 — une connexion directe doit offrir le meme choix qu'une
+    // arrivee par onAuthStateChange : sans cela, une personne a deux
+    // casquettes n'atteignait jamais la seconde.
+    if (ok !== false) await _hcPreparerRoles('client', email, uid);
   } catch (e) {
-    if (alertEl) { alertEl.textContent = '⚠️ Erreur de connexion (voir la console).'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
     console.error(e);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
@@ -2754,7 +2867,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
   // même distinction que pour l'administrateur.
   if (erreurTechnique) {
     console.error('Erreur technique lors de l\'ouverture de l\'espace client :', erreurTechnique);
-    if (alertEl) { alertEl.textContent = '⚠️ Impossible d\'ouvrir votre espace client.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Impossible d\'ouvrir votre espace client.');
     return false;
   }
 
@@ -2942,12 +3055,61 @@ const LIB_STATUT_INFO = {
   a_corriger: 'À corriger'
 };
 
+// LOT C1 — la demande se fait DANS l'espace client.
+//
+// Le cadre charge le VRAI formulaire en mode intégré : même code, mêmes
+// questions, mêmes règles conditionnelles, mêmes compteurs, mêmes
+// accordéons, mêmes calendriers, mêmes validations, même récapitulatif
+// et même payload. Aucune copie n'est faite ici — une seconde
+// implémentation divergerait le jour même.
+//
+// Même origine : la session Supabase est partagée, rien n'est transmis
+// par le navigateur, et le rattachement de la demande reste décidé par
+// le serveur à partir de auth.uid().
 function ouvrirNouvelleDemande() {
-  // La session Supabase est partagée entre les deux pages (même
-  // origine) : rien à transmettre, et aucune identité à faire confiance
-  // côté navigateur.
-  window.location.href = 'index.html?nouvelle-demande=1';
+  const cadre = document.getElementById('client-demande-cadre');
+  if (!cadre) { window.location.href = 'index.html?nouvelle-demande=1'; return; }
+  // Rechargé à chaque ouverture : le brouillon et la reprise restent
+  // ceux du formulaire lui-même, jamais un état gardé ici.
+  if (!cadre.getAttribute('src')) {
+    cadre.setAttribute('src', 'index.html?nouvelle-demande=1&integre=1');
+  }
+  showPage('client-nouvelle-demande');
 }
+
+function fermerNouvelleDemande() {
+  showPage('client-dashboard');
+}
+
+// Le formulaire intégré parle à son espace : hauteur réelle, et surtout
+// référence de la demande dès qu'elle est enregistrée.
+//
+// Le message n'est accepté QUE s'il vient de notre propre origine et de
+// notre propre cadre : un autre onglet, une autre page ou une extension
+// ne peuvent rien injecter ici.
+window.addEventListener('message', function (ev) {
+  try {
+    if (ev.origin !== window.location.origin) return;
+    const cadre = document.getElementById('client-demande-cadre');
+    if (!cadre || ev.source !== cadre.contentWindow) return;
+    const m = ev.data;
+    if (!m || typeof m !== 'object') return;
+
+    if (m.type === 'hc-demande-hauteur' && typeof m.hauteur === 'number') {
+      cadre.style.height = Math.max(520, Math.min(4000, m.hauteur)) + 'px';
+      return;
+    }
+    if (m.type === 'hc-demande-enregistree') {
+      // La liste est rechargée depuis la base : la référence et le
+      // statut affichés sont ceux que le SERVEUR a enregistrés, jamais
+      // ceux que le cadre annonce.
+      if (typeof chargerDemandesClient === 'function') chargerDemandesClient();
+      showPage('client-dashboard');
+      const zone = document.getElementById('client-demandes-liste');
+      if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+    }
+  } catch (e) { console.warn('Message du formulaire intégré ignoré :', e); }
+});
 
 function ouvrirCompletionDemande(id) {
   window.location.href = 'index.html?completer=' + encodeURIComponent(id);
@@ -3128,12 +3290,12 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
   // est admin ou non, une déconnexion serait une décision arbitraire.
   if (erreurTechnique) {
     console.error('Erreur technique lors de la vérification admin:', erreurTechnique);
-    if (alertEl) { alertEl.textContent = '⚠️ Impossible de vérifier les droits administrateur.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Impossible de vérifier les droits administrateur.');
     return false;
   }
 
   if (!admin) {
-    if (alertEl) { alertEl.textContent = '⚠️ Ce compte n\'a pas les droits administrateur.'; alertEl.style.display = 'flex'; }
+    if (alertEl) _hcNoteEl(alertEl, 'Ce compte n\'a pas les droits administrateur.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
@@ -3156,14 +3318,130 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 // convoyeur si ce n'est pas un admin — reproduisant exactement le
 // comportement déjà en place pour convoyeur seul, étendu pour couvrir
 // les deux rôles sans jamais les confondre.
+// ══════════════════════════════════════════════════════════════
+// LOT B1 — UNE IDENTITE, PLUSIEURS CASQUETTES
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : une personne a la fois cliente et partenaire
+// n'atteignait JAMAIS son second espace. finaliserSessionParUid()
+// prenait le PREMIER role trouve — admin, puis partenaire, puis client
+// — et s'arretait la.
+//
+// Les roles sont desormais demandes AU SERVEUR
+// (public.roles_utilisateur(), migration 104). La page ne devine rien,
+// n'interroge aucune table role par role, et ne peut donc pas se
+// tromper ni renseigner sur quelqu'un d'autre.
+//
+// A RETENIR : changer d'espace ne change QUE l'affichage. Aucune
+// requete n'est autorisee par ce choix : les politiques RLS restent
+// les seules a decider ce qui est lisible, et elles ne regardent que
+// auth.uid().
+window._hcRolesAutorises = [];
+window._hcRoleActif = null;
+
+const HC_LIB_ROLE = { admin: 'Admin', partenaire: 'Convoyeur', client: 'Client' };
+const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace convoyeur', client: 'Espace client' };
+
+// Les roles REELLEMENT attribues a la session en cours. En cas de
+// panne, on repart sur une liste vide : l'ancien enchainement prend
+// alors le relais, et aucun espace n'est ouvert par defaut.
+async function _hcRolesDeLaSession() {
+  try {
+    if (!_sbAuthPret || !_sbAuthPret()) return [];
+    const { data, error } = await sbAuth.rpc('roles_utilisateur');
+    if (error) { console.warn('roles_utilisateur :', error); return []; }
+    return (data || [])
+      .map(r => (typeof r === 'string' ? r : (r && r.role)))
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('roles_utilisateur :', e);
+    return [];
+  }
+}
+
+// Ouvre UN espace, et lui seul. Refuse net tout role qui n'a pas ete
+// confirme par le serveur : un appel direct depuis la console ne peut
+// donc pas ouvrir un Dashboard non attribue.
+async function _hcOuvrirEspace(role, email, authUserId) {
+  if (window._hcRolesAutorises.indexOf(role) === -1) {
+    console.warn('Espace non attribué refusé :', role);
+    return false;
+  }
+  const precedent = window._hcRoleActif;
+  window._hcRoleActif = role;
+  let ouvert;
+  if (role === 'admin')           ouvert = await finaliserSessionAdmin(email, null, authUserId, false);
+  else if (role === 'partenaire') ouvert = await finaliserSessionConvoyeur(email, null, authUserId, false);
+  else                            ouvert = await finaliserSessionClient(email, null, authUserId, false);
+  // Un espace qui n'a PAS pu s'ouvrir ne doit jamais etre presente
+  // comme ouvert : on revient a celui d'ou l'on vient, plutot que de
+  // laisser un selecteur qui affirme une bascule qui n'a pas eu lieu.
+  if (ouvert === false) window._hcRoleActif = precedent;
+  return ouvert;
+}
+
+// Le selecteur n'apparait QUE s'il y a vraiment un choix a faire.
+function _hcRendreSelecteurRoles(email, authUserId) {
+  const zone = document.getElementById('sb-roles');
+  if (!zone) return;
+  const roles = window._hcRolesAutorises || [];
+  if (roles.length < 2) { zone.style.display = 'none'; zone.innerHTML = ''; return; }
+  zone.innerHTML = '';
+  ['client', 'partenaire', 'admin'].filter(r => roles.indexOf(r) !== -1).forEach(r => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = HC_LIB_ESPACE[r] || r;
+    b.setAttribute('data-hc-role', r);
+    if (r === window._hcRoleActif) b.setAttribute('aria-current', 'true');
+    // Un clic suffit : aucune reconnexion, la session ne bouge pas.
+    b.onclick = function () {
+      if (r === window._hcRoleActif) return;
+      _hcOuvrirEspace(r, email, authUserId).then(function () {
+        _hcRendreSelecteurRoles(email, authUserId);
+      });
+    };
+    zone.appendChild(b);
+  });
+  zone.style.display = 'flex';
+}
+
+// LOT B1 — apres une connexion directe : on demande les roles reels et
+// on affiche le selecteur si, et seulement si, il y a un choix.
+// Le role deja ouvert est celui par lequel la personne est entree.
+async function _hcPreparerRoles(roleOuvert, email, authUserId) {
+  window._hcRolesAutorises = await _hcRolesDeLaSession();
+  if (window._hcRolesAutorises.indexOf(roleOuvert) === -1) {
+    // Le serveur ne confirme pas ce role : on n'invente rien, et on
+    // n'affiche aucun selecteur. L'espace deja ouvert l'a ete par le
+    // chemin historique, qui a ses propres controles.
+    window._hcRoleActif = roleOuvert;
+    const z = document.getElementById('sb-roles');
+    if (z) { z.style.display = 'none'; z.innerHTML = ''; }
+    return;
+  }
+  window._hcRoleActif = roleOuvert;
+  _hcRendreSelecteurRoles(email, authUserId);
+}
+
 async function finaliserSessionParUid(email, authUserId) {
-  const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
-  if (estAdmin) return;
-  const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
-  if (estConvoyeur) return;
-  // Ni admin ni partenaire : c'est un client. Sa session est réelle,
-  // exactement comme les deux autres rôles.
-  await finaliserSessionClient(email, null, authUserId, false);
+  window._hcRolesAutorises = await _hcRolesDeLaSession();
+
+  // Repli si le serveur ne repond pas ou si la migration 104 n'est pas
+  // encore appliquee : l'enchainement historique, strictement
+  // inchange. Aucun espace n'est ouvert sans que son role existe.
+  if (!window._hcRolesAutorises.length) {
+    const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
+    if (estAdmin) return;
+    const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
+    if (estConvoyeur) return;
+    await finaliserSessionClient(email, null, authUserId, false);
+    return;
+  }
+
+  // Ordre d'ouverture par defaut, inchange : admin, partenaire, client.
+  const prefere = ['admin', 'partenaire', 'client']
+    .filter(r => window._hcRolesAutorises.indexOf(r) !== -1)[0];
+  const ouvert = await _hcOuvrirEspace(prefere, email, authUserId);
+  if (ouvert !== false) _hcRendreSelecteurRoles(email, authUserId);
 }
 
 function initApp(user) {
@@ -3240,6 +3518,7 @@ const PAGE_TITLES = {
   'convoyeur-recompenses':['Récompenses', 'Challenge mensuel & fidélité'],
   'convoyeur-profil':     ['Mon profil', 'Gérez vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue Marc'],
+  'client-nouvelle-demande': ['Nouvelle demande', 'Convoyage, stockage, nettoyage ou recherche d\'un professionnel'],
   'client-missions':     ['Mes missions', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],
@@ -3404,12 +3683,27 @@ const REINIT_LONGUEUR_MIN = 8;
 // fonctionnent, avec repli sur l'adresse de production quand l'origine
 // n'est pas exploitable (ouverture d'un fichier local, par exemple).
 // Chaque origine utilisée doit être autorisée dans Supabase.
+// LOT A3 — l'origine officielle, declaree une seule fois. Le repli ne
+// pointe plus sur le deploiement d'APERCU : un lien envoye a un client
+// doit mener au site de production, qui ne disparaitra pas.
+var HC_ORIGINE_PRODUCTION = 'https://helixcar.vercel.app';
+
+// Toutes les adresses envoyees a un client sont construites a partir de
+// l'origine reellement servie, avec repli sur la production.
+function _hcOrigineOfficielle() {
+  try {
+    const o = window.location.origin;
+    if (o && /^https:/.test(o)) return o;
+  } catch (e) {}
+  return HC_ORIGINE_PRODUCTION;
+}
+
 function urlRetourReinitialisation() {
   try {
     const o = window.location.origin;
     if (o && /^https?:/.test(o)) return o + '/dashboard.html';
   } catch (e) {}
-  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
 }
 
 // Message TOUJOURS identique, que l'adresse existe ou non : il ne doit
@@ -3465,15 +3759,22 @@ async function envoyerLienReinitialisation(email) {
 // Entrée depuis l'écran de connexion du Dashboard.
 async function ouvrirMotDePasseOublie(e) {
   if (e) e.preventDefault();
+  // LOT E1 — ni prompt(), ni alert() : le champ e-mail de l'ecran de
+  // connexion est deja la, et le message s'affiche dans le composant
+  // discret partage, juste sous le formulaire.
   const champ = document.getElementById('login-email');
-  let adresse = champ ? champ.value.trim() : '';
+  const adresse = champ ? champ.value.trim() : '';
   if (!adresse) {
-    adresse = (prompt('Votre adresse e-mail, pour recevoir un lien de réinitialisation :') || '').trim();
-    if (!adresse) return;
+    _hcNote('login-alert',
+      'Renseignez votre adresse e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié ? ».',
+      'info');
+    if (champ) champ.focus();
+    return;
   }
+  _hcNote('login-alert', 'Envoi en cours…', 'info');
   const r = await envoyerLienReinitialisation(adresse);
   if (r.enCours) return;
-  alert(r.message);
+  _hcNote('login-alert', r.message, r.ok ? 'info' : 'erreur');
 }
 
 // ------------------------------------------------------------
@@ -3481,12 +3782,22 @@ async function ouvrirMotDePasseOublie(e) {
 // ------------------------------------------------------------
 let _enregistrementMdpEnCours = false;
 
-function _reinitAfficherErreur(texte) {
-  const el = document.getElementById('reinit-alert');
-  if (!el) return;
-  if (!texte) { el.style.display = 'none'; return; }
-  el.style.display = 'block';
+// LOT E1 — point de passage unique des messages d'authentification.
+// ton : 'erreur' (defaut), 'succes' ou 'info'.
+function _hcNoteEl(el, texte, ton) {
+  if (!el) return null;
+  el.className = 'hc-note'
+    + (ton === 'succes' ? ' hc-note--succes' : (ton === 'info' ? ' hc-note--info' : ''));
+  if (!texte) { el.classList.remove('visible'); el.textContent = ''; el.style.display = ''; return el; }
   el.textContent = texte;
+  el.classList.add('visible');
+  el.style.display = '';
+  return el;
+}
+function _hcNote(id, texte, ton) { return _hcNoteEl(document.getElementById(id), texte, ton); }
+
+function _reinitAfficherErreur(texte) {
+  _hcNote('reinit-alert', texte, 'erreur');
 }
 
 function ouvrirFormulaireNouveauMotDePasse() {
@@ -5810,7 +6121,7 @@ function validerConvoyeur(id, name, email) {
     try {
       if (window.emailjs && email) {
         const prenom = (name || '').split(' ')[0];
-        const lienCompte = 'https://helixcar-i89b.vercel.app/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
+        const lienCompte = _hcOrigineOfficielle() + '/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
         const msg = 'Bonjour ' + prenom + ',\n\n' +
           'Votre compte convoyeur HelixCar est validé ! Bienvenue dans le programme Convoyeurs d\'Excellence.\n\n' +
           'Dernière étape : créez votre mot de passe pour accéder à votre espace convoyeur et voir les missions disponibles :\n' +
@@ -6603,7 +6914,7 @@ function envoyerEmailFicheMission(missionId, conv) {
     const notesTxt = m.notes ? '\n\n📌 Informations importantes :\n' + m.notes : '';
     const optionsListe = [m.nettoyage ? 'Nettoyage' : null, m.plateau ? 'Plateau' : null, m.urgence ? 'Urgent' : null, m.electrique ? 'Véhicule électrique' : null].filter(Boolean);
     const optionsTxt = optionsListe.length ? '\nOptions : ' + optionsListe.join(', ') : '';
-    const lienFiche = 'https://helixcar-i89b.vercel.app/fiche-mission.html?mission=' + encodeURIComponent(m.reference);
+    const lienFiche = _hcOrigineOfficielle() + '/fiche-mission.html?mission=' + encodeURIComponent(m.reference);
     const msg = 'Bonjour ' + (conv.prenom || '') + ',\n\n' +
       'Mission confirmée : ' + m.reference + '\n\n' +
       '📄 Fiche mission complète (à imprimer et à faire signer au départ et à l\'arrivée) :\n' + lienFiche + '\n\n' +
@@ -9777,7 +10088,11 @@ function _construirePdfDevis(c, d) {
     'Mission sur site', 'Intervention',
     'Informations complémentaires',
     'Prestation', 'Prestations',
-    "Lieu d'intervention", 'Véhicules à nettoyer'
+    "Lieu d'intervention", 'Véhicules à nettoyer',
+    // LOT F1/F2 — la carte de periode et d'horaires du nettoyage suit
+    // immediatement le bandeau : sans cette respiration, son titre
+    // touche la zone grise qui le precede.
+    'Période et horaires'
   ];
   function _espaceAvantTitre(titre) {
     return ESPACE_AVANT_TITRE_GLOBAL
@@ -9918,17 +10233,51 @@ function _construirePdfDevis(c, d) {
   // Ligne « Libellé : valeur » — la valeur est posée JUSTE APRÈS le
   // libellé, à partir de sa largeur réellement mesurée : petit
   // espacement, jamais une grande colonne vide.
+  // LOT F2 — LE TEXTE NE DEBORDE PLUS DE SA CARTE.
+  //
+  // L'ancienne version posait la valeur juste apres le libelle, sans
+  // aucune limite de largeur : un libelle long — « Horaire de debut sur
+  // place » — additionne a une valeur longue depassait la carte grise,
+  // touchait la marge, et pouvait chevaucher ce qui suit.
+  //
+  // La valeur est desormais decoupee sur la largeur REELLEMENT
+  // disponible, et ses lignes suivantes sont alignees sous elle. La
+  // hauteur est MESUREE avec exactement le meme calcul que le dessin :
+  // aucune carte ne peut plus etre trop courte pour son contenu.
+  var HAUTEUR_LIGNE_LV = 4.9;
+  function _lignesValeurLV(label, valeur) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
+    var l = String(label) + ' :';
+    var w = doc.getTextWidth(l);
+    // Largeur restante dans la carte, marge interieure droite comprise.
+    var dispo = (LARGEUR - 14) - w - 2.6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
+    // Un libelle si long qu'il ne laisse plus de place : la valeur
+    // passe entierement a la ligne suivante plutot que d'etre ecrasee.
+    if (dispo < 18) {
+      return { w: w, dispo: LARGEUR - 14, sousLibelle: true,
+               lignes: doc.splitTextToSize(String(valeur), LARGEUR - 14) };
+    }
+    return { w: w, dispo: dispo, sousLibelle: false,
+             lignes: doc.splitTextToSize(String(valeur), dispo) };
+  }
+  function _hauteurLigneLV(label, valeur) {
+    var m = _lignesValeurLV(label, valeur);
+    return (m.lignes.length + (m.sousLibelle ? 1 : 0)) * HAUTEUR_LIGNE_LV + 1.6;
+  }
   function ligneLV(label, valeur, x, yy, dess) {
+    var m = _lignesValeurLV(label, valeur);
     if (dess) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
       doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
-      var l = String(label) + ' :';
-      T(l, x, yy);
-      var w = doc.getTextWidth(l);
+      T(String(label) + ' :', x, yy);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9.8);
       doc.setTextColor(ANTHRACITE_V6[0], ANTHRACITE_V6[1], ANTHRACITE_V6[2]);
-      T(String(valeur), x + w + 2.6, yy);
+      var yv = m.sousLibelle ? yy + HAUTEUR_LIGNE_LV : yy;
+      var xv = m.sousLibelle ? x : x + m.w + 2.6;
+      m.lignes.forEach(function (lg, i) { T(lg, xv, yv + i * HAUTEUR_LIGNE_LV); });
     }
+    return (m.lignes.length + (m.sousLibelle ? 1 : 0)) * HAUTEUR_LIGNE_LV + 1.6;
   }
 
   // Carte de lignes « libellé : valeur ». Une ligne par donnée
@@ -9939,12 +10288,15 @@ function _construirePdfDevis(c, d) {
     });
     if (!utiles.length) return;
     sectionAvecBloc(titre, function (dess) {
-      var y0 = y, cur = y0 + 7.4;
+      var y0 = y, cur = y0 + 7.4, dernier = 0;
       utiles.forEach(function (l) {
+        dernier = _hauteurLigneLV(l[0], l[1]);
         ligneLV(l[0], l[1], xG, cur, dess);
-        cur += 6.5;
+        cur += Math.max(6.5, dernier);
       });
-      return (cur - y0) - 6.5 + 7.4;
+      // Meme calcul que le dessin : hauteur avancee, moins le dernier
+      // interligne, plus la marge basse de la carte.
+      return (cur - y0) - Math.max(6.5, dernier) + 7.4;
     });
   }
 
@@ -10008,8 +10360,20 @@ function _construirePdfDevis(c, d) {
     bandeauIndicateurs([
       ['Véhicules', ndPdf.nombre_vehicules_approx || ''],
       ['Formule', NETT_LIB_TYPE[ndPdf.type_nettoyage] || ''],
-      ['Date', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Période', _nettPeriodeTexte(ndPdf, _dvDate)],
       ['Horaire', _nettHoraireTexte(ndPdf)]
+    ]);
+    // LOT F2 — la periode et les DEUX horaires, avec exactement les
+    // libelles du formulaire, dans une carte placee juste apres le
+    // bandeau : le client retrouve mot pour mot ce qu'il a saisi.
+    // La carte est mesuree avant d'etre dessinee (sectionAvecBloc) :
+    // un titre ne peut pas rester seul en bas de page, et une valeur
+    // longue passe a la ligne dans la carte au lieu d'en deborder.
+    carteLignes('Période et horaires', [
+      ['Date de début', ndPdf.date_souhaitee ? _dvDate(ndPdf.date_souhaitee) : ''],
+      ['Date de fin', ndPdf.date_fin ? _dvDate(ndPdf.date_fin) : ''],
+      ['Horaire de début sur place', ndPdf.creneau_debut || ''],
+      ['Horaire de fin sur place', ndPdf.creneau_fin || '']
     ]);
     carteLignes("Lieu d'intervention", [
       ['Adresse', _nettAdresseTexte(ndPdf)],
@@ -10029,11 +10393,14 @@ function _construirePdfDevis(c, d) {
     var estTechPdf = (pdPdf.categorie === 'technicien');
     y += ESPACE_AVANT_TITRE_GLOBAL;
     sectionTitre('Trouver un professionnel automobile');
+    // LOT D4 — le devis d'un TECHNICIEN se lit sur la periode, la duree
+    // et le nombre de professionnels. Plus aucun vehicule : ni compte
+    // reel, ni vehicule fictif.
     bandeauIndicateurs(estTechPdf ? [
       ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
       ['Spécialité', _proLibelleMetier(pdPdf)],
-      ['Véhicules', pdPdf.nombre_vehicules || ''],
-      ['Professionnels', pdPdf.nombre_professionnels || '']
+      ['Professionnels', pdPdf.nombre_professionnels || ''],
+      ['Durée', _proDureeTexte(pdPdf)]
     ] : [
       ['Besoin', PRO_LIB_CATEGORIE[pdPdf.categorie] || ''],
       ['Mission', _proLibelleMetier(pdPdf)],
@@ -11512,8 +11879,13 @@ function _nbVehiculesDossier(c) {
     return nd.nombre_vehicules_approx || 1;
   }
   if (_estDemandeProfessionnel(c)) {
+    // LOT D4 — un besoin de professionnel porte sur des PERSONNES et
+    // sur une periode, jamais sur un parc. On ne se replie plus sur 1 :
+    // afficher « 1 vehicule » la ou le client n'en a declare aucun
+    // serait inventer une donnee. Un ancien dossier qui en porte encore
+    // garde la sienne.
     var pd = _proDetails(c) || {};
-    return pd.nombre_vehicules || 1;
+    return pd.nombre_vehicules || 0;
   }
   return c.nb_vehicules || (_vehiculesDuDossier(c) || []).length || 1;
 }
@@ -11841,7 +12213,7 @@ async function testerPrepareDevisQA(clientId) {
       return; // reste sur le Dashboard, aucune redirection
     }
 
-    var urlClient = 'https://helixcar-i89b.vercel.app/devis.html?token=' + encodeURIComponent(tokenBrut);
+    var urlClient = _hcOrigineOfficielle() + '/devis.html?token=' + encodeURIComponent(tokenBrut);
     tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
     window.location.href = urlClient; // redirection de l'onglet courant, aucun _blank
   } else {

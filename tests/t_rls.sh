@@ -1964,6 +1964,462 @@ check "F9 : une seule contrainte d'activités sur convoyeurs" "1" \
 check "F10 : une seule signature pour informations_demande" "1" \
   "$(sql "select count(*) from pg_proc where proname='informations_demande';")"
 
+echo "── V bis. LOT D3 : L'HORAIRE DE NETTOYAGE, EXIGE ET COMPLET ──"
+# REPRODUCTION D'ABORD. Avec les seules migrations 101 et 102, une
+# demande de nettoyage SANS heure de fin est presentee comme complete,
+# et la mission se cree quand meme : la rubrique unique « Horaire
+# d'intervention » etait satisfaite des que l'heure de DEBUT existait.
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff40','TEST-QA-CLAUDE-PR4-H1',
+             'nett-h1@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','interieur',
+               'lieu','locaux_client',
+               'adresse_rue','9 rue Sans Fin','adresse_cp','75000','adresse_ville','Paris',
+               'date_souhaitee','2026-12-01','date_fin','2026-12-03',
+               'creneau_debut','08:30',
+               'nombre_vehicules_approx', 3,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Sonia','telephone','+33600000042')))
+     on conflict (id) do nothing;" >/dev/null
+
+AVANT_ATTENDUES=$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40') where statut='attendue';" | tail -1)
+check "V-D3-1 : REPRODUCTION — sans heure de fin, rien n'est reclame avant 103" "0" "$AVANT_ATTENDUES"
+AVANT_RUBRIQUES=$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40') where cle like 'nettoyage_horaire%';" | tail -1)
+check "V-D3-2 : REPRODUCTION — une seule rubrique d'horaire avant 103" "1" "$AVANT_RUBRIQUES"
+
+errD3=$(appliquer migrations/103_nettoyage_horaires_obligatoires.sql)
+check "V-D3-3 : migrations/103 s'applique sans erreur" "" "$errD3"
+
+check "V-D3-4 : la mission porte ses deux bornes horaires" "2" \
+  "$(sql "select count(*) from information_schema.columns
+     where table_schema='public' and table_name='missions'
+       and column_name in ('heure_debut_intervention','heure_fin_intervention');")"
+check "V-D3-5 : heure_intervention n'est PAS retiree" "1" \
+  "$(sql "select count(*) from information_schema.columns
+     where table_schema='public' and table_name='missions' and column_name='heure_intervention';")"
+
+check "V-D3-6 : l'horaire compte desormais DEUX rubriques" "2" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40')
+      where cle in ('nettoyage_horaire_debut','nettoyage_horaire_fin');" | tail -1)"
+check "V-D3-7 : le debut fourni est reconnu comme fourni" "fournie" \
+  "$(sqlAdmin "select statut from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40')
+      where cle='nettoyage_horaire_debut';" | tail -1)"
+check "V-D3-8 : la fin absente est desormais RECLAMEE" "attendue" \
+  "$(sqlAdmin "select statut from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40')
+      where cle='nettoyage_horaire_fin';" | tail -1)"
+check "V-D3-9 : son libelle est celui du formulaire" "Horaire de fin sur place" \
+  "$(sqlAdmin "select libelle from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40')
+      where cle='nettoyage_horaire_fin';" | tail -1)"
+
+sql "insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH1','eeeeeeee-0000-0000-0000-00000000ff40', 400, 'accepte');" >/dev/null
+check "V-D3-10 : devis accepte mais heure de fin absente : AUCUNE mission" "INFORMATIONS_MANQUANTES" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff40') ->> 'code';" | tail -1)"
+check "V-D3-11 : ... et la table des missions reste vide pour elle" "0" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff40';")"
+
+# Le client complete son horaire de fin : la mission se cree alors.
+sql "update public.clients
+        set nettoyage_details = nettoyage_details || jsonb_build_object('creneau_fin','16:45')
+      where id='eeeeeeee-0000-0000-0000-00000000ff40';" >/dev/null
+check "V-D3-12 : une fois la fin fournie, plus rien n'est attendu" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff40') where statut='attendue';" | tail -1)"
+check "V-D3-13 : et la mission se cree enfin" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff40') ->> 'code';" | tail -1)"
+check "V-D3-14 : elle porte les deux heures, chacune dans sa colonne" "08:30:00|16:45:00" \
+  "$(sql "select heure_debut_intervention||'|'||heure_fin_intervention from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff40';")"
+check "V-D3-15 : et le texte lisible reste renseigne pour les fiches existantes" "08:30 – 16:45" \
+  "$(sql "select heure_intervention from public.missions
+      where client_id='eeeeeeee-0000-0000-0000-00000000ff40';")"
+check "V-D3-16 : une seule mission, toujours" "1" \
+  "$(sql "select count(*) from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff40';")"
+
+# Une demande ANCIENNE, sans aucun horaire, reste lisible et passe par
+# le mecanisme des informations manquantes — jamais une erreur.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff41','TEST-QA-CLAUDE-PR4-H2',
+             'nett-h2@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 1,
+               'type_nettoyage','exterieur',
+               'lieu','locaux_client',
+               'adresse_rue','3 place Ancienne','adresse_cp','33000','adresse_ville','Bordeaux',
+               'date_souhaitee','2026-12-10',
+               'nombre_vehicules_approx', 2,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Ancien','telephone','+33600000043')))
+     on conflict (id) do nothing;" >/dev/null
+check "V-D3-17 : un ancien dossier sans horaire reste LISIBLE" "1" \
+  "$(sqlAdmin "select case when count(*) > 0 then 1 else 0 end
+      from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff41');" | tail -1)"
+check "V-D3-18 : ses deux horaires manquants lui sont reclames" "2" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff41')
+      where cle like 'nettoyage_horaire%' and statut='attendue';" | tail -1)"
+check "V-D3-19 : et sa date de fin aussi" "attendue" \
+  "$(sqlAdmin "select statut from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff41')
+      where cle='nettoyage_date_fin';" | tail -1)"
+
+# Une heure de forme inattendue ne fait jamais echouer la creation.
+sql "update public.clients
+        set nettoyage_details = nettoyage_details
+            || jsonb_build_object('date_fin','2026-12-11','creneau_debut','n''importe quoi','creneau_fin','25:99')
+      where id='eeeeeeee-0000-0000-0000-00000000ff41';" >/dev/null
+sql "insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH2','eeeeeeee-0000-0000-0000-00000000ff41', 300, 'accepte');" >/dev/null
+check "V-D3-20 : une heure illisible n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff41') ->> 'code';" | tail -1)"
+check "V-D3-21 : elle laisse simplement les colonnes vides" "true" \
+  "$(sql "select (heure_debut_intervention is null and heure_fin_intervention is null)::text
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff41';")"
+
+# ----------------------------------------------------------------
+# V-D3-30 a V-D3-35 — LA CONVERSION DEFENSIVE DOIT L'ETRE VRAIMENT
+# ----------------------------------------------------------------
+# REPRODUCTION. Le filtre par expression reguliere laisse passer des
+# valeurs qui franchissent la forme mais qui ne se convertissent PAS :
+#
+#   '25:30'       ~ '^[0-2][0-9]:[0-5][0-9]$'   -> vrai, ::time  ECHOUE
+#   '2026-02-30'  ~ '^\d{4}-\d{2}-\d{2}$'      -> vrai, ::date  ECHOUE
+#   '99999999999' ~ '^[0-9]+$'                  -> vrai, ::integer ECHOUE
+#
+# Le commentaire de la migration promet qu'une donnee inattendue
+# « laisse la colonne vide plutot que de faire echouer la creation ».
+# V-D3-20 ne l'avait pas prouve : '25:99' est REJETE par le filtre, donc
+# n'atteignait jamais la conversion. Ces controles visent la fenetre
+# reellement dangereuse — celle que le filtre accepte.
+#
+# Consequence si elle n'est pas fermee : un dossier portant une telle
+# valeur fait echouer creer_mission_nettoyage_si_prete par une erreur
+# SQL brute, et l'administrateur ne peut plus creer la mission du tout.
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff42','TEST-QA-CLAUDE-PR4-H3',
+             'nett-h3@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','interieur',
+               'lieu','locaux_client',
+               'adresse_rue','5 rue Hors Plage','adresse_cp','69000','adresse_ville','Lyon',
+               'date_souhaitee','2026-12-01','date_fin','2026-12-02',
+               'creneau_debut','25:30','creneau_fin','17:00',
+               'nombre_vehicules_approx', 2,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Hors Plage','telephone','+33600000044')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH3','eeeeeeee-0000-0000-0000-00000000ff42', 310, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-30 : une heure hors plage (25:30) n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff42') ->> 'code';" | tail -1)"
+check "V-D3-31 : elle laisse le debut vide et garde la fin valide" "|17:00:00" \
+  "$(sql "select coalesce(heure_debut_intervention::text,'')||'|'||coalesce(heure_fin_intervention::text,'')
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff42';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff43','TEST-QA-CLAUDE-PR4-H4',
+             'nett-h4@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','exterieur',
+               'lieu','locaux_client',
+               'adresse_rue','7 rue Date Impossible','adresse_cp','31000','adresse_ville','Toulouse',
+               'date_souhaitee','2026-02-30','date_fin','2026-12-05',
+               'creneau_debut','09:00','creneau_fin','12:00',
+               'nombre_vehicules_approx', 1,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Date','telephone','+33600000045')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH4','eeeeeeee-0000-0000-0000-00000000ff43', 320, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-32 : une date impossible (30 fevrier) n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff43') ->> 'code';" | tail -1)"
+check "V-D3-33 : elle laisse la date de debut vide et garde la fin valide" "|2026-12-05" \
+  "$(sql "select coalesce(date_intervention::text,'')||'|'||coalesce(date_fin_intervention::text,'')
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff43';")"
+
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, nettoyage_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff44','TEST-QA-CLAUDE-PR4-H5',
+             'nett-h5@helixcar.test','nettoyage','nouveau',
+             jsonb_build_object(
+               'schema_version', 2,
+               'type_nettoyage','interieur_exterieur',
+               'lieu','locaux_client',
+               'adresse_rue','11 rue Trop Grand','adresse_cp','44000','adresse_ville','Nantes',
+               'date_souhaitee','2026-12-08','date_fin','2026-12-09',
+               'creneau_debut','07:00','creneau_fin','19:00',
+               'nombre_vehicules_approx', 99999999999,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Grand','telephone','+33600000046')))
+     on conflict (id) do nothing;
+     insert into public.devis (reference, client_id, prix, statut)
+     values ('TEST-QA-CLAUDE-PR4-DH5','eeeeeeee-0000-0000-0000-00000000ff44', 330, 'accepte')
+     on conflict do nothing;" >/dev/null
+check "V-D3-34 : un nombre de vehicules hors bornes n'empeche pas la creation" "CREEE" \
+  "$(sqlAdmin "select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000ff44') ->> 'code';" | tail -1)"
+check "V-D3-35 : il laisse simplement la colonne vide" "true" \
+  "$(sql "select (nb_vehicules is null)::text
+      from public.missions where client_id='eeeeeeee-0000-0000-0000-00000000ff44';")"
+
+# Les trois convertisseurs, pris isolement : ils convertissent ce qui
+# est convertible et rendent NULL — jamais une erreur — pour le reste.
+check "V-D3-36 : hc_vers_heure convertit une heure valide" "08:30:00" \
+  "$(sql "select public.hc_vers_heure('08:30')::text;")"
+check "V-D3-37 : et rend NULL sans erreur sur une heure impossible" "true" \
+  "$(sql "select (public.hc_vers_heure('25:30') is null)::text;")"
+check "V-D3-38 : hc_vers_date convertit une date valide" "2026-12-01" \
+  "$(sql "select public.hc_vers_date('2026-12-01')::text;")"
+check "V-D3-39 : et rend NULL sans erreur sur un 30 fevrier" "true" \
+  "$(sql "select (public.hc_vers_date('2026-02-30') is null)::text;")"
+check "V-D3-40 : hc_vers_entier convertit un entier valide" "3" \
+  "$(sql "select public.hc_vers_entier('3')::text;")"
+check "V-D3-41 : et rend NULL sans erreur au-dela des bornes" "true" \
+  "$(sql "select (public.hc_vers_entier('99999999999') is null)::text;")"
+check "V-D3-42 : les trois sont strictes — NULL entre, NULL sort" "true" \
+  "$(sql "select (public.hc_vers_heure(null) is null
+              and public.hc_vers_date(null) is null
+              and public.hc_vers_entier(null) is null)::text;")"
+check "V-D3-43 : une seule signature pour chaque convertisseur" "3" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('hc_vers_heure','hc_vers_date','hc_vers_entier');")"
+check "V-D3-44 : aucun n'est security definer" "0" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('hc_vers_heure','hc_vers_date','hc_vers_entier') and prosecdef;")"
+
+echo "── V ter. LOT D2 : LE SCENARIO REELLEMENT CHOISI COMMANDE ──"
+# Un stockage ou le client depose ET recupere lui-meme : HelixCar
+# n'intervient sur aucun trajet. Rien de tel ne doit lui etre reclame.
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut,
+       stockage_acheminement, stockage_sortie, stockage_ville, stockage_date_debut, trajet_commun)
+     values ('eeeeeeee-0000-0000-0000-00000000ff50','TEST-QA-CLAUDE-PR4-S1',
+             'stock-s1@helixcar.test','stockage','nouveau',
+             'depot_client','recuperation_client','Lyon','2026-12-01', false)
+     on conflict (id) do nothing;
+     insert into public.vehicules (dossier_id, position, immatriculation, marque_modele)
+     values ('eeeeeeee-0000-0000-0000-00000000ff50', 1, 'AA-111-AA', 'TEST-QA Clio')
+     on conflict do nothing;" >/dev/null
+
+check "V-D2-1 : aucune prise en charge HelixCar n'est reclamee" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50')
+      where cle like '%prise_en_charge%' or cle like '%adresse_depart%' or cle like '%contact_pc%';" | tail -1)"
+check "V-D2-2 : aucune livraison HelixCar n'est reclamee" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50')
+      where cle like '%adresse_arrivee%' or cle like '%contact_liv%';" | tail -1)"
+check "V-D2-3 : aucune restitution n'est reclamee" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50')
+      where cle like '%restit%';" | tail -1)"
+check "V-D2-4 : le VIN, facultatif dans le formulaire, n'est jamais reclame" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50')
+      where cle like '%vin%';" | tail -1)"
+check "V-D2-5 : une demande complete ne laisse rien d'attendu" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50')
+      where statut='attendue';" | tail -1)"
+check "V-D2-6 : et la liste n'est pas vide pour autant" "1" \
+  "$(sqlAdmin "select case when count(*) > 0 then 1 else 0 end
+      from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff50');" | tail -1)"
+
+# Le TECHNICIEN ne se voit jamais reclamer de vehicule (lot D4).
+sql "insert into public.clients
+      (id, numero_client, email, type_service, statut, professionnel_details)
+     values ('eeeeeeee-0000-0000-0000-00000000ff60','TEST-QA-CLAUDE-PR4-P1',
+             'pro-p1@helixcar.test','professionnel','nouveau',
+             jsonb_build_object(
+               'categorie','technicien','specialite','mecanique',
+               'adresse_rue','5 rue Atelier','adresse_ville','Nantes',
+               'date_debut','2026-12-05','date_fin','2026-12-06',
+               'heure_debut','08:00','heure_fin','18:00',
+               'description','TEST-QA remise en etat',
+               'nombre_professionnels', 2,
+               'contact_sur_place', jsonb_build_object('nom','TEST-QA Leo','telephone','+33600000044')))
+     on conflict (id) do nothing;" >/dev/null
+check "V-D4-1 : aucun vehicule n'est reclame a un technicien" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff60')
+      where cle like '%vehicule%';" | tail -1)"
+check "V-D4-2 : sa demande est complete sans aucun vehicule" "0" \
+  "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000ff60')
+      where statut='attendue';" | tail -1)"
+
+errD3b=$(appliquer migrations/103_nettoyage_horaires_obligatoires.sql)
+check "V-D3-22 : 103 se rejoue sans erreur" "" "$errD3b"
+check "V-D3-23 : une seule signature pour chaque fonction remplacee" "2" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('informations_demande','creer_mission_nettoyage_si_prete');")"
+
+echo "── W bis. LOT B1 : UNE IDENTITE, PLUSIEURS CASQUETTES ──"
+# Une meme personne doit pouvoir etre cliente ET partenaire avec la
+# MEME adresse, donc la meme identite Auth et le meme mot de passe.
+
+# Une personne qui est deja cliente et qui a depose une candidature
+# partenaire avec la meme adresse.
+sql "insert into auth.users (id, email, email_confirmed_at) values
+      ('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test', now()),
+      ('77777777-0000-0000-0000-000000000002','autre-personne@helixcar.test', now()),
+      ('77777777-0000-0000-0000-000000000003','non-confirmee@helixcar.test', null)
+     on conflict (id) do nothing;
+     insert into public.clients (id, numero_client, email, type_service, statut, auth_user_id)
+     values ('77777777-1111-0000-0000-000000000001','TEST-QA-CLAUDE-PR4-B1',
+             'deux-casquettes@helixcar.test','convoyage','nouveau',
+             '77777777-0000-0000-0000-000000000001')
+     on conflict (id) do nothing;
+     insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000001','TEST-QA','Deux Casquettes',
+             'deux-casquettes@helixcar.test', array['convoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+
+# REPRODUCTION : avant 104, la page ne peut pas connaitre les roles.
+AVANT_FN=$(sql "select count(*) from pg_proc where proname='roles_utilisateur';")
+check "W-B1-1 : REPRODUCTION — aucun moyen de connaitre ses roles avant 104" "0" "$AVANT_FN"
+AVANT_IDX=$(sql "select count(*) from pg_indexes
+   where indexname in ('admins_une_ligne_par_identite','convoyeurs_une_fiche_par_identite');")
+check "W-B1-2 : REPRODUCTION — rien n'empeche deux fiches par identite" "0" "$AVANT_IDX"
+
+errB1=$(appliquer migrations/104_identite_unique_roles_multiples.sql)
+check "W-B1-3 : migrations/104 s'applique sans erreur" "" "$errB1"
+check "W-B1-4 : les deux index d'unicite sont poses" "2" \
+  "$(sql "select count(*) from pg_indexes
+     where indexname in ('admins_une_ligne_par_identite','convoyeurs_une_fiche_par_identite');")"
+
+# La candidature n'est PAS encore rattachee : un seul role.
+check "W-B1-5 : avant rattachement, la personne n'est que cliente" "client" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select string_agg(role, ',' order by role) from public.roles_utilisateur();
+     commit;" | tail -1)"
+
+# QUELQU'UN D'AUTRE ne peut pas s'attribuer cette candidature.
+check "W-B1-6 : une autre identite ne peut pas s'attribuer la fiche" "INTROUVABLE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000002','autre-personne@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-7 : ... et la fiche reste bien non rattachee" "t" \
+  "$(sql "select (auth_user_id is null) from public.convoyeurs
+      where id='77777777-2222-0000-0000-000000000001';")"
+
+# Une adresse NON CONFIRMEE ne suffit pas.
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000009','TEST-QA','Non Confirmee',
+             'non-confirmee@helixcar.test', array['convoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+check "W-B1-8 : une adresse non confirmee ne rattache rien" "ADRESSE_NON_CONFIRMEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000003','non-confirmee@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000009') ->> 'code';
+     commit;" | tail -1)"
+
+# LE PARCOURS LEGITIME.
+check "W-B1-9 : la personne rattache SA candidature a SON identite" "RATTACHEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-10 : elle porte desormais DEUX roles, sans second mot de passe" "client,partenaire" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select string_agg(role, ',' order by role) from public.roles_utilisateur();
+     commit;" | tail -1)"
+check "W-B1-11 : une seule identite Auth pour cette adresse" "1" \
+  "$(sql "select count(*) from auth.users where email='deux-casquettes@helixcar.test';")"
+
+# IDEMPOTENCE et DOUBLE CLIC.
+check "W-B1-12 : rejouer l'appel ne duplique rien" "DEJA_RATTACHEE" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" | tail -1)"
+check "W-B1-13 : et toujours UNE seule fiche partenaire pour cette identite" "1" \
+  "$(sql "select count(*) from public.convoyeurs
+      where auth_user_id='77777777-0000-0000-0000-000000000001'
+        and statut is distinct from 'refuse';")"
+
+# Une SECONDE candidature de la meme personne ne cree pas un second role.
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut)
+     values ('77777777-2222-0000-0000-000000000002','TEST-QA','Deux Casquettes Bis',
+             'deux-casquettes@helixcar.test', array['nettoyage'], 'actif')
+     on conflict (id) do nothing;" >/dev/null
+check "W-B1-14 : une deuxieme fiche partenaire est refusee pour la meme identite" "ROLE_DEJA_PRESENT" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000002') ->> 'code';
+     commit;" | tail -1)"
+# Ecriture DIRECTE, hors de toute fonction : c'est la base elle-meme
+# qui doit refuser. L'erreur attendue est ignoree, seul le compte final
+# fait foi.
+FORCE_CONV=$(sql "update public.convoyeurs set auth_user_id='77777777-0000-0000-0000-000000000001'
+      where id='77777777-2222-0000-0000-000000000002';" 2>&1 | head -1)
+check "W-B1-15 : la base refuse elle-meme une deuxieme fiche rattachee" "1" \
+  "$(sql "select count(*) from public.convoyeurs
+      where auth_user_id='77777777-0000-0000-0000-000000000001'
+        and statut is distinct from 'refuse';")"
+check "W-B1-15 bis : et elle le dit par une violation d'unicite" "1" \
+  "$(printf '%s' "$FORCE_CONV" | grep -ci 'duplicate key\|unique' || true)"
+FORCE_ADMIN=$(sql "insert into public.admins (auth_user_id, email, actif)
+      values ('11111111-1111-1111-1111-111111111111','admin@helixcar.test', true);" 2>&1 | head -1)
+check "W-B1-16 : et deux lignes d'administrateur pour une identite aussi" "1" \
+  "$(sql "select count(*) from public.admins
+      where auth_user_id='11111111-1111-1111-1111-111111111111';")"
+check "W-B1-16 bis : la aussi par une violation d'unicite" "1" \
+  "$(printf '%s' "$FORCE_ADMIN" | grep -ci 'duplicate key\|unique' || true)"
+
+# LE ROLE ADMINISTRATEUR N'EST JAMAIS AUTO-ATTRIBUABLE.
+check "W-B1-17 : un client ne peut pas s'inscrire administrateur" "0" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from (
+       select 1 where (select count(*) from public.roles_utilisateur() where role='admin') > 0
+     ) d;
+     commit;" | tail -1)"
+check "W-B1-18 : ajouter_role_partenaire n'ecrit jamais dans admins" "0" \
+  "$(sql "select count(*) from pg_proc p
+     where p.proname='ajouter_role_partenaire'
+       and pg_get_functiondef(p.oid) ilike '%insert into public.admins%';")"
+
+# AUCUNE ENUMERATION : la fonction ne prend aucune adresse en parametre.
+check "W-B1-19 : roles_utilisateur ne prend aucun parametre" "0" \
+  "$(sql "select pronargs from pg_proc where proname='roles_utilisateur';")"
+check "W-B1-20 : elle n'est pas offerte a anon" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='roles_utilisateur' and grantee='anon';")"
+check "W-B1-21 : ajouter_role_partenaire non plus" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='ajouter_role_partenaire' and grantee='anon';")"
+# Sans session, le refus arrive AVANT meme d'entrer dans la fonction :
+# `anon` n'a pas le droit de l'executer. C'est plus strict que le garde
+# NON_AUTHENTIFIE prevu a l'interieur — lequel reste en place pour un
+# appelant authenticated dont auth.uid() serait nul.
+ANON_ROLE=$(sql "begin; select public.devenir_anon();
+     select public.ajouter_role_partenaire('77777777-2222-0000-0000-000000000001') ->> 'code';
+     commit;" 2>&1 | tail -1)
+check "W-B1-22 : sans session, rien n'est possible" "1" \
+  "$(printf '%s' "$ANON_ROLE" | grep -ci 'permission denied\|NON_AUTHENTIFIE' || true)"
+check "W-B1-22 bis : et le garde interne existe quand meme" "1" \
+  "$(sql "select count(*) from pg_proc p
+     where p.proname='ajouter_role_partenaire'
+       and pg_get_functiondef(p.oid) ilike '%NON_AUTHENTIFIE%';")"
+
+# LES RLS NE SONT PAS ELARGIES : changer de Dashboard ne donne aucun droit.
+check "W-B1-23 : un partenaire ne lit toujours pas les demandes des clients" "0" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from public.clients where auth_user_id is distinct from auth.uid();
+     commit;" | tail -1)"
+check "W-B1-24 : il ne voit que SA fiche partenaire" "1" \
+  "$(sql "begin;
+     select public.devenir('77777777-0000-0000-0000-000000000001','deux-casquettes@helixcar.test');
+     select count(*) from public.convoyeurs;
+     commit;" | tail -1)"
+
+errB1b=$(appliquer migrations/104_identite_unique_roles_multiples.sql)
+check "W-B1-25 : 104 se rejoue sans erreur" "" "$errB1b"
+check "W-B1-26 : une seule signature par fonction" "2" \
+  "$(sql "select count(*) from pg_proc
+     where proname in ('roles_utilisateur','ajouter_role_partenaire');")"
+
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="
 for e in "${ECHECS[@]:-}"; do [ -n "$e" ] && echo "  - $e"; done

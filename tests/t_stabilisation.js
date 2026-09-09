@@ -610,14 +610,24 @@ async function modesParVehicule(page, n) {
     const page = await pageClient(browser);
     const fuite = await page.evaluate(() => {
       const dbg = document.getElementById('supabase-debug');
-      // On simule ce que faisait l'ancienne version.
-      dbg.style.display = 'block';
-      dbg.textContent = 'Erreur 400 [convoyeurs]: 23514';
+      // On simule ce que faisait l'ancienne version : un message
+      // d'erreur d'une AUTRE fenêtre, laissé affiché.
+      _hcAfficherBandeauErreur('Erreur 400 [convoyeurs]: 23514');
+      const avant = { visible: getComputedStyle(dbg).display !== 'none',
+                      texte: dbg.textContent };
       openModal('client');
-      return { affiche: dbg.style.display, texte: dbg.textContent };
+      return {
+        avant: avant,
+        visible: getComputedStyle(dbg).display !== 'none',
+        texte: dbg.textContent
+      };
     });
+    // La GARANTIE se mesure sur ce que voit le client, pas sur le
+    // mécanisme d'affichage (lot E1 : classe partagée, plus de style
+    // en ligne).
     check('F6 : ouvrir « Devenir client » efface toute erreur précédente',
-      fuite.affiche === 'none' && fuite.texte === '', JSON.stringify(fuite));
+      fuite.avant.visible === true && fuite.visible === false && fuite.texte === '',
+      JSON.stringify(fuite));
     await page.close();
   }
 
@@ -1031,21 +1041,64 @@ window.jspdf = { jsPDF: function () {
       p('nett-creneau-debut', ''); p('nett-creneau-fin', '');
       clic('input[name="nett-delai"][value="standard"]');
       const sansPlage = _validateNettoyageEtape4();
-      // Puis avec une plage incohérente : là, et là seulement, ça bloque.
+
+      // SUR PLUSIEURS JOURS, ce sont les COUPLES date+heure qui
+      // comptent : commencer à 17:00 le premier jour et finir à 09:00
+      // le surlendemain est parfaitement valide.
       p('nett-creneau-debut', '17:00'); p('nett-creneau-fin', '09:00');
+      const surPlusieursJours = _validateNettoyageEtape4();
+
+      // SUR UNE SEULE JOURNÉE, la même plage devient incohérente.
+      p('nett-date-fin', _hcFormaterYMD(d));
       const plageIncoherente = _validateNettoyageEtape4();
-      // Et enfin une plage cohérente.
+
+      // Et une plage cohérente le même jour passe.
       p('nett-creneau-debut', '09:00'); p('nett-creneau-fin', '17:00');
       const plageCoherente = _validateNettoyageEtape4();
-      return { sansPlage: sansPlage.ok, plageIncoherente: plageIncoherente.ok,
-               plageCoherente: plageCoherente.ok };
+      // On laisse le formulaire dans un état VALIDE et complet pour la
+      // lecture du payload qui suit.
+      p('nett-date-fin', _hcFormaterYMD(f));
+      return { sansPlage: sansPlage.ok, surPlusieursJours: surPlusieursJours.ok,
+               plageIncoherente: plageIncoherente.ok, plageCoherente: plageCoherente.ok };
     });
-    check('L6 : sans plage horaire, l\'étape est VALIDE — elle est facultative',
-      validation.sansPlage === true, JSON.stringify(validation));
-    check('L7 : une plage incohérente est refusée, et elle seule',
+    // ══ RÈGLE CHANGÉE SUR DEMANDE EXPLICITE (lot D3) ══
+    // Jusqu'ici l'horaire sur place était FACULTATIF, et cette suite
+    // l'exigeait. Le propriétaire demande désormais l'inverse : les deux
+    // horaires deviennent OBLIGATOIRES. Le contrôle n'est pas supprimé,
+    // il est retourné et nommé — et il devient plus strict, puisqu'une
+    // étape sans horaire doit maintenant être REFUSÉE.
+    check('L6 : sans horaire sur place, l\'étape est désormais REFUSÉE (lot D3)',
+      validation.sansPlage === false, JSON.stringify(validation));
+    check('L7 : le même jour, une fin antérieure au début est refusée',
       validation.plageIncoherente === false, JSON.stringify(validation));
+    check('L7 ter : sur plusieurs jours, 17:00 → 09:00 est VALIDE',
+      validation.surPlusieursJours === true, JSON.stringify(validation));
     check('L8 : une plage cohérente passe',
       validation.plageCoherente === true, JSON.stringify(validation));
+
+    // Et le refus est LISIBLE, sur le bon champ.
+    const refus = await page.evaluate(() => {
+      const p = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      p('nett-creneau-debut', ''); p('nett-creneau-fin', '');
+      _validateNettoyageEtape4();
+      const lire = id => {
+        const e = document.getElementById(id);
+        const grp = e && e.closest('.modal-form-group');
+        const m = grp && grp.querySelector('.field-error-msg');
+        return { classe: !!e && e.classList.contains('field-error'),
+                 message: (m && m.textContent) || '' };
+      };
+      const r = { debut: lire('nett-creneau-debut'), fin: lire('nett-creneau-fin') };
+      // On restaure une saisie valide : la lecture du payload qui suit
+      // doit porter sur un formulaire complet.
+      p('nett-creneau-debut', '09:00'); p('nett-creneau-fin', '17:00');
+      _validateNettoyageEtape4();
+      return r;
+    });
+    check('L7 bis : les deux champs sont signalés, chacun sous le sien',
+      refus.debut.classe === true && refus.fin.classe === true
+      && /obligatoire/i.test(refus.debut.message) && /obligatoire/i.test(refus.fin.message),
+      JSON.stringify(refus));
 
     // Le payload ne recrée aucune des clés supprimées.
     const payloadNett = await page.evaluate(() => _construireDetailsNettoyage());

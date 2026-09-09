@@ -261,9 +261,18 @@ async function moisFuturComplet(page) {
   const src = require('fs').readFileSync(fichier('index.html'), 'utf8');
   L.check('D1 : les périodes sont déclarées dans une seule table',
     (src.match(/var HC_PERIODES_CALENDRIER = \[/g) || []).length === 1);
-  L.check('D2 : la table couvre bien les deux périodes du formulaire',
-    /stock-debut/.test(src.split('HC_PERIODES_CALENDRIER')[1].slice(0, 400))
-    && /pro-date-debut/.test(src.split('HC_PERIODES_CALENDRIER')[1].slice(0, 400)));
+  // Lecture du VRAI contenu de la table, pas d'une fenêtre de
+  // caractères : les trois périodes du formulaire doivent y être, et
+  // chacune avec ses deux bornes. Le Nettoyage a rejoint la table au
+  // lot A2 — sans quoi sa date de fin restait impossible à saisir.
+  const tableSrc = (src.match(/var HC_PERIODES_CALENDRIER = \[([\s\S]*?)\n\];/) || [])[1] || '';
+  const paires = (tableSrc.match(/debut:\s*'([^']+)'[\s\S]*?fin:\s*'([^']+)'/g) || []);
+  L.check('D2 : la table couvre les TROIS périodes du formulaire',
+    /debut: 'stock-debut',\s*fin: 'stock-fin'/.test(tableSrc)
+    && /debut: 'pro-date-debut', fin: 'pro-date-fin'/.test(tableSrc)
+    && /debut: 'nett-date',\s*fin: 'nett-date-fin'/.test(tableSrc)
+    && paires.length === 3,
+    tableSrc.slice(0, 300));
   L.check('D3 : plus aucun mode « stockage » codé en dur dans le calendrier',
     src.indexOf('_hcCalModeStockage') === -1 && src.indexOf('_hcEffacerStockage') === -1);
   L.check('D4 : une seule fonction efface une période',

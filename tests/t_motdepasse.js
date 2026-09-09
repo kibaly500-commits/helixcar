@@ -333,8 +333,36 @@ window.emailjs = { init: function () {},
   check('E4b : les deux pages retombent sur la MÊME page d\'atterrissage',
     (dash.match(/\/dashboard\.html'/g) || []).length > 0
     && /_hcUrlRetourReinitialisation/.test(idx) && /urlRetourReinitialisation/.test(dash));
-  check('E4c : aucun formulaire de nouveau mot de passe dupliqué dans index.html',
-    !/reinit-mdp2/.test(idx));
+  // RÈGLE CORRIGÉE (lot A3). L'ancienne version exigeait que l'écran
+  // « nouveau mot de passe » n'existe QUE dans dashboard.html. C'est
+  // precisement ce qui cassait le parcours : quand l'URL de retour
+  // n'est pas encore autorisee cote Supabase, le lien retombe sur la
+  // « Site URL » du projet — la vitrine — et la personne n'avait alors
+  // aucun ecran pour choisir son mot de passe.
+  //
+  // La regle devient donc plus stricte, jamais plus laxiste : l'ecran
+  // doit exister DES DEUX COTES, en UN SEUL exemplaire par page, et
+  // les deux doivent offrir les memes garanties.
+  const nbFormulaires = t => (t.match(/id="reinit-mdp2"/g) || []).length;
+  check('E4c : l\'écran « nouveau mot de passe » existe des deux côtés, en un seul exemplaire',
+    nbFormulaires(idx) === 1 && nbFormulaires(dash) === 1,
+    'index=' + nbFormulaires(idx) + ' dashboard=' + nbFormulaires(dash));
+  check('E4d : les deux écrans exigent une vraie session avant d\'écrire',
+    /auth\.updateUser\(\s*\{\s*password/.test(idx)
+    && /auth\.updateUser\(\s*\{\s*password/.test(dash)
+    && /getSession\(\)/.test(idx.slice(idx.indexOf('async function enregistrerNouveauMotDePasse'),
+                                         idx.indexOf('async function enregistrerNouveauMotDePasse') + 2500)));
+  check('E4e : les deux écrans reconnaissent le flux de récupération',
+    /PASSWORD_RECOVERY/.test(idx) && /PASSWORD_RECOVERY/.test(dash));
+  check('E4f : un lien expiré ou altéré est reconnu, jamais ignoré',
+    /_hcErreurLienRecuperation/.test(idx) && /otp_expired|expired/i.test(idx));
+  check('E4g : le jeton de récupération ne reste pas dans la barre d\'adresse',
+    /_hcNettoyerFragmentRecuperation/.test(idx) && /replaceState/.test(idx));
+  // Aucune redirection ouverte : l'URL de retour est CONSTRUITE a
+  // partir de l'origine servie, jamais reprise d'un parametre.
+  check('E4h : aucune redirection ouverte dans l\'URL de retour',
+    !/redirectTo:\s*[^,)]*(searchParams|location\.search|document\.referrer)/.test(idx)
+    && !/redirectTo:\s*[^,)]*(searchParams|location\.search|document\.referrer)/.test(dash));
   check('E5 : plus aucun prompt() pour choisir un mot de passe',
     !/prompt\([^)]*mot de passe[^)]*\)/i.test(dash) || !/prompt\([^)]*nouveau mot de passe/i.test(dash));
   check('E6 : aucune erreur JS', erreursJs.length === 0, erreursJs.join(' | '));

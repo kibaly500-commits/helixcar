@@ -2076,6 +2076,31 @@
   /* Période 1 — Prise en charge → Livraison (rouge HelixCar) */
   .hc-cal-jour--p1-borne { background: var(--accent); color: #fff !important; }
   .hc-cal-jour--p1-inter { background: #FBDEDF; color: var(--ink); }
+  /* LOT E4 — le calendrier du NETTOYAGE garde son langage visuel :
+     un rond rouge plein sur chacune des deux bornes, et un rond
+     beaucoup plus clair et discret sur chaque jour intermediaire.
+     Marqueur pose uniquement sur la grille du nettoyage : le rendu
+     carre du Convoyage et du Stockage reste strictement inchange. */
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-borne {
+    border-radius: 50%;
+  }
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-inter {
+    background: transparent;
+    color: var(--ink);
+    position: relative;
+  }
+  #hc-cal-grille[data-hc-periode="nettoyage"] .hc-cal-jour--p1-inter::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: .32;
+  }
   /* Période 2 — Livraison → Restitution (teinte chaude complémentaire) */
   .hc-cal-jour--p2-borne { background: #6B1E3C; color: #fff !important; }
   .hc-cal-jour--p2-inter { background: #E9D3DC; color: var(--ink); }
@@ -2750,6 +2775,83 @@
   @keyframes hcBulleErreur {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     LOT E1 — LE MESSAGE HELIXCAR, PARTAGE PAR TOUS LES FORMULAIRES
+     ══════════════════════════════════════════════════════════════
+     Plus aucun grand rectangle rouge ou vert. Le fond reste BLANC,
+     le texte est discret et integre a l'interface, et une erreur se
+     signale par le meme petit repere vertical rouge que
+     « Ce champ est obligatoire » — exactement le rendu demande.
+
+     Trois tons, un seul composant : erreur, succes, information. Seule
+     la couleur du filet de gauche change ; jamais le fond. */
+  .hc-note {
+    display: none;
+    position: relative;
+    margin: 10px 0;
+    padding: 2px 0 2px 12px;
+    background: transparent;
+    border: 0;
+    border-left: 3px solid #DC2626;
+    border-radius: 0;
+    color: #4A5056;
+    font-family: var(--font-body, inherit);
+    font-size: .82rem;
+    line-height: 1.45;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .hc-note.visible { display: block; }
+  .hc-note--succes { border-left-color: #2F7D5B; }
+  .hc-note--info   { border-left-color: rgba(16,24,32,.22); }
+  /* Meme composant, posé sur la section sombre « Être recontacté » :
+     seul le contraste du texte change, jamais la forme. */
+  .hc-note--sombre { color: rgba(255,255,255,.86); }
+
+  /* ══════════════════════════════════════════════════════════════
+     LOT C1 — MODE INTEGRE A L'ESPACE CLIENT
+     ══════════════════════════════════════════════════════════════
+     Le MEME formulaire, affiche dans l'espace client au lieu de la
+     grosse modale publique : la vitrine s'efface, l'overlay sombre
+     disparait, et la fenetre devient un bloc large et aere qui suit la
+     largeur de son conteneur. Aucune question, aucune regle, aucun
+     champ n'est modifie — seule la mise en page change. */
+  body.hc-integre > header,
+  body.hc-integre > nav,
+  body.hc-integre > footer,
+  body.hc-integre > section,
+  body.hc-integre > main,
+  body.hc-integre > div:not(.modal-overlay) { display: none !important; }
+  body.hc-integre { background: #fff; overflow: auto !important; }
+  body.hc-integre #modal-client.modal-overlay {
+    position: static;
+    display: block;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    overflow: visible;
+    opacity: 1;
+    visibility: visible;
+  }
+  body.hc-integre #modal-client .modal {
+    max-width: 100%;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 26px 30px 34px;
+  }
+  body.hc-integre #modal-client .modal::before { display: none; }
+  /* La croix de fermeture n'a plus d'objet : c'est « Retour a mes
+     demandes » qui referme, dans l'espace client. */
+  body.hc-integre #modal-client .modal-close { display: none; }
+  @media (max-width: 640px) {
+    body.hc-integre #modal-client .modal { padding: 20px 16px 28px; }
   }
 
   #modal-client .modal-row {
@@ -4735,14 +4837,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   #modal-client .nett-rep-btn { width: 28px; height: 28px; min-width: 28px; }
 }
 
-/* 9 — Jour sélectionné du calendrier Nettoyage : cercle rouge plein,
-   chiffre blanc. Classe posée uniquement en contexte nettoyage. */
-.hc-cal-jour--sel-nett {
-  background: var(--accent) !important;
-  color: #fff !important;
-  border-radius: 50%;
-}
-
 /* Description courte sous un libellé d'option de service. */
 #modal-client .hc-opt-desc {
   display: block;
@@ -6114,6 +6208,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
+      <div id="rc-message-zone" class="hc-note hc-note--sombre" role="alert"></div>
+
       <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitRecontact()" id="rc-btn">Demander à être recontacté →</button>
 
     </div>
@@ -6297,8 +6393,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
-      <div id="hc-bandeau-connecte"
-           style="display:none;background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#065F46"></div>
+      <div id="hc-bandeau-connecte" class="hc-note hc-note--succes" role="status"></div>
 
       <div class="modal-form-group">
 
@@ -6524,30 +6619,16 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           </div>
         </div>
 
-        <!-- RUBRIQUE — Véhicules (technicien uniquement) -->
-        <div class="veh-sous-accordeon" id="pro-acc-vehicules" style="display:none">
-          <button type="button" class="veh-sous-barre" onclick="proBasculerRubrique('vehicules')">
-            <span class="veh-sous-num" data-pro-num="vehicules">2</span><span class="veh-sous-titre" id="pro-vehicules-titre">Informations sur les véhicules</span><span class="veh-sous-chevron">&rsaquo;</span>
-          </button>
-          <div class="veh-sous-contenu">
-
-            <div class="modal-form-group">
-              <label>Combien de véhicules sont concernés ? <span class="field-required">*</span></label>
-              <div style="display:flex;align-items:center;gap:12px">
-                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(-1)" aria-label="Retirer un véhicule">&minus;</button>
-                <input type="number" id="pro-nb-vehicules" value="1" min="1" max="3" step="1" readonly style="width:70px;text-align:center;padding:10px;border:1.5px solid rgba(16,24,32,.18);border-radius:3px;font-size:1rem;font-weight:600">
-                <button type="button" class="btn-compteur" onclick="proMajNbVehicules(1)" aria-label="Ajouter un véhicule">+</button>
-              </div>
-            </div>
-
-            <div id="pro-vehicules-liste"></div>
-
-            <div class="veh-sous-ok">
-              <button type="button" class="veh-sous-effacer" onclick="proEffacerRubrique('vehicules')">Effacer</button>
-              <button type="button" class="veh-sous-valider" onclick="proOkRubrique('vehicules')">OK</button>
-            </div>
-          </div>
-        </div>
+        <!-- LOT D4 — LA RUBRIQUE « INFORMATIONS SUR LES VEHICULES »
+             A ETE SUPPRIMEE.
+             Elle n'existait QUE pour la categorie « Technicien
+             automobile » (_proVehiculesApplicables() valait
+             `_proCategorie() === 'technicien'`). Le besoin porte sur
+             des PERSONNES et sur une periode d'intervention, jamais
+             sur un parc : le nombre de professionnels demandes est
+             conserve, la quantite et les fiches de vehicules ne le
+             sont pas. Le « Renfort automobile sur site » n'a jamais eu
+             cette rubrique et n'est donc en rien modifie. -->
 
         <!-- RUBRIQUE — Lieu d'intervention (+ contact sur place) -->
         <div class="veh-sous-accordeon" id="pro-acc-lieu">
@@ -6939,11 +7020,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div id="nett-creneau-bloc">
             <div class="modal-row">
               <div class="modal-form-group">
-                <label>Horaire de début sur place <span class="field-optional-hint">(facultatif)</span></label>
+                <label>Horaire de début sur place <span class="field-required">*</span></label>
                 <input type="time" id="nett-creneau-debut" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div class="modal-form-group">
-                <label>Horaire de fin sur place <span class="field-optional-hint">(facultatif)</span></label>
+                <label>Horaire de fin sur place <span class="field-required">*</span></label>
                 <input type="time" id="nett-creneau-fin" readonly style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
             </div>
@@ -7250,7 +7331,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <input type="text" id="parr-code-input" placeholder="Ex : HC0042" style="text-transform:uppercase;letter-spacing:.06em" oninput="this.value=this.value.toUpperCase()">
         <div id="parr-code-msg" style="font-size:.73rem;margin-top:4px;display:none"></div>
       </div>
-      <div id="supabase-debug" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:12px;font-size:.8rem;color:#991B1B;word-break:break-all"></div>
+      <div id="supabase-debug" class="hc-note" role="alert"></div>
       <button class="btn btn-primary" id="client-submit-btn" style="width:100%;justify-content:center;margin-top:12px;padding:16px 24px;font-size:.92rem" onclick="submitClientForm()">Créer mon compte →</button>
 
       </div>
@@ -7480,7 +7561,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div id="conv-recap"></div>
 
-        <div id="conv-erreur-envoi" style="display:none;white-space:pre-line;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-top:16px;font-size:.8rem;color:#991B1B"></div>
+        <div id="conv-erreur-envoi" class="hc-note" role="alert"></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;padding:16px 24px;font-size:.92rem" onclick="submitConvoyeurForm()">Envoyer ma candidature →</button>
 
       </div>
@@ -7532,8 +7613,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <h2>Compléter mes informations</h2>
     <p id="completer-sous-titre">Ces éléments nous manquent pour organiser votre prestation.</p>
 
-    <div id="completer-message"
-         style="display:none;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem"></div>
+    <div id="completer-message" class="hc-note" role="status"></div>
 
     <div id="completer-progression"
          style="display:none;font-size:.8rem;color:#4B5563;margin-bottom:14px"></div>
@@ -7545,6 +7625,70 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <button type="button" id="completer-envoyer" class="btn btn-primary"
             style="width:100%;justify-content:center;font-size:.92rem"
             onclick="envoyerInformationsCompletees()">Enregistrer mes informations</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     LOT A3 — CHOISIR UN NOUVEAU MOT DE PASSE
+     ══════════════════════════════════════════════════════════════
+     Le lien recu par e-mail ramene sur le site. Quand Supabase ne
+     connait pas encore l'URL de redirection demandee, il retombe sur
+     la « Site URL » du projet — c'est-a-dire CETTE page. Sans ecran
+     ici, la personne atterrissait sur la vitrine et n'avait aucun
+     moyen de choisir son mot de passe : c'est exactement ce qui etait
+     constate. L'ecran existe donc des deux cotes. -->
+<div class="modal-overlay" id="modal-reinit">
+  <div class="modal" style="max-width:520px;text-align:left">
+    <button class="modal-close" onclick="closeModal('reinit')" aria-label="Fermer">✕</button>
+
+    <div id="reinit-bloc-formulaire">
+      <h2>Nouveau mot de passe</h2>
+      <p>Choisissez un nouveau mot de passe pour votre compte HelixCar.</p>
+
+      <div id="reinit-message" class="hc-note" role="alert"></div>
+
+      <div class="modal-form-group">
+        <label>Nouveau mot de passe <span class="field-required">*</span></label>
+        <div style="position:relative">
+          <input type="password" id="reinit-mdp" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" aria-describedby="reinit-mdp-aide" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div id="reinit-mdp-aide" style="font-size:.75rem;color:#6B7280;margin-top:6px">8 caractères minimum.</div>
+      </div>
+
+      <div class="modal-form-group">
+        <label>Confirmer le nouveau mot de passe <span class="field-required">*</span></label>
+        <div style="position:relative">
+          <input type="password" id="reinit-mdp2" required minlength="8" data-mdp="1"
+                 autocomplete="new-password" style="padding-right:44px">
+          <button type="button" class="btn-oeil" onclick="basculerMotDePasse('reinit-mdp2', this)"
+                  aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              id="reinit-valider" onclick="enregistrerNouveauMotDePasse()">Enregistrer le mot de passe</button>
+    </div>
+
+    <div id="reinit-bloc-succes" style="display:none">
+      <h2>Mot de passe modifié</h2>
+      <div class="hc-note hc-note--succes visible" role="status">Votre mot de passe a bien été modifié. Vous pouvez maintenant vous connecter avec ce nouveau mot de passe.</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              onclick="terminerReinitialisation()">Aller à la connexion</button>
+    </div>
+
+    <div id="reinit-bloc-expire" style="display:none">
+      <h2>Lien expiré</h2>
+      <div id="reinit-message-expire" class="hc-note visible" role="alert">Ce lien de réinitialisation n'est plus valable. Il a peut-être expiré, ou il a déjà servi. Demandez-en un nouveau depuis la connexion.</div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center"
+              onclick="terminerReinitialisation()">Demander un nouveau lien</button>
+    </div>
   </div>
 </div>
 
@@ -7577,7 +7721,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
       </div>
 
-      <div id="connexion-message" style="display:none;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:2px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#991B1B"></div>
+      <div id="connexion-message" class="hc-note" role="status"></div>
 
       <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;font-size:.92rem" onclick="submitConnexionForm()">Se connecter →</button>
 
@@ -7964,9 +8108,21 @@ function _localisationStockage() {
   return HELIXCAR_STOCKAGE.ville + ' (' + HELIXCAR_STOCKAGE.code_postal + ')';
 }
 
+// LOT A3 — l'origine officielle, declaree une seule fois et AVANT tout
+// usage. Le repli ne pointe plus sur le deploiement d'apercu : un lien
+// envoye a un client doit mener au site de production.
+var HC_ORIGINE_PRODUCTION = 'https://helixcar.vercel.app';
+
 // Destinataire des notifications administrateur + lien du dashboard.
 var HELIXCAR_EMAIL_ADMIN   = 'helixcarpro@gmail.com';
-var HELIXCAR_URL_DASHBOARD = 'https://helixcar-i89b.vercel.app/dashboard.html';
+// LOT A3 — construit, jamais code en dur sur le deploiement d'apercu.
+var HELIXCAR_URL_DASHBOARD = (function () {
+  try {
+    var o = window.location.origin;
+    if (o && /^https:/.test(o)) return o + '/dashboard.html';
+  } catch (e) {}
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
+})();
 
 // ── SERVICE DEMANDÉ : convoyage / stockage / les deux / compte seul ──
 function _typeServiceChoisi() {
@@ -8806,21 +8962,67 @@ function _hcAppliquerModeConnecte() {
     courriel.setAttribute('aria-readonly', 'true');
     courriel.style.background = '#F3F4F6';
   }
-  var banniere = document.getElementById('hc-bandeau-connecte');
-  if (banniere) {
-    banniere.style.display = 'block';
-    banniere.textContent = 'Vous êtes connecté'
-      + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
-      + '. Vos informations de compte sont déjà renseignées.';
-  }
+  _hcNote('hc-bandeau-connecte', 'Vous êtes connecté'
+    + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
+    + '. Vos informations de compte sont déjà renseignées.', 'succes');
 }
 
 // Entrée « Faire une nouvelle demande » depuis l'espace client :
 // index.html?nouvelle-demande=1 . On ouvre le parcours à la question
 // « Comment pouvons-nous vous accompagner ? ».
+// LOT C1 — le formulaire est-il affiche DANS l'espace client ?
+function _hcModeIntegre() {
+  try {
+    var p = new URLSearchParams(window.location.search || '');
+    // Deux conditions : le mode est demande, ET la page est bien
+    // encadree. Ouvrir l'adresse a la main dans un onglet ne fait donc
+    // pas disparaitre la vitrine.
+    return p.get('integre') === '1' && window.parent !== window;
+  } catch (e) { return false; }
+}
+
+// Hauteur reelle du formulaire, transmise a l'espace client pour qu'il
+// n'y ait jamais deux barres de defilement imbriquees.
+var _hcHauteurTransmise = 0;
+function _hcTransmettreHauteur() {
+  if (!_hcModeIntegre()) return;
+  try {
+    var h = Math.ceil(document.documentElement.scrollHeight);
+    if (Math.abs(h - _hcHauteurTransmise) < 12) return;
+    _hcHauteurTransmise = h;
+    window.parent.postMessage({ type: 'hc-demande-hauteur', hauteur: h }, window.location.origin);
+  } catch (e) {}
+}
+
+function _hcActiverModeIntegre() {
+  if (!_hcModeIntegre()) return;
+  document.body.classList.add('hc-integre');
+  // La hauteur suit le formulaire : etapes, accordeons, fiches
+  // vehicules ajoutees ou retirees.
+  try {
+    var obs = new MutationObserver(function () { _hcTransmettreHauteur(); });
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true });
+  } catch (e) {}
+  window.addEventListener('resize', _hcTransmettreHauteur);
+  setInterval(_hcTransmettreHauteur, 700);
+  _hcTransmettreHauteur();
+}
+
+// Previent l'espace client qu'une demande vient d'etre enregistree.
+// L'espace RECHARGE alors la liste DEPUIS LA BASE : la reference et le
+// statut affiches sont ceux que le serveur a enregistres, jamais ceux
+// que ce message annonce.
+function _hcPrevenirEspaceClient() {
+  if (!_hcModeIntegre()) return;
+  try {
+    window.parent.postMessage({ type: 'hc-demande-enregistree' }, window.location.origin);
+  } catch (e) {}
+}
+
 async function _hcDemarrerDepuisEspaceClient() {
   var params = new URLSearchParams(window.location.search || '');
   if (params.get('nouvelle-demande') !== '1') return false;
+  _hcActiverModeIntegre();
   await _hcChargerSessionClient();
   if (!_hcSessionClient) {
     // Pas de session : on ne prétend pas être connecté. Le parcours
@@ -8862,15 +9064,9 @@ var _completerRubriques = [];
 var _completerEnvoiEnCours = false;
 
 function _completerAfficherMessage(texte, type) {
-  var el = document.getElementById('completer-message');
-  if (!el) return;
-  if (!texte) { el.style.display = 'none'; return; }
-  var vert = (type === 'ok');
-  el.style.display = 'block';
-  el.style.background = vert ? '#ECFDF5' : '#FEF2F2';
-  el.style.border = '1.5px solid ' + (vert ? '#6EE7B7' : '#FCA5A5');
-  el.style.color = vert ? '#065F46' : '#991B1B';
-  el.textContent = texte;
+  // LOT E1 — plus de fond vert ni de fond rouge : le meme composant
+  // discret que partout ailleurs, seul le filet de gauche change.
+  _hcNote('completer-message', texte, (type === 'ok') ? 'succes' : 'erreur');
 }
 
 function _completerChampId(cle) { return 'completer-champ-' + cle; }
@@ -9190,6 +9386,21 @@ function _validateNettoyageEtape2() {
   return { ok: ok, first: first };
 }
 
+// LOT D3 — chronologie de l'intervention de nettoyage.
+// Compare des COUPLES date+heure, jamais deux heures nues : une
+// intervention qui commence a 17:00 le lundi et finit a 09:00 le
+// mercredi est valide. Sur une seule journee, la fin doit etre
+// strictement posterieure au debut.
+// Renvoie true si l'on ne peut pas encore conclure (dates absentes) :
+// c'est la validation des DATES qui les reclame, pas celle-ci.
+function _nettChronologieOk(dateDebut, heureDebut, dateFin, heureFin) {
+  if (!heureDebut || !heureFin) return true;
+  if (!dateDebut || !dateFin) return heureFin > heureDebut;
+  if (dateFin > dateDebut) return true;
+  if (dateFin < dateDebut) return false;
+  return heureFin > heureDebut;
+}
+
 function _validateNettoyageEtape4() {
   var ok = true, first = null;
   function fail(id) { ok = false; if (!first) first = id; }
@@ -9243,11 +9454,31 @@ function _validateNettoyageEtape4() {
     }
   }
 
-  // HORAIRE SUR PLACE : facultatif. On ne verifie que sa coherence
-  // interne — jamais sa presence.
+  // ══════════════════════════════════════════════════════════════
+  // LOT D3 — L'HORAIRE SUR PLACE DEVIENT OBLIGATOIRE
+  // ══════════════════════════════════════════════════════════════
+  // Une intervention de nettoyage se planifie : sans heure d'arrivee ni
+  // heure de fin, ni le partenaire ni le client ne savent quand elle a
+  // lieu. Les deux champs sont donc exiges — et rien n'est preremplí :
+  // une heure inventee serait pire qu'une heure absente.
+  //
+  // CHRONOLOGIE. Sur UNE seule journee (debut = fin), la fin doit etre
+  // posterieure au debut. Sur PLUSIEURS jours, ce sont les couples
+  // date+heure complets qui sont compares : finir a 09:00 le surlendemain
+  // apres avoir commence a 17:00 est parfaitement valide.
   var deb = _nettCreneauDebut(), fin = _nettCreneauFin();
-  if (deb && fin && fin <= deb) {
-    _showFieldError('nett-creneau-fin', 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.');
+  if (!deb) {
+    _showFieldError('nett-creneau-debut', 'Ce champ est obligatoire.');
+    fail('nett-creneau-debut');
+  } else _clearFieldError('nett-creneau-debut');
+  if (!fin) {
+    _showFieldError('nett-creneau-fin', 'Ce champ est obligatoire.');
+    fail('nett-creneau-fin');
+  } else if (deb && !_nettChronologieOk(_nettDate(), deb, _nettDateFin(), fin)) {
+    _showFieldError('nett-creneau-fin',
+      (_nettDate() && _nettDateFin() && _nettDate() === _nettDateFin())
+        ? 'La fin doit \u00eatre post\u00e9rieure au d\u00e9but.'
+        : 'La fin de l\'intervention ne peut pas pr\u00e9c\u00e9der son d\u00e9but.');
     fail('nett-creneau-fin');
   } else {
     _clearFieldError('nett-creneau-fin');
@@ -9342,10 +9573,13 @@ function construireRecapNettoyage() {
   if (d.adresse_cp || d.adresse_ville) orga += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
   // Libelle unique, identique au dashboard et au PDF.
   orga += _recapLigne('Contact sur place', _hcContactSurPlaceTexte(d.contact_sur_place));
-  orga += _recapLigne('Date souhait\u00e9e', _formaterDateFr(d.date_souhaitee));
-  if (d.creneau_debut || d.creneau_fin) {
-    orga += _recapLigne('Horaire sur place', (d.creneau_debut || '') + ' \u2014 ' + (d.creneau_fin || ''));
-  }
+  // LOTS A2 et D3 — la PERIODE complete et les DEUX horaires, avec
+  // exactement les libelles du formulaire. Le recapitulatif ne peut pas
+  // montrer moins que ce qui a ete demande, ni le nommer autrement.
+  orga += _recapLigne('Date de d\u00e9but', _formaterDateFr(d.date_souhaitee));
+  orga += _recapLigne('Date de fin', _formaterDateFr(d.date_fin));
+  orga += _recapLigne('Horaire de d\u00e9but sur place', d.creneau_debut || '');
+  orga += _recapLigne('Horaire de fin sur place', d.creneau_fin || '');
   orga += _recapLigne('D\u00e9lai', NETT_DELAI[d.delai] || '');
   html += _recapBloc('Organisation de l\'intervention', orga, 4);
 
@@ -9385,7 +9619,6 @@ var PRO_LIB_MISSION = {
   soutien_administratif: 'Soutien administratif',
   autre: 'Autre mission', conseil: 'Client à conseiller'
 };
-var PRO_MAX_VEHICULES = 3;
 var PRO_MAX_PROS = 20;
 
 // ── LECTEURS ────────────────────────────────────────
@@ -9419,13 +9652,6 @@ function _proNbPros() {
   var n = Number((document.getElementById('pro-nb-pros') || {}).value);
   return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_PROS) : 1;
 }
-// Les vehicules n'existent QUE pour le technicien : un renfort sur site
-// n'est jamais rattache a une liste de vehicules.
-function _proVehiculesApplicables() { return _proCategorie() === 'technicien'; }
-function _proNbVehicules() {
-  var n = Number((document.getElementById('pro-nb-vehicules') || {}).value);
-  return (Number.isInteger(n) && n >= 1) ? Math.min(n, PRO_MAX_VEHICULES) : 1;
-}
 function _proAdresseRue() { return ((document.getElementById('pro-adresse-rue') || {}).value || '').trim(); }
 function _proAdresseCp() { return ((document.getElementById('pro-adresse-cp') || {}).value || '').trim(); }
 function _proAdresseVille() { return ((document.getElementById('pro-adresse-ville') || {}).value || '').trim(); }
@@ -9448,195 +9674,6 @@ function _proDureeJours() {
 // Meme principe que _nettQuantites : la MEMOIRE JS est la source de
 // verite, jamais le DOM. Les cartes sont re-rendues sans perdre une
 // saisie, et une carte retiree disparait reellement du payload.
-var _proMemoireVehicules = {};
-
-function _reinitialiserVehiculesProfessionnel() { _proMemoireVehicules = {}; }
-
-function _proMemoriserVehicule(i) {
-  _proMemoireVehicules[i] = {
-    type_vehicule: (document.getElementById('pro-veh-' + i + '-type') || {}).value || '',
-    marque_modele: ((document.getElementById('pro-veh-' + i + '-marque') || {}).value || '').trim()
-  };
-  _formulaireClientSale = true;
-  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
-  if (typeof _masquerNoticeBrouillonDesReprise === 'function') _masquerNoticeBrouillonDesReprise();
-  // Une modification peut rendre ce véhicule incomplet : son numéro
-  // doit alors repasser au rouge immédiatement.
-  if (typeof _proMajEtatVehicules === 'function') _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// Vehicules destines au brouillon / au payload : uniquement ceux qui
-// existent reellement dans le compteur courant.
-function _proVehiculesRetenus() {
-  var out = [];
-  if (!_proVehiculesApplicables()) return out;
-  var n = _proNbVehicules();
-  for (var i = 0; i < n; i++) {
-    var m = _proMemoireVehicules[i] || {};
-    out.push({
-      position: i + 1,
-      type_vehicule: m.type_vehicule || null,
-      marque_modele: m.marque_modele || null
-    });
-  }
-  return out;
-}
-function _proVehiculesPourBrouillon() {
-  var out = {};
-  Object.keys(_proMemoireVehicules).forEach(function (k) {
-    var m = _proMemoireVehicules[k];
-    if (m && typeof m === 'object') {
-      out[k] = { type_vehicule: m.type_vehicule || '', marque_modele: m.marque_modele || '' };
-    }
-  });
-  return out;
-}
-function _proRestaurerVehiculesDepuisBrouillon(source) {
-  _proMemoireVehicules = {};
-  if (!source || typeof source !== 'object') return;   // ancien brouillon : aucune erreur
-  Object.keys(source).forEach(function (k) {
-    var m = source[k];
-    if (m && typeof m === 'object') {
-      _proMemoireVehicules[k] = {
-        type_vehicule: String(m.type_vehicule || ''),
-        marque_modele: String(m.marque_modele || '')
-      };
-    }
-  });
-}
-
-function proRendreVehicules() {
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (!zone) return;
-  var n = _proNbVehicules();
-  var html = '';
-  for (var i = 0; i < n; i++) {
-    var mem = _proMemoireVehicules[i] || {};
-    var options = '<option value="">— Sélectionnez —</option>';
-    // Reutilise la liste de gabarits DEJA existante : aucune nouvelle
-    // nomenclature de vehicules creee pour ce parcours.
-    TYPES_VEHICULE.forEach(function (t) {
-      options += '<option value="' + t[0] + '"' + (mem.type_vehicule === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
-    });
-    html += '<div class="pro-veh-acc" id="pro-veh-acc-' + i + '">' +
-      '<button type="button" class="pro-veh-barre" onclick="proBasculerVehicule(' + i + ')">' +
-        '<span class="pro-veh-num">' + (i + 1) + '</span>' +
-        '<span class="pro-veh-titre">Véhicule ' + (i + 1) + '</span>' +
-        '<span class="pro-veh-chevron">&rsaquo;</span>' +
-      '</button>' +
-      '<div class="pro-veh-contenu">' +
-        '<div class="modal-form-group"><label>Type de véhicule <span class="field-required">*</span></label>' +
-        '<select id="pro-veh-' + i + '-type" onchange="_proMemoriserVehicule(' + i + ');_clearFieldError(\'pro-veh-' + i + '-type\')">' + options + '</select></div>' +
-        '<div class="modal-form-group"><label>Marque et modèle <span class="field-required">*</span></label>' +
-        '<input type="text" id="pro-veh-' + i + '-marque" value="' + _attr(mem.marque_modele || '') + '" placeholder="Ex : BMW Série 3" autocomplete="off" oninput="_proMemoriserVehicule(' + i + ')" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box"></div>' +
-        // Chaque véhicule porte SES propres actions. Elles ne touchent
-        // jamais un autre véhicule : l'index est passé explicitement.
-        '<div class="veh-sous-actions">' +
-          '<button type="button" class="veh-sous-effacer" onclick="proEffacerVehicule(' + i + ')">Effacer</button>' +
-          '<button type="button" class="veh-sous-valider" onclick="proOkVehicule(' + i + ')">OK</button>' +
-        '</div>' +
-      '</div></div>';
-  }
-  zone.innerHTML = html;
-  _proMajLibelleVehicules();
-  _proMajEtatVehicules();
-}
-
-// ── UN VÉHICULE EST-IL COMPLET ? ──
-// Mêmes champs obligatoires que la validation de la rubrique, lus
-// depuis la mémoire : aucune règle recopiée.
-function _proVehiculeComplet(i) {
-  var m = _proMemoireVehicules[i] || {};
-  return !!(String(m.type_vehicule || '').trim() && String(m.marque_modele || '').trim());
-}
-
-// Effacer : vide UNIQUEMENT ce véhicule.
-function proEffacerVehicule(i) {
-  var t = document.getElementById('pro-veh-' + i + '-type');
-  var mq = document.getElementById('pro-veh-' + i + '-marque');
-  if (t) t.value = '';
-  if (mq) mq.value = '';
-  _clearFieldError('pro-veh-' + i + '-type');
-  _clearFieldError('pro-veh-' + i + '-marque');
-  _proMemoriserVehicule(i);
-  var carte = document.getElementById('pro-veh-acc-' + i);
-  if (carte) { carte.classList.remove('termine'); delete carte.dataset.proValide; }
-  _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// OK : valide UNIQUEMENT ce véhicule. Le numéro ne passe au vert que si
-// ses informations obligatoires sont réellement renseignées.
-function proOkVehicule(i) {
-  var carte = document.getElementById('pro-veh-acc-' + i);
-  if (!carte) return;
-  if (!_proVehiculeComplet(i)) {
-    if (!String((_proMemoireVehicules[i] || {}).type_vehicule || '').trim()) {
-      _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.');
-    }
-    if (!String((_proMemoireVehicules[i] || {}).marque_modele || '').trim()) {
-      _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.');
-    }
-    delete carte.dataset.proValide;
-    _proMajEtatVehicules();
-    return;
-  }
-  carte.dataset.proValide = '1';
-  carte.classList.remove('ouvert');
-  _proMajEtatVehicules();
-  _proMajBoutonContinuer();
-}
-
-// Recalcule le vert/rouge de CHAQUE véhicule. Un numéro n'est vert que
-// si l'utilisateur a validé ce véhicule ET qu'il est encore complet :
-// ouvrir une carte ne suffit jamais, et modifier une valeur jusqu'à la
-// rendre incomplète le fait repasser au rouge.
-function _proMajEtatVehicules() {
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (!zone) return;
-  Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
-    var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
-    var vert = carte.dataset.proValide === '1' && _proVehiculeComplet(i);
-    carte.classList.toggle('termine', vert);
-  });
-}
-
-function proBasculerVehicule(i) {
-  var el = document.getElementById('pro-veh-acc-' + i);
-  if (!el) return;
-  var vaSouvrir = !el.classList.contains('ouvert');
-  // Un clic ouvre UNIQUEMENT la carte choisie.
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (zone) {
-    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (x) {
-      if (x !== el) x.classList.remove('ouvert');
-    });
-  }
-  el.classList.toggle('ouvert', vaSouvrir);
-}
-
-// Libelle dynamique : singulier a 1 vehicule, pluriel au-dela.
-function _proMajLibelleVehicules() {
-  var t = document.getElementById('pro-vehicules-titre');
-  if (t) t.textContent = (_proNbVehicules() > 1) ? 'Informations sur les véhicules' : 'Information sur le véhicule';
-}
-
-function proMajNbVehicules(delta) {
-  var el = document.getElementById('pro-nb-vehicules');
-  if (!el) return;
-  var avant = _proNbVehicules();
-  var apres = Math.min(PRO_MAX_VEHICULES, Math.max(1, avant + delta));
-  if (apres === avant) return;
-  el.value = apres;
-  // Une carte retiree ne doit plus jamais reapparaitre dans le payload.
-  for (var i = apres; i < PRO_MAX_VEHICULES; i++) delete _proMemoireVehicules[i];
-  proRendreVehicules();
-  _formulaireClientSale = true;
-  if (typeof _planifierSauvegardeBrouillonClient === 'function') _planifierSauvegardeBrouillonClient();
-  _proMajBoutonContinuer();
-}
-
 function proMajNbPros(delta) {
   var el = document.getElementById('pro-nb-pros');
   if (!el) return;
@@ -9647,7 +9684,10 @@ function proMajNbPros(delta) {
 }
 
 // ── RUBRIQUES ───────────────────────────────────────
-var PRO_RUBRIQUES = ['besoin', 'vehicules', 'lieu', 'periode', 'mission'];
+// LOT D4 — « vehicules » a disparu de la liste : la rubrique n'existe
+// plus. Les quatre rubriques conservees sont exactement celles
+// demandees.
+var PRO_RUBRIQUES = ['besoin', 'lieu', 'periode', 'mission'];
 
 // Accordeons fermes par defaut : AUCUN ne s'ouvre automatiquement, et
 // un clic n'ouvre que celui qui a ete choisi.
@@ -9665,16 +9705,7 @@ function proEffacerToutLeFormulaire() {
   PRO_RUBRIQUES.forEach(function (cle) {
     try { proEffacerRubrique(cle); } catch (e) {}
   });
-  // Les véhicules ont leur propre effacement, individuel par carte.
-  var zone = document.getElementById('pro-vehicules-liste');
-  if (zone) {
-    Array.prototype.forEach.call(zone.querySelectorAll('.pro-veh-acc'), function (carte) {
-      var i = parseInt(String(carte.id).replace('pro-veh-acc-', ''), 10);
-      if (!isNaN(i)) { try { proEffacerVehicule(i); } catch (e) {} }
-    });
-  }
   _proMajEtatRubriques();
-  _proMajEtatVehicules();
   _proMajBoutonContinuer();
   if (typeof construireRecapProfessionnel === 'function') {
     try { construireRecapProfessionnel(); } catch (e) {}
@@ -9739,10 +9770,6 @@ function proEffacerRubrique(cle) {
     var nbp = document.getElementById('pro-nb-pros'); if (nbp) nbp.value = 1;
     _clearGroupError('pro-categorie-group'); _clearGroupError('pro-specialite-group'); _clearGroupError('pro-mission-group');
     proOnCategorieChange();
-  } else if (cle === 'vehicules') {
-    _reinitialiserVehiculesProfessionnel();
-    var nbv = document.getElementById('pro-nb-vehicules'); if (nbv) nbv.value = 1;
-    proRendreVehicules();
   } else if (cle === 'lieu') {
     viderChamps(['pro-adresse-rue', 'pro-adresse-cp', 'pro-adresse-ville']);
     decocher('pro-contact-sp');
@@ -9789,18 +9816,8 @@ function proOnCategorieChange() {
   _clearGroupError('pro-mission-group');
   _clearGroupError('pro-categorie-group');
 
-  // Les vehicules n'appartiennent qu'au technicien : en renfort, la
-  // rubrique disparait et sa memoire est reellement videe.
-  var accVeh = document.getElementById('pro-acc-vehicules');
-  if (accVeh) accVeh.style.display = (c === 'technicien') ? 'block' : 'none';
-  if (c !== 'technicien') {
-    _reinitialiserVehiculesProfessionnel();
-    var nbv = document.getElementById('pro-nb-vehicules');
-    if (nbv) nbv.value = 1;
-    if (accVeh) accVeh.classList.remove('ouvert');
-  } else {
-    proRendreVehicules();
-  }
+  // LOT D4 — plus aucune rubrique de vehicules a montrer ni a masquer :
+  // elle n'existe plus pour aucune categorie.
 
   var titreMission = document.getElementById('pro-mission-titre');
   if (titreMission) titreMission.textContent = (c === 'renfort') ? 'Type de mission' : 'Mission';
@@ -9892,19 +9909,6 @@ function _proValiderRubrique(cle, fail) {
     return ok;
   }
 
-  if (cle === 'vehicules') {
-    if (!_proVehiculesApplicables()) return true;   // renfort : rubrique absente
-    var n = _proNbVehicules();
-    for (var i = 0; i < n; i++) {
-      var m = _proMemoireVehicules[i] || {};
-      if (!m.type_vehicule) { _showFieldError('pro-veh-' + i + '-type', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-type'); }
-      else _clearFieldError('pro-veh-' + i + '-type');
-      if (!m.marque_modele) { _showFieldError('pro-veh-' + i + '-marque', 'Ce champ est obligatoire.'); ko('pro-veh-' + i + '-marque'); }
-      else _clearFieldError('pro-veh-' + i + '-marque');
-    }
-    return ok;
-  }
-
   if (cle === 'lieu') {
     if (!_checkRequiredText('pro-adresse-rue', null, true)) ko('pro-adresse-rue');
     if (!_checkCodePostal('pro-adresse-cp', true)) ko('pro-adresse-cp');
@@ -9952,8 +9956,6 @@ function _validateProfessionnelEtape2() {
     var champ = document.getElementById(first);
     var acc = champ && champ.closest ? champ.closest('.veh-sous-accordeon') : null;
     if (acc) acc.classList.add('ouvert');
-    var carte = champ && champ.closest ? champ.closest('.pro-veh-acc') : null;
-    if (carte) carte.classList.add('ouvert');
   }
   return { ok: ok, first: first };
 }
@@ -9974,15 +9976,6 @@ function _proRubriqueComplete(cle) {
   if (cle === 'besoin') {
     if (!_proCategorie() || !_proMetier()) return false;
     if (_proPrecisionApplicable() && !_proMetierPrecision()) return false;
-    return true;
-  }
-  if (cle === 'vehicules') {
-    if (!_proVehiculesApplicables()) return true;
-    var n = _proNbVehicules();
-    for (var i = 0; i < n; i++) {
-      var m = _proMemoireVehicules[i] || {};
-      if (!m.type_vehicule || !m.marque_modele) return false;
-    }
     return true;
   }
   if (cle === 'lieu') {
@@ -10036,8 +10029,13 @@ function _construireDetailsProfessionnel() {
     // En mode conseil, le nombre de professionnels n'est pas demande :
     // il ne doit donc jamais partir avec une valeur par defaut.
     nombre_professionnels: conseil ? null : _proNbPros(),
-    nombre_vehicules: _proVehiculesApplicables() ? _proNbVehicules() : null,
-    vehicules: _proVehiculesRetenus(),
+    // LOT D4 — plus AUCUNE quantite ni fiche de vehicule n'est envoyee.
+    // Les cles restent presentes et NULLES plutot qu'absentes : le
+    // Dashboard, le devis et les informations necessaires distinguent
+    // ainsi une demande recente (rien a afficher) d'une demande
+    // ancienne, qui porte encore ses vehicules et reste lisible.
+    nombre_vehicules: null,
+    vehicules: [],
     adresse_rue: _proAdresseRue() || null,
     adresse_cp: _proAdresseCp() || null,
     adresse_ville: _proAdresseVille() || null,
@@ -10083,14 +10081,10 @@ function construireRecapProfessionnel() {
   if (d.nombre_professionnels) besoin += _recapLigne('Professionnels', String(d.nombre_professionnels));
   html += _recapBloc('Votre besoin', besoin, 2);
 
-  if (d.nombre_vehicules) {
-    var veh = _recapLigne('Nombre de véhicules', String(d.nombre_vehicules));
-    (d.vehicules || []).forEach(function (v, idx) {
-      var libelle = [_libelleTypeVehicule(v.type_vehicule), v.marque_modele].filter(Boolean).join(' — ');
-      veh += _recapLigne('Véhicule ' + (idx + 1), libelle);
-    });
-    html += _recapBloc(d.nombre_vehicules > 1 ? 'Informations sur les véhicules' : 'Information sur le véhicule', veh, 2);
-  }
+  // LOT D4 — le recapitulatif d'une demande en cours ne montre plus
+  // aucun vehicule : la rubrique n'existe plus, et rien ne doit
+  // reapparaitre ici. Les anciens dossiers, eux, restent lisibles dans
+  // le Dashboard, qui affiche ce qu'ils portent reellement.
 
   var lieu = _recapLigne('Adresse', d.adresse_rue);
   if (d.adresse_cp || d.adresse_ville) lieu += _recapLigne('Ville', [d.adresse_cp, d.adresse_ville].filter(Boolean).join(' '));
@@ -13502,7 +13496,9 @@ function _construireBrouillonClient() {
     // V77.1 - copie (jamais la reference) des quantites Nettoyage, qui
     // ne sont portees par aucun champ HTML serialisable.
     nettoyageQuantites: (typeof _nettQuantitesPourBrouillon === 'function') ? _nettQuantitesPourBrouillon() : {},
-    professionnelVehicules: (typeof _proVehiculesPourBrouillon === 'function') ? _proVehiculesPourBrouillon() : {}
+    // LOT D4 — plus aucun vehicule n'est memorise : un ancien brouillon
+    // qui en contient encore ne peut donc plus les reinjecter.
+    professionnelVehicules: {}
   };
 }
 
@@ -13798,13 +13794,10 @@ function _restaurerBrouillonClientSiPresent() {
   if (typeof _nettRestaurerQuantitesDepuisBrouillon === 'function') {
     _nettRestaurerQuantitesDepuisBrouillon(brouillon.nettoyageQuantites);
   }
-  // Meme principe pour les vehicules du parcours Professionnel :
-  // restaures AVANT onChoixService(), qui declenche proRendreVehicules().
-  // Un ancien brouillon depourvu de professionnelVehicules laisse
-  // simplement la memoire vide, sans erreur.
-  if (typeof _proRestaurerVehiculesDepuisBrouillon === 'function') {
-    _proRestaurerVehiculesDepuisBrouillon(brouillon.professionnelVehicules);
-  }
+  // LOT D4 — un ancien brouillon peut encore porter
+  // `professionnelVehicules` : il n'est plus jamais relu. La rubrique
+  // n'existe plus, elle ne doit donc pas pouvoir revenir par une
+  // reprise de brouillon.
 
   if (typeof onChoixService === 'function') onChoixService();
   if (typeof nettRendreRepartition === 'function') nettRendreRepartition();
@@ -13930,9 +13923,6 @@ function resetClientForm() {
   // vraie reinitialisation (jamais lors d'un simple Retour ni d'une
   // bascule temporaire de service).
   _reinitialiserQuantitesNettoyage();
-  // Meme raison : _proMemoireVehicules est une variable JS persistante
-  // que la restauration du HTML d'origine ne remet pas a zero.
-  if (typeof _reinitialiserVehiculesProfessionnel === 'function') _reinitialiserVehiculesProfessionnel();
   var _mc = document.getElementById('modal-client');
   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
@@ -14171,7 +14161,7 @@ async function convOuvrirEnregistreur() {
       natif.click();
       return;
     }
-    alert("Votre navigateur ne permet pas d'enregistrer une vidéo dans la page.\n\n"
+    _convEnrMessage("Votre navigateur ne permet pas d'enregistrer une vidéo dans la page. "
         + "Utilisez « Choisir une vidéo existante ».");
     convOuvrirSelecteurVideo('fichier');
     return;
@@ -15614,7 +15604,7 @@ async function _submitClientFormInterne() {
   email_val  = email_val.trim();
 
   if (!prenom_val || !email_val) {
-    alert('Veuillez remplir au moins votre prenom et email.');
+    _hcAfficherBandeauErreur('Renseignez au moins votre prénom et votre adresse e-mail.');
     return;
   }
 
@@ -16401,22 +16391,42 @@ function setLang(lang) {
 
 
 
+// ══════════════════════════════════════════════════════════════
+// LOT E1 — LE SEUL POINT DE PASSAGE DES MESSAGES D'INTERFACE
+// ══════════════════════════════════════════════════════════════
+// Un unique composant, partage par TOUS les formulaires et tous les
+// ecrans d'authentification. Fond blanc, texte discret, et pour une
+// erreur le meme petit repere vertical rouge que « Ce champ est
+// obligatoire ». Plus aucun grand rectangle rouge ou vert, plus aucune
+// alerte native, plus aucun message technique brut.
+//
+// ton : 'erreur' (defaut), 'succes' ou 'info'.
+function _hcNote(id, texte, ton) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  el.className = 'hc-note'
+    + (ton === 'succes' ? ' hc-note--succes' : (ton === 'info' ? ' hc-note--info' : ''));
+  if (!texte) { el.classList.remove('visible'); el.textContent = ''; el.style.display = ''; return el; }
+  // textContent, jamais innerHTML : aucun contenu recu ne peut devenir
+  // du balisage.
+  el.textContent = texte;
+  el.classList.add('visible');
+  // Une regle en ligne heritee ne doit pas continuer a masquer la zone.
+  el.style.display = '';
+  return el;
+}
+function _hcNoteEffacer(id) { return _hcNote(id, '', null); }
+
 // Le bandeau d'erreur de la fenetre client. Il ne doit JAMAIS survivre
 // a la tentative qui l'a produit : ni d'une fenetre a l'autre, ni d'un
 // essai au suivant, ni apres un rechargement.
 function _hcEffacerBandeauErreur() {
-  var dbg = document.getElementById('supabase-debug');
-  if (!dbg) return;
-  dbg.style.display = 'none';
-  dbg.textContent = '';
+  _hcNoteEffacer('supabase-debug');
 }
 
 // Message lisible par le client. Le detail technique n'y figure jamais.
 function _hcAfficherBandeauErreur(texte) {
-  var dbg = document.getElementById('supabase-debug');
-  if (!dbg) return;
-  dbg.style.display = 'block';
-  dbg.textContent = texte;
+  _hcNote('supabase-debug', texte, 'erreur');
 }
 
 function openModal(type) {
@@ -16517,13 +16527,267 @@ var _reinitEnvoiEnCours = false;
 // Même URL de retour que le Dashboard, construite depuis l'origine
 // réellement servie. Chaque origine utilisée doit être autorisée dans
 // Supabase (voir le dossier de recette).
+// ══════════════════════════════════════════════════════════════
+// LOT A3 — L'URL DE RETOUR, TOUJOURS SUR NOTRE PROPRE ORIGINE
+// ══════════════════════════════════════════════════════════════
+// Elle est CONSTRUITE a partir de l'origine servie, jamais reprise
+// d'un parametre d'URL, d'un referrer ou d'un champ : aucune
+// redirection ouverte n'est possible. Le repli ne pointe plus sur le
+// domaine d'apercu — le meme defaut que le CORS du lot A1 — mais sur
+// le site de production.
 function _hcUrlRetourReinitialisation() {
   try {
     var o = window.location.origin;
     if (o && /^https?:/.test(o)) return o + '/dashboard.html';
   } catch (e) {}
-  return 'https://helixcar-i89b.vercel.app/dashboard.html';
+  return HC_ORIGINE_PRODUCTION + '/dashboard.html';
 }
+
+// ══════════════════════════════════════════════════════════════
+// LOT A3 — RECONNAITRE LE FLUX DE RECUPERATION, ET LE MENER A BOUT
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : le lien recu par e-mail ramenait sur la
+// vitrine HelixCar, sans aucun ecran permettant de choisir un nouveau
+// mot de passe. Cause : Supabase ne redirige vers `redirectTo` que si
+// cette adresse figure dans ses « Redirect URLs » ; sinon il retombe
+// silencieusement sur la « Site URL » du projet — c'est-a-dire cette
+// page. L'ecran de saisie n'existait, lui, que dans dashboard.html.
+//
+// Deux corrections, independantes l'une de l'autre :
+//   * la configuration Supabase (action manuelle, § « Actions
+//     manuelles » du dossier de recette) ;
+//   * et surtout CE CODE, qui rend le parcours robuste meme si la
+//     redirection retombe sur la vitrine.
+var _hcReinitEnregistrementEnCours = false;
+
+// Un lien perime, deja utilise ou altere revient avec une erreur dans
+// le fragment d'URL. On la lit AVANT toute tentative de session.
+function _hcErreurLienRecuperation() {
+  var brut = '';
+  try { brut = (window.location.hash || '').replace(/^#/, '') + '&' + (window.location.search || '').replace(/^\?/, ''); }
+  catch (e) { return null; }
+  if (!brut) return null;
+  var p = new URLSearchParams(brut);
+  var code = p.get('error_code') || '';
+  var err = p.get('error') || '';
+  if (!code && !err) return null;
+  if (/expired/i.test(code)) return 'expire';
+  return 'invalide';
+}
+
+// Le fragment porte-t-il bien un flux de RECUPERATION ? On ne se fie
+// jamais a un simple `type=recovery` place a la main dans la barre
+// d'adresse : l'ecran ne s'ouvre que si Supabase a reellement etabli
+// une session de recuperation (verifiee ci-dessous).
+function _hcFragmentRecuperation() {
+  try {
+    var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    return p.get('type') === 'recovery';
+  } catch (e) { return false; }
+}
+
+function ouvrirEcranNouveauMotDePasse(etat) {
+  var f = document.getElementById('reinit-bloc-formulaire');
+  var ok = document.getElementById('reinit-bloc-succes');
+  var ko = document.getElementById('reinit-bloc-expire');
+  if (f)  f.style.display  = (etat === 'formulaire') ? '' : 'none';
+  if (ok) ok.style.display = (etat === 'succes')     ? '' : 'none';
+  if (ko) ko.style.display = (etat === 'expire')     ? '' : 'none';
+  if (etat === 'formulaire') {
+    // Memorise pour survivre a un F5 : Supabase ne rejoue pas
+    // PASSWORD_RECOVERY apres rechargement, mais la session de
+    // recuperation est toujours ouverte.
+    try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+    _hcNoteEffacer('reinit-message');
+    var a = document.getElementById('reinit-mdp');
+    var b = document.getElementById('reinit-mdp2');
+    if (a) a.value = '';
+    if (b) b.value = '';
+  }
+  var deja = document.getElementById('modal-reinit');
+  if (deja && !deja.classList.contains('open')) {
+    deja.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    document.body.classList.add('hc-modal-open');
+    reinitialiserAffichageMotsDePasse(deja);
+  }
+  if (etat === 'formulaire') {
+    var champ = document.getElementById('reinit-mdp');
+    if (champ) { try { champ.focus(); } catch (e) {} }
+  }
+}
+
+async function enregistrerNouveauMotDePasse() {
+  // Double clic : le second appel ne fait rien tant que le premier n'a
+  // pas repondu.
+  if (_hcReinitEnregistrementEnCours) return;
+  var a = document.getElementById('reinit-mdp');
+  var b = document.getElementById('reinit-mdp2');
+  var mdp = a ? a.value : '';
+  var mdp2 = b ? b.value : '';
+  if (mdp.length < 8) {
+    _hcNote('reinit-message', 'Le mot de passe doit contenir au moins 8 caractères.', 'erreur');
+    if (a) a.focus();
+    return;
+  }
+  if (mdp !== mdp2) {
+    _hcNote('reinit-message', 'Les deux mots de passe ne sont pas identiques.', 'erreur');
+    if (b) b.focus();
+    return;
+  }
+  if (!_sb || !_sb.auth) {
+    _hcNote('reinit-message', 'Service momentanément indisponible. Réessayez dans quelques instants.', 'erreur');
+    return;
+  }
+
+  _hcReinitEnregistrementEnCours = true;
+  var btn = document.getElementById('reinit-valider');
+  if (btn) btn.disabled = true;
+  try {
+    // LE MOT DE PASSE N'EST CHANGE QUE S'IL EXISTE UNE VRAIE SESSION DE
+    // RECUPERATION. Sans elle, updateUser echoue — et c'est bien ainsi :
+    // aucun ecran local ne doit pouvoir modifier un mot de passe.
+    var ses = await _sb.auth.getSession();
+    if (!ses || !ses.data || !ses.data.session) {
+      ouvrirEcranNouveauMotDePasse('expire');
+      return;
+    }
+    var res = await _sb.auth.updateUser({ password: mdp });
+    if (res && res.error) {
+      var m = String(res.error.message || '');
+      if (/expired|invalid|not authenticated|session/i.test(m)) {
+        ouvrirEcranNouveauMotDePasse('expire');
+        return;
+      }
+      _hcNote('reinit-message',
+        /should be different|same/i.test(m)
+          ? 'Choisissez un mot de passe différent de l\'ancien.'
+          : 'Le mot de passe n\'a pas pu être enregistré. Réessayez dans quelques instants.',
+        'erreur');
+      return;
+    }
+    // Succes REEL, confirme par le serveur. Le contexte de
+    // recuperation est referme : le lien ne sert plus a rien.
+    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    try { _hcNettoyerFragmentRecuperation(); } catch (e) {}
+    ouvrirEcranNouveauMotDePasse('succes');
+  } catch (e) {
+    _hcNote('reinit-message', 'Le mot de passe n\'a pas pu être enregistré. Vérifiez votre connexion et réessayez.', 'erreur');
+  } finally {
+    _hcReinitEnregistrementEnCours = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Le jeton ne doit pas rester dans la barre d'adresse ni dans
+// l'historique une fois consomme.
+function _hcNettoyerFragmentRecuperation() {
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) {}
+}
+
+async function terminerReinitialisation() {
+  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  try { if (_sb && _sb.auth) await _sb.auth.signOut(); } catch (e) {}
+  _hcNettoyerFragmentRecuperation();
+  var m = document.getElementById('modal-reinit');
+  if (m) m.classList.remove('open');
+  document.body.style.overflow = '';
+  document.body.classList.remove('hc-modal-open');
+  openModal('connexion');
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOT B2 — LA CONFIRMATION D'ADRESSE MENE QUELQUE PART
+// ══════════════════════════════════════════════════════════════
+// CE QUI ETAIT CONSTATE : l'e-mail « Confirm your email address » etait
+// en anglais, et son lien ramenait sur la page d'accueil sans la
+// moindre confirmation lisible. Le modele francais est desormais
+// versionne (supabase/templates/confirmation-adresse.html) ; il reste a
+// le recopier dans Supabase, ce que le dossier de recette indique.
+//
+// COTE CODE, la page doit reconnaitre l'arrivee et le dire. Le succes
+// n'est JAMAIS affirme sur la seule presence d'un fragment d'URL : il
+// faut que Supabase ait reellement etabli la session, ou emis
+// l'evenement de connexion.
+function _hcFragmentConfirmation() {
+  try {
+    var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    var t = p.get('type');
+    return t === 'signup' || t === 'email_change' || t === 'magiclink';
+  } catch (e) { return false; }
+}
+
+var _hcConfirmationAnnoncee = false;
+function _hcAnnoncerAdresseConfirmee(avecSession) {
+  if (_hcConfirmationAnnoncee) return;
+  _hcConfirmationAnnoncee = true;
+  _hcNettoyerFragmentRecuperation();
+  if (avecSession) {
+    // Une session existe : on mene la personne a son espace, sans lui
+    // redemander quoi que ce soit.
+    try { window.location.href = _hcUrlRetourReinitialisation(); } catch (e) {}
+    return;
+  }
+  // Pas de session : on ouvre la connexion avec un message neutre. Il
+  // ne dit rien de plus que ce qui est certain.
+  if (typeof openModal === 'function') openModal('connexion');
+  _hcNote('connexion-message',
+    'Adresse e-mail confirmée, vous pouvez vous connecter.', 'info');
+}
+
+// Branchement : un seul ecouteur, pose une fois.
+(function _hcBrancherRecuperation() {
+  var erreurLien = _hcErreurLienRecuperation();
+  if (erreurLien) {
+    // Un lien perime ou altere ne doit jamais laisser la personne sur
+    // une vitrine muette.
+    try {
+      document.addEventListener('DOMContentLoaded', function () {
+        ouvrirEcranNouveauMotDePasse('expire');
+      });
+    } catch (e) {}
+  }
+  if (!_sb || !_sb.auth || !_sb.auth.onAuthStateChange) return;
+  _sb.auth.onAuthStateChange(function (evenement, session) {
+    if (evenement === 'PASSWORD_RECOVERY') {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    // Reprise apres un F5 en pleine reinitialisation, ou arrivee sur un
+    // fragment de recuperation que la bibliotheque a deja consomme.
+    var enCours = false;
+    try { enCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
+    if ((enCours || _hcFragmentRecuperation()) && session && session.user) {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    // LOT B2 — confirmation d'adresse. On n'annonce le succes qu'apres
+    // un evenement REEL de Supabase, jamais sur le seul fragment d'URL.
+    if (_hcFragmentConfirmation()
+        && (evenement === 'SIGNED_IN' || evenement === 'INITIAL_SESSION'
+            || evenement === 'USER_UPDATED')) {
+      _hcAnnoncerAdresseConfirmee(!!(session && session.user));
+    }
+  });
+
+  // Le lien peut aussi arriver SANS session — Supabase a confirme
+  // l'adresse, mais la personne doit se connecter. Aucun evenement
+  // n'est alors emis : on le dit, apres avoir laisse a la bibliotheque
+  // le temps d'etablir une session si elle le peut.
+  if (_hcFragmentConfirmation() && !_hcErreurLienRecuperation()) {
+    setTimeout(function () {
+      if (_hcConfirmationAnnoncee) return;
+      if (!_sb || !_sb.auth) { _hcAnnoncerAdresseConfirmee(false); return; }
+      _sb.auth.getSession().then(function (r) {
+        _hcAnnoncerAdresseConfirmee(!!(r && r.data && r.data.session));
+      }).catch(function () { _hcAnnoncerAdresseConfirmee(false); });
+    }, 900);
+  }
+})();
 
 // Message TOUJOURS identique, que l'adresse existe ou non.
 var HC_REINIT_MESSAGE_NEUTRE =
@@ -16531,10 +16795,7 @@ var HC_REINIT_MESSAGE_NEUTRE =
 
 async function demanderReinitialisationMotDePasse() {
   if (event) event.preventDefault();
-  var msg = document.getElementById('connexion-message');
-  var afficher = function (texte) {
-    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
-  };
+  var afficher = function (texte, ton) { _hcNote('connexion-message', texte, ton || 'erreur'); };
 
   // Double clic : le second appel ne renvoie pas un deuxième e-mail.
   if (_reinitEnvoiEnCours) return;
@@ -16558,7 +16819,7 @@ async function demanderReinitialisationMotDePasse() {
   }
 
   _reinitEnvoiEnCours = true;
-  afficher('Envoi en cours…');
+  afficher('Envoi en cours…', 'info');
   try {
     var res = await _sb.auth.resetPasswordForEmail(email, {
       redirectTo: _hcUrlRetourReinitialisation()
@@ -16575,7 +16836,7 @@ async function demanderReinitialisationMotDePasse() {
     // Toute autre erreur reste silencieuse : la distinguer d'un succès
     // révélerait l'existence du compte.
     if (erreur) console.error('resetPasswordForEmail:', erreur);
-    afficher(HC_REINIT_MESSAGE_NEUTRE);
+    afficher(HC_REINIT_MESSAGE_NEUTRE, 'info');
   } catch (e) {
     afficher('L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.');
   } finally {
@@ -16585,10 +16846,7 @@ async function demanderReinitialisationMotDePasse() {
 
 async function submitConnexionForm() {
   event && event.preventDefault();
-  var msg = document.getElementById('connexion-message');
-  var afficher = function (texte) {
-    if (msg) { msg.style.display = 'block'; msg.textContent = texte; }
-  };
+  var afficher = function (texte, ton) { _hcNote('connexion-message', texte, ton || 'erreur'); };
   var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
   var mdp   = ((document.getElementById('connexion-password') || {}).value || '');
   if (!email || !mdp) {
@@ -16599,7 +16857,7 @@ async function submitConnexionForm() {
     afficher('La connexion est momentanément indisponible. Réessayez dans quelques instants.');
     return;
   }
-  afficher('Connexion en cours…');
+  afficher('Connexion en cours…', 'info');
   var res = null;
   try {
     res = await _sb.auth.signInWithPassword({ email: email, password: mdp });
@@ -16625,6 +16883,13 @@ function showSuccess(type) {
   var successEl = document.getElementById('modal-' + type + '-success');
   var overlay = document.getElementById('modal-' + type);
   if (!successEl || !overlay) return;
+  // LOT C1 — dans l'espace client, l'ecran de succes n'est pas la
+  // bonne reponse : la place de la demande est dans SA liste, avec sa
+  // reference et son statut relus depuis la base.
+  if (type === 'client' && typeof _hcModeIntegre === 'function' && _hcModeIntegre()) {
+    _hcPrevenirEspaceClient();
+    return;
+  }
   // Recupere le contenu du succes
   var successHTML = successEl.innerHTML;
   // Vide TOUT l'overlay et le remplace par un modal propre avec juste le succes
@@ -17876,18 +18141,14 @@ async function uploadFichier(inputId, prefixe) {
 // jamais dans celle du client : une erreur ne doit pas suivre
 // l'utilisateur d'un formulaire a l'autre.
 function _convAfficherEchecCandidature(texte) {
-  var zone = document.getElementById('conv-erreur-envoi');
-  if (zone) {
-    zone.textContent = texte;
-    zone.style.display = 'block';
-    try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
-    return;
-  }
-  alert(texte);
+  // Plus aucun repli sur alert() : une alerte native n'est ni au design
+  // HelixCar, ni lisible par un lecteur d'ecran dans le flux du
+  // formulaire, ni effacable quand l'utilisateur corrige.
+  var zone = _hcNote('conv-erreur-envoi', texte, 'erreur');
+  if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
 }
 function _convEffacerEchecCandidature() {
-  var zone = document.getElementById('conv-erreur-envoi');
-  if (zone) { zone.style.display = 'none'; zone.textContent = ''; }
+  _hcNoteEffacer('conv-erreur-envoi');
 }
 
 // SUPPRESSION D'UN FICHIER DEVENU ORPHELIN.
@@ -17937,7 +18198,7 @@ async function submitConvoyeurForm() {
   prenom = prenom.trim(); nom = nom.trim(); email = email.trim(); tel = tel.trim();
 
   if (!email || !tel) {
-    alert('Veuillez renseigner au moins votre email et votre téléphone.');
+    _convAfficherEchecCandidature('Renseignez au moins votre adresse e-mail et votre téléphone.');
     return;
   }
 
@@ -18015,10 +18276,10 @@ async function submitConvoyeurForm() {
   if (!rc_pro_url) echecs.push('la RC professionnelle');
   if (echecs.length) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    alert(
-      "L'envoi de " + echecs.join(', ') + " a échoué.\n\n" +
-      "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion " +
-      "et le format des fichiers (PDF, JPG ou PNG), puis réessayez."
+    _convAfficherEchecCandidature(
+      "L'envoi de " + echecs.join(', ') + " a échoué.\n"
+      + "Votre candidature n'a pas été enregistrée. Vérifiez votre connexion "
+      + "et le format des fichiers (PDF, JPG ou PNG), puis réessayez."
     );
     return;
   }
@@ -18061,7 +18322,7 @@ async function submitConvoyeurForm() {
     catch (e) { empreinteJeton = null; }
     if (!empreinteJeton) {
       if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-      alert("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n\n"
+      _convAfficherEchecCandidature("Votre navigateur ne permet pas l'envoi sécurisé de la vidéo.\n"
         + "Votre candidature n'a pas été enregistrée. Essayez depuis un navigateur à jour.");
       return;
     }
@@ -18121,9 +18382,10 @@ async function submitConvoyeurForm() {
       _renderFormStep('convoyeur');
       var zoneErr = document.getElementById('conv-zone-video');
       if (zoneErr) { try { zoneErr.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} }
-      alert(
-        "L'envoi de votre vidéo a échoué.\n\n" +
-        "Votre candidature n'est pas finalisée. Vérifiez votre connexion, puis réessayez."
+      _convAfficherEchecCandidature(
+        "L'envoi de votre vidéo a échoué.\n"
+        + "Votre candidature n'est pas finalisée : rien n'a été perdu, et la vidéo "
+        + "peut être renvoyée. Vérifiez votre connexion, puis réessayez."
       );
       return;
     }
@@ -18171,7 +18433,7 @@ function submitParrainage() {
   var numClient = document.getElementById('parr-num-client').value.trim().toUpperCase();
 
   if (!prenom || !email || !fPrenom || !fEmail) {
-    alert('Veuillez remplir tous les champs obligatoires (*).');
+    _hcNote('parr-message', 'Renseignez tous les champs obligatoires (*).', 'erreur');
     return;
   }
 
@@ -18263,7 +18525,10 @@ function submitRecontact() {
 
   console.log('RC submit:', prenom, nom, tel, email, motif, profil);
 
-  if (!tel && !email) { alert('Veuillez renseigner au moins votre téléphone ou email.'); return; }
+  if (!tel && !email) {
+    _hcNote('rc-message-zone', 'Renseignez au moins votre téléphone ou votre adresse e-mail.', 'erreur');
+    return;
+  }
 
   supabaseInsert('recontacts', {
     prenom: prenom,
@@ -18540,6 +18805,7 @@ document.addEventListener('DOMContentLoaded', () => { initAutocomplete(); });
 
     <div id="parrainage-form">
       <h2>Parrainer un proche</h2>
+      <div id="parr-message" class="hc-note" role="alert"></div>
       <p>Votre filleul et vous bénéficiez chacun de <strong>10% de réduction</strong> sur votre prochain convoyage, dès sa 1ère mission réalisée.</p>
 
       <!-- Parrain -->
@@ -18699,7 +18965,42 @@ function basculerLivraisonVehicule(i) {
 
 
 
+// ══════════════════════════════════════════════════════════════
+// LOT D1 — QUAND HELIXCAR N'INTERVIENT PAS SUR LE TRAJET
+// ══════════════════════════════════════════════════════════════
+// Dans un STOCKAGE ou le client depose lui-meme son vehicule ET vient
+// lui-meme le rechercher, HelixCar ne le transporte a aucun moment. La
+// rubrique « Livraison » de chaque vehicule n'a alors aucun objet : ni
+// adresse d'arrivee, ni contact, ni date, ni restitution organisee par
+// HelixCar.
+//
+// CE QUI ETAIT CONSTATE : la rubrique restait affichee, numerotee, avec
+// la question de restitution et le bloc « Vehicule a restituer ». Le
+// client repondait donc a des questions sans objet, et leurs valeurs
+// pouvaient partir en base.
+//
+// UNE SEULE fonction porte la regle. Formulaire, lecture du payload,
+// recapitulatif, Dashboard, devis et informations necessaires la
+// consultent tous : ils ne peuvent pas diverger.
+//
+// PORTEE STRICTE, volontairement : uniquement le stockage, uniquement
+// quand les DEUX trajets sont faits par le client. Les scenarios mixtes
+// (HelixCar achemine, ou HelixCar livre) et le Convoyage ne sont pas
+// touches.
+function _livraisonSansObjet() {
+  // Les deux reponses doivent avoir ete DONNEES, et donnees ainsi. Une
+  // question encore sans reponse ne fait rien disparaitre : c'est
+  // exactement l'erreur commise ailleurs, ou une rubrique dependait
+  // d'une AUTRE reponse pas encore fournie.
+  return _avecStockage()
+      && _acheminementStockage() === 'depot_client'
+      && _sortieStockage() === 'recuperation_client';
+}
+
 function _vehiculeARestitutionSpecifique(i) {
+  // Sans objet : la question n'est pas posee, donc aucune reponse
+  // heritee d'un scenario precedent ne peut etre lue.
+  if (_livraisonSansObjet()) return false;
   var r = document.querySelector('input[name="veh-' + i + '-restit-active"]:checked');
   return !!(r && r.value === 'oui');
 }
@@ -18943,7 +19244,10 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
-    if (livraison) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
+    // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
+    // sur aucun des deux trajets. Ni titre, ni numero, ni sous-champ,
+    // ni validation cachee : rien n'est rendu.
+    if (livraison && !_livraisonSansObjet()) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
 
     // ── LE MODE DE TRANSPORT, TOUJOURS PRESENT, TOUJOURS ICI ──
     //
@@ -19002,7 +19306,10 @@ function _lireFichesVehicules() {
     out.push({
       position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),mode_transport:modeEl?modeEl.value:'',consignes:g('consignes'),
       adresse_depart_rue:g('pc-rue'),code_postal_depart:g('pc-cp'),ville_depart:g('pc-ville'),pc_contact_nom:g('pc-contact'),pc_contact_tel:g('pc-tel'),date_prise_en_charge:g('pc-date'),heure_prise_en_charge:h('pc','heure'),pc_heure_type:h('pc','type'),pc_creneau_debut:h('pc','cdeb'),pc_creneau_fin:h('pc','cfin'),
-      livraison_apres_stockage:livActive,
+      // LOT D1 — quand HelixCar n'intervient sur aucun trajet, aucune
+      // valeur de livraison ne part en base, meme heritee d'un
+      // scenario precedent.
+      livraison_apres_stockage:_livraisonSansObjet()?null:livActive,
       // Heure de récupération par le client — propre à CE véhicule,
       // uniquement pertinente quand HelixCar ne le livre pas après
       // stockage (livActive===false). Jamais mélangée avec un autre
@@ -19358,9 +19665,28 @@ function _hcDateMaximaleChamp(id) {
 // La liste ci-dessous est la SEULE chose à compléter pour qu'une
 // nouvelle période bénéficie du même calendrier — aucune règle de
 // coloration, de borne ni de navigation n'est dupliquée.
+// ══════════════════════════════════════════════════════════════
+// LOT A2 — LE NETTOYAGE UTILISE LE MEME COMPOSANT QUE LES AUTRES
+// ══════════════════════════════════════════════════════════════
+// DEFAUT CORRIGE. La periode de nettoyage ne figurait PAS ici : ses
+// deux champs etaient donc traites comme deux dates isolees, et
+// _hcValiderCalendrier() ecrivait TOUJOURS dans #nett-date. Ouvrir le
+// calendrier depuis « Date de fin », choisir un jour puis valider
+// ecrasait donc la date de DEBUT et laissait la fin vide — exactement
+// ce qui etait constate : 25/09/2026 en debut, « jj/mm/aaaa » en fin.
+//
+// En rejoignant HC_PERIODES_CALENDRIER, le nettoyage herite du
+// composant de periode deja eprouve par le Stockage et par « Trouver un
+// professionnel » : ouverture depuis l'un OU l'autre champ, sous-etape
+// debut/fin explicite, borne « la fin ne precede jamais le debut »
+// appliquee au rendu (comparaison stricte : le meme jour reste
+// selectionnable), effacement des deux bornes, et coloration de la
+// plage. Aucune logique dupliquee.
 var HC_PERIODES_CALENDRIER = [
   { debut: 'stock-debut',    fin: 'stock-fin',     legende: 'Début → fin du stockage' },
-  { debut: 'pro-date-debut', fin: 'pro-date-fin',  legende: 'Début → fin de l\'intervention' }
+  { debut: 'pro-date-debut', fin: 'pro-date-fin',  legende: 'Début → fin de l\'intervention' },
+  { debut: 'nett-date',      fin: 'nett-date-fin', legende: 'Début → fin du nettoyage',
+    marque: 'nettoyage' }
 ];
 
 function _hcPeriodeDeuxBornes(id) {
@@ -19405,7 +19731,6 @@ function _hcConstruireOverlay() {
   overlay.querySelector('#hc-cal-prec').addEventListener('click', function () { _hcNaviguerMois(-1); });
   overlay.querySelector('#hc-cal-suiv').addEventListener('click', function () { _hcNaviguerMois(1); });
   overlay.querySelector('#hc-cal-effacer').addEventListener('click', function () {
-    _hcCalTempNettoyage = null;   // V77
     _hcEffacerActionBar();
   });
   overlay.querySelector('#hc-cal-ok').addEventListener('click', _hcValiderCalendrier);
@@ -19476,8 +19801,6 @@ function _hcOuvrirCalendrier(champ) {
     _hcCalChampActif = champ.id;
     _hcCalSousEtapePeriode = null;
     dateReference = _hcParserYMD(champ.value);
-    // V77 - reprend la date deja saisie comme selection temporaire.
-    _hcCalTempNettoyage = (champ.id === 'nett-date') ? dateReference : null;
   }
   var overlay = _hcConstruireOverlay();
   var auj = _hcAujourdhui();
@@ -19529,29 +19852,17 @@ function _hcDateDebutLiee(id) {
   return null;
 }
 
-// V77 - selection temporaire, UNIQUEMENT pour #nett-date : le clic sur
-// un jour ne fait que memoriser la date ici ; le champ n'est ecrit
-// qu'au clic sur OK. Aucun autre calendrier n'est concerne.
-var _hcCalTempNettoyage = null;
-
-function _hcEstCalendrierNettoyage() {
-  return _hcCalChampActif === 'nett-date' || _hcCalChampActif === 'nett-date-fin';
-}
-
-// Confirme la selection temporaire puis ferme (bouton OK).
+// LOT A2 — la selection temporaire specifique au nettoyage a ete
+// SUPPRIMEE avec le defaut qu'elle portait : elle memorisait un jour
+// puis, au clic sur OK, l'ecrivait TOUJOURS dans #nett-date, quel que
+// soit le champ reellement ouvert. La date de fin ne pouvait donc
+// jamais etre renseignee, et choisir une fin ecrasait le debut.
+//
+// Le nettoyage passe desormais par le composant de periode commun
+// (HC_PERIODES_CALENDRIER), ou chaque clic ecrit dans la BONNE borne.
+// OK ne fait donc plus que fermer, comme pour le Stockage et pour
+// « Trouver un professionnel ».
 function _hcValiderCalendrier() {
-  if (_hcEstCalendrierNettoyage() && _hcCalTempNettoyage) {
-    var champ = document.getElementById('nett-date');
-    if (champ) {
-      champ.value = _hcFormaterYMD(_hcCalTempNettoyage);
-      try {
-        var evtIn = (typeof Event === 'function') ? new Event('input', { bubbles: true }) : null;
-        if (evtIn) champ.dispatchEvent(evtIn);
-      } catch (e) {}
-      _hcDeclencherChange(champ);
-      if (typeof _clearFieldError === 'function') _clearFieldError('nett-date');
-    }
-  }
   _hcFermerCalendrier();
 }
 
@@ -19560,7 +19871,6 @@ function _hcFermerCalendrier() {
   _hcCalChampActif = null;
   _hcCalPeriode = null;
   _hcCalSousEtapePeriode = null;
-  _hcCalTempNettoyage = null;
 }
 
 function _hcClasseJour(date, periode) {
@@ -19623,12 +19933,16 @@ function _hcRendreCalendrier() {
     var estInterdit = date < borneReelle || (borneMaxMetier && date > borneMaxMetier);
     var estAuj = _hcMemeJour(date, auj);
     var classe = _hcClasseJour(date, periode);
-    var estSelNett = _hcCalTempNettoyage && _hcMemeJour(date, _hcCalTempNettoyage);
-    var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '') + (estSelNett ? ' hc-cal-jour--sel-nett' : '');
+    var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '');
     html += '<button type="button" class="' + classesFinales + '" data-jour="' + j + '"' +
       (estInterdit ? ' disabled aria-disabled="true" tabindex="-1"' : '') + '>' + j + '</button>';
   }
-  overlay.querySelector('#hc-cal-grille').innerHTML = html;
+  var grille = overlay.querySelector('#hc-cal-grille');
+  // LOT E4 — marqueur de famille de periode, lu par la seule feuille de
+  // style du nettoyage. Retire des qu'un autre calendrier s'ouvre.
+  if (_hcCalPeriode && _hcCalPeriode.marque) grille.setAttribute('data-hc-periode', _hcCalPeriode.marque);
+  else grille.removeAttribute('data-hc-periode');
+  grille.innerHTML = html;
 
   Array.prototype.forEach.call(overlay.querySelectorAll('.hc-cal-jour[data-jour]'), function (btn) {
     btn.addEventListener('click', function () {
@@ -19685,14 +19999,6 @@ function _hcSelectionnerJour(j) {
       // Reste en mode "fin" : un nouveau clic redéfinit simplement la
       // fin, cohérent avec « modifier une période existante ».
     }
-    _hcRendreCalendrier();
-    return;
-  }
-
-  // V77 - NETTOYAGE : on memorise seulement, le calendrier reste ouvert
-  // et le champ n'est ecrit qu'au clic sur OK.
-  if (_hcEstCalendrierNettoyage()) {
-    _hcCalTempNettoyage = date;
     _hcRendreCalendrier();
     return;
   }
@@ -20261,28 +20567,75 @@ document.addEventListener('click', function (e) {
 #modal-client .hc-delai-group { margin-top:30px !important; padding-top:6px; }
 #modal-client .hc-delai-group > label:first-child { margin-bottom:12px !important; display:block; }
 /* Sous-accordéons véhicule : deux actions équilibrées. */
-/* Cartes véhicule du parcours « Trouver un professionnel ».
-   Classes DÉDIÉES volontairement : ces cartes sont imbriquées dans une
-   rubrique .veh-sous-accordeon, et la règle existante
-   « .veh-sous-accordeon.ouvert .veh-sous-contenu » est un sélecteur
-   DESCENDANT — réutiliser littéralement ces classes aurait ouvert
-   toutes les cartes dès l'ouverture de la rubrique. Le rendu visuel
-   reste strictement celui des sous-accordéons existants. */
-#modal-client .pro-veh-acc { border:1px solid rgba(16,24,32,.11); border-radius:12px; margin:10px 0; overflow:hidden; background:#fff; }
-#modal-client .pro-veh-barre { width:100%; border:0; background:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; text-align:left; font-family:var(--font-body); }
-#modal-client .pro-veh-num { width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#f4eeee;color:var(--accent);font-size:.7rem;font-weight:700;flex:0 0 25px; }
-#modal-client .pro-veh-titre { flex:1; color:var(--ink); font-size:.88rem; font-weight:660; }
-#modal-client .pro-veh-chevron { color:#8A8F93; font-size:1.15rem; transform:rotate(90deg); transition:transform .18s ease; }
-#modal-client .pro-veh-acc.ouvert .pro-veh-chevron { transform:rotate(-90deg); }
-/* Numéro vert UNIQUEMENT quand le véhicule a été validé et reste
-   complet. Le rouge (fond rosé) est l'état par défaut ci-dessus. */
-#modal-client .pro-veh-acc.termine .pro-veh-num { background:#edf5ef; color:#247443; }
-#modal-client .pro-veh-contenu { display:none; padding:0 16px 14px; }
-#modal-client .pro-veh-acc.ouvert > .pro-veh-contenu { display:block; }
+/* LOT D4 — les styles des cartes « vehicule » du parcours
+   Professionnel ont ete supprimes avec la rubrique elle-meme. */
 
 #modal-client .veh-sous-ok { gap:9px; align-items:center; }
-#modal-client .veh-sous-ok .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
-#modal-client .veh-sous-ok .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
+/* ══════════════════════════════════════════════════════════════
+   LOT E3 — « EFFACER / OK », TOUJOURS LE MEME COUPLE DE BOUTONS
+   ══════════════════════════════════════════════════════════════
+   CE QUI ETAIT CONSTATE : sous l'identite d'un vehicule, ces deux
+   boutons apparaissaient en HTML brut, colles a gauche.
+   CAUSE : le style n'etait pose que sur `.veh-sous-ok .veh-sous-*`.
+   Les cartes qui utilisaient un AUTRE conteneur (`.veh-sous-actions`)
+   n'heritaient donc de rien du tout.
+   Le style suit desormais la CLASSE DU BOUTON, quel que soit son
+   conteneur : le couple ne peut plus se retrouver non style. Et tout
+   conteneur d'actions aligne a droite, comme le composant de
+   reference. */
+#modal-client .veh-sous-ok,
+#modal-client .veh-sous-actions {
+  display:flex; justify-content:flex-end; gap:9px; align-items:center; margin-top:14px;
+}
+#modal-client .veh-sous-effacer,
+#modal-client .veh-sous-valider {
+  border:0; border-radius:8px; padding:10px 18px;
+  font:600 .8rem var(--font-body); cursor:pointer;
+}
+#modal-client .veh-sous-effacer { background:transparent !important; color:#676D72 !important; border:1px solid rgba(23,28,33,.14) !important; }
+#modal-client .veh-sous-valider { background:var(--ink) !important; color:#fff !important; }
+#modal-client .veh-sous-valider:hover { opacity:.9; }
+
+/* ══════════════════════════════════════════════════════════════
+   LOT E2 — LE FOND BLEU DE L'AUTOREMPLISSAGE
+   ══════════════════════════════════════════════════════════════
+   Quand le navigateur propose une adresse enregistree, il peint
+   LUI-MEME un fond bleu (ou jaune) sur le champ, par-dessus le style
+   HelixCar. `background-clip: text` limite ce fond aux seules
+   glyphes : il devient invisible, et le fond de l'auteur reprend la
+   main. La longue transition couvre le bref instant ou certains
+   navigateurs repeignent malgre tout.
+
+   Ce qui n'est PAS fait, volontairement : desactiver
+   l'autocompletion, masquer les suggestions ou gener un gestionnaire
+   de mots de passe. Seule la couleur est neutralisee. Le contour de
+   focus clavier reste intact — il est defini ailleurs et n'est pas
+   touche ici. */
+#modal-client input:-webkit-autofill,
+#modal-client input:-webkit-autofill:hover,
+#modal-client input:-webkit-autofill:focus,
+#modal-client input:-webkit-autofill:active,
+#modal-connexion input:-webkit-autofill,
+#modal-connexion input:-webkit-autofill:hover,
+#modal-connexion input:-webkit-autofill:focus,
+#modal-connexion input:-webkit-autofill:active,
+#modal-reinit input:-webkit-autofill,
+#modal-reinit input:-webkit-autofill:hover,
+#modal-reinit input:-webkit-autofill:focus,
+#modal-reinit input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+  caret-color: #3A3F45;
+  transition: background-color 100000s ease-in-out 0s;
+}
+/* Firefox : meme intention, propriete standardisee. */
+#modal-client input:autofill,
+#modal-connexion input:autofill,
+#modal-reinit input:autofill {
+  background-clip: text;
+  -webkit-text-fill-color: #3A3F45;
+}
 #modal-client .veh-sous-accordeon:not(.termine) > .veh-sous-barre .veh-sous-num { background:#f4eeee !important; color:var(--accent) !important; }
 #modal-client .hc-group-error { outline:1px solid rgba(158,63,70,.48); outline-offset:4px; border-radius:10px; }
 /* Accordéons de l'étape 02 */

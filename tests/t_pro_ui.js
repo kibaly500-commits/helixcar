@@ -6,13 +6,8 @@ async function ouvrirRubrique(page, cle) {
   await page.evaluate(c => proBasculerRubrique(c), cle);
   await page.waitForTimeout(60);
 }
-async function remplirVehicule(page, i, type, marque) {
-  await page.evaluate(idx => proBasculerVehicule(idx), i);
-  await page.waitForTimeout(40);
-  await page.selectOption('#pro-veh-' + i + '-type', type);
-  await page.fill('#pro-veh-' + i + '-marque', marque);
-  await page.waitForTimeout(60);
-}
+// LOT D4 — le helper de saisie des vehicules a ete retire avec la
+// rubrique elle-meme.
 
 (async () => {
   const browser = await L.launch();
@@ -133,70 +128,52 @@ async function remplirVehicule(page, i, type, marque) {
   });
   L.check('C4 : rendre la section incomplète la repasse au rouge', redevientRouge === false);
 
-  // ── D. VÉHICULES INDÉPENDANTS ──
+  // ── D. LA RUBRIQUE VÉHICULES A DISPARU (lot D4) ──
+  //
+  // RÈGLE INVERSÉE SUR DEMANDE EXPLICITE. Cette section vérifiait que
+  // chaque carte véhicule portait ses propres boutons Effacer / OK et
+  // que l'une n'affectait jamais l'autre. Le propriétaire demande le
+  // retrait complet de la rubrique pour la catégorie « Technicien
+  // automobile » — la seule qui la possédait. Les contrôles ne sont pas
+  // supprimés : ils exigent maintenant l'absence, ce qui est plus
+  // strict que l'ancienne indépendance.
   await page.evaluate(() => {
     document.querySelector('input[name="pro-specialite"][value="mecanique"]').click();
     proOnMetierChange();
   });
-  await ouvrirRubrique(page, 'vehicules');
-  await page.evaluate(() => { proMajNbVehicules(1); proMajNbVehicules(1); });   // 3 véhicules
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(120);
 
-  const boutonsVeh = await page.evaluate(() => {
-    const cartes = document.querySelectorAll('#pro-vehicules-liste .pro-veh-acc');
-    return Array.from(cartes).map(c => ({
-      effacer: !!c.querySelector('.veh-sous-effacer'),
-      ok: !!c.querySelector('.veh-sous-valider')
-    }));
-  });
-  L.check('D1 : chaque véhicule porte SES boutons Effacer et OK',
-    boutonsVeh.length >= 3 && boutonsVeh.every(b => b.effacer && b.ok), JSON.stringify(boutonsVeh));
+  const plusDeVehicules = await page.evaluate(() => ({
+    accordeon: !!document.getElementById('pro-acc-vehicules'),
+    liste: !!document.getElementById('pro-vehicules-liste'),
+    compteur: !!document.getElementById('pro-nb-vehicules'),
+    cartes: document.querySelectorAll('.pro-veh-acc').length,
+    champs: document.querySelectorAll('[id^="pro-veh-"]').length,
+    fonctions: ['proMajNbVehicules', 'proRendreVehicules', 'proOkVehicule',
+                'proEffacerVehicule', 'proBasculerVehicule', '_proMemoriserVehicule',
+                '_proMajEtatVehicules', '_proVehiculesApplicables']
+      .filter(f => typeof window[f] === 'function'),
+    rubriques: PRO_RUBRIQUES.slice()
+  }));
+  L.check('D1 : plus aucune carte, aucun champ, aucun compteur de véhicule',
+    plusDeVehicules.accordeon === false && plusDeVehicules.liste === false
+    && plusDeVehicules.compteur === false && plusDeVehicules.cartes === 0
+    && plusDeVehicules.champs === 0, JSON.stringify(plusDeVehicules));
+  L.check('D2 : plus aucune fonction ne les pilote',
+    plusDeVehicules.fonctions.length === 0, JSON.stringify(plusDeVehicules.fonctions));
+  L.check('D3 : les quatre rubriques conservées, dans l\'ordre demandé',
+    JSON.stringify(plusDeVehicules.rubriques)
+      === JSON.stringify(['besoin', 'lieu', 'periode', 'mission']),
+    JSON.stringify(plusDeVehicules.rubriques));
 
-  await remplirVehicule(page, 0, 'berline', 'TEST-QA BMW');
-  await remplirVehicule(page, 1, 'suv', 'TEST-QA Audi');
-  const okVeh = await page.evaluate(() => {
-    proOkVehicule(0);
-    const c = n => document.getElementById('pro-veh-acc-' + n);
-    return [0, 1, 2].map(n => c(n).classList.contains('termine'));
+  // Le nombre de PROFESSIONNELS, lui, est conservé : il porte sur des
+  // personnes, pas sur un parc.
+  const pros = await page.evaluate(() => {
+    proMajNbPros(1);
+    return { valeur: _proNbPros(), champ: !!document.getElementById('pro-nb-pros') };
   });
-  L.check('D2 : OK ne valide QUE le véhicule concerné',
-    okVeh[0] === true && okVeh[1] === false && okVeh[2] === false, JSON.stringify(okVeh));
-
-  const okVehIncomplet = await page.evaluate(() => {
-    proOkVehicule(2);   // jamais rempli
-    return document.getElementById('pro-veh-acc-2').classList.contains('termine');
-  });
-  L.check('D3 : un véhicule incomplet ne verdit pas', okVehIncomplet === false);
-
-  const effacement = await page.evaluate(() => {
-    proOkVehicule(1);
-    const avant = {
-      v0: (document.getElementById('pro-veh-0-marque') || {}).value,
-      v1: (document.getElementById('pro-veh-1-marque') || {}).value
-    };
-    proEffacerVehicule(1);
-    return {
-      avant,
-      apres: {
-        v0: (document.getElementById('pro-veh-0-marque') || {}).value,
-        v1: (document.getElementById('pro-veh-1-marque') || {}).value
-      },
-      vert0: document.getElementById('pro-veh-acc-0').classList.contains('termine'),
-      vert1: document.getElementById('pro-veh-acc-1').classList.contains('termine')
-    };
-  });
-  L.check('D4 : Effacer ne vide QUE le véhicule concerné',
-    effacement.apres.v0 === 'TEST-QA BMW' && effacement.apres.v1 === '', JSON.stringify(effacement));
-  L.check('D5 : le véhicule effacé repasse au rouge, l\'autre reste vert',
-    effacement.vert0 === true && effacement.vert1 === false, JSON.stringify(effacement));
-
-  const modifApresOk = await page.evaluate(() => {
-    document.getElementById('pro-veh-0-marque').value = '';
-    _proMemoriserVehicule(0);
-    return document.getElementById('pro-veh-acc-0').classList.contains('termine');
-  });
-  L.check('D6 : modifier un véhicule validé jusqu\'à l\'incomplétude le repasse au rouge',
-    modifApresOk === false);
+  L.check('D4 : le compteur de professionnels est conservé et fonctionne',
+    pros.champ === true && pros.valeur >= 2, JSON.stringify(pros));
 
   L.check('D7 : aucune erreur JS', page.jsErrors.length === 0, page.jsErrors.join(' | '));
 
@@ -245,7 +222,6 @@ async function remplirVehicule(page, i, type, marque) {
     rue: (document.getElementById('pro-adresse-rue') || {}).value,
     ville: (document.getElementById('pro-adresse-ville') || {}).value,
     specialite: !!document.querySelector('input[name="pro-specialite"]:checked'),
-    veh0: (document.getElementById('pro-veh-0-marque') || {}).value,
     rubriquesVertes: PRO_RUBRIQUES.filter(c => {
       const a = document.getElementById('pro-acc-' + c);
       return a && a.classList.contains('termine');
@@ -253,8 +229,8 @@ async function remplirVehicule(page, i, type, marque) {
   }));
   L.check('F4 : confirmer vide TOUTE la demande, pas seulement Mission',
     apresEffacement.description === '' && apresEffacement.rue === ''
-    && apresEffacement.ville === '' && apresEffacement.specialite === false
-    && apresEffacement.veh0 === '', JSON.stringify(apresEffacement));
+    && apresEffacement.ville === '' && apresEffacement.specialite === false,
+    JSON.stringify(apresEffacement));
   L.check('F5 : plus aucune section ne reste marquée validée',
     apresEffacement.rubriquesVertes === 0, String(apresEffacement.rubriquesVertes));
 
