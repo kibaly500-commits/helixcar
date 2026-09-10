@@ -389,6 +389,50 @@ tbody tr:last-child { border-bottom: none; }
 }
 .fidelite-labels { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--gray); }
 
+/* ── LOT L01 — PROGRAMME DE FIDÉLITÉ CLIENT (points, paliers) ──
+   Cinq paliers en ligne sur grand écran, empilés sur téléphone. Les
+   états sont dits en TEXTE (Atteint / En cours / À atteindre) : la
+   couleur ne porte jamais seule l'information. */
+.fid-resume { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 4px; }
+.fid-chiffre { background: var(--gray-light); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.fid-chiffre-label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray); margin-bottom: 6px; }
+.fid-chiffre-val { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-size: 1.3rem; line-height: 1.15; overflow-wrap: anywhere; }
+.fid-note { font-size: .83rem; color: #555; line-height: 1.6; }
+.fid-paliers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: row; gap: 12px; }
+.fid-palier {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--white); border: 1px solid var(--gray-light); border-radius: 12px; padding: 18px 12px;
+}
+.fid-palier--atteint { border-color: var(--green); }
+.fid-palier--courant { border-color: var(--yellow); box-shadow: 0 0 0 2px rgba(181,68,75,.12); }
+.fid-palier--a-atteindre { opacity: .75; }
+.fid-palier-icone {
+  width: 46px; height: 46px; flex-shrink: 0; margin-bottom: 10px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--gray-light); color: var(--gray); background: var(--white);
+}
+.fid-palier--atteint .fid-palier-icone { color: var(--green); border-color: var(--green); }
+.fid-palier--courant .fid-palier-icone { color: var(--yellow); border-color: var(--yellow); }
+.fid-palier-corps { min-width: 0; }
+.fid-palier-nom { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: .95rem; }
+.fid-palier-seuil { font-size: .8rem; color: var(--gray); margin-top: 2px; }
+.fid-palier-etat {
+  display: inline-block; margin-top: 8px; padding: 3px 9px; border-radius: 100px;
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  background: var(--gray-light); color: #555;
+}
+.fid-palier--atteint .fid-palier-etat { background: rgba(31,122,77,.12); color: var(--green); }
+.fid-palier--courant .fid-palier-etat { background: rgba(181,68,75,.10); color: var(--yellow); }
+.fid-palier-recompense { font-size: .78rem; color: #555; line-height: 1.5; margin-top: 8px; }
+.fid-plus { color: var(--green); }
+.fid-moins { color: var(--red); }
+@media (max-width: 768px) {
+  .fid-resume { grid-template-columns: 1fr; }
+  .fid-paliers { flex-direction: column; }
+  .fid-palier { flex-direction: row; text-align: left; gap: 14px; padding: 14px; }
+  .fid-palier-icone { margin-bottom: 0; }
+}
+
 /* ── HISTORIQUE ── */
 .historique-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
 .hstat { background: var(--gray-light); border-radius: 10px; padding: 14px; text-align: center; }
@@ -2032,8 +2076,6 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="stats-row">
           <div class="stat-card yellow"><div class="stat-label">Missions effectuées</div><div class="stat-value">8</div></div>
-          <div class="stat-card green"><div class="stat-label">Km parcourus</div><div class="stat-value">3 840</div></div>
-          <div class="stat-card blue"><div class="stat-label">Palier fidélité</div><div class="stat-value">P.2</div><div class="stat-sub">1 220 km vers P.3</div></div>
           <div class="stat-card orange"><div class="stat-label">Mission en cours</div><div class="stat-value">1</div><div class="stat-sub">En route</div></div>
         </div>
 
@@ -2052,17 +2094,17 @@ body.scroll-verrouille { overflow: hidden; }
           </div>
         </div>
 
+        <!-- LOT L01 — PROGRAMME DE FIDÉLITÉ : plus aucune valeur écrite en
+             dur. Le contenu vient de la vue v_ma_fidelite (solde, prochain
+             palier, points restants calculés par le serveur, migration 109)
+             et est rendu par rendreFideliteCarte(). -->
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Votre programme fidélité</div></div>
+            <div><div class="card-title">Votre programme de fidélité</div></div>
             <button class="btn btn-sm btn-primary" onclick="showPage('client-fidelite')">Voir détail →</button>
           </div>
-          <div class="fidelite-bar-wrap">
-            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:6px">
-              <span>1 280 km parcourus</span><span>Prochain palier : 2 500 km</span>
-            </div>
-            <div class="fidelite-bar-track"><div class="fidelite-bar-fill" style="width:51%"></div></div>
-            <div class="fidelite-labels"><span>Palier 1 ✅</span><span>Palier 2 — 1 220 km restants</span></div>
+          <div id="client-fidelite-carte">
+            <div style="font-size:.85rem;color:#666">Chargement…</div>
           </div>
         </div>
       </div>
@@ -2124,7 +2166,7 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- CLIENT: Fidélité -->
+      <!-- CLIENT: Informations à compléter -->
       <div class="page" id="page-client-infos">
         <div class="card">
           <div class="card-header"><div class="card-title">Demandes nécessitant des informations</div></div>
@@ -2134,47 +2176,18 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
+      <!-- CLIENT: Fidélité — LOT L01 ═══════════════════════════════
+           Tout ce qui s'affiche ici vient du serveur : v_ma_fidelite
+           (solde, palier courant, prochain seuil, points restants, Box
+           mystère — migration 109) et fidelite_mouvements (historique,
+           lu sous RLS). Le navigateur n'additionne rien, ne décide
+           d'aucune récompense, n'annonce jamais un avantage
+           « disponible » et ne peut rien écrire dans le registre.
+           Décision C10 : cinq paliers en points (2 000 → 10 000), puis
+           une Box mystère tous les 2 000 points, sans plafond. -->
       <div class="page" id="page-client-fidelite">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Votre progression</div></div>
-          <div class="fidelite-bar-wrap">
-            <div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:8px">
-              <span>Km parcourus : <strong>1 280 km</strong></span>
-              <span>Palier suivant : <strong>2 500 km</strong></span>
-            </div>
-            <div class="fidelite-bar-track"><div class="fidelite-bar-fill" style="width:51%"></div></div>
-            <div style="text-align:center;font-size:0.82rem;color:var(--gray);margin-top:8px">Il vous reste <strong>1 220 km</strong> pour atteindre le Palier 2</div>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
-          <div style="background:var(--yellow);border-radius:14px;padding:24px">
-            <div style="font-size:1.5rem;margin-bottom:8px">🎁</div>
-            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 1 — 1 000 km ✅</div>
-            <div style="font-size:0.83rem;line-height:1.6">Réduction 10% · Box surprise auto (10-15 €)</div>
-            <span class="badge badge-active" style="margin-top:10px;display:inline-flex">Débloqué</span>
-          </div>
-          <div style="background:var(--white);border-radius:14px;padding:24px;border:2px solid var(--yellow)">
-            <div style="font-size:1.5rem;margin-bottom:8px">⭐</div>
-            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 2 — 2 500 km</div>
-            <div style="font-size:0.83rem;line-height:1.6;color:#555">Réduction 15% · Nettoyage extérieur gratuit · Service client prioritaire</div>
-            <span class="badge badge-pending" style="margin-top:10px;display:inline-flex">1 220 km restants</span>
-          </div>
-          <div style="background:var(--gray-light);border-radius:14px;padding:24px;opacity:0.7">
-            <div style="font-size:1.5rem;margin-bottom:8px">🔒</div>
-            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 3 — 5 000 km</div>
-            <div style="font-size:0.83rem;color:#888">Récompenses mystère…</div>
-          </div>
-          <div style="background:var(--gray-light);border-radius:14px;padding:24px;opacity:0.6">
-            <div style="font-size:1.5rem;margin-bottom:8px">🔒</div>
-            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier 4 — 10 000 km</div>
-            <div style="font-size:0.83rem;color:#888">Récompenses mystère…</div>
-          </div>
-          <div style="background:var(--navy);color:white;border-radius:14px;padding:24px;opacity:0.6">
-            <div style="font-size:1.5rem;margin-bottom:8px">🏆</div>
-            <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;margin-bottom:6px">Palier Entreprises — 20 000 km</div>
-            <div style="font-size:0.83rem;opacity:0.7">Récompenses mystère…</div>
-          </div>
+        <div id="client-fidelite-page">
+          <div class="card"><div style="font-size:.85rem;color:#666">Chargement…</div></div>
         </div>
       </div>
 
@@ -3157,6 +3170,254 @@ async function loadDemandesClient() {
   }).join('');
 }
 
+// ============================================================
+// LOT L01 — PROGRAMME DE FIDÉLITÉ CLIENT (décision C10)
+// ============================================================
+// 1 € payé = 1 point, uniquement sur une prestation terminée ET payée.
+// Paliers 2 000 / 4 000 / 6 000 / 8 000 / 10 000 points, puis une Box
+// mystère tous les 2 000 points, sans plafond.
+//
+// RÈGLE : le navigateur AFFICHE, il ne CALCULE pas. Solde, palier
+// courant, prochain seuil, points restants et Box mystère viennent de
+// la vue v_ma_fidelite (fidelite_prochain_palier(fidelite_solde()) côté
+// serveur). L'historique vient de fidelite_mouvements, sous RLS. Rien
+// ici n'annonce un avantage « disponible » : les récompenses des paliers
+// 2 à 5 et le contenu de la Box mystère ne sont pas définis, et un
+// avantage ne se décide pas sur un solde lu dans une page.
+
+// Les cinq paliers initiaux : seuil, nom, icône, et ce qui est VÉRIFIÉ.
+// Seule la récompense du palier 1 est validée ; les autres sont « à
+// définir » — on ne les invente pas.
+var FIDELITE_PALIERS = [
+  { seuil: 2000,  nom: 'Palier 1', icone: 'cadeau',  recompense: 'Réduction de 10 % sur une box surprise automobile.' },
+  { seuil: 4000,  nom: 'Palier 2', icone: 'etoile',  recompense: 'Récompense à définir.' },
+  { seuil: 6000,  nom: 'Palier 3', icone: 'insigne', recompense: 'Récompense à définir.' },
+  { seuil: 8000,  nom: 'Palier 4', icone: 'couronne', recompense: 'Récompense à définir.' },
+  { seuil: 10000, nom: 'Palier 5', icone: 'trophee', recompense: 'Récompense à définir.' }
+];
+var FIDELITE_DERNIER_SEUIL_INITIAL = 10000;
+
+// Icônes SVG en ligne, sobres et distinctes. Contenu fixe : aucune
+// donnée serveur n'y est injectée.
+var FIDELITE_ICONES = {
+  cadeau:   '<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5.5 12.5V20h13v-7.5"/><path d="M12 8.5V20"/>'
+          + '<path d="M12 8.5c-1.8-3.6-5.6-3.4-5.6-1.4S9.4 8.5 12 8.5z"/><path d="M12 8.5c1.8-3.6 5.6-3.4 5.6-1.4S14.6 8.5 12 8.5z"/>',
+  etoile:   '<polygon points="12 3.2 14.8 9 21.2 9.7 16.5 14.1 17.7 20.5 12 17.4 6.3 20.5 7.5 14.1 2.8 9.7 9.2 9"/>',
+  insigne:  '<path d="M12 3l7 3v5.2c0 4.8-3.3 8.3-7 9.8-3.7-1.5-7-5-7-9.8V6l7-3z"/><path d="M9 12.2l2.1 2.1 4-4.2"/>',
+  couronne: '<path d="M3.5 17.5l1.8-10 4.9 4.7L12 5.5l1.8 6.7 4.9-4.7 1.8 10z"/><path d="M5 20.5h14"/>',
+  trophee:  '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 5.2H5.3a2.8 2.8 0 0 0 2.7 2.6"/><path d="M16 5.2h2.7a2.8 2.8 0 0 1-2.7 2.6"/>'
+          + '<path d="M12 13v3"/><path d="M9 20.5h6"/><path d="M10 16h4v4.5h-4z"/>'
+};
+function _fidIcone(nom) {
+  var trace = FIDELITE_ICONES[nom] || FIDELITE_ICONES.cadeau;
+  return '<svg class="fid-icone" data-icone="' + escapeHtml(nom) + '" viewBox="0 0 24 24" width="26" height="26" '
+    + 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" '
+    + 'aria-hidden="true" focusable="false">' + trace + '</svg>';
+}
+
+// Entier lu depuis le serveur, ou null : on n'affiche jamais une valeur
+// devinée à la place d'une valeur absente.
+function _fidEntier(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+// « 12 000 » : séparateur de milliers insécable, sans dépendre des
+// réglages du navigateur.
+function _fidNombre(n) {
+  var s = String(Math.abs(n));
+  var out = s.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return (n < 0 ? '\u2212' : '') + out;
+}
+function _fidPoints(n) { return _fidNombre(n) + (Math.abs(n) === 1 ? ' point' : ' points'); }
+function _fidDate(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('fr-FR'); } catch (e) { return ''; }
+}
+var FIDELITE_MOTIFS = {
+  prestation_payee: 'Prestation terminée et payée',
+  remboursement:    'Remboursement — points retirés',
+  annulation:       'Annulation — points retirés',
+  ajustement_admin: 'Ajustement HelixCar'
+};
+
+async function chargerFideliteClient() {
+  if (!_sbAuthPret()) throw new Error('Session requise.');
+  var vue = await sbAuth.from('v_ma_fidelite').select('*').limit(1);
+  if (vue.error) throw new Error(vue.error.message);
+  var hist = await sbAuth.from('fidelite_mouvements')
+    .select('id, points, motif, detail, created_at')
+    .order('created_at', { ascending: false }).limit(50);
+  if (hist.error) throw new Error(hist.error.message);
+  return { fidelite: (vue.data || [])[0] || null, mouvements: hist.data || [] };
+}
+
+// Les valeurs serveur, contrôlées une fois pour toutes. null si la
+// ligne manque ou si une valeur n'est pas un entier : rien n'est
+// reconstitué côté navigateur.
+function _fidLire(f) {
+  if (!f) return null;
+  var o = {
+    solde: _fidEntier(f.solde),
+    palierCourant: _fidEntier(f.palier_courant),
+    prochainSeuil: _fidEntier(f.prochain_seuil),
+    pointsRestants: _fidEntier(f.points_restants),
+    boxesAcquises: _fidEntier(f.boxes_mystere_acquises),
+    boxMystere: f.box_mystere === true || f.box_mystere === 'true',
+    prochainNom: typeof f.prochain_nom === 'string' ? f.prochain_nom : '',
+    palierCourantNom: typeof f.palier_courant_nom === 'string' ? f.palier_courant_nom : ''
+  };
+  if (o.solde === null || o.palierCourant === null || o.prochainSeuil === null || o.pointsRestants === null) return null;
+  if (o.boxesAcquises === null) o.boxesAcquises = 0;
+  return o;
+}
+
+// Avancement entre le palier courant et le prochain : une proportion des
+// nombres du serveur, pas un seuil décidé ici.
+function _fidPourcentage(o) {
+  var pas = o.prochainSeuil - o.palierCourant;
+  if (pas <= 0) return 0;
+  var p = Math.round(((o.solde - o.palierCourant) / pas) * 100);
+  return Math.max(0, Math.min(100, p));
+}
+
+// État d'un palier initial, en TEXTE, déduit des seuils du serveur.
+function _fidEtatPalier(o, seuil) {
+  if (seuil <= o.palierCourant) return { cls: 'fid-palier--atteint', texte: 'Atteint' };
+  if (seuil === o.prochainSeuil) return { cls: 'fid-palier--courant', texte: 'En cours' };
+  return { cls: 'fid-palier--a-atteindre', texte: 'À atteindre' };
+}
+
+function _fidHtmlIndisponible() {
+  return '<div class="fid-note" style="color:var(--red)">'
+    + 'Impossible de charger votre programme de fidélité pour le moment.</div>';
+}
+
+function _fidHtmlResume(o) {
+  var vide = o.solde === 0;
+  var prochain = escapeHtml(o.prochainNom || '') + ' · ' + _fidPoints(o.prochainSeuil);
+  return '<div class="fid-resume">'
+    + '<div class="fid-chiffre"><div class="fid-chiffre-label">Points cumulés</div>'
+    +   '<div class="fid-chiffre-val" id="fid-solde">' + _fidNombre(o.solde) + '</div></div>'
+    + '<div class="fid-chiffre"><div class="fid-chiffre-label">Prochain palier</div>'
+    +   '<div class="fid-chiffre-val" id="fid-prochain">' + prochain + '</div></div>'
+    + '<div class="fid-chiffre"><div class="fid-chiffre-label">Points restants</div>'
+    +   '<div class="fid-chiffre-val" id="fid-restants">' + _fidNombre(o.pointsRestants) + '</div></div>'
+    + '</div>'
+    + '<div class="fidelite-bar-wrap">'
+    +   '<div class="fidelite-bar-track"><div class="fidelite-bar-fill" style="width:' + _fidPourcentage(o) + '%"></div></div>'
+    +   '<div class="fidelite-labels"><span>'
+    +     (o.palierCourant > 0 ? escapeHtml(o.palierCourantNom || '') + ' · ' + _fidPoints(o.palierCourant) : '0 point')
+    +   '</span><span>' + prochain + '</span></div>'
+    + '</div>'
+    + (vide
+        ? '<div class="fid-note" id="fid-vide">Vous n\'avez pas encore de points. Ils sont crédités lorsqu\'une '
+          + 'prestation est terminée et payée : 1 € payé = 1 point.</div>'
+        : '<div class="fid-note">1 € payé sur une prestation terminée = 1 point. Les points n\'expirent pas.</div>');
+}
+
+function _fidHtmlPaliers(o) {
+  var items = FIDELITE_PALIERS.map(function (p) {
+    var etat = _fidEtatPalier(o, p.seuil);
+    return '<li class="fid-palier ' + etat.cls + '" data-seuil="' + p.seuil + '" data-etat="' + escapeHtml(etat.texte) + '">'
+      + '<div class="fid-palier-icone">' + _fidIcone(p.icone) + '</div>'
+      + '<div class="fid-palier-corps">'
+      +   '<div class="fid-palier-nom">' + escapeHtml(p.nom) + '</div>'
+      +   '<div class="fid-palier-seuil">' + _fidPoints(p.seuil) + '</div>'
+      +   '<span class="fid-palier-etat">' + escapeHtml(etat.texte) + '</span>'
+      +   '<div class="fid-palier-recompense">' + escapeHtml(p.recompense) + '</div>'
+      + '</div></li>';
+  }).join('');
+  return '<ol class="fid-paliers" id="fid-paliers">' + items + '</ol>'
+    + '<div class="fid-note" style="margin-top:14px">Au-delà de ' + _fidPoints(FIDELITE_DERNIER_SEUIL_INITIAL)
+    + ', chaque nouveau palier de 2\u00a0000 points ouvre une Box mystère.</div>';
+}
+
+// Au-delà de 10 000 points : ce qui est acquis, le seuil courant et le
+// prochain seuil — nom et seuil, rien sur le contenu, qui n'est pas défini.
+function _fidHtmlBoxMystere(o) {
+  if (o.palierCourant < FIDELITE_DERNIER_SEUIL_INITIAL) return '';
+  var acquis = [];
+  for (var s = FIDELITE_DERNIER_SEUIL_INITIAL + 2000; s <= o.palierCourant; s += 2000) acquis.push(s);
+  var courant = o.palierCourant > FIDELITE_DERNIER_SEUIL_INITIAL
+    ? 'Box mystère · ' + _fidPoints(o.palierCourant)
+    : escapeHtml(o.palierCourantNom || 'Palier 5') + ' · ' + _fidPoints(o.palierCourant);
+  return '<div class="card" id="fid-box-mystere">'
+    + '<div class="card-header"><div><div class="card-title">Box mystère</div>'
+    + '<div class="card-sub">Un palier tous les 2\u00a0000 points au-delà de 10\u00a0000, sans plafond.</div></div></div>'
+    + '<div class="detail-row"><span class="detail-label">Boxes mystère acquises</span>'
+    +   '<span class="detail-val" id="fid-boxes-acquises">' + _fidNombre(o.boxesAcquises) + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Seuil courant</span>'
+    +   '<span class="detail-val" id="fid-seuil-courant">' + courant + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Prochain seuil</span>'
+    +   '<span class="detail-val" id="fid-seuil-prochain">Box mystère · ' + _fidPoints(o.prochainSeuil) + '</span></div>'
+    + (acquis.length
+        ? '<div class="fid-note" style="margin-top:12px">Historique acquis : '
+          + acquis.map(function (s) { return _fidPoints(s); }).join(', ') + '.</div>'
+        : '')
+    + '<div class="fid-note" style="margin-top:8px">Le contenu et la valeur de la Box mystère ne sont pas encore communiqués.</div>'
+    + '</div>';
+}
+
+function _fidHtmlHistorique(mouvements) {
+  if (!mouvements.length) {
+    return '<div class="fid-note" id="fid-historique-vide">Aucun mouvement pour l\'instant.</div>';
+  }
+  return '<div id="fid-historique">' + mouvements.map(function (m) {
+    var pts = _fidEntier(m.points);
+    if (pts === null) return '';
+    var cls = pts > 0 ? 'fid-plus' : (pts < 0 ? 'fid-moins' : '');
+    var libelle = FIDELITE_MOTIFS[m.motif] || 'Mouvement';
+    return '<div class="detail-row">'
+      + '<span class="detail-label">' + escapeHtml(_fidDate(m.created_at)) + ' · ' + escapeHtml(libelle) + '</span>'
+      + '<span class="detail-val ' + cls + '">' + (pts > 0 ? '+' : '') + _fidNombre(pts) + '</span>'
+      + '</div>';
+  }).join('') + '</div>';
+}
+
+function rendreFidelitePage(donnees) {
+  var zone = document.getElementById('client-fidelite-page');
+  if (!zone) return;
+  var o = _fidLire(donnees && donnees.fidelite);
+  if (!o) { zone.innerHTML = '<div class="card">' + _fidHtmlIndisponible() + '</div>'; return; }
+  zone.innerHTML =
+      '<div class="card"><div class="card-header"><div><div class="card-title">Programme de fidélité</div>'
+    + '<div class="card-sub">Vos points, calculés par HelixCar à partir de vos prestations terminées et payées.</div></div></div>'
+    + _fidHtmlResume(o) + '</div>'
+    + '<div class="card"><div class="card-header"><div class="card-title">Les cinq paliers</div></div>'
+    + _fidHtmlPaliers(o) + '</div>'
+    + _fidHtmlBoxMystere(o)
+    + '<div class="card"><div class="card-header"><div class="card-title">Historique des points</div></div>'
+    + _fidHtmlHistorique((donnees && donnees.mouvements) || []) + '</div>';
+}
+
+function rendreFideliteCarte(donnees) {
+  var zone = document.getElementById('client-fidelite-carte');
+  if (!zone) return;
+  var o = _fidLire(donnees && donnees.fidelite);
+  if (!o) { zone.innerHTML = _fidHtmlIndisponible(); return; }
+  zone.innerHTML = _fidHtmlResume(o);
+}
+
+async function loadFideliteClient() {
+  var zone = document.getElementById('client-fidelite-page');
+  if (!zone) return;
+  zone.innerHTML = '<div class="card"><div style="font-size:.85rem;color:#666">Chargement…</div></div>';
+  var donnees = null;
+  try { donnees = await chargerFideliteClient(); }
+  catch (e) { zone.innerHTML = '<div class="card">' + _fidHtmlIndisponible() + '</div>'; return; }
+  rendreFidelitePage(donnees);
+}
+
+async function loadFideliteCarte() {
+  var zone = document.getElementById('client-fidelite-carte');
+  if (!zone) return;
+  var donnees = null;
+  try { donnees = await chargerFideliteClient(); }
+  catch (e) { zone.innerHTML = _fidHtmlIndisponible(); return; }
+  rendreFideliteCarte(donnees);
+}
+
 // Onglet « Informations à compléter ». La liste des rubriques et leur
 // statut sont CALCULÉS PAR LE SERVEUR (informations_demande) à partir
 // des données réellement enregistrées : le navigateur ne décide jamais
@@ -3522,7 +3783,7 @@ const PAGE_TITLES = {
   'client-missions':     ['Mes missions', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],
-  'client-fidelite':     ['Programme fidélité', 'Vos récompenses HelixCar'],
+  'client-fidelite':     ['Programme de fidélité', 'Vos points HelixCar'],
   'client-profil':       ['Mon profil', 'Gérez vos informations'],
 };
 
@@ -3552,7 +3813,8 @@ function showPage(id) {
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
   if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
-  if (id === 'client-dashboard') { loadDemandesClient(); }
+  if (id === 'client-dashboard') { loadDemandesClient(); loadFideliteCarte(); }
+  if (id === 'client-fidelite') { loadFideliteClient(); }
   if (id === 'client-infos') { loadInfosClient(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
