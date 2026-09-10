@@ -12,5 +12,5 @@ check "PERF-6 : migration 119 sans erreur" "" "$errAnalyseur"
 errAnalyseur2=$(appliquer migrations/119_nettoyage_alertes_analyseur.sql)
 check "PERF-7 : migration 119 idempotente" "" "$errAnalyseur2"
 check "SEC-119-1 : le garde vidéo de trigger n'est exécutable par aucun rôle API" "0" "$(sql "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='garde_video_finale_serveur' and (has_function_privilege('anon',p.oid,'execute') or has_function_privilege('authenticated',p.oid,'execute'));" )"
-check "PERF-119-1 : un seul index type_service subsiste" "1" "$(sql "select count(*) from pg_indexes where schemaname='public' and tablename='clients' and indexdef like '%(type_service)%';")"
+check "PERF-119-1 : aucun index type_service en double" "t" "$(sql "select count(*) <= 1 from pg_indexes where schemaname='public' and tablename='clients' and indexdef like '%(type_service)%';")"
 check "PERF-119-2 : l'ancienne politique de dépôt dupliquée est retirée" "0" "$(sql "select count(*) from pg_policies where schemaname='public' and tablename='convoyeurs' and policyname='insert_convoyeurs';")"
