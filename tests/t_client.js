@@ -359,6 +359,7 @@ window.fetch = function (url, options) {
   await page.waitForTimeout(400);
   await page.evaluate(() => { window.__journal = []; });
   await L.chooseService(page, 'professionnel');
+  await L.ouvrirEtapeProfessionnel(page);
   await ouvrirRubrique(page, 'besoin');
   await page.click('input[name="pro-categorie"][value="renfort"]');
   await page.waitForTimeout(80);

@@ -9,6 +9,8 @@
 // simule un vrai retour sur la page avec la base inchangée.
 const { chromium, lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 
 let pass = 0, fail = 0; const echecs = [];
 function check(l, c, e) {
@@ -120,10 +122,21 @@ window.emailjs = { send: function () { window.__db.emails.push(Array.from(argume
                    init: function () {}, sendForm: function () { window.__db.emails.push(['form']); _ecrireBase(); return Promise.resolve(); } };
 `;
 
-const FICHIER = urlFichier('dashboard.html');
-
 (async () => {
+  // Origine HTTP locale stable pour sessionStorage : la campagne a
+  // observé un double vide après rechargement sous file://. On ne
+  // reconstruit pas les fixtures pour faire passer les assertions : la
+  // même base simulée doit réellement survivre au reload de cette page.
+  // Un seul fichier est servi, aucun accès Supabase ni chemin arbitraire.
+  const serveur = http.createServer((req, res) => {
+    if (req.url !== '/dashboard.html') { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, {'Content-Type':'text/html; charset=utf-8'});
+    res.end(fs.readFileSync(fichier('dashboard.html')));
+  });
+  await new Promise(resolve => serveur.listen(0, '127.0.0.1', resolve));
+  const FICHIER = 'http://127.0.0.1:' + serveur.address().port + '/dashboard.html';
   const browser = await lancerNavigateur();
+  try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
@@ -320,8 +333,11 @@ const FICHIER = urlFichier('dashboard.html');
   check('Z1 : aucune erreur JavaScript pendant tout le scénario',
     errs.length === 0, errs.slice(0, 3).join(' | '));
 
-  await browser.close();
+  } finally {
+    await browser.close();
+    await new Promise(resolve => serveur.close(resolve));
+  }
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));
-  process.exit(fail === 0 ? 0 : 1);
-})();
+  process.exitCode = fail === 0 ? 0 : 1;
+})().catch(e => { console.error(e); process.exitCode = 1; });

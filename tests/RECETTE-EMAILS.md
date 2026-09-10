@@ -1,5 +1,17 @@
 # RECETTE E-MAILS — Lot E01 : inventaire honnête des e-mails
 
+> **Note de reprise — 10 septembre 2026.** L'inventaire ci-dessous est
+> celui du commit `fed90a7`, pas une nouvelle campagne de réception.
+> « Opérationnel non vérifié en réception » signifie qu'un appel d'envoi
+> a été repéré dans le code ; cela ne certifie pas son fonctionnement.
+> Depuis cette photographie, l'interface Opportunités appelle bien
+> `publier_opportunite` et `decider_candidature` : l'ancienne mention
+> « aucune interface ne l'appelle » n'est plus actuelle. Les intentions
+> de notification ne sont toujours pas des e-mails envoyés. Aucun
+> consommateur ni modèle nouveau n'a été ajouté pendant la reprise,
+> et aucune réception réelle n'a été validée. Voir
+> [REPRISE-CODEX.md](REPRISE-CODEX.md) pour l'état courant et les blocages.
+
 Dossier d'inspection, lecture seule. Aucun e-mail n'a été envoyé, aucun
 service réel appelé, aucun secret lu ni cherché. Aucun modèle n'a été
 fabriqué : ce document dit ce qui existe dans le dépôt, ce qui manque, et

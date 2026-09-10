@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Lots D01 (mode intégré, complétion par véhicule) et X01 (vitrine) — index.html
-import io, sys
-CHEMIN = '/home/user/helixcar/index.html'
+import io, os, sys
+CHEMIN = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'index.html'))
 src = io.open(CHEMIN, encoding='utf-8').read()
 
 def rep(old, new, n=1):
@@ -342,22 +342,25 @@ rep("""async function _hcOuvrirCompletionDepuisUrl() {
 # ══════════════════════════════════════════════════════════════
 
 # 6. Pied de page : plus de lien sans cible.
-rep("""       <a href="#">Convoyage standard</a>""", """       <a href="#services">Convoyage standard</a>""")
-rep("""       <a href="#">Véhicules de luxe</a>""", """       <a href="#services">Véhicules de luxe</a>""")
-rep("""       <a href="#">Gestion de parc</a>""", """       <a href="#services">Gestion de parc</a>""")
-rep("""       <a href="#">Stockage</a>""", """       <a href="#stockage-automobile">Stockage</a>""")
-rep("""       <a href="#">Nettoyage</a>""", """       <a href="#services">Nettoyage</a>""")
-rep("""       <a href="#">Formulaire contact</a>""", """       <a href="#recontact">Formulaire contact</a>""")
+rep("""      <a href="#">Convoyage standard</a>""", """      <a href="#services">Convoyage standard</a>""")
+rep("""      <a href="#">Véhicules de luxe</a>""", """      <a href="#services">Véhicules de luxe</a>""")
+rep("""      <a href="#">Gestion de parc</a>""", """      <a href="#services">Gestion de parc</a>""")
+rep("""      <a href="#">Stockage</a>""", """      <a href="#stockage-automobile">Stockage</a>""")
+rep("""      <a href="#">Nettoyage</a>""", """      <a href="#services">Nettoyage</a>""")
+rep("""      <a href="#">Formulaire contact</a>""", """      <a href="#recontact">Formulaire contact</a>""")
 for mort in ['Blog', 'Mentions légales', 'Politique de confidentialité']:
-    ligne = '       <a href="#">' + mort + '</a>'
+    ligne = '      <a href="#">' + mort + '</a>'
     if src.count(ligne) != 1: print('ECHEC lien mort', mort); sys.exit(1)
-    src = src.replace(ligne, '       <!-- LOT X01 — lien « ' + mort + ' » retiré : aucune page ne le porte dans le dépôt. -->')
+    if mort == 'Blog':
+        src = src.replace(ligne, '      <!-- LOT X01 — lien « Blog » retiré : aucune page ne le porte dans le dépôt. -->')
+    else:
+        src = src.replace(ligne, '      <span role="link" aria-disabled="true" style="display:block;color:#999">' + mort + (' — indisponibles' if mort == 'Mentions légales' else ' — indisponible') + '</span>')
 
 # 7. Le chiffre sans source du bandeau d'accueil.
 rep("""          <div class="hero2-panel-stat-num">98%</div>
           <div class="hero2-panel-stat-label">Satisfaction client</div>""",
-    """          <div class="hero2-panel-stat-num">1 h</div>
-          <div class="hero2-panel-stat-label">Devis gratuit</div>""")
+    """          <div class="hero2-panel-stat-num">Devis</div>
+          <div class="hero2-panel-stat-label">Personnalisé</div>""")
 
 # 8. Les témoignages signés de noms inventés.
 tranche('<section class="testimonials" id="avis">', '<!-- FAQ -->', """<!-- LOT X01 — la section « Ce qu'ils en disent » (quatre témoignages
@@ -368,11 +371,14 @@ tranche('<section class="testimonials" id="avis">', '<!-- FAQ -->', """<!-- LOT 
 # 9. « Être recontacté » : le succès n'est affiché qu'après l'écriture
 #    réelle, et aucune donnée personnelle ne va dans la console.
 rep("""  var message = form ? (form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '') : '';
+
   console.log('RC submit:', prenom, nom, tel, email, motif, profil);
+
   if (!tel && !email) {
     _hcNote('rc-message-zone', 'Renseignez au moins votre téléphone ou votre adresse e-mail.', 'erreur');
     return;
   }
+
   supabaseInsert('recontacts', {
     prenom: prenom,
     nom: nom,
@@ -382,6 +388,7 @@ rep("""  var message = form ? (form.querySelector('textarea') ? form.querySelect
     profil: profil,
     message: message
   }).then(r => console.log('Recontact saved:', r));
+
   document.getElementById('recontact-form').style.display = 'none';
   document.getElementById('recontact-success').style.display = 'block';
 """, """  var message = form ? (form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '') : '';

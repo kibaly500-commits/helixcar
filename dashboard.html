@@ -3181,10 +3181,13 @@ async function publierOpportunite(id) {
     const res = await sbAuth.rpc('publier_opportunite', { p_id: id });
     if (res && res.error) throw new Error(res.error.message);
     const r = (res && res.data) || {};
+    let message, ton;
     if (r.ok && r.code === 'PUBLIEE') {
-      _hcNote('opportunite-message', 'Opportunité envoyée : visible par les partenaires éligibles (' + (r.notifications_a_envoyer || 0) + ' notification(s) à envoyer, aucun e-mail n\'existe encore).', 'succes');
+      message = 'Opportunité publiée : visible par les partenaires éligibles (' + (r.notifications_a_envoyer || 0) + ' notification(s) à envoyer, e-mails non branchés).';
+      ton = 'succes';
     } else if (r.code === 'DEJA_PUBLIEE') {
-      _hcNote('opportunite-message', 'Cette opportunité était déjà publiée.', 'info');
+      message = 'Cette opportunité était déjà publiée.';
+      ton = 'info';
     } else {
       const msgs = { DESCRIPTION_VIDE: 'La description publique est vide.', INTITULE_VIDE: 'L\'intitulé est vide.',
                      BADGES_REQUIS_VIDES: 'Choisissez au moins un métier requis.', CLOTUREE: 'Cette opportunité est clôturée.',
@@ -3193,6 +3196,9 @@ async function publierOpportunite(id) {
       return;
     }
     await ouvrirOpportuniteAdmin(id);
+    // L'ouverture remet la note à zéro : présenter le résultat APRÈS
+    // la relecture, sinon confirmations et refus disparaissent aussitôt.
+    _hcNote('opportunite-message', message, ton);
     loadOpportunitesAdmin();
   } catch (e) {
     console.error('publier_opportunite :', e && e.message);
@@ -3217,8 +3223,8 @@ async function deciderCandidature(candidatureId, etat) {
       DEJA_RETENU: 'Ce partenaire est déjà retenu.', NON_PUBLIEE: 'L\'opportunité n\'est pas publiée.',
       ETAT_INVALIDE: 'État inconnu.', INTROUVABLE: 'Candidature introuvable.', NON_AUTORISE: 'Seul un administrateur peut décider.'
     };
-    _hcNote('opportunite-message', msgs[r.code] || 'La décision n\'a pas pu être enregistrée.', r.ok ? 'succes' : 'erreur');
     await ouvrirOpportuniteAdmin(_oppCourante.o.id);
+    _hcNote('opportunite-message', msgs[r.code] || 'La décision n\'a pas pu être enregistrée.', r.ok ? 'succes' : 'erreur');
     loadOpportunitesAdmin();
   } catch (e) {
     console.error('decider_candidature :', e && e.message);
@@ -3604,7 +3610,9 @@ function _infosGrouper(lignes) {
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
 }
 function _infoLibelleEtat(l) {
-  const base = String(l.libelle || l.cle || '');
+  let base = String(l.libelle || l.cle || '');
+  const vehicule = /^vehicule_(\d+)_/.exec(l.cle || '');
+  if (vehicule && !/^Véhicule \d+/.test(base)) base = 'Véhicule ' + vehicule[1] + ' — ' + base;
   if (l.statut === 'a_corriger') return base + ' — à corriger';
   if (l.statut === 'attendue') return base + ' manquante';
   return base;
@@ -3641,7 +3649,8 @@ async function loadInfosClient() {
   resultats.forEach(function (r) {
     const d = r.d;
     const entete = '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
-      + '<div style="font-size:.85rem;color:#555;margin-top:4px">' + escapeHtml(_libelleServiceClient(d.type_service)) + '</div>';
+      + '<div style="font-size:.85rem;color:#555;margin-top:4px">' + escapeHtml(_libelleServiceClient(d.type_service))
+      + (d.statut ? ' <span class="badge" style="margin-left:6px">' + escapeHtml(d.statut) + '</span>' : '') + '</div>';
     if (r.erreur) {
       erreurs++;
       blocs.push('<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '"><div class="card-header"><div>' + entete + '</div></div>'
@@ -3652,13 +3661,24 @@ async function loadInfosClient() {
     if (!lignes.length) return;   // aucune information n'est requise pour cette demande
     const restantes = lignes.filter(_estRestante);
     const fournies = lignes.length - restantes.length;
-    const transmises = lignes.filter(function (l) { return l.statut === 'transmise'; }).length;
     restantesTotal += restantes.length;
     const complet = restantes.length === 0;
+    // Cet onglet est une liste d'actions. Une demande sans information
+    // restante n'y est plus affichée ; les états « Complet » restent
+    // visibles par véhicule lorsqu'une autre rubrique de la demande manque.
+    if (complet) return;
     const groupes = _infosGrouper(lignes);
+    const dejaRecues = lignes.filter(function (l) { return !_estRestante(l); });
     let corps = '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
       + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '') + ' sur ' + lignes.length + '</strong> déjà '
       + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
+    if (dejaRecues.length) {
+      corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Déjà reçues</div>'
+        + '<div style="font-size:.82rem;color:#555">'
+        + dejaRecues.map(function (l) { return escapeHtml(String(l.libelle || l.cle || '')); }).join('<br>')
+        + '</div>';
+    }
+    corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
     groupes.forEach(function (g) {
       const gRestantes = g.lignes.filter(_estRestante);
       const gComplet = gRestantes.length === 0;
@@ -3677,9 +3697,7 @@ async function loadInfosClient() {
     blocs.push(
       '<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '" data-complet="' + (complet ? '1' : '0') + '">'
       + '<div class="card-header"><div>' + entete + '</div>'
-      + (complet
-          ? '<span class="badge badge-done">Complet' + (transmises ? ' — en cours de validation par HelixCar' : '') + '</span>'
-          : '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>')
+      + '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>'
       + '</div>' + corps + '</div>');
   });
 
@@ -8545,9 +8563,13 @@ function _dv(v) { return (v === null || v === undefined || v === '') ? '—' : S
 function _dvDate(v) {
   if (!v) return '—';
   try {
+    // Une date civile n'est pas un instant UTC : 2026-09-21 doit rester
+    // le 21 septembre, même si le navigateur se trouve hors de France.
+    var civil = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+    if (civil) return civil[3] + '/' + civil[2] + '/' + civil[1];
     var d = new Date(v);
     if (isNaN(d.getTime())) return String(v);
-    return d.toLocaleDateString('fr-FR');
+    return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
   } catch (e) { return String(v); }
 }
 
@@ -8556,7 +8578,7 @@ function _dvDateHeure(v) {
   try {
     var d = new Date(v);
     if (isNaN(d.getTime())) return String(v);
-    return d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   } catch (e) { return String(v); }
 }
 
@@ -8618,9 +8640,8 @@ function _nettHoraireTexte(nd) {
   if (!nd) return '';
   var plage = [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
   if (plage) return plage;
-  // Demandes antérieures uniquement.
-  if (nd.dispo_type === 'precise') return nd.heure_precise || '';
-  if (nd.dispo_type === 'flexible') return 'Flexible';
+  // Ancien dossier : conserver une heure réellement saisie, jamais
+  // inventer un horaire ni réintroduire l'ancien choix « Flexible ».
   return nd.heure_precise || '';
 }
 
@@ -8713,7 +8734,7 @@ var NETT_LIB_CAT = {
 var NETT_LIB_TYPE = {
   interieur: 'Nettoyage intérieur', exterieur: 'Nettoyage extérieur',
   interieur_exterieur: 'Nettoyage intérieur et extérieur',
-  preparation_complete: 'Préparation complète — intérieur et extérieur', conseil: 'Client à conseiller'
+  preparation_complete: 'Préparation complète', conseil: 'Client à conseiller'
 };
 // V75 — intervention exclusivement sur le site du client. Les anciens
 // libellés (Chez HelixCar / À définir) restent connus ici afin que les
@@ -9618,7 +9639,7 @@ function ouvrirFicheDemande(clientId) {
     org += L(nd.date_fin && nd.date_fin !== nd.date_souhaitee ? 'Période' : 'Date souhaitée',
              _nettPeriodeTexte(nd, _dvDate));
     var _horaireNett = _nettHoraireTexte(nd);
-    if (_horaireNett) org += L('Horaire sur place', _horaireNett);
+    org += L('Horaire sur place', _horaireNett || 'Non renseigné');
     org += L('Délai', NETT_LIB_DELAI[nd.delai] || nd.delai);
     // V77 — la cle instructions n'est plus ecrite ; conservee en lecture
     // pour les demandes anterieures.

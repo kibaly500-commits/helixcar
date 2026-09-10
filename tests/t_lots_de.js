@@ -188,6 +188,7 @@ function rubriquesVisibles(page, n) {
     const page = await L.newPage(browser);
     await L.fillStep1(page, 'pro');
     await L.chooseService(page, 'professionnel');
+    await L.ouvrirEtapeProfessionnel(page);
     await page.waitForTimeout(200);
     const etat = await page.evaluate(() => {
       const coche = (n, v, h) => {
@@ -290,7 +291,8 @@ function rubriquesVisibles(page, n) {
       && parseFloat(rendu.droite) === 0, JSON.stringify(rendu));
 
     // Une erreur de champ garde son petit repère, et disparaît à la correction.
-    await L.fillStep1(page, 'particulier');
+    // F01-010 : Nettoyage est réservé aux professionnels, y compris dans ce scénario.
+    await L.fillStep1(page, 'pro');
     await L.chooseService(page, 'nettoyage');
     await page.waitForTimeout(150);
     const champ = await page.evaluate(() => {

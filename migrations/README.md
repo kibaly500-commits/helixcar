@@ -79,6 +79,7 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 22 | **E** | `109_fidelite_points.sql` | **lot L01** (C10) : registre `fidelite_mouvements`, paliers 2 000 → 10 000 puis Box mystère tous les 2 000 points, vue `v_ma_fidelite`, garde-fou de l'état de paiement, contrepassations. Testée par `tests/rls/l01.sh` |
 | 23 | **E** | `110_paiement_confirme_et_mission.sql` | **lot Q02** (C02) : journal `paiement_evenements`, `traiter_paiement_confirme` réservée à `service_role` (futur webhook), création de mission de nettoyage **seulement** si devis accepté ET payé ET informations complètes, déclencheur de complétion, `v_mes_devis`. Testée par `tests/rls/q02.sh` |
 | 24 | **E** | `111_evaluations_et_missions_client.sql` | **lot D01** : `evaluations` (une par mission, écriture par `evaluer_mission` seulement), `v_mes_missions`. Testée par `tests/rls/d01.sh` |
+| 25 | **E** | `112_plafonds_mission_et_nettoyage_reserve.sql` | **lot F01** : plafonds serveur Mission 166 / Type de mission 156, contrôle des changements de catégorie, Nettoyage réservé aux entreprises, conservation des anciens dossiers. Tests préparés dans `tests/rls/f01.sh`, **non exécutés pendant la reprise Codex** (PostgreSQL indisponible). Aucune application distante. |
 
 ### Deux secrets, et pourquoi `92` retire une signature
 

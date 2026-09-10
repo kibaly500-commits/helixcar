@@ -1283,7 +1283,7 @@ window.jspdf = { jsPDF: function () {
       const d = _construireDetailsProfessionnel();
       return { okCat, okMet, categorie: d.categorie, mission: d.mission,
                libelle: _proLibelleMetier(d), etape4: _estEtapeApplicable(4),
-               apresEtape2: _prochaineEtape(2) };
+               apresEtape2: _prochaineEtape(2), apresEtape3: _prochaineEtape(3) };
     });
     check('N9 : parcours « Trouver un professionnel » — il vit et se remplit (t_pro, t_pro_ui)',
       pro.okCat === true && pro.okMet === true && pro.categorie === 'renfort',
@@ -1291,12 +1291,14 @@ window.jspdf = { jsPDF: function () {
     check('N10 : le métier « Soutien administratif » est réellement sélectionnable (t_metiers)',
       pro.mission === 'soutien_administratif' && pro.libelle === 'Soutien administratif',
       JSON.stringify(pro));
-    // Le parcours professionnel tient TOUT ENTIER dans l'étape 2 : la
-    // 4 ne lui est pas applicable, et « Continuer » mène directement au
-    // récapitulatif. C'est la nouveauté, pas un manque.
-    check('N11 : le parcours professionnel va de l\'étape 2 au récapitulatif (t_etapes)',
-      pro.etape4 === false && pro.apresEtape2 === 5,
-      JSON.stringify([pro.etape4, pro.apresEtape2]));
+    // LOT F01 (F01-023..027) — ANCIEN COMPORTEMENT ADAPTÉ : le parcours
+    // tenait tout entier dans l'étape 2 et « Continuer » menait de 2 au
+    // récapitulatif. Les quatre rubriques vivent désormais dans l'étape
+    // 3 dédiée : 2 -> 3 (rubriques) -> 5 (récapitulatif). L'étape 4
+    // (véhicules) ne lui est toujours pas applicable.
+    check('N11 : le parcours professionnel va de l\'étape 2 à l\'étape 3 dédiée, puis au récapitulatif (t_etapes)',
+      pro.etape4 === false && pro.apresEtape2 === 3 && pro.apresEtape3 === 5,
+      JSON.stringify([pro.etape4, pro.apresEtape2, pro.apresEtape3]));
     await pagePro.close();
 
     // ── N12 à N13 : les huit métiers de candidature ──

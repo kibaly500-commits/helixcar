@@ -2656,11 +2656,18 @@ check "DEV-17 : aucun objet Stripe créé par ce lot" "0" \
 # disposent de check(), sql(), sqlAdmin(), appliquer() et su/psql.
 for f in "$REPO"/tests/rls/*.sh; do
   [ -f "$f" ] || continue
+  # F01 (112) impose de nouvelles règles de saisie : les anciennes
+  # fixtures des migrations antérieures doivent être créées avant.
+  [ "$(basename "$f")" = 'f01.sh' ] && continue
   echo
   echo "── $(basename "$f") ──"
   # shellcheck disable=SC1090
   . "$f"
 done
+
+if [ -f "$REPO/tests/rls/f01.sh" ]; then
+  . "$REPO/tests/rls/f01.sh"
+fi
 
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="

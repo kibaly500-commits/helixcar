@@ -1,7 +1,8 @@
 # Sections RLS par lot
 
 Chaque fichier `*.sh` de ce dossier est **exécuté à la fin de
-`tests/t_rls.sh`**, dans l'ordre alphabétique, avec les mêmes helpers :
+`tests/t_rls.sh`**, dans l'ordre alphabétique **sauf `f01.sh`, exécuté
+en dernier** (la migration 112 doit suivre les fixtures historiques), avec les mêmes helpers :
 `check "libellé" "attendu" "obtenu"`, `sql "…"`, `sqlAdmin "…"`,
 `appliquer migrations/NNN_….sql`, et l'accès direct `su postgres -c "psql
 -U postgres -d $DB …"`.

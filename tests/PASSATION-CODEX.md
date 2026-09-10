@@ -1,5 +1,11 @@
 # Passation — branche `claude/helixcar-expert-review-p0-p1-qcawh6`
 
+> **Document historique de l'arrêt de Claude.** La reprise du 10 septembre
+> 2026 et ses résultats sont dans [REPRISE-CODEX.md](REPRISE-CODEX.md).
+> Les mentions « TERMINÉ ET PROUVÉ » ci-dessous ne valident pas les gates
+> réels Q01/V01 : réception e-mail, vidéo privée et recette distante restent
+> à prouver. Les états F01/D01/O01/X01 ont évolué depuis cette passation.
+
 Document de passation rédigé à l'arrêt du développement, à la demande du
 propriétaire (« Codex va reprendre le travail sur ta branche »). Il dit
 ce qui est fait, ce qui est prouvé, ce qui ne l'est pas, et la prochaine
