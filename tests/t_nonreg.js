@@ -260,6 +260,8 @@ const futur = dansNJours;
     'package-lock.json',
     // Le lanceur de tests et la campagne d'intégration continue.
     '.github/workflows/tests.yml',
+    // Recette : désactive les déploiements Vercel de cette seule branche.
+    'vercel.json',
     // node_modules et sorties locales, désormais ignorés par git.
     '.gitignore',
     // Le dossier de recette et de mise en production.
