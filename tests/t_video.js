@@ -280,6 +280,13 @@ async function etatVideo(page) {
       const corps = JSON.parse(route.request().postData() || '{}');
       appels.push({ type: 'fonction', action: corps.action, corps: corps });
       if (corps.action === 'autoriser') {
+        // LOT V01 — le serveur répond « déjà confirmée » : la vidéo a
+        // été finalisée par une confirmation dont la réponse s'est
+        // perdue. Aucun dépôt, aucune seconde confirmation attendus.
+        if (opts.dejaConfirmee) {
+          return route.fulfill({ status: 200, contentType: 'application/json',
+            body: JSON.stringify({ ok: true, deja_confirmee: true, chemin: CHEMIN_SERVEUR }) });
+        }
         if (opts.autoriserKo) {
           return route.fulfill({ status: 403, contentType: 'application/json',
             body: JSON.stringify({ ok: false, code: 'FORBIDDEN', message: "Autorisation d'envoi inconnue ou déjà utilisée." }) });
@@ -376,6 +383,19 @@ async function etatVideo(page) {
   envoi = await lancerEnvoi(page);
   L.check('J13 : confirmation refusée -> envoi considéré comme échoué',
     !!envoi.erreur && /reçue entièrement/i.test(envoi.erreur), JSON.stringify(envoi));
+  await desarmer(page);
+
+  // LOT V01 — idempotence côté navigateur : la confirmation précédente
+  // avait réussi, sa réponse s'est perdue, le candidat relance.
+  await armerInterceptions(page, { dejaConfirmee: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J14 : « déjà confirmée » -> succès, sans dépôt ni seconde confirmation',
+    envoi.ok === true && envoi.deja_confirmee === true && envoi.chemin === CHEMIN_SERVEUR
+    && !appels.some(a => a.type === 'depot') && !appels.some(a => a.action === 'confirmer')
+    && !appels.some(a => a.type === 'reprenable'),
+    JSON.stringify({ envoi, appels: appels.map(a => a.action || a.type) }));
+  L.check('J14b : le jeton à usage unique est oublié côté navigateur',
+    (await page.evaluate(() => _convJetonEnvoi)) === null);
   await desarmer(page);
 
   // ── K. Aucune URL publique nulle part ──

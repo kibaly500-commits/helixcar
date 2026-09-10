@@ -72,6 +72,14 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 15 | **D** | `97_missions_verrou_serveur.sql` | **correctif de sécurité** : ce qu'un partenaire a le droit de changer sur une mission — colonnes, transitions de statut, attribution, photos exigées |
 | 16 | **D** | `98_photos_justificatives_reelles.sql` | **correctif de sécurité** : une photo n'est acceptée que si son fichier existe réellement dans le bucket privé et appartient à la mission ; `ajoutee_par` imposé par le serveur |
 | 17 | **D** | `99_reclamation_demande.sql` | **correctif fonctionnel** : rattacher sa demande après confirmation d'adresse — session, adresse confirmée et identique, identifiant exact, secret dont seule l'empreinte est stockée, expiration, consommation. Le secret de réclamation est **distinct** de celui de création (§ *Deux secrets*, ci-dessous) |
+| 18 | **E** | `100_activites_partenaire.sql` → `104_identite_unique_roles_multiples.sql` | lots des Pull Requests nº 3 et nº 4 (déjà appliquées jusqu'à `102` ; `103` et `104` livrées par la PR nº 4) |
+| 19 | **E** | `105_video_envoi_en_deux_phases.sql` | **correctif P0 (lot V01)** : l'envoi de la vidéo de candidature en deux phases — colonnes d'envoi en cours, finalisation atomique réservée à `service_role`, garde-fou de `90` aligné sur `97` et renforcé. Sans elle, la fonction `candidature-video` livrée ne peut pas confirmer une vidéo |
+| 20 | **E** | `106_devis_versions_et_journal_envois.sql` | **correctif P0 (lot Q01)** : version de devis, états séparés (consulté, paiement en attente), journal `devis_envois` fermé par RLS. Sans elle, la fonction `devis-secure` livrée ne peut pas préparer ni envoyer |
+| 21 | **E** | `108_opportunites_missions.sql` | **lot O01** : opportunités privées, candidatures uniques, attribution atomique N sur N, clôture à N/N seulement (C03), journal d'intentions de notification (C11), vues partenaire / administrateur. Testée par `tests/rls/o01.sh` |
+| 22 | **E** | `109_fidelite_points.sql` | **lot L01** (C10) : registre `fidelite_mouvements`, paliers 2 000 → 10 000 puis Box mystère tous les 2 000 points, vue `v_ma_fidelite`, garde-fou de l'état de paiement, contrepassations. Testée par `tests/rls/l01.sh` |
+| 23 | **E** | `110_paiement_confirme_et_mission.sql` | **lot Q02** (C02) : journal `paiement_evenements`, `traiter_paiement_confirme` réservée à `service_role` (futur webhook), création de mission de nettoyage **seulement** si devis accepté ET payé ET informations complètes, déclencheur de complétion, `v_mes_devis`. Testée par `tests/rls/q02.sh` |
+| 24 | **E** | `111_evaluations_et_missions_client.sql` | **lot D01** : `evaluations` (une par mission, écriture par `evaluer_mission` seulement), `v_mes_missions`. Testée par `tests/rls/d01.sh` |
+| 25 | **E** | `112_plafonds_mission_et_nettoyage_reserve.sql` | **lot F01** : plafonds serveur Mission 166 / Type de mission 156, contrôle des changements de catégorie, Nettoyage réservé aux entreprises, conservation des anciens dossiers. Tests préparés dans `tests/rls/f01.sh`, **non exécutés pendant la reprise Codex** (PostgreSQL indisponible). Aucune application distante. |
 
 ### Deux secrets, et pourquoi `92` retire une signature
 
@@ -327,6 +335,61 @@ lisible avec la clé `anon` tant que la phase C n'est pas passée. En
 conséquence : **enchaîner B et C dans la même fenêtre de maintenance**,
 et **ne bloquer aucun partenaire avant la phase C**.
 
+### Phase E — lots P0 de la révision experte (105 et 106)
+
+`105` et `106` sont additives et idempotentes. Elles accompagnent le
+redéploiement de **deux** Edge Functions, qu'une fusion ne redéploie pas :
+
+```bash
+# depuis la racine du dépôt (supabase/config.toml y est lu)
+supabase functions deploy candidature-video
+supabase functions deploy devis-secure
+```
+
+`devis-secure` vivait à la racine du dépôt (`index.ts`), hors de
+l'arborescence que la CLI sait déployer ; elle est désormais dans
+`supabase/functions/devis-secure/index.ts`, avec son réglage
+`verify_jwt = false` versionné (la page publique `devis.html` l'appelle
+sans session ; les actions administrateur vérifient elles-mêmes le JWT
+et l'appartenance à `public.admins`).
+
+Variables d'environnement des Edge Functions (Supabase → Edge Functions
+→ Secrets) — **aucune n'est lue ni écrite par ce dépôt** :
+
+| Variable | Fonction | Rôle |
+|---|---|---|
+| `RESEND_API_KEY` | `devis-secure` | déjà requise : envoi réel du devis |
+| `RESEND_FROM` | `devis-secure` | facultative : expéditeur une fois le domaine vérifié chez Resend (défaut : `HelixCar <onboarding@resend.dev>`) |
+| `HELIXCAR_URL_PUBLIQUE` | `devis-secure` | facultative : URL publique canonique des liens envoyés aux clients (défaut : l'origine autorisée qui appelle, puis `https://helixcar.vercel.app`). À renseigner **seulement** lors du branchement du domaine officiel |
+| `HELIXCAR_ORIGINES_SUPPLEMENTAIRES` | les deux | facultative : origines CORS à ajouter (ex. `https://helixcar.fr,https://www.helixcar.fr`), **sans** retirer les origines Vercel pendant la transition |
+
+Contrôles après application :
+
+```sql
+-- 105
+select count(*) from information_schema.columns
+ where table_name = 'convoyeurs'
+   and column_name in ('video_envoi_chemin','video_envoi_mime','video_envoi_taille_octets',
+                       'video_envoi_duree_secondes','video_envoi_commence_le','video_upload_jeton_consomme_le');
+-- attendu : 6
+select conname from pg_constraint
+ where conrelid = 'public.convoyeurs'::regclass
+   and conname in ('convoyeurs_video_coherente','convoyeurs_video_envoi_coherent');
+-- attendu : les DEUX
+select count(*) from information_schema.role_routine_grants
+ where routine_name = 'finaliser_video_candidature' and grantee in ('anon','authenticated');
+-- attendu : 0
+
+-- 106
+select count(*) from information_schema.columns
+ where table_name = 'devis'
+   and column_name in ('version','version_preparee','version_envoyee','version_acceptee','consulte_le',
+                       'envoi_en_cours_depuis','paiement_statut','paiement_confirme_le','annule_le','expire_le');
+-- attendu : 10
+select policyname from pg_policies where tablename = 'devis_envois';
+-- attendu : « devis_envois : lecture admin » uniquement
+```
+
 ## Réglages manuels Supabase (hors SQL)
 
 0. **Déployer la fonction `candidature-video`** — *indispensable au
@@ -440,7 +503,13 @@ et **ne bloquer aucun partenaire avant la phase C**.
 
 ## Stripe
 
-Aucun objet lié au paiement n'est créé : pas de colonne « payé », pas de
-webhook, pas de création automatique de mission. L'enchaînement
-paiement → complément → mission reste **dormant** et devra être activé
-dans un lot ultérieur, uniquement sur confirmation serveur fiable.
+Aucun objet Stripe n'existe dans le dépôt. Depuis la migration `110`, le
+serveur sait **recevoir** une confirmation de paiement :
+`traiter_paiement_confirme(devis_id, fournisseur, evenement_id, montant,
+devise, detail)` — exécutable uniquement avec la clé `service_role`
+(jamais depuis une session), idempotente par événement, et elle crée la
+mission de nettoyage si le dossier est complet (sinon la dernière
+information transmise la crée). Le futur webhook Stripe devra vérifier la
+signature de l'événement puis appeler cette fonction ; tant qu'il n'existe
+pas, aucun devis ne passe « payé » et aucune mission de nettoyage ne se
+crée (décision C02).

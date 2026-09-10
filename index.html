@@ -1312,6 +1312,20 @@
   .track-node.active .node-km,
 
   .track-node.done .node-km { color: var(--yellow); }
+  /* LOT L01 — libellé du palier sous son seuil, et texte de continuité. */
+  .node-nom { font-size: 0.72rem; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .loyalty-suite { max-width: 720px; margin: -40px auto 48px; text-align: center; color: rgba(255,255,255,0.65); font-size: 0.9rem; line-height: 1.7; }
+  .loyalty-suite p { margin: 0 0 10px; }
+  .loyalty-suite strong { color: var(--yellow); }
+  @media (max-width: 768px) {
+    .track-line { display: none; }
+    .track-nodes { flex-direction: column; align-items: stretch; gap: 10px; }
+    .track-node { flex-direction: row; gap: 14px; text-align: left; align-items: center;
+      background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px 14px; }
+    .track-node .node-circle { margin-bottom: 0; flex-shrink: 0; }
+    .track-node .node-nom { margin-top: 0; margin-left: auto; }
+    .loyalty-suite { margin-top: 0; }
+  }
 
 
 
@@ -2379,6 +2393,10 @@
     outline: none;
   }
 
+  /* Lot A01 — Edge (Chromium) ajoute son propre bouton de révélation
+     dans les champs de mot de passe : il ferait doublon avec l'œil. */
+  input::-ms-reveal, input::-ms-clear { display: none; }
+
   #modal-client input:-webkit-autofill,
   #modal-client input:-webkit-autofill:hover,
   #modal-client input:-webkit-autofill:focus,
@@ -2853,6 +2871,33 @@
   @media (max-width: 640px) {
     body.hc-integre #modal-client .modal { padding: 20px 16px 28px; }
   }
+  /* LOT D01 — l'écran « Compléter mes informations » vit lui aussi dans
+     l'espace client : même mise en page intégrée que le formulaire. */
+  body.hc-integre #modal-completer.modal-overlay {
+    position: static; display: block; background: transparent;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    padding: 0; overflow: visible; opacity: 1; visibility: visible;
+  }
+  body.hc-integre #modal-completer .modal {
+    max-width: 100%; width: 100%; min-height: 0; margin: 0;
+    border-radius: 0; border: 0; box-shadow: none; padding: 26px 30px 34px;
+  }
+  body.hc-integre #modal-completer .modal::before { display: none; }
+  body.hc-integre #modal-completer .modal-close { display: none; }
+  #completer-retour { display: none; }
+  body.hc-integre #completer-retour { display: inline-flex; }
+  /* Identité déjà connue (D01-005..007) : ni « Devenir client », ni
+     « Créez votre compte », ni pastille d'identité. */
+  body.hc-integre #client-modal-titre, body.hc-integre #client-modal-sous-titre,
+  body.hc-sans-identite #client-modal-titre, body.hc-sans-identite #client-modal-sous-titre { display: none !important; }
+  /* D01-008 — dans l'espace client, « Continuer » n'occupe plus toute la
+     largeur du bloc : la grande barre rouge sous le formulaire, c'était lui. */
+  body.hc-integre #client-step-nav .btn-step-next { flex: 0 0 auto; min-width: 220px; margin-left: auto; }
+  /* Regroupement par véhicule dans l'écran de complétion. */
+  .completer-groupe { margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .completer-groupe strong { font-size: .9rem; }
+  .completer-etat { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px; border-radius: 100px; background: #F3F4F6; color: #555; }
+  .completer-etat--complet { background: rgba(31,122,77,.12); color: #1F7A4D; }
 
   #modal-client .modal-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px;
@@ -4782,6 +4827,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   display: none !important;
 }
 
+/* LOT F01 — Trouver un professionnel : l'étape 3 ne montre QUE les quatre
+   rubriques métier. Même principe que le nettoyage ci-dessus : le bloc
+   « Prise en charge » est masqué, jamais supprimé. */
+#modal-client[data-service-professionnel="1"] .form-step[data-step="3"] > *:not(#bloc-socle-professionnel) {
+  display: none !important;
+}
+
 /* 2 — Bloc Conditions grisé pour un client non professionnel. */
 #modal-client #nett-eligibilite-bloc[data-inactif="1"] .nett-elig-opt {
   opacity: .55;
@@ -4848,6 +4900,30 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+/* LOT F01 (F01-010) — service réservé aux entreprises. L'option reste
+   VISIBLE et LISIBLE (« Réservé aux entreprises »), mais un particulier
+   ne peut ni la cocher (souris, clavier, tactile : le bouton radio est
+   réellement désactivé) ni la contourner. Le professionnel la voit
+   active, sans aucun changement. */
+#modal-client label.radio-opt.hc-opt-reservee {
+  opacity: .55;
+  cursor: not-allowed;
+}
+#modal-client label.radio-opt.hc-opt-reservee input[type="radio"] { cursor: not-allowed; }
+#modal-client label.radio-opt.hc-opt-reservee .hc-opt-desc { color: var(--accent); font-weight: 600; }
+
+/* LOT F01 (F01-035/036) — compteur discret sous un texte plafonné
+   (Mission : 166 caractères, Type de mission : 156). Il devient rouge
+   quand un texte restauré d'un brouillon dépasse la limite. */
+#modal-client .hc-compteur {
+  font-size: .74rem;
+  color: #7A7F84;
+  text-align: right;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+#modal-client .hc-compteur.hc-compteur--depasse { color: #DC2626; font-weight: 600; }
 </style>
 
 <style id="hc-connexion-premium-v1">
@@ -4994,6 +5070,24 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 }
 </style>
 
+<!-- LOT D01 — garde précoce du mode intégré (?integre=1 dans un cadre) :
+     la vitrine ne doit jamais apparaître, même un instant, dans l'espace
+     client. La classe est posée avant l'analyse du corps ; le reste du
+     mode intégré (body.hc-integre) prend le relais au chargement. -->
+<style>
+  html.hc-integre-tot body > *:not(.modal-overlay) { display: none !important; }
+  html.hc-integre-tot body { background: #fff; }
+</style>
+<script>
+(function () {
+  try {
+    var p = new URLSearchParams(window.location.search || '');
+    if (p.get('integre') === '1' && window.parent !== window) {
+      document.documentElement.classList.add('hc-integre-tot');
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 
 <body>
@@ -5014,9 +5108,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
     <li><a href="#services">Services</a></li>
 
-    <li><a href="#devis">Devis</a></li>
 
     <li><a href="#fidelite">Fidélité</a></li>
+
+    <li><a href="#devis">Devis</a></li>
 
     <li><a href="#convoyeurs">Partenaires</a></li>
 
@@ -5180,8 +5275,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div class="hero2-panel-stat-label">Sécurisé</div>
         </div>
         <div>
-          <div class="hero2-panel-stat-num">98%</div>
-          <div class="hero2-panel-stat-label">Satisfaction client</div>
+          <div class="hero2-panel-stat-num">Devis</div>
+          <div class="hero2-panel-stat-label">Personnalisé</div>
         </div>
         <div>
           <div class="hero2-panel-stat-num">EU</div>
@@ -5517,6 +5612,126 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
 
+<!-- FIDELITE -->
+
+<section class="loyalty" id="fidelite">
+
+  <div class="section-tag reveal">Programme de fidélité</div>
+
+  <h2 class="section-h2 reveal">Chaque prestation payée<br>vous rapproche du prochain palier</h2>
+
+  <p class="section-sub reveal">1&nbsp;€ payé sur une prestation terminée = 1 point, tous services confondus. Cinq paliers, puis une Box mystère tous les 2&nbsp;000 points.</p>
+
+  <!-- LOT L01 / L02 — cinq paliers en POINTS (décision C10), icônes sobres
+       (cadeau, étoile, insigne, couronne, trophée), aucune progression
+       fictive : la vitrine ne connaît aucun client, elle n'affiche donc
+       ni palier « atteint » ni barre remplie. Le solde réel se lit dans
+       l'espace client, calculé par le serveur. -->
+  <div class="loyalty-track reveal" role="list" aria-label="Les cinq paliers du programme de fidélité">
+
+    <div class="track-line"></div>
+
+    <div class="track-nodes">
+
+      <div class="track-node" role="listitem" data-seuil="2000">
+        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.15em" data-icone="cadeau"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5.5 12.5V20h13v-7.5"/><path d="M12 8.5V20"/><path d="M12 8.5c-1.8-3.6-5.6-3.4-5.6-1.4S9.4 8.5 12 8.5z"/><path d="M12 8.5c1.8-3.6 5.6-3.4 5.6-1.4S14.6 8.5 12 8.5z"/></svg></div>
+        <div class="node-km">2 000 points</div>
+        <div class="node-nom">Palier 1</div>
+      </div>
+      <div class="track-node" role="listitem" data-seuil="4000">
+        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.15em" data-icone="etoile"><polygon points="12 3.2 14.8 9 21.2 9.7 16.5 14.1 17.7 20.5 12 17.4 6.3 20.5 7.5 14.1 2.8 9.7 9.2 9"/></svg></div>
+        <div class="node-km">4 000 points</div>
+        <div class="node-nom">Palier 2</div>
+      </div>
+      <div class="track-node" role="listitem" data-seuil="6000">
+        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.15em" data-icone="insigne"><path d="M12 3l7 3v5.2c0 4.8-3.3 8.3-7 9.8-3.7-1.5-7-5-7-9.8V6l7-3z"/><path d="M9 12.2l2.1 2.1 4-4.2"/></svg></div>
+        <div class="node-km">6 000 points</div>
+        <div class="node-nom">Palier 3</div>
+      </div>
+      <div class="track-node" role="listitem" data-seuil="8000">
+        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.15em" data-icone="couronne"><path d="M3.5 17.5l1.8-10 4.9 4.7L12 5.5l1.8 6.7 4.9-4.7 1.8 10z"/><path d="M5 20.5h14"/></svg></div>
+        <div class="node-km">8 000 points</div>
+        <div class="node-nom">Palier 4</div>
+      </div>
+      <div class="track-node" role="listitem" data-seuil="10000">
+        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.15em" data-icone="trophee"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 5.2H5.3a2.8 2.8 0 0 0 2.7 2.6"/><path d="M16 5.2h2.7a2.8 2.8 0 0 1-2.7 2.6"/><path d="M12 13v3"/><path d="M9 20.5h6"/><path d="M10 16h4v4.5h-4z"/></svg></div>
+        <div class="node-km">10 000 points</div>
+        <div class="node-nom">Palier 5</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="loyalty-suite reveal">
+    <p><strong>Palier 1 — 2&nbsp;000 points</strong> : réduction de 10&nbsp;% sur une box surprise automobile.
+       Les récompenses des paliers suivants sont dévoilées à chaque palier atteint.</p>
+    <p>Au-delà de 10&nbsp;000 points, le programme continue sans remise à zéro : 12&nbsp;000, 14&nbsp;000, 16&nbsp;000 points…
+       Chaque nouveau seuil ouvre une <strong>Box mystère</strong>.</p>
+  </div>
+
+  <div class="loyalty-bottom">
+
+    <div class="loyalty-card reveal">
+
+      <h3>Programme Clients</h3>
+
+      <p>Vos points sont calculés par HelixCar sur vos prestations terminées et payées : convoyage, stockage, nettoyage ou intervention d'un professionnel. Suivez vos points cumulés et le prochain palier depuis votre espace client.</p>
+
+<p style="color:rgba(255,255,255,.5);font-size:.82rem;margin-top:8px;font-style:italic">Les récompenses sont révélées à chaque nouveau palier atteint. Les points n'expirent pas.</p>
+
+    </div>
+
+    <div class="loyalty-card reveal">
+
+      <h3>Offre Parrainage</h3>
+
+      <p>Parrainez un proche avec HelixCar : dès sa première mission réalisée, profitez de <strong style="color:var(--yellow)">10% de réduction</strong> sur votre prochain convoyage.</p>
+
+
+
+    </div>
+
+  </div>
+
+</section>
+
+
+
+<!-- INFO EXPANDABLE 2 (en savoir plus - récompenses) -->
+
+<div class="expand-target" id="info-rewards">
+
+  <div style="background:var(--white);padding:60px 80px;border-top:3px solid var(--yellow)">
+
+    <div style="max-width:760px;margin:0 auto">
+
+      <div class="section-tag">Récompenses</div>
+
+      <h2 class="section-h2">Fidélité & Challenge mensuel</h2>
+
+      <p style="color:#444;line-height:1.8;margin-bottom:20px">
+
+        Rejoignez notre programme de fidélité : chaque euro payé sur une prestation terminée vous rapporte un point, quel que soit le service. Cinq paliers jalonnent le parcours (2&nbsp;000, 4&nbsp;000, 6&nbsp;000, 8&nbsp;000 et 10&nbsp;000 points), puis une Box mystère s'ouvre tous les 2&nbsp;000 points, sans remise à zéro. Suivez vos points cumulés et le prochain palier depuis votre espace client.
+
+      </p>
+
+      <p style="color:#444;line-height:1.8">
+
+        Pour nos convoyeurs, un challenge excitant vous attend : chaque mois, ceux qui auront parcouru le plus de kilomètres se verront attribuer des récompenses allant jusqu'à 150 euros. Parce que chez HelixCar, nous aimons relever des défis et aller toujours plus loin !
+
+      </p>
+
+      <button class="btn btn-dark" style="margin-top:24px" onclick="hideExpand('info-rewards')">Fermer ↑</button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
 <!-- DEVIS -->
 
 <section class="quote-section" id="devis">
@@ -5588,209 +5803,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   </div>
 
 </section>
-<!-- FIDELITE -->
-
-<section class="loyalty" id="fidelite">
-
-  <div class="section-tag reveal">Programme de fidélité convoyage</div>
-
-  <h2 class="section-h2 reveal">Plus vous transportez,<br>plus vous gagnez</h2>
-
-  <p class="section-sub reveal">Suivez votre progression en temps réel et débloquez des récompenses exclusives à chaque palier.</p>
-
-
-
-  <div class="loyalty-track reveal">
-
-    <div class="track-line"></div>
-
-    <div class="track-progress" id="loyalty-bar" style="width:28%"></div>
-
-    <div class="track-nodes">
-
-      <!-- Palier 1 -->
-
-      <div class="track-node done">
-
-        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="4" y="9.5" width="16" height="10.5" rx="1"/><path d="M3.5 9.5h17v4h-17z"/><line x1="12" y1="9.5" x2="12" y2="20"/><path d="M12 9.5c-1.3-4-6-4.3-6-1.2 0 2 2.6 1.2 6 1.2z"/><path d="M12 9.5c1.3-4 6-4.3 6-1.2 0 2-2.6 1.2-6 1.2z"/></svg></div>
-
-        <div class="node-km">1 000 km</div>
-
-        <div class="node-tooltip">
-
-          <h4>Palier 1 — 1 000 km</h4>
-
-          Réduction 10% sur le prochain convoyage.<br>
-
-          Box surprise accessoires auto (10–15 €).
-
-        </div>
-
-      </div>
-
-      <!-- Palier 2 - active -->
-
-      <div class="track-node active">
-
-        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="4" y="9.5" width="16" height="10.5" rx="1"/><path d="M3.5 9.5h17v4h-17z"/><line x1="12" y1="9.5" x2="12" y2="20"/><path d="M12 9.5c-1.3-4-6-4.3-6-1.2 0 2 2.6 1.2 6 1.2z"/><path d="M12 9.5c1.3-4 6-4.3 6-1.2 0 2-2.6 1.2-6 1.2z"/></svg></div>
-
-        <div class="node-km">3 000 km</div>
-
-        <div class="node-tooltip">
-
-          <h4>Palier 2 — 2 500 km</h4>
-
-          Réduction 15% sur votre prochain convoyage.<br>
-
-          Nettoyage offert.
-
-          <span class="locked-badge"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Prochain palier</span>
-
-        </div>
-
-      </div>
-
-      <!-- Palier 3 -->
-
-      <div class="track-node">
-
-        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
-
-        <div class="node-km">7 000 km</div>
-
-        <div class="node-tooltip">
-
-          <h4>Palier 3 — 5 000 km</h4>
-
-          Réduction 10% sur votre prochain convoyage.<br>
-
-          Nettoyage offert.
-
-          <span class="locked-badge"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Mystère</span>
-
-        </div>
-
-      </div>
-
-      <!-- Palier 4 -->
-
-      <div class="track-node">
-
-        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
-
-        <div class="node-km">15 000 km</div>
-
-        <div class="node-tooltip">
-
-          <h4>Palier 4 — 10 000 km</h4>
-
-          Réduction 25% sur votre prochain convoyage.<br>
-
-          Bon d'achat de 50 € sur vos prochains convoyages.
-
-          <span class="locked-badge"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Mystère</span>
-
-        </div>
-
-      </div>
-
-      <!-- Entreprises -->
-
-      <div class="track-node">
-
-        <div class="node-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><path d="M8 4h8v4.5a4 4 0 0 1-8 0V4z"/><path d="M8 5.2H5.3a2.8 2.8 0 0 0 2.7 2.6"/><path d="M16 5.2h2.7a2.8 2.8 0 0 1-2.7 2.6"/><line x1="12" y1="12.3" x2="12" y2="16"/><line x1="9" y1="19.5" x2="15" y2="19.5"/><path d="M10 16h4v3.5h-4z"/></svg></div>
-
-        <div class="node-km">30 000 km</div>
-
-        <div class="node-tooltip">
-
-          <h4>Palier Entreprises — 20 000 km</h4>
-
-          10% de réduction sur vos convoyages pendant 1 an, un mois sur deux.<br>
-
-          Bon de 100 € à utiliser sur vos prochains convoyages.
-
-          <span class="locked-badge"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.15em"><rect x="5" y="11" width="14" height="9" rx="1.2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Mystère</span>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-
-
-  <div style="text-align:center;margin-bottom:56px;color:rgba(255,255,255,0.6);font-size:0.88rem">
-
-
-  </div>
-
-
-
-  <div class="loyalty-bottom">
-
-    <div class="loyalty-card reveal">
-
-      <h3>Programme Clients</h3>
-
-      <p>Rejoignez notre programme de fidélité et débloquez des récompenses à chaque véhicule transporté. Bon d'achats, box surprises, réductions exclusives…</p>
-
-<p style="color:rgba(255,255,255,.5);font-size:.82rem;margin-top:8px;font-style:italic">Les récompenses sont révélées à chaque nouveau palier atteint.</p>
-
-    </div>
-
-    <div class="loyalty-card reveal">
-
-      <h3>Offre Parrainage</h3>
-
-      <p>Parrainez un proche avec HelixCar : dès sa première mission réalisée, profitez de <strong style="color:var(--yellow)">10% de réduction</strong> sur votre prochain convoyage.</p>
-
-
-
-    </div>
-
-  </div>
-
-</section>
-
-
-
-<!-- INFO EXPANDABLE 2 (en savoir plus - récompenses) -->
-
-<div class="expand-target" id="info-rewards">
-
-  <div style="background:var(--white);padding:60px 80px;border-top:3px solid var(--yellow)">
-
-    <div style="max-width:760px;margin:0 auto">
-
-      <div class="section-tag">Récompenses</div>
-
-      <h2 class="section-h2">Fidélité & Challenge mensuel</h2>
-
-      <p style="color:#444;line-height:1.8;margin-bottom:20px">
-
-        Rejoignez notre programme de fidélité et débloquez des récompenses à chaque véhicule transporté avec nos services. Suivez votre progression en temps réel et atteignez de nouveaux paliers pour obtenir des avantages exclusifs (bon d'achat, box surprise, réduction…). Plus vous transportez de véhicules, plus vous gagnez !
-
-      </p>
-
-      <p style="color:#444;line-height:1.8">
-
-        Pour nos convoyeurs, un challenge excitant vous attend : chaque mois, ceux qui auront parcouru le plus de kilomètres se verront attribuer des récompenses allant jusqu'à 150 euros. Parce que chez HelixCar, nous aimons relever des défis et aller toujours plus loin !
-
-      </p>
-
-      <button class="btn btn-dark" style="margin-top:24px" onclick="hideExpand('info-rewards')">Fermer ↑</button>
-
-    </div>
-
-  </div>
-
-</div>
-
-
-
 <!-- CONVOYEURS -->
 
 <section class="convoyeurs" id="convoyeurs">
@@ -5917,60 +5929,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 <!-- TESTIMONIALS -->
 
-<section class="testimonials" id="avis">
-
-  <div class="section-tag reveal">Témoignages</div>
-
-  <h2 class="section-h2 reveal">Ce qu'ils en disent</h2>
-
-  <div class="testimonials-grid">
-
-    <div class="testimonial-card reveal">
-
-      <p class="testimonial-text">Nous avions besoin de conserver plusieurs véhicules quelques semaines. La prise en charge et la restitution ont été très simples.</p>
-
-      <div class="testimonial-author">Antoine A.</div>
-
-      <div class="testimonial-role">Client particulier</div>
-
-    </div>
-
-    <div class="testimonial-card reveal">
-
-      <p class="testimonial-text">Transport impeccable pour mon véhicule. Le suivi était clair du départ à la livraison.</p>
-
-      <div class="testimonial-author">Marie L.</div>
-
-      <div class="testimonial-role">Client particulier</div>
-
-    </div>
-
-    <div class="testimonial-card reveal">
-
-      <p class="testimonial-text">Nous avions un besoin ponctuel sur notre site. HelixCar nous a permis de centraliser la demande simplement.</p>
-
-      <div class="testimonial-author">Sébastien M.</div>
-
-      <div class="testimonial-role">Directeur flotte entreprise</div>
-
-    </div>
-
-    <div class="testimonial-card reveal">
-
-      <p class="testimonial-text">Le véhicule a été préparé avec soin avant sa restitution. Très pratique d'avoir plusieurs services au même endroit.</p>
-
-      <div class="testimonial-author">Karim B.</div>
-
-      <div class="testimonial-role">Client particulier</div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-
+<!-- LOT X01 — la section « Ce qu'ils en disent » (quatre témoignages
+     signés de noms inventés, sans source) est retirée : aucun avis réel
+     n'existe dans le dépôt. Elle reviendra avec des avis authentiques. -->
 <!-- FAQ -->
 
 <section class="faq" id="faq">
@@ -6252,15 +6213,15 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <h4>Services</h4>
 
-      <a href="#">Convoyage standard</a>
+      <a href="#services">Convoyage standard</a>
 
-      <a href="#">Véhicules de luxe</a>
+      <a href="#services">Véhicules de luxe</a>
 
-      <a href="#">Gestion de parc</a>
+      <a href="#services">Gestion de parc</a>
 
-      <a href="#">Stockage</a>
+      <a href="#stockage-automobile">Stockage</a>
 
-      <a href="#">Nettoyage</a>
+      <a href="#services">Nettoyage</a>
 
     </div>
 
@@ -6274,7 +6235,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <a href="#fidelite">Programme fidélité</a>
 
-      <a href="#">Blog</a>
+      <!-- LOT X01 — lien « Blog » retiré : aucune page ne le porte dans le dépôt. -->
 
     </div>
 
@@ -6284,11 +6245,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <a href="mailto:helixcarpro@gmail.com">helixcarpro@gmail.com</a>
 
-      <a href="#">Formulaire contact</a>
+      <a href="#recontact">Formulaire contact</a>
 
-      <a href="#">Mentions légales</a>
+      <span role="link" aria-disabled="true" style="display:block;color:#999">Mentions légales — indisponibles</span>
 
-      <a href="#">Politique de confidentialité</a>
+      <span role="link" aria-disabled="true" style="display:block;color:#999">Politique de confidentialité — indisponible</span>
 
     </div>
 
@@ -6311,9 +6272,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
     <button class="modal-close" onclick="closeModal('client')">✕</button>
 
-      <h2>Devenir client</h2>
+      <h2 id="client-modal-titre">Devenir client</h2>
 
-      <p style="color:#666;font-size:.88rem;margin-bottom:20px">Créez votre compte HelixCar en quelques étapes.</p>
+      <p style="color:#666;font-size:.88rem;margin-bottom:20px" id="client-modal-sous-titre">Créez votre compte HelixCar en quelques étapes.</p>
 
       <div class="step-indicator" id="client-step-indicator">
         <div class="step-indicator-item active" data-step-item="1"><div class="step-indicator-num">01</div></div>
@@ -6450,7 +6411,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <label class="radio-opt"><input type="radio" name="type-service" value="stockage" onclick="onChoixService()"><span>Stockage automobile <button type="button" class="hc-help-btn" data-help="Le stockage peut être associé à une prise en charge et/ou une livraison de votre véhicule par HelixCar." aria-label="Aide sur le stockage automobile">i</button></span></label>
           <label class="radio-opt"><input type="radio" name="type-service" value="convoyage" onclick="onChoixService()"><span>Convoyage automobile</span></label>
           <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService()"><span>Trouver un professionnel automobile</span></label>
-          <label class="radio-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService()"><span>Nettoyage automobile professionnel<span class="hc-opt-desc">Réservé aux entreprises</span></span></label>
+          <!-- LOT F01 (F01-010/011) — option réservée aux entreprises : pour un
+               particulier, le bouton radio est réellement désactivé
+               (nettSyncOptionService) et l'option grisée ; le serveur
+               applique la même interdiction (migration 112). -->
+          <label class="radio-opt" id="type-service-nettoyage-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService()"><span>Nettoyage automobile professionnel<span class="hc-opt-desc" id="type-service-nettoyage-desc">Réservé aux entreprises</span></span></label>
           <label class="radio-opt"><input type="radio" name="type-service" value="compte" onclick="onChoixService()"><span>Je souhaite simplement créer mon compte pour l'instant</span></label>
         </div>
       </div>
@@ -6559,6 +6524,137 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
            Rubriques repliables reprenant STRICTEMENT les classes des
            sous-accordéons véhicules (veh-sous-*), donc le même design,
            les mêmes boutons Effacer / OK et aucune nouvelle icône. -->
+      <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
+        <div class="chrono-section">Période de stockage</div>
+        <div id="info-lieu-stockage" style="background:#fff;border:1px solid rgba(16,24,32,.07);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:.82rem;color:#555;line-height:1.6"></div>
+
+        <!-- Bug 4 (V50.47) — la zone des champs devient repliable : même
+             PRINCIPE que les sous-accordéons véhicules (display togglé
+             par une classe), sans reprendre leurs classes CSS littérales
+             pour ne pas hériter de leur habillage visuel sur un bloc déjà
+             validé graphiquement. -->
+        <div id="bloc-stockage-resume" style="display:none;background:#fff;border:1px solid rgba(16,24,32,.08);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+          <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#9A9EA2;font-weight:700;margin-bottom:4px">Période de stockage estimée</div>
+          <div id="bloc-stockage-resume-dates" style="font-size:.92rem;color:var(--ink);font-weight:600;margin-bottom:12px"></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button type="button" onclick="_hcEffacerPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid rgba(158,63,70,.35);background:#fff;color:var(--accent);cursor:pointer">Effacer</button>
+            <button type="button" onclick="_hcRouvrirPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer">Modifier</button>
+          </div>
+        </div>
+        <div id="bloc-stockage-champs">
+        <div class="modal-row">
+          <div class="modal-form-group">
+            <label>Date de début du stockage <button type="button" class="hc-help-btn" data-help="Date à laquelle le véhicule entre effectivement en stockage." aria-label="Aide sur le début du stockage">i</button> <span class="field-required">*</span></label>
+            <input type="date" id="stock-debut" readonly onchange="revaliderChaineDates()">
+          </div>
+          <div class="modal-form-group">
+            <label>Date de fin prévue <button type="button" class="hc-help-btn" data-help="Date prévue de sortie du véhicule du stockage." aria-label="Aide sur la fin du stockage">i</button> <span class="field-required">*</span></label>
+            <input type="date" id="stock-fin" readonly onchange="revaliderChaineDates()">
+          </div>
+        </div>
+        <!-- V50.3G — les heures d'entrée/sortie stockage ont été déplacées
+             directement sous les questions Acheminement/Sortie qui les
+             rendent pertinentes (cf. plus bas). Elles ne sont plus ici. -->
+        <div id="stock-duree" style="display:none;font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:12px"></div>
+        <div class="modal-form-group">
+          <label>Informations complémentaires <span class="field-optional-hint">(facultatif)</span></label>
+          <textarea id="stock-notes" placeholder="Précisez toute demande particulière liée au stockage…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:64px;resize:vertical;outline:none"></textarea>
+        </div>
+
+        <!-- V50.44 — bouton OK PUREMENT VISUEL (Objectif 5), même style
+             que les autres sous-sections (classe veh-sous-valider déjà
+             existante). AUCUNE logique câblée : voir le rapport. -->
+        <div class="veh-sous-ok" style="justify-content:flex-end;display:flex;margin-bottom:4px">
+          <button type="button" class="veh-sous-effacer" onclick="_hcEffacerPeriodeStockage()">Effacer</button>
+          <button type="button" class="veh-sous-valider" onclick="_hcOkPeriodeStockage()">OK</button>
+        </div>
+        </div>
+
+        <div class="modal-form-group">
+          </div>
+        <div class="chrono-section">Avant le stockage</div>
+        <div class="modal-form-group">
+          <label>Comment les véhicules arrivent-ils chez HelixCar ? <button type="button" class="hc-help-btn" data-help="Indiquez si vous déposez vous-même le ou les véhicules, ou si HelixCar vient les récupérer avant leur stockage." aria-label="Aide sur l’acheminement">i</button> <span class="field-required">*</span></label>
+          <div style="display:flex;flex-direction:column;gap:7px" id="stock-acheminement-group">
+            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="depot_client" onclick="onAcheminementStockage()"><span>Je les dépose moi-même</span></label>
+            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="helixcar" onclick="onAcheminementStockage()"><span>HelixCar vient les récupérer</span></label>
+          </div>
+        </div>
+        <!-- V50.3G — champ déplacé ici : n'apparaît que si le client dépose
+             lui-même (cf. _heureEntreeStockageApplicable(), inchangée). -->
+        <div class="modal-form-group" id="bloc-stock-heure-entree">
+          <label>Heure d'entrée prévue <span class="field-required">*</span></label>
+          <input id="stock-heure-entree" type="time" readonly onchange="_onChangementHeureEntreeStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+        </div>
+
+        <div class="modal-form-group">
+          </div>
+        <div class="chrono-section">Après le stockage</div>
+        <div class="modal-form-group">
+          <label>Que souhaitez-vous après le stockage ? <button type="button" class="hc-help-btn" data-help="Choisissez si vous venez récupérer les véhicules après le stockage ou si HelixCar vous les livre." aria-label="Aide sur la récupération après stockage">i</button> <span class="field-required">*</span></label>
+          <div style="display:flex;flex-direction:column;gap:7px" id="stock-sortie-group">
+            <label class="radio-opt"><input type="radio" name="stock-sortie" value="recuperation_client" onclick="onSortieStockage()"><span>Je viens récupérer les véhicules</span></label>
+            <label class="radio-opt"><input type="radio" name="stock-sortie" value="helixcar" onclick="onSortieStockage()"><span>HelixCar me livre les véhicules</span></label>
+          </div>
+        </div>
+        <!-- V50.3G — champ déplacé ici, libellé mis à jour pour cohérence
+             avec « Je viens récupérer les véhicules ». Id, clé payload et
+             colonne Supabase INCHANGÉS (stock-heure-sortie /
+             stockage_heure_sortie) — seul le texte visible change. N'apparaît
+             que si le client récupère lui-même (cf.
+             _heureSortieStockageApplicable(), inchangée). -->
+        <div class="modal-form-group" id="bloc-stock-heure-sortie">
+          <label>Heure de récupération prévue <span class="field-required">*</span></label>
+          <input id="stock-heure-sortie" type="time" readonly onchange="_verifierHeureRecupStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <!-- Bloc CONVOYAGE : masqué tant que le service ne comprend pas de convoyage -->
+      <!-- Compteur de véhicules : commun aux 3 services -->
+
+
+
+      <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
+        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
+        <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
+        <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
+      </div>
+
+      </div>
+
+      <!-- Questions mission (masquées si pas-maintenant) -->
+<div id="mission-details-group">
+
+      <div class="form-step" data-step="2">
+        <div id="trajet-type-group" style="display:none">
+        <div class="modal-form-group">
+          <label>Type de trajet</label>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label class="radio-opt"><input type="radio" name="trajet-type" value="achat" onclick="toggleTrajetAutre()"><span>Achat de véhicule (garage / particulier)</span></label>
+            <label class="radio-opt"><input type="radio" name="trajet-type" value="vente" onclick="toggleTrajetAutre()"><span>Vente de véhicule</span></label>
+            <label class="radio-opt"><input type="radio" name="trajet-type" value="demenagement" onclick="toggleTrajetAutre()"><span>Déménagement / déplacement personnel</span></label>
+            <label class="radio-opt"><input type="radio" name="trajet-type" value="professionnel" onclick="toggleTrajetAutre()"><span>Transport professionnel (flotte / entreprise)</span></label>
+            <label class="radio-opt"><input type="radio" name="trajet-type" value="autre" onclick="toggleTrajetAutre()"><span>Autre</span></label>
+          </div>
+        </div>
+        <div class="modal-form-group" id="trajet-autre-group" style="display:none">
+          <label>Précisez la raison de votre convoyage <span class="field-required">*</span></label>
+          <input type="text" id="client-trajet-autre" placeholder="Ex : succession, rapatriement, transfert familial, véhicule immobilisé…">
+        </div>
+        </div>
+      </div>
+
+      <div class="form-step" data-step="3">
+
+        <!-- LOT F01 (F01-023..029) — TROUVER UN PROFESSIONNEL : ÉTAPE DÉDIÉE.
+             Les quatre rubriques « Votre besoin », « Lieu d'intervention »,
+             « Période et horaires » et « Mission » vivaient sous la liste des
+             services, à l'étape 2. Elles sont DÉPLACÉES telles quelles dans
+             cette étape 3 : aucun libellé, aucun champ, aucune validation,
+             aucun payload ni brouillon n'est modifié — seul l'emplacement.
+             Le bloc « Prise en charge » ci-dessous est masqué pour ce service
+             (attribut data-service-professionnel sur la modale), jamais
+             supprimé : il réapparaît tel quel pour Convoyage / Stockage. -->
       <div id="bloc-socle-professionnel" style="display:none">
 
         <!-- RUBRIQUE — Votre besoin -->
@@ -6730,7 +6826,14 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
             <div class="modal-form-group">
               <label id="pro-description-label">Décrivez la mission brièvement <span class="field-required">*</span></label>
-              <textarea id="pro-description" rows="3" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+              <!-- LOT F01 (F01-035/036, décision C01) — plafond de saisie :
+                   166 caractères pour « Mission », 156 pour « Type de
+                   mission » (Renfort), espaces et accents compris. Le
+                   le contrôle suit la catégorie (_proMajPlafondDescription),
+                   le compteur reste discret, et le serveur applique la
+                   même limite (migration 112). -->
+              <textarea id="pro-description" rows="3" onbeforeinput="proAvantDescriptionInput(event)" oninput="proOnDescriptionInput()" onpaste="proOnDescriptionColle(event)" aria-describedby="pro-description-compteur" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
+              <div class="hc-compteur" id="pro-description-compteur" aria-live="polite">0 / 166 caractères</div>
             </div>
 
             <div class="modal-form-group">
@@ -6749,128 +6852,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
 
       </div>
-
-      <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
-        <div class="chrono-section">Période de stockage</div>
-        <div id="info-lieu-stockage" style="background:#fff;border:1px solid rgba(16,24,32,.07);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:.82rem;color:#555;line-height:1.6"></div>
-
-        <!-- Bug 4 (V50.47) — la zone des champs devient repliable : même
-             PRINCIPE que les sous-accordéons véhicules (display togglé
-             par une classe), sans reprendre leurs classes CSS littérales
-             pour ne pas hériter de leur habillage visuel sur un bloc déjà
-             validé graphiquement. -->
-        <div id="bloc-stockage-resume" style="display:none;background:#fff;border:1px solid rgba(16,24,32,.08);border-radius:10px;padding:14px 16px;margin-bottom:16px">
-          <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#9A9EA2;font-weight:700;margin-bottom:4px">Période de stockage estimée</div>
-          <div id="bloc-stockage-resume-dates" style="font-size:.92rem;color:var(--ink);font-weight:600;margin-bottom:12px"></div>
-          <div style="display:flex;justify-content:flex-end;gap:8px">
-            <button type="button" onclick="_hcEffacerPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid rgba(158,63,70,.35);background:#fff;color:var(--accent);cursor:pointer">Effacer</button>
-            <button type="button" onclick="_hcRouvrirPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer">Modifier</button>
-          </div>
-        </div>
-        <div id="bloc-stockage-champs">
-        <div class="modal-row">
-          <div class="modal-form-group">
-            <label>Date de début du stockage <button type="button" class="hc-help-btn" data-help="Date à laquelle le véhicule entre effectivement en stockage." aria-label="Aide sur le début du stockage">i</button> <span class="field-required">*</span></label>
-            <input type="date" id="stock-debut" readonly onchange="revaliderChaineDates()">
-          </div>
-          <div class="modal-form-group">
-            <label>Date de fin prévue <button type="button" class="hc-help-btn" data-help="Date prévue de sortie du véhicule du stockage." aria-label="Aide sur la fin du stockage">i</button> <span class="field-required">*</span></label>
-            <input type="date" id="stock-fin" readonly onchange="revaliderChaineDates()">
-          </div>
-        </div>
-        <!-- V50.3G — les heures d'entrée/sortie stockage ont été déplacées
-             directement sous les questions Acheminement/Sortie qui les
-             rendent pertinentes (cf. plus bas). Elles ne sont plus ici. -->
-        <div id="stock-duree" style="display:none;font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:12px"></div>
-        <div class="modal-form-group">
-          <label>Informations complémentaires <span class="field-optional-hint">(facultatif)</span></label>
-          <textarea id="stock-notes" placeholder="Précisez toute demande particulière liée au stockage…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:64px;resize:vertical;outline:none"></textarea>
-        </div>
-
-        <!-- V50.44 — bouton OK PUREMENT VISUEL (Objectif 5), même style
-             que les autres sous-sections (classe veh-sous-valider déjà
-             existante). AUCUNE logique câblée : voir le rapport. -->
-        <div class="veh-sous-ok" style="justify-content:flex-end;display:flex;margin-bottom:4px">
-          <button type="button" class="veh-sous-effacer" onclick="_hcEffacerPeriodeStockage()">Effacer</button>
-          <button type="button" class="veh-sous-valider" onclick="_hcOkPeriodeStockage()">OK</button>
-        </div>
-        </div>
-
-        <div class="modal-form-group">
-          </div>
-        <div class="chrono-section">Avant le stockage</div>
-        <div class="modal-form-group">
-          <label>Comment les véhicules arrivent-ils chez HelixCar ? <button type="button" class="hc-help-btn" data-help="Indiquez si vous déposez vous-même le ou les véhicules, ou si HelixCar vient les récupérer avant leur stockage." aria-label="Aide sur l’acheminement">i</button> <span class="field-required">*</span></label>
-          <div style="display:flex;flex-direction:column;gap:7px" id="stock-acheminement-group">
-            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="depot_client" onclick="onAcheminementStockage()"><span>Je les dépose moi-même</span></label>
-            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="helixcar" onclick="onAcheminementStockage()"><span>HelixCar vient les récupérer</span></label>
-          </div>
-        </div>
-        <!-- V50.3G — champ déplacé ici : n'apparaît que si le client dépose
-             lui-même (cf. _heureEntreeStockageApplicable(), inchangée). -->
-        <div class="modal-form-group" id="bloc-stock-heure-entree">
-          <label>Heure d'entrée prévue <span class="field-required">*</span></label>
-          <input id="stock-heure-entree" type="time" readonly onchange="_onChangementHeureEntreeStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-        </div>
-
-        <div class="modal-form-group">
-          </div>
-        <div class="chrono-section">Après le stockage</div>
-        <div class="modal-form-group">
-          <label>Que souhaitez-vous après le stockage ? <button type="button" class="hc-help-btn" data-help="Choisissez si vous venez récupérer les véhicules après le stockage ou si HelixCar vous les livre." aria-label="Aide sur la récupération après stockage">i</button> <span class="field-required">*</span></label>
-          <div style="display:flex;flex-direction:column;gap:7px" id="stock-sortie-group">
-            <label class="radio-opt"><input type="radio" name="stock-sortie" value="recuperation_client" onclick="onSortieStockage()"><span>Je viens récupérer les véhicules</span></label>
-            <label class="radio-opt"><input type="radio" name="stock-sortie" value="helixcar" onclick="onSortieStockage()"><span>HelixCar me livre les véhicules</span></label>
-          </div>
-        </div>
-        <!-- V50.3G — champ déplacé ici, libellé mis à jour pour cohérence
-             avec « Je viens récupérer les véhicules ». Id, clé payload et
-             colonne Supabase INCHANGÉS (stock-heure-sortie /
-             stockage_heure_sortie) — seul le texte visible change. N'apparaît
-             que si le client récupère lui-même (cf.
-             _heureSortieStockageApplicable(), inchangée). -->
-        <div class="modal-form-group" id="bloc-stock-heure-sortie">
-          <label>Heure de récupération prévue <span class="field-required">*</span></label>
-          <input id="stock-heure-sortie" type="time" readonly onchange="_verifierHeureRecupStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
-        </div>
-      </div>
-
-      <!-- Bloc CONVOYAGE : masqué tant que le service ne comprend pas de convoyage -->
-      <!-- Compteur de véhicules : commun aux 3 services -->
-
-
-
-      <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
-        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
-        <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
-        <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
-      </div>
-
-      </div>
-
-      <!-- Questions mission (masquées si pas-maintenant) -->
-<div id="mission-details-group">
-
-      <div class="form-step" data-step="2">
-        <div id="trajet-type-group" style="display:none">
-        <div class="modal-form-group">
-          <label>Type de trajet</label>
-          <div style="display:flex;flex-direction:column;gap:7px">
-            <label class="radio-opt"><input type="radio" name="trajet-type" value="achat" onclick="toggleTrajetAutre()"><span>Achat de véhicule (garage / particulier)</span></label>
-            <label class="radio-opt"><input type="radio" name="trajet-type" value="vente" onclick="toggleTrajetAutre()"><span>Vente de véhicule</span></label>
-            <label class="radio-opt"><input type="radio" name="trajet-type" value="demenagement" onclick="toggleTrajetAutre()"><span>Déménagement / déplacement personnel</span></label>
-            <label class="radio-opt"><input type="radio" name="trajet-type" value="professionnel" onclick="toggleTrajetAutre()"><span>Transport professionnel (flotte / entreprise)</span></label>
-            <label class="radio-opt"><input type="radio" name="trajet-type" value="autre" onclick="toggleTrajetAutre()"><span>Autre</span></label>
-          </div>
-        </div>
-        <div class="modal-form-group" id="trajet-autre-group" style="display:none">
-          <label>Précisez la raison de votre convoyage <span class="field-required">*</span></label>
-          <input type="text" id="client-trajet-autre" placeholder="Ex : succession, rapatriement, transfert familial, véhicule immobilisé…">
-        </div>
-        </div>
-      </div>
-
-      <div class="form-step" data-step="3">
 
         <!-- SECTION LIVRAISON -->
         <div style="border-top:2px solid #f0f0f0;margin:18px 0 14px;padding-top:4px">
@@ -6980,7 +6961,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
           <div id="nett-contact-sp-moi" style="display:none">
             <div id="nett-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
-            <div id="nett-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+            <!-- LOT F01 (F01-030) — composant HelixCar discret (.hc-note) à la
+                 place de l'encadré orange : fond inchangé, filet vertical. -->
+            <div id="nett-contact-sp-moi-manque" class="hc-note hc-note--info" role="status" style="display:none;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
           </div>
 
           <div id="nett-contact-sp-autre" style="display:none">
@@ -7336,7 +7319,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       </div>
 
-      <div id="client-socle-msg" style="display:none;width:100%;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.8rem;color:#8a5a2e;line-height:1.5">
+      <!-- LOT F01 (F01-030) — même composant discret que le reste du
+           formulaire ; ce message n'est plus jamais affiché (parcours
+           tous construits), il garde son identifiant pour la reprise. -->
+      <div id="client-socle-msg" class="hc-note hc-note--info" role="status" style="display:none;width:100%;margin-bottom:10px">
         Ce parcours est en cours de préparation chez HelixCar et n'est pas encore disponible à la soumission. Vous pouvez déjà le sélectionner ; nous vous préviendrons dès qu'il sera activé.
       </div>
       <div class="form-step-nav" id="client-step-nav">
@@ -7625,6 +7611,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <button type="button" id="completer-envoyer" class="btn btn-primary"
             style="width:100%;justify-content:center;font-size:.92rem"
             onclick="envoyerInformationsCompletees()">Enregistrer mes informations</button>
+    <button type="button" id="completer-retour" class="btn"
+            style="width:100%;justify-content:center;font-size:.92rem;margin-top:10px"
+            onclick="_hcFermerCompletion()">← Retour à mes informations</button>
   </div>
 </div>
 
@@ -7955,6 +7944,10 @@ function _renderFormStep(type) {
   if (type === 'client' && typeof _clientLibererBoutonContinuer === 'function') {
     _clientLibererBoutonContinuer();
     if (typeof _clientPurgerBranchesInactives === 'function') _clientPurgerBranchesInactives();
+    // LOT F01 (F01-010) — l'option de service réservée aux entreprises
+    // est resynchronisée à chaque rendu : réinitialisation, reprise de
+    // brouillon et espace client intégré passent tous par ici.
+    if (typeof nettSyncOptionService === 'function') nettSyncOptionService();
   }
 
   container.querySelectorAll('.form-step').forEach(function(el) {
@@ -8221,6 +8214,40 @@ function _nettConditions() {
     eau_electricite: !!(document.getElementById('nett-elig-eau-elec') || {}).checked
   };
 }
+// LOT F01 (F01-010/011) — L'OPTION DE SERVICE ELLE-MEME EST RESERVEE.
+// Un particulier voit « Nettoyage automobile professionnel » grisé,
+// avec « Réservé aux entreprises », et ne peut pas le cocher : le bouton
+// radio est reellement desactive (souris, clavier, tactile). Si le
+// statut redevient « Particulier » alors que ce service etait choisi,
+// le choix est retire et la progression revient a l'etape du service :
+// aucune demande de nettoyage ne peut plus partir d'un particulier —
+// et le serveur applique la meme regle (migration 112).
+// Appelee a chaque changement de type de client, a chaque rendu
+// d'etape (reinitialisation, brouillon, espace client integre) : une
+// seule source de verite, #client-type.
+function nettSyncOptionService() {
+  var opt = document.querySelector('#modal-client input[name="type-service"][value="nettoyage"]');
+  if (!opt) return;
+  var pro = _nettEstProfessionnel();
+  opt.disabled = !pro;
+  opt.setAttribute('aria-disabled', pro ? 'false' : 'true');
+  var lab = opt.closest('label');
+  if (lab) {
+    lab.classList.toggle('hc-opt-reservee', !pro);
+    lab.setAttribute('aria-disabled', pro ? 'false' : 'true');
+    if (!pro) lab.setAttribute('title', 'Réservé aux entreprises'); else lab.removeAttribute('title');
+  }
+  if (!pro && opt.checked) {
+    opt.checked = false;
+    lab && lab.classList.remove('selected');
+    // Plus aucun service choisi : les etapes au-dela du choix du service
+    // ne sont plus atteintes, et l'etape courante y revient.
+    _etapeMax = Math.min(_etapeMax, 2);
+    if (_formStepState.client > 2) _formStepState.client = 2;
+    if (typeof onChoixService === 'function') onChoixService();
+  }
+}
+
 // Resynchronise l'affichage du statut pro. Appele quand #client-type
 // change (etape 1) et a chaque recalcul d'eligibilite.
 function nettSyncStatutPro() {
@@ -9043,11 +9070,52 @@ async function _hcDemarrerDepuisEspaceClient() {
     if (typeof _renderFormStep === 'function') _renderFormStep('client');
     return true;
   }
+  // LOT D01 — l'identité est connue : l'étape 1 n'existe plus pour ce
+  // parcours (pastille retirée, retour impossible en dessous de l'étape 2).
+  document.body.classList.add('hc-sans-identite');
   _formStepState.client = 2;
   if (typeof _etapeMax !== 'undefined') _etapeMax = Math.max(_etapeMax || 1, 2);
   if (typeof _renderFormStep === 'function') _renderFormStep('client');
   return true;
 }
+
+// LOT D01 — sans identité à redemander (D01-005..009). Ces enveloppes
+// n'altèrent aucune règle du formulaire : elles retirent la pastille
+// d'identité de l'étapeur, empêchent d'y revenir, et renumérotent les
+// intitulés « Aller à l'étape N » sur le rang réellement visible.
+(function () {
+  var rendreOrig = _renderFormStep;
+  _renderFormStep = function (type) {
+    rendreOrig(type);
+    if (type !== 'client' || !document.body.classList.contains('hc-sans-identite')) return;
+    var item1 = document.querySelector('#client-step-indicator .step-indicator-item[data-step-item="1"]');
+    if (item1) {
+      item1.classList.add('hc-step-hidden');
+      item1.classList.remove('done', 'active', 'atteinte');
+      item1.dataset.cliquable = '0';
+      item1.style.cursor = '';
+      item1.removeAttribute('title');
+    }
+    var nav = document.getElementById('client-step-nav');
+    if (nav) nav.classList.toggle('step-first', _formStepState.client <= 2);
+    var rang = 0;
+    document.querySelectorAll('#client-step-indicator .step-indicator-item').forEach(function (el) {
+      if (el.classList.contains('hc-step-hidden') || el.classList.contains('inapplicable')) return;
+      rang++;
+      if (el.dataset.cliquable === '1') el.setAttribute('title', 'Aller à l\'étape ' + rang);
+    });
+  };
+  var precedentOrig = clientStepPrev;
+  clientStepPrev = function () {
+    if (document.body.classList.contains('hc-sans-identite') && _formStepState.client <= 2) return;
+    precedentOrig();
+  };
+  var peutOrig = _peutNaviguerVersEtape;
+  _peutNaviguerVersEtape = function (n) {
+    if (n === 1 && document.body.classList.contains('hc-sans-identite')) return false;
+    return peutOrig(n);
+  };
+})();
 
 // ============================================================
 // COMPLÉTER MES INFORMATIONS
@@ -9062,6 +9130,7 @@ async function _hcDemarrerDepuisEspaceClient() {
 var _completerDemandeId = null;
 var _completerRubriques = [];
 var _completerEnvoiEnCours = false;
+var _completerGeneration = 0;
 
 function _completerAfficherMessage(texte, type) {
   // LOT E1 — plus de fond vert ni de fond rouge : le meme composant
@@ -9074,6 +9143,35 @@ function _completerChampId(cle) { return 'completer-champ-' + cle; }
 // Rend UNIQUEMENT les rubriques encore manquantes ou à corriger, avec
 // les mêmes composants que le formulaire (.modal-form-group, label,
 // champ). Une rubrique validée n'apparaît jamais.
+// LOT D01 — regroupement par véhicule (D01-012/013) et états « Complet »
+// (D01-016). Les clés vehicule_<n>_… viennent du serveur (migration 101) ;
+// l'identité disponible (marque/modèle, immatriculation) titre le groupe.
+function _completerGrouper(lignes) {
+  var groupes = {}, ordre = [];
+  lignes.forEach(function (l) {
+    var m = /^vehicule_(\d+)_/.exec(l.cle || '');
+    var cle = m ? 'vehicule_' + m[1] : 'general';
+    if (!groupes[cle]) {
+      groupes[cle] = { cle: cle, rang: m ? Number(m[1]) : 0, titre: m ? 'Véhicule ' + m[1] : 'Informations générales', lignes: [], identite: '' };
+      ordre.push(cle);
+    }
+    groupes[cle].lignes.push(l);
+    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && !groupes[cle].identite) groupes[cle].identite = l.valeur;
+  });
+  return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
+}
+function _completerEstRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+function _completerLibelle(l) {
+  var base = String(l.libelle || l.cle || '');
+  var vehicule = /^vehicule_(\d+)_/.exec(l.cle || '');
+  if (vehicule && !/^Véhicule \d+/.test(base)) base = 'Véhicule ' + vehicule[1] + ' — ' + base;
+  return l.statut === 'a_corriger' ? base + ' — à corriger' : base + ' manquante';
+}
+
+// Rend les rubriques par groupe : seules les manquantes ou à corriger
+// ont un champ, avec les mêmes composants que le formulaire
+// (.modal-form-group, label, champ). Une rubrique validée n'apparaît
+// jamais comme champ ; son groupe la compte comme renseignée.
 function _completerRendre(lignes) {
   var zone = document.getElementById('completer-rubriques');
   var prog = document.getElementById('completer-progression');
@@ -9081,22 +9179,18 @@ function _completerRendre(lignes) {
   zone.innerHTML = '';
 
   var total = lignes.length;
-  var fournies = lignes.filter(function (l) {
-    return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
-  }).length;
+  var fournies = lignes.filter(function (l) { return !_completerEstRestante(l); }).length;
   if (prog) {
     prog.style.display = 'block';
     prog.textContent = fournies + ' information' + (fournies > 1 ? 's' : '')
       + ' sur ' + total + ' déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.';
   }
 
-  var aCompleter = lignes.filter(function (l) {
-    return l.statut === 'attendue' || l.statut === 'a_corriger';
-  });
+  var aCompleter = lignes.filter(_completerEstRestante);
   _completerRubriques = aCompleter;
 
   if (!aCompleter.length) {
-    zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563">'
+    zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563" id="completer-complet">'
       + 'Aucune information ne manque pour cette demande. Merci !</p>';
     var b = document.getElementById('completer-envoyer');
     if (b) b.style.display = 'none';
@@ -9105,49 +9199,97 @@ function _completerRendre(lignes) {
   var bouton = document.getElementById('completer-envoyer');
   if (bouton) bouton.style.display = '';
 
-  aCompleter.forEach(function (l) {
-    var groupe = document.createElement('div');
-    groupe.className = 'modal-form-group';
-
-    var label = document.createElement('label');
-    label.textContent = l.libelle;
-    var etoile = document.createElement('span');
-    etoile.className = 'field-required';
-    etoile.textContent = '*';
-    label.appendChild(document.createTextNode(' '));
-    label.appendChild(etoile);
-    groupe.appendChild(label);
-
-    // Motif de correction : ce que l'administrateur demande de
-    // corriger. Aucun commentaire interne n'existe dans ce modèle, il
-    // ne peut donc pas en fuir.
-    if (l.statut === 'a_corriger' && l.commentaire) {
-      var motif = document.createElement('div');
-      motif.style.cssText = 'background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:2px;'
-        + 'padding:8px 10px;margin-bottom:8px;font-size:.78rem;color:#92400E';
-      motif.textContent = 'À corriger : ' + l.commentaire;
-      groupe.appendChild(motif);
+  var groupes = _completerGrouper(lignes);
+  groupes.forEach(function (g) {
+    var restantes = g.lignes.filter(_completerEstRestante);
+    {
+      var entete = document.createElement('div');
+      entete.className = 'completer-groupe';
+      entete.setAttribute('data-groupe', g.cle);
+      var titre = document.createElement('strong');
+      titre.textContent = g.titre + (g.identite ? ' · ' + g.identite : '');
+      var etat = document.createElement('span');
+      etat.className = 'completer-etat' + (restantes.length ? '' : ' completer-etat--complet');
+      etat.textContent = restantes.length ? restantes.length + ' à compléter' : 'Complet';
+      entete.appendChild(titre); entete.appendChild(etat);
+      zone.appendChild(entete);
     }
+    var connues = g.lignes.filter(function (l) { return !_completerEstRestante(l); });
+    if (connues.length) {
+      var recap = document.createElement('p');
+      recap.style.cssText = 'font-size:.82rem;color:#555;overflow-wrap:anywhere';
+      recap.textContent = connues.map(function (l) { return String(l.libelle || l.cle) + (l.valeur ? ' : ' + l.valeur : ' — renseigné'); }).join(' · ');
+      zone.appendChild(recap);
+    }
+    restantes.forEach(function (l) {
+      var groupe = document.createElement('div');
+      groupe.className = 'modal-form-group';
+      groupe.setAttribute('data-cle', l.cle);
 
-    var champ = document.createElement('input');
-    champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
-               : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
-    champ.id = _completerChampId(l.cle);
-    champ.value = l.valeur || '';
-    groupe.appendChild(champ);
+      var label = document.createElement('label');
+      label.htmlFor = _completerChampId(l.cle);
+      label.textContent = _completerLibelle(l);
+      var etoile = document.createElement('span');
+      etoile.className = 'field-required';
+      etoile.textContent = '*';
+      label.appendChild(document.createTextNode(' '));
+      label.appendChild(etoile);
+      groupe.appendChild(label);
 
-    zone.appendChild(groupe);
+      if (l.statut === 'a_corriger' && l.commentaire) {
+        var motif = document.createElement('div');
+        motif.style.cssText = 'background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:2px;'
+          + 'padding:8px 10px;margin-bottom:8px;font-size:.78rem;color:#92400E';
+        motif.textContent = 'À corriger : ' + l.commentaire;
+        groupe.appendChild(motif);
+      }
+
+      var champ = document.createElement('input');
+      champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
+                 : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
+      champ.id = _completerChampId(l.cle);
+      champ.value = l.valeur || '';
+      groupe.appendChild(champ);
+      zone.appendChild(groupe);
+    });
+    if (restantes.length) {
+      var enregistrer = document.createElement('button');
+      enregistrer.type = 'button';
+      enregistrer.className = 'btn';
+      enregistrer.style.cssText = 'margin:4px 0 12px;min-height:44px';
+      enregistrer.setAttribute('data-enregistrer-groupe', g.cle);
+      enregistrer.textContent = 'Enregistrer — ' + g.titre;
+      enregistrer.addEventListener('click', function () { envoyerInformationsCompletees(g.cle); });
+      zone.appendChild(enregistrer);
+    }
   });
 }
 
+// Fermeture : dans l'espace client, on prévient le cadre parent ; sur
+// le site, on ferme simplement la fenêtre.
+function _hcFermerCompletion() {
+  if (_hcModeIntegre()) {
+    try { window.parent.postMessage({ type: 'hc-completion-fermee' }, window.location.origin); } catch (e) {}
+    return;
+  }
+  if (typeof closeModal === 'function') closeModal('completer');
+}
+
 async function ouvrirCompleterInformations(demandeId) {
+  var generation = ++_completerGeneration;
   _completerDemandeId = demandeId;
+  _completerRubriques = [];
+  var envoyer = document.getElementById('completer-envoyer');
+  if (envoyer) envoyer.style.display = 'none';
+  var contexte = document.getElementById('completer-sous-titre');
+  if (contexte) contexte.textContent = 'Dossier ' + demandeId + ' — complétez uniquement les informations demandées.';
   _completerAfficherMessage('');
   if (typeof openModal === 'function') openModal('completer');
   var zone = document.getElementById('completer-rubriques');
   if (zone) zone.innerHTML = '<p style="font-size:.85rem;color:#6B7280">Chargement…</p>';
 
   await _hcChargerSessionClient();
+  if (generation !== _completerGeneration) return;
   if (!_hcSessionClient) {
     _completerAfficherMessage('Votre session a expiré. Reconnectez-vous pour compléter vos informations.');
     if (zone) zone.innerHTML = '';
@@ -9155,30 +9297,39 @@ async function ouvrirCompleterInformations(demandeId) {
   }
   try {
     var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
+    if (generation !== _completerGeneration) return;
     if (r && r.error) throw new Error(r.error.message);
     _completerRendre((r && r.data) || []);
   } catch (e) {
+    if (generation !== _completerGeneration) return;
     if (zone) zone.innerHTML = '';
     _completerAfficherMessage('Impossible de charger vos informations pour le moment. Réessayez.');
   }
 }
 
-async function envoyerInformationsCompletees() {
+async function envoyerInformationsCompletees(groupeCle) {
   // Double clic : le second appel est ignoré tant que le premier n'a
   // pas répondu. Rien n'est envoyé deux fois.
   if (_completerEnvoiEnCours) return;
   if (!_completerDemandeId) return;
+  var demandeId = _completerDemandeId, generation = _completerGeneration;
 
+  // LOT D01 — enregistrement PROGRESSIF (D01-016) : ce qui est saisi
+  // part maintenant, le reste peut attendre. Le serveur ignore les
+  // rubriques absentes et n'écrase jamais une rubrique validée.
   var reponses = {};
-  var manquant = null;
+  var nbSaisies = 0;
   _completerRubriques.forEach(function (l) {
+    var m = /^vehicule_(\d+)_/.exec(l.cle || '');
+    if (groupeCle && groupeCle !== (m ? 'vehicule_' + m[1] : 'general')) return;
     var el = document.getElementById(_completerChampId(l.cle));
     var v = el ? String(el.value || '').trim() : '';
-    if (!v) { if (!manquant) manquant = l.libelle; return; }
+    if (!v) return;
     reponses[l.cle] = v;
+    nbSaisies++;
   });
-  if (manquant) {
-    _completerAfficherMessage('Renseignez « ' + manquant +' » avant d\'enregistrer.');
+  if (!nbSaisies) {
+    _completerAfficherMessage('Renseignez au moins une information avant d\'enregistrer.');
     return;
   }
 
@@ -9186,26 +9337,57 @@ async function envoyerInformationsCompletees() {
   var bouton = document.getElementById('completer-envoyer');
   var libelleBouton = bouton ? bouton.textContent : '';
   if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
+  var boutonsGroupes = document.querySelectorAll('[data-enregistrer-groupe]');
+  boutonsGroupes.forEach(function (b) { b.disabled = true; });
+  // Les autres fiches restent éditables pendant cette requête. Seuls
+  // les champs envoyés sont figés pour ne pas masquer une modification.
+  Object.keys(reponses).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.disabled = true; });
   _completerAfficherMessage('');
 
   try {
     var r = await _sb.rpc('repondre_informations_demande', {
-      p_client_id: _completerDemandeId,
+      p_client_id: demandeId,
       p_reponses: reponses
     });
+    if (generation !== _completerGeneration) return;
     if (r && r.error) throw new Error(r.error.message);
-    _completerAfficherMessage('Vos informations ont bien été enregistrées.', 'ok');
+    if (!r || typeof r.data !== 'number' || r.data < 1) {
+      _completerAfficherMessage('Aucune nouvelle information enregistrée. Rechargez ce dossier pour vérifier son état avant de réessayer.');
+      return;
+    }
     // On relit l'état RÉEL depuis le serveur : après un F5 ou une
     // reprise, l'écran montre toujours ce que la base contient.
-    var relu = await _sb.rpc('informations_demande', { p_client_id: _completerDemandeId });
-    if (relu && !relu.error) _completerRendre(relu.data || []);
+    var relu = await _sb.rpc('informations_demande', { p_client_id: demandeId });
+    if (generation !== _completerGeneration) return;
+    var lignesRelues = (relu && !relu.error) ? (relu.data || []) : null;
+    if (!lignesRelues) {
+      _completerAfficherMessage('Le serveur a reçu votre enregistrement, mais son état ne peut pas être relu. Vos saisies sont conservées ; vérifiez le dossier avant de renvoyer.');
+      return;
+    }
+    var nonEnvoyees = {};
+    _completerRubriques.forEach(function (l) {
+      var el = document.getElementById(_completerChampId(l.cle));
+      if (el && !Object.prototype.hasOwnProperty.call(reponses, l.cle)) nonEnvoyees[l.cle] = el.value;
+    });
+    _completerRendre(lignesRelues);
+    Object.keys(nonEnvoyees).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.value = nonEnvoyees[cle]; });
+    var restantes = lignesRelues ? lignesRelues.filter(_completerEstRestante).length : null;
+    _completerAfficherMessage('Vos informations ont bien été enregistrées.'
+      + (restantes ? ' Il reste ' + restantes + ' information' + (restantes > 1 ? 's' : '') + ' à renseigner : maintenant ou plus tard, rien n\'est perdu.' : ''), 'ok');
+    // L'espace client relit son onglet depuis le serveur, jamais depuis ce message.
+    if (_hcModeIntegre()) {
+      try { window.parent.postMessage({ type: 'hc-completion-enregistree' }, window.location.origin); } catch (e) {}
+    }
   } catch (e) {
+    if (generation !== _completerGeneration) return;
     // Coupure réseau ou refus : rien n'est perdu, les valeurs saisies
     // restent à l'écran et l'envoi peut être relancé.
     _completerAfficherMessage('L\'enregistrement n\'a pas abouti. Vos saisies sont conservées : réessayez.');
   } finally {
     _completerEnvoiEnCours = false;
     if (bouton) { bouton.disabled = false; bouton.textContent = libelleBouton || 'Enregistrer mes informations'; }
+    boutonsGroupes.forEach(function (b) { b.disabled = false; });
+    if (generation === _completerGeneration) Object.keys(reponses).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.disabled = false; });
   }
 }
 
@@ -9214,6 +9396,9 @@ async function _hcOuvrirCompletionDepuisUrl() {
   var params = new URLSearchParams(window.location.search || '');
   var id = params.get('completer');
   if (!id) return false;
+  // LOT D01 — dans l'espace client (cadre intégré), la vitrine s'efface
+  // et l'écran de complétion occupe le bloc.
+  _hcActiverModeIntegre();
   await ouvrirCompleterInformations(id);
   return true;
 }
@@ -9225,7 +9410,35 @@ document.addEventListener('DOMContentLoaded', function () {
     _hcDemarrerDepuisEspaceClient().catch(function () {});
     _hcOuvrirCompletionDepuisUrl().catch(function () {});
   } catch (e) {}
+  try { _hcOuvrirConnexionDepuisHash(); } catch (e) {}
 });
+
+// Lot A01 — le Dashboard ne porte plus de formulaire de connexion : il
+// renvoie ici avec #connexion, éventuellement suivi d'un motif
+// (deconnecte, mdp-modifie, mdp-inchange). La fenêtre « Connexion »
+// s'ouvre, la phrase correspondante s'affiche, et le fragment est
+// retiré de la barre d'adresse : un rechargement ne rejoue rien.
+var HC_MOTIFS_CONNEXION = {
+  'deconnecte':   ['Vous êtes bien déconnecté.', 'info'],
+  'mdp-modifie':  ['Votre mot de passe a bien été modifié. Connectez-vous avec ce nouveau mot de passe.', 'succes'],
+  'mdp-inchange': ['Votre mot de passe n\'a pas été modifié. Pour recevoir un nouveau lien, utilisez « Mot de passe oublié ? ».', 'info']
+};
+function _hcOuvrirConnexionDepuisHash() {
+  var h = '';
+  try { h = (window.location.hash || '').replace(/^#/, ''); } catch (e) { return false; }
+  if (!/^connexion(=|$)/.test(h)) return false;
+  var motif = '';
+  try { motif = decodeURIComponent(h.split('=').slice(1).join('=')); } catch (e) { motif = ''; }
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) {}
+  openModal('connexion');
+  var phrase = HC_MOTIFS_CONNEXION[motif];
+  if (phrase) _hcNote('connexion-message', phrase[0], phrase[1]);
+  return true;
+}
 
 
 function _hcCompteIdentite() {
@@ -9594,9 +9807,11 @@ function _nettLibelleCategorie(v) {
 // ══════════════════════════════════════════════════════════════
 // TROUVER UN PROFESSIONNEL AUTOMOBILE
 // ══════════════════════════════════════════════════════════════
-// Parcours porte par l'ETAPE 2 existante : aucune nouvelle etape
-// globale, "Continuer" mene directement au recapitulatif habituel
-// (cf. _estEtapeApplicable, qui rend l'etape 4 inapplicable ici).
+// LOT F01 — l'etape 2 ne porte que le choix du service ; les quatre
+// rubriques metier vivent dans l'ETAPE 3 (bloc #bloc-socle-professionnel,
+// deplace tel quel). "Continuer" depuis l'etape 3 mene directement au
+// recapitulatif habituel (cf. _estEtapeApplicable, qui rend l'etape 4
+// inapplicable ici).
 // Toutes les donnees metier vivent dans professionnel_details, sur le
 // meme modele que nettoyage_details : liste blanche stricte, aucun
 // champ Convoyage/Stockage ne peut s'y glisser.
@@ -9659,8 +9874,75 @@ function _proDateDebut() { return ((document.getElementById('pro-date-debut') ||
 function _proDateFin() { return ((document.getElementById('pro-date-fin') || {}).value || '').trim(); }
 function _proHeureDebut() { return ((document.getElementById('pro-horaire-cdeb') || {}).value || '').trim(); }
 function _proHeureFin() { return ((document.getElementById('pro-horaire-cfin') || {}).value || '').trim(); }
-function _proDescription() { return ((document.getElementById('pro-description') || {}).value || '').trim(); }
+function _proDescription() { return (document.getElementById('pro-description') || {}).value || ''; }
 function _proInfos() { return ((document.getElementById('pro-infos') || {}).value || '').trim(); }
+
+// ── LOT F01 (F01-035/036, décision C01) — PLAFONDS DE SAISIE ─────────
+// « Mission » (Technicien) : 166 caractères ; « Type de mission »
+// (Renfort) : 156 caractères. Espaces, virgules et accents comptent
+// pour un caractère chacun : comptage en points de code Unicode, comme
+// char_length() côté serveur (migration 112), et NON en unités UTF-16.
+// Le maxlength natif compterait notamment les emojis deux fois. Les deux
+// chaînes de référence font EXACTEMENT 166 et 156 caractères.
+var PRO_PLAFOND_DESCRIPTION = { mission: 166, type_mission: 156 };
+function _proPlafondDescription() {
+  return (_proCategorie() === 'renfort') ? PRO_PLAFOND_DESCRIPTION.type_mission
+                                          : PRO_PLAFOND_DESCRIPTION.mission;
+}
+// Longueur RÉELLE du texte saisi (sans le trim : les espaces comptent).
+function _proLongueurDescription() {
+  return Array.from((document.getElementById('pro-description') || {}).value || '').length;
+}
+function _proDescriptionTropLongue() {
+  return _proLongueurDescription() > _proPlafondDescription();
+}
+function _proMessagePlafond() {
+  var max = _proPlafondDescription(), n = _proLongueurDescription();
+  return 'Limite de ' + max + ' caractères, espaces et accents compris (' + n + ' saisis) : raccourcissez le texte.';
+}
+// Le contrôle et le compteur suivent la catégorie choisie. Un texte
+// restauré d'un brouillon n'est JAMAIS tronqué : le compteur passe en
+// rouge et la validation refuse la soumission tant qu'il dépasse.
+function _proMajPlafondDescription() {
+  var el = document.getElementById('pro-description');
+  if (!el) return;
+  var max = _proPlafondDescription();
+  el.removeAttribute('maxlength');
+  el.setAttribute('data-max-caracteres', String(max));
+  var cpt = document.getElementById('pro-description-compteur');
+  if (cpt) {
+    var n = _proLongueurDescription();
+    cpt.textContent = n + ' / ' + max + ' caractères';
+    cpt.classList.toggle('hc-compteur--depasse', n > max);
+  }
+}
+function proOnDescriptionInput() {
+  _proMajPlafondDescription();
+  if (!_proDescriptionTropLongue()) _clearFieldError('pro-description');
+  else _showFieldError('pro-description', _proMessagePlafond());
+  _proMajBoutonContinuer();
+}
+// Refuser l'insertion entière au-delà du plafond, sans tronquer le
+// texte existant ni un brouillon restauré. Les sélections restent en
+// indices UTF-16, alors que le résultat est compté en points de code.
+function _proAutoriserInsertionDescription(e, texte) {
+  var el = document.getElementById('pro-description');
+  if (!el || texte === null || texte === undefined) return;
+  var futur = el.value.slice(0, el.selectionStart) + texte + el.value.slice(el.selectionEnd);
+  if (Array.from(futur).length > _proPlafondDescription() && e && e.cancelable) {
+    e.preventDefault();
+    _showFieldError('pro-description', 'Limite de ' + _proPlafondDescription() + ' caractères, espaces et accents compris : insertion refusée, texte conservé.');
+  }
+}
+function proAvantDescriptionInput(e) {
+  if (e && e.inputType && e.inputType.indexOf('insert') === 0) {
+    _proAutoriserInsertionDescription(e, e.inputType === 'insertLineBreak' ? '\n' : e.data);
+  }
+}
+// Collage trop long refusé dans son intégralité, jamais raccourci.
+function proOnDescriptionColle(e) {
+  if (e && e.clipboardData) _proAutoriserInsertionDescription(e, e.clipboardData.getData('text'));
+}
 
 // Duree REELLEMENT deduite des deux dates : jamais demandee au client,
 // jamais inventee. Retourne 0 tant que la periode est incomplete.
@@ -9827,6 +10109,9 @@ function proOnCategorieChange() {
                                           : 'Décrivez la mission brièvement') +
       ' <span class="field-required">*</span>';
   }
+  // LOT F01 (F01-035/036) — le plafond suit le libellé : 156 pour
+  // « Type de mission », 166 pour « Mission ».
+  if (typeof _proMajPlafondDescription === 'function') _proMajPlafondDescription();
 
   proOnMetierChange();
   _proMajNumerosRubriques();
@@ -9937,6 +10222,13 @@ function _proValiderRubrique(cle, fail) {
 
   if (cle === 'mission') {
     if (!_checkRequiredText('pro-description', null, true)) ko('pro-description');
+    // LOT F01 (F01-035/036) — un texte au-dela du plafond (par exemple
+    // restaure d'un brouillon) est refuse a la soumission, jamais
+    // tronque en silence : meme regle que le serveur (migration 112).
+    else if (_proDescriptionTropLongue()) {
+      _showFieldError('pro-description', _proMessagePlafond());
+      ko('pro-description');
+    }
     return ok;   // informations complementaires : reellement facultatives
   }
   return true;
@@ -9989,7 +10281,7 @@ function _proRubriqueComplete(cle) {
     if (_proMemeJour() && _proHeureFin() <= _proHeureDebut()) return false;
     return true;
   }
-  if (cle === 'mission') return !!_proDescription();
+  if (cle === 'mission') return !!_proDescription().trim() && !_proDescriptionTropLongue();
   return true;
 }
 
@@ -10005,9 +10297,12 @@ function _proMajBoutonContinuer() {
   // On empêche toujours de RESTER sur une étape plus lointaine que ce
   // que l'étape 2 autorise : c'est un garde-fou de navigation, pas un
   // grisage de bouton.
+  // LOT F01 — les rubriques vivent à l'étape 3 : c'est elle, et non
+  // plus l'étape 2, qui borne la progression tant qu'elles sont
+  // incomplètes.
   if (!_proPeutContinuerEtape2()) {
-    _etapeMax = Math.min(_etapeMax, 2);
-    if (_formStepState.client > 2) _formStepState.client = 2;
+    _etapeMax = Math.min(_etapeMax, 3);
+    if (_formStepState.client > 3) _formStepState.client = 3;
   }
 }
 
@@ -10178,6 +10473,10 @@ function onChoixService() {
   // Stockage. Marqueur unique porte par la modale.
   var _modalCli = document.getElementById('modal-client');
   if (_modalCli) _modalCli.setAttribute('data-service-nettoyage', nett ? '1' : '0');
+  // LOT F01 — meme mecanisme pour Trouver un professionnel : l'etape 3
+  // ne montre que ses quatre rubriques, le bloc Prise en charge y est
+  // masque (CSS), jamais supprime.
+  if (_modalCli) _modalCli.setAttribute('data-service-professionnel', pro ? '1' : '0');
   if (nett) { nettRendreRepartition(); nettOnEligibiliteChange(true); }
 
   // Lot 2 (V72) — GARDE-FOU SOCLE : tant que les parcours Nettoyage et
@@ -10556,11 +10855,12 @@ function _typeHoraire(i, prefixe) {
 // sautée. On distingue APPLICABLE (sens métier) et ATTEINTE (parcourue).
 function _estEtapeApplicable(n) {
   if (n === 1 || n === 2 || n === 5) return true;
-  // Trouver un professionnel : tout le parcours tient dans l'étape 2.
-  // « Continuer » mène donc directement au récapitulatif habituel,
-  // sans créer ni traverser aucune étape supplémentaire.
+  // Trouver un professionnel : l'étape 2 ne porte que le choix du
+  // service ; les quatre rubriques métier vivent dans l'étape 3
+  // (LOT F01). L'étape 4 (véhicules) ne lui est pas applicable :
+  // « Continuer » depuis l'étape 3 mène au récapitulatif habituel.
   if (n === 4) return !_avecProfessionnel();
-  if (n === 3) return !!_blocsGlobauxActifs().pc;   // prise en charge globale
+  if (n === 3) return _avecProfessionnel() || !!_blocsGlobauxActifs().pc;   // rubriques métier ou prise en charge globale
   return false;
 }
 
@@ -13090,15 +13390,13 @@ function _validateClientStep(n) {
       return ok;
     }
 
-    // Trouver un professionnel : validation dédiée puis sortie
-    // immédiate, exactement comme le Nettoyage. Aucune règle
+    // Trouver un professionnel : à l'étape 2, seul le choix du service
+    // est exigé — sélectionner ce service active immédiatement
+    // « Continuer ». Les quatre rubriques métier sont validées à
+    // l'ÉTAPE 3 (LOT F01), avec exactement les mêmes règles qu'avant
+    // (_validateProfessionnelEtape2, inchangée). Aucune règle
     // Convoyage/Stockage plus bas ne doit s'appliquer.
     if (typeService === 'professionnel') {
-      var rP2 = _validateProfessionnelEtape2();
-      if (!rP2.ok) {
-        ok = false;
-        if (!firstInvalid) firstInvalid = document.getElementById(rP2.first);
-      }
       if (firstInvalid) {
         try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
       }
@@ -13198,6 +13496,21 @@ function _validateClientStep(n) {
         _clearFieldError('client-trajet-autre');
       }
     }
+  }
+
+  // LOT F01 — Trouver un professionnel : l'étape 3 porte les quatre
+  // rubriques métier. Validation dédiée puis sortie immédiate : le bloc
+  // « Prise en charge » ci-dessous n'est jamais évalué pour ce service.
+  if (n === 3 && _avecProfessionnel()) {
+    var rP3 = _validateProfessionnelEtape2();
+    if (!rP3.ok) {
+      ok = false;
+      if (!firstInvalid) firstInvalid = document.getElementById(rP3.first);
+    }
+    if (firstInvalid) {
+      try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    }
+    return ok;
   }
 
   if (n === 3 && _blocsGlobauxActifs().pc) {
@@ -13480,7 +13793,7 @@ function _construireBrouillonClient() {
     if (el.type === 'checkbox') {
       champs[el.id] = { c: !!el.checked };
     } else {
-      var v = (el.value || '').trim();
+      var v = el.id === 'pro-description' ? (el.value || '') : (el.value || '').trim();
       if (v) champs[el.id] = { v: v };
     }
   });
@@ -13925,6 +14238,7 @@ function resetClientForm() {
   _reinitialiserQuantitesNettoyage();
   var _mc = document.getElementById('modal-client');
   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
+  if (_mc) _mc.setAttribute('data-service-professionnel', '0');
   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
   _demandeSoumise = false;   // nouvelle demande : l'avertissement redevient actif
   _formulaireClientSale = false;
@@ -14924,6 +15238,15 @@ function uploadVideoCandidature() {
       duree_secondes: _convVideo.duree
     }).then(function (autorisation) {
       if (autorisation.erreur) { resolve({ erreur: autorisation.erreur }); return; }
+      // LOT V01 — IDEMPOTENCE. La confirmation précédente a réussi côté
+      // serveur mais sa réponse s'est perdue (réseau coupé juste après,
+      // second clic) : le serveur le dit, et il n'y a rien à renvoyer.
+      // Aucun dépôt, aucune seconde confirmation, pas d'erreur trompeuse.
+      if (autorisation.deja_confirmee) {
+        _convJetonEnvoi = null;
+        resolve({ ok: true, chemin: autorisation.chemin, deja_confirmee: true });
+        return;
+      }
       if (!autorisation.chemin || !autorisation.token) {
         resolve({ erreur: 'Autorisation d\'envoi incomplète.' }); return;
       }
@@ -15199,6 +15522,20 @@ function toggleClientType() {
   document.getElementById('client-societe-group').style.display = isPro ? 'block' : 'none';
 
   document.getElementById('client-siret-group').style.display   = isPro ? 'block' : 'none';
+
+  // Lot A01 — revenir sur « Particulier » efface ce qui n'a plus de sens :
+  // une société ou un SIRET saisis puis masqués ne doivent jamais partir
+  // avec la demande (le payload les force aussi à null, voir plus bas).
+  if (!isPro) {
+    const soc = document.getElementById('client-societe');
+    const sir = document.getElementById('client-siret');
+    if (soc) soc.value = '';
+    if (sir) sir.value = '';
+  }
+
+  // LOT F01 (F01-010) — l'option « Nettoyage automobile professionnel »
+  // suit immédiatement le statut : réservée aux entreprises.
+  if (typeof nettSyncOptionService === 'function') nettSyncOptionService();
 
 }
 
@@ -15570,13 +15907,14 @@ async function _submitClientFormInterne() {
     }
   }
 
-  // Meme garde-fou final pour Trouver un professionnel : tout le
-  // parcours tenant dans l'etape 2, seules les etapes 1 et 2 sont
-  // rejouees, avec les MEMES validateurs que la navigation.
+  // Meme garde-fou final pour Trouver un professionnel : les etapes 1,
+  // 2 et 3 (les quatre rubriques metier, LOT F01) sont rejouees, avec
+  // les MEMES validateurs que la navigation.
   if (_avecProfessionnel()) {
     var _etapeKOPro = null;
     if (!_validateClientStep(1)) _etapeKOPro = 1;
     if (!_etapeKOPro && !_validateClientStep(2)) _etapeKOPro = 2;
+    if (!_etapeKOPro && !_validateClientStep(3)) _etapeKOPro = 3;
     if (_etapeKOPro) {
       _formStepState.client = _etapeKOPro;
       _etapeMax = Math.max(_etapeMax, _etapeKOPro);
@@ -15660,8 +15998,8 @@ async function _submitClientFormInterne() {
       email:           email_val,
       telephone:       tel_val,
       type_client:     type_val,
-      societe:         societe_val || null,
-      siret:           siret_val || null,
+      societe:         type_val === 'pro' ? (societe_val || null) : null,
+      siret:           type_val === 'pro' ? (siret_val || null) : null,
       disponibilite:   'planifie',
       source_acquisition:        source_val || null,
       source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
@@ -15687,8 +16025,8 @@ async function _submitClientFormInterne() {
       email:           email_val,
       telephone:       tel_val,
       type_client:     type_val,
-      societe:         societe_val || null,
-      siret:           siret_val || null,
+      societe:         type_val === 'pro' ? (societe_val || null) : null,
+      siret:           type_val === 'pro' ? (siret_val || null) : null,
       disponibilite:   'planifie',
       source_acquisition:        source_val || null,
       source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
@@ -15815,8 +16153,8 @@ async function _submitClientFormInterne() {
     email:                  email_val,
     telephone:              tel_val,
     type_client:            type_val,
-    societe:                societe_val || null,
-    siret:                  siret_val || null,
+    societe:                type_val === 'pro' ? (societe_val || null) : null,
+    siret:                  type_val === 'pro' ? (siret_val || null) : null,
     disponibilite:          val,
     adresse_depart_rue:     (pcActif ? from_rue : '') || null,
     code_postal_depart:     (pcActif ? from_cp : '') || null,
@@ -16117,6 +16455,23 @@ async function _submitClientFormInterne() {
         // l'usage du développeur. Le client, lui, lit une phrase qu'il
         // peut comprendre et suivre.
         console.error('Echec de creation de la demande :', r && r.error);
+        // LOT F01 — refus MÉTIER du serveur (migration 112) : la phrase
+        // dit ce qui bloque et comment corriger. Jamais le message SQL.
+        var _erreurSrv = String((r && r.error) || '');
+        if (_erreurSrv.indexOf('HC_RESERVE_ENTREPRISES') !== -1) {
+          _hcAfficherBandeauErreur(
+            'Le nettoyage automobile professionnel est réservé aux entreprises. '
+            + 'Indiquez « Professionnel / Entreprise » à l\'étape 1, ou choisissez un autre service. '
+            + 'Rien n\'a été enregistré et vos informations sont conservées.');
+          return;
+        }
+        if (_erreurSrv.indexOf('HC_PLAFOND_TYPE_MISSION') !== -1 || _erreurSrv.indexOf('HC_PLAFOND_MISSION') !== -1) {
+          var _maxSrv = (_erreurSrv.indexOf('HC_PLAFOND_TYPE_MISSION') !== -1) ? 156 : 166;
+          _hcAfficherBandeauErreur(
+            'Le texte de la mission dépasse la limite de ' + _maxSrv + ' caractères, espaces et accents compris. '
+            + 'Raccourcissez-le puis renvoyez votre demande. Rien n\'a été enregistré et vos informations sont conservées.');
+          return;
+        }
         _hcAfficherBandeauErreur(
           'Votre demande n\'a pas pu être enregistrée. '
           + 'Rien n\'a été validé et vos informations sont conservées : '
@@ -16157,8 +16512,16 @@ async function _submitClientFormInterne() {
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
           '</div>' +
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
-      } else if (_compteEtat === 'cree' || _compteEtat === 'existe_deja' || _compteEtat === 'non_demande') {
+      } else if (_compteEtat === 'cree') {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
+      } else if (_compteEtat === 'existe_deja') {
+        html += '<div class="hc-succes-txt">Vous avez déjà un compte HelixCar avec cette adresse.</div>';
+      } else if (_compteEtat === 'non_demande' && _idCompteDepot) {
+        // Lot A01 — dépôt depuis un compte déjà connecté : rien n'a été
+        // créé, et on ne prétend pas le contraire.
+        html += '<div class="hc-succes-txt">Vous êtes déjà connecté à votre compte HelixCar : rien de plus à faire.</div>';
+      } else if (_compteEtat === 'non_demande') {
+        html += '<div class="hc-succes-txt">Aucun compte n\'a été créé pour le moment. Reprenez la création depuis « Connexion » quand vous le souhaitez.</div>';
       }
 
       // ── CE QUI EST ANNONCÉ EST CE QUI S'EST RÉELLEMENT PASSÉ ──
@@ -16439,6 +16802,10 @@ function openModal(type) {
 
   document.getElementById('modal-' + type).classList.add('open');
 
+  // Lot A01 — aucun message d'une tentative précédente (lien envoyé,
+  // erreur de connexion) n'accueille la fenêtre « Connexion ».
+  if (type === 'connexion') _hcNoteEffacer('connexion-message');
+
   // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
   // l'état laissé lors de la fermeture précédente.
   reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
@@ -16452,6 +16819,9 @@ function openModal(type) {
   // « Devenir client » (jamais pour le convoyeur, hors périmètre),
   // après le reset d'étape ci-dessus (DOM propre avant restauration).
   if (type === 'client') _restaurerBrouillonClientSiPresent();
+  // LOT F01 (F01-010) — dès l'ouverture, l'option « Nettoyage automobile
+  // professionnel » reflète le type de client (particulier par défaut).
+  if (type === 'client' && typeof nettSyncOptionService === 'function') nettSyncOptionService();
 
 }
 
@@ -16469,6 +16839,12 @@ function closeModal(type) {
 
   document.body.style.overflow = '';
   document.body.classList.remove('hc-modal-open');
+
+  // Lot A01 — fermer la fenêtre « Connexion » ne laisse aucun message
+  // derrière ; quitter « Nouveau mot de passe » par le bouton ✕ efface le
+  // drapeau de reprise : une connexion normale ne le rouvrira pas.
+  if (type === 'connexion') _hcNoteEffacer('connexion-message');
+  if (type === 'reinit') _hcEffacerDrapeauReinit();
 
   // Réinitialise le formulaire client une fois l'animation terminée,
   // pour éviter que le retour à l'étape 1 soit visible pendant la fermeture.
@@ -16586,6 +16962,37 @@ function _hcFragmentRecuperation() {
   } catch (e) { return false; }
 }
 
+// Lot A01 — le drapeau « réinitialisation en cours » ne sert qu'à faire
+// revenir le formulaire après un rechargement (F5) de la MÊME session de
+// récupération. Il porte l'identifiant de cette session quand on le
+// connaît, n'est honoré qu'à la reprise (INITIAL_SESSION), jamais à une
+// connexion normale (SIGNED_IN), et il est effacé à toute sortie :
+// succès, fermeture, connexion.
+function _hcMemoriserReinit(session) {
+  try {
+    sessionStorage.setItem('helixcar_reinit_en_cours', '1');
+    if (session && session.user && session.user.id) {
+      sessionStorage.setItem('helixcar_reinit_uid', session.user.id);
+    }
+  } catch (e) {}
+}
+function _hcEffacerDrapeauReinit() {
+  try {
+    sessionStorage.removeItem('helixcar_reinit_en_cours');
+    sessionStorage.removeItem('helixcar_reinit_uid');
+  } catch (e) {}
+}
+function _hcReinitEnCoursPour(session) {
+  var drapeau = null, uid = null;
+  try {
+    drapeau = sessionStorage.getItem('helixcar_reinit_en_cours');
+    uid = sessionStorage.getItem('helixcar_reinit_uid');
+  } catch (e) {}
+  if (drapeau !== '1') return false;
+  if (!session || !session.user) return false;
+  return !uid || uid === session.user.id;
+}
+
 function ouvrirEcranNouveauMotDePasse(etat) {
   var f = document.getElementById('reinit-bloc-formulaire');
   var ok = document.getElementById('reinit-bloc-succes');
@@ -16597,7 +17004,7 @@ function ouvrirEcranNouveauMotDePasse(etat) {
     // Memorise pour survivre a un F5 : Supabase ne rejoue pas
     // PASSWORD_RECOVERY apres rechargement, mais la session de
     // recuperation est toujours ouverte.
-    try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+    _hcMemoriserReinit(null);
     _hcNoteEffacer('reinit-message');
     var a = document.getElementById('reinit-mdp');
     var b = document.getElementById('reinit-mdp2');
@@ -16668,7 +17075,7 @@ async function enregistrerNouveauMotDePasse() {
     }
     // Succes REEL, confirme par le serveur. Le contexte de
     // recuperation est referme : le lien ne sert plus a rien.
-    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    _hcEffacerDrapeauReinit();
     try { _hcNettoyerFragmentRecuperation(); } catch (e) {}
     ouvrirEcranNouveauMotDePasse('succes');
   } catch (e) {
@@ -16690,7 +17097,7 @@ function _hcNettoyerFragmentRecuperation() {
 }
 
 async function terminerReinitialisation() {
-  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  _hcEffacerDrapeauReinit();
   try { if (_sb && _sb.auth) await _sb.auth.signOut(); } catch (e) {}
   _hcNettoyerFragmentRecuperation();
   var m = document.getElementById('modal-reinit');
@@ -16753,18 +17160,27 @@ function _hcAnnoncerAdresseConfirmee(avecSession) {
   }
   if (!_sb || !_sb.auth || !_sb.auth.onAuthStateChange) return;
   _sb.auth.onAuthStateChange(function (evenement, session) {
+    var aSession = !!(session && session.user);
     if (evenement === 'PASSWORD_RECOVERY') {
+      _hcMemoriserReinit(session);
       ouvrirEcranNouveauMotDePasse('formulaire');
       return;
     }
-    // Reprise apres un F5 en pleine reinitialisation, ou arrivee sur un
-    // fragment de recuperation que la bibliotheque a deja consomme.
-    var enCours = false;
-    try { enCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
-    if ((enCours || _hcFragmentRecuperation()) && session && session.user) {
+    // Arrivee sur un fragment de recuperation que la bibliotheque a deja
+    // consomme sans rejouer PASSWORD_RECOVERY.
+    if (_hcFragmentRecuperation() && aSession) {
+      _hcMemoriserReinit(session);
       ouvrirEcranNouveauMotDePasse('formulaire');
       return;
     }
+    // Reprise apres un F5 en pleine reinitialisation : la MEME session,
+    // et seulement a la reprise. Une connexion normale ulterieure
+    // (SIGNED_IN) ne rouvre jamais ce formulaire : le drapeau est efface.
+    if (evenement === 'INITIAL_SESSION' && aSession && _hcReinitEnCoursPour(session)) {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    if (evenement === 'SIGNED_IN') _hcEffacerDrapeauReinit();
     // LOT B2 — confirmation d'adresse. On n'annonce le succes qu'apres
     // un evenement REEL de Supabase, jamais sur le seul fragment d'URL.
     if (_hcFragmentConfirmation()
@@ -16871,8 +17287,10 @@ async function submitConnexionForm() {
     afficher('Adresse e-mail ou mot de passe incorrect.');
     return;
   }
-  // La session est ouverte : l'espace client la retrouve tel quel,
-  // puisque les deux pages partagent la même origine.
+  // La session est ouverte : l'espace la retrouve tel quel, puisque les
+  // deux pages partagent la même origine. Aucun reste d'un parcours de
+  // récupération abandonné ne doit la suivre.
+  _hcEffacerDrapeauReinit();
   window.location.href = 'dashboard.html';
 }
 
@@ -18511,7 +18929,7 @@ function submitParrainage() {
   } catch(e) { console.error('EmailJS exception:', e); }
 }
 
-function submitRecontact() {
+async function submitRecontact() {
   // Collecte robuste - fonctionne sur mobile et PC
   var form = document.getElementById('recontact-form');
   var inputs = form ? form.querySelectorAll('input[type="text"], input[type="tel"], input[type="email"]') : [];
@@ -18522,24 +18940,34 @@ function submitRecontact() {
   var motif  = document.getElementById('rc-motif') ? document.getElementById('rc-motif').value : '';
   var profil = form ? (form.querySelector('input[name="rc-profil"]:checked') ? form.querySelector('input[name="rc-profil"]:checked').value : '') : '';
   var message = form ? (form.querySelector('textarea') ? form.querySelector('textarea').value.trim() : '') : '';
-
-  console.log('RC submit:', prenom, nom, tel, email, motif, profil);
-
   if (!tel && !email) {
     _hcNote('rc-message-zone', 'Renseignez au moins votre téléphone ou votre adresse e-mail.', 'erreur');
     return;
   }
-
-  supabaseInsert('recontacts', {
-    prenom: prenom,
-    nom: nom,
-    telephone: tel || 'non renseigné',
-    email: email,
-    motif: motif,
-    profil: profil,
-    message: message
-  }).then(r => console.log('Recontact saved:', r));
-
+  // LOT X01 — le succès n'est annoncé qu'après l'écriture RÉELLE : un
+  // refus du serveur laisse le formulaire en place, avec une phrase
+  // compréhensible. Aucune donnée personnelle n'est journalisée.
+  if (window._hcRecontactEnCours) return;
+  window._hcRecontactEnCours = true;
+  _hcNote('rc-message-zone', 'Envoi en cours…', 'info');
+  var resultat = null;
+  try {
+    resultat = await supabaseInsert('recontacts', {
+      prenom: prenom,
+      nom: nom,
+      telephone: tel || 'non renseigné',
+      email: email,
+      motif: motif,
+      profil: profil,
+      message: message
+    });
+  } catch (e) { resultat = { error: String(e && e.message) }; }
+  window._hcRecontactEnCours = false;
+  if (!resultat || resultat.error) {
+    _hcNote('rc-message-zone', 'Votre demande n\'a pas pu être envoyée. Réessayez dans quelques instants, ou appelez-nous directement.', 'erreur');
+    return;
+  }
+  _hcNote('rc-message-zone', '');
   document.getElementById('recontact-form').style.display = 'none';
   document.getElementById('recontact-success').style.display = 'block';
 
@@ -20893,6 +21321,8 @@ document.addEventListener('click', function (e) {
     if(kind==='calendar') return '<svg '+common+'><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></svg>';
     if(kind==='before') return '<svg '+common+'><path d="M4 12h14M13 7l5 5-5 5"/><circle cx="5" cy="12" r="2"/></svg>';
     if(kind==='after') return '<svg '+common+'><path d="M20 12H6M11 7l-5 5 5 5"/><circle cx="19" cy="12" r="2"/></svg>';
+    // LOT F01 — stylo discret : l'étape métier du parcours « Trouver un professionnel ».
+    if(kind==='edit') return '<svg '+common+'><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
     return '<svg '+common+'><circle cx="12" cy="12" r="8"/></svg>';
   }
   var stepMeta={
@@ -20907,8 +21337,16 @@ document.addEventListener('click', function (e) {
     var item3=ind.querySelector('[data-step-item="3"]'), lineBefore=item3?item3.previousElementSibling:null;
     var applicable=!!_estEtapeApplicable(3);
     if(item3){item3.classList.toggle('hc-step-hidden',!applicable);if(lineBefore&&lineBefore.classList.contains('step-indicator-line'))lineBefore.classList.toggle('hc-step-hidden',!applicable);}
+    // LOT F01 — l'étape 4 (véhicules) n'existe pas pour « Trouver un
+    // professionnel » : elle sort de l'étapeur comme l'étape 3 sort de
+    // celui du nettoyage — jamais une pastille grisée à tort, aucun trou.
+    var item4=ind.querySelector('[data-step-item="4"]'), lineBefore4=item4?item4.previousElementSibling:null;
+    var applicable4=!!_estEtapeApplicable(4);
+    if(item4){item4.classList.toggle('hc-step-hidden',!applicable4);if(lineBefore4&&lineBefore4.classList.contains('step-indicator-line'))lineBefore4.classList.toggle('hc-step-hidden',!applicable4);}
+    var proActif=(typeof _avecProfessionnel==='function')&&_avecProfessionnel();
     ind.querySelectorAll('.step-indicator-item').forEach(function(item){
       var actual=parseInt(item.getAttribute('data-step-item'),10), meta=stepMeta[actual], n=item.querySelector('.step-indicator-num');
+      if(actual===3&&proActif)meta={kind:'edit',label:'Votre mission'};
       if(meta&&n){n.innerHTML=svg(meta.kind);item.setAttribute('aria-label',meta.label);item.setAttribute('title',meta.label);}
     });
   };
@@ -21519,6 +21957,10 @@ console.log('HelixCar ' + window.HC_VERSION);
     if(kind==='presentation')return '<svg '+c+'><path d="M4 5.5h16v10H9.5L6 19v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>';
     // V77 - horloge : etape Organisation du parcours Nettoyage.
     if(kind==='clock')return '<svg '+c+'><circle cx="12" cy="12" r="7.5"/><path d="M12 7.8V12l2.8 1.7"/></svg>';
+    // LOT F01 - stylo discret : etape des rubriques metier du parcours
+    // « Trouver un professionnel ». Jamais une voiture, jamais « Valider
+    // un vehicule ».
+    if(kind==='edit')return '<svg '+c+'><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
     return '<svg '+c+'><path d="m5 12 4 4 10-10"/></svg>';
   }
   function lockStepper(){
@@ -21528,7 +21970,10 @@ console.log('HelixCar ' + window.HC_VERSION);
     // source d'etat : le service actif. Restauration immediate au
     // changement de service puisque lockStepper est rejoue a chaque rendu.
     var _nettActif = (typeof _avecNettoyage === 'function') && _avecNettoyage();
-    var kinds={1:'person',2:'request',3:'route',4:(_nettActif?'clock':'vehicle'),5:'check'};
+    // LOT F01 - etape 3 : stylo pour Trouver un professionnel (ses quatre
+    // rubriques metier), itineraire pour la prise en charge des autres.
+    var _proActif = (typeof _avecProfessionnel === 'function') && _avecProfessionnel();
+    var kinds={1:'person',2:'request',3:(_proActif?'edit':'route'),4:(_nettActif?'clock':'vehicle'),5:'check'};
     Object.keys(kinds).forEach(function(k){var n=ind.querySelector('[data-step-item="'+k+'"] .step-indicator-num');if(n)n.innerHTML=svg(kinds[k]);});
     var visible=Array.prototype.filter.call(ind.querySelectorAll('.step-indicator-item'),function(x){return !x.classList.contains('hc-step-hidden')&&getComputedStyle(x).display!=='none';});
     ind.classList.remove('hc-step-count-4','hc-step-count-5');ind.classList.add('hc-step-count-'+Math.max(4,Math.min(5,visible.length)));
@@ -21614,4 +22059,3 @@ console.log('HelixCar ' + window.HC_VERSION);
 </body>
 
 </html>
-

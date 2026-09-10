@@ -268,6 +268,16 @@ const futur = dansNJours;
     'RECETTE-STABILISATION-POST-PR2.md',
     // Celui du chantier qui a suivi la PR nº 3.
     'RECETTE-POST-PR3.md',
+    // Lot Q01 : la page publique du devis suit le contrat versionné de
+    // la fonction serveur (version obsolète, paiement en attente).
+    'devis.html',
+    // Lot Q01 : la fonction devis-secure vivait à la racine, hors de
+    // l'arborescence que la CLI Supabase déploie. Elle est DÉPLACÉE
+    // (git mv) vers supabase/functions/devis-secure/index.ts : l'ancien
+    // chemin apparaît dans le diff comme supprimé, c'est voulu.
+    'index.ts',
+    // Le dossier de recette de la révision experte P0/P1.
+    'RECETTE-EXPERT-P0-P1.md',
   ];
   // supabase/templates/ — les modèles d'e-mail Supabase, versionnés
   // pour que ce qui part réellement aux clients soit relu et comparé
@@ -280,13 +290,17 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 12,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 15,
     PERIMETRE.length + ' entrées');
-  L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
-    !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
+  // devis.html et index.ts sont entrés dans le périmètre avec le lot
+  // Q01 (voir PERIMETRE) ; les pages annexes, elles, restent interdites.
+  L.check('E6b : aucun fichier hors périmètre (edl.html, fiche-mission.html…)',
+    !fichiers.some(f => ['edl.html', 'fiche-mission.html',
                          'lettre-voiture.html',
                          'helixcar-emails.html'].indexOf(f) !== -1),
     fichiers.join(', '));
+  L.check('E6d : la fonction devis-secure n\'est plus à la racine du dépôt',
+    !fs.existsSync(fichier('index.ts')) && fs.existsSync(fichier('supabase/functions/devis-secure/index.ts')));
   // Ce qui est touché dans l'inscription partenaire doit se limiter aux
   // mots de passe : aucun autre comportement de cette page ne change.
   const diffConvoyeur = execSync('git diff origin/main -- creer-compte-convoyeur.html',
@@ -323,8 +337,8 @@ const futur = dansNJours;
   // RLS refusait en silence. E6d ci-dessous rend cette évolution
   // vérifiable, et interdit tout retour en arrière.
   L.check('E6c : l\'inscription partenaire ne change que le mot de passe et la logique de compte',
-    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)),
-    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)).slice(0, 3).join(' | '));
+    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)),
+    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)).slice(0, 3).join(' | '));
   // L'ÉLARGISSEMENT CI-DESSUS EST COMPENSÉ, jamais laissé à nu : ces
   // trois contrôles interdisent tout retour au comportement d'avant.
   const srcConvoyeur = fs.readFileSync(fichier('creer-compte-convoyeur.html'), 'utf8');

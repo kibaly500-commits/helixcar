@@ -188,6 +188,7 @@ function rubriquesVisibles(page, n) {
     const page = await L.newPage(browser);
     await L.fillStep1(page, 'pro');
     await L.chooseService(page, 'professionnel');
+    await L.ouvrirEtapeProfessionnel(page);
     await page.waitForTimeout(200);
     const etat = await page.evaluate(() => {
       const coche = (n, v, h) => {
@@ -261,7 +262,7 @@ function rubriquesVisibles(page, n) {
     const couleursInterdites = /#FEF2F2|#FCA5A5|#991B1B|#ECFDF5|#6EE7B7|#065F46/;
     check('E1-3 : aucune couleur de grand encadré rouge ou vert dans index.html',
       !couleursInterdites.test(idx), (idx.match(couleursInterdites) || [])[0]);
-    const zoneAuth = dash.slice(0, dash.indexOf('function doLogin') + 4000);
+    const zoneAuth = dash.slice(0, dash.indexOf('async function finaliserSessionConvoyeur') + 4000);
     check('E1-4 : ni dans les écrans d\'authentification du Dashboard',
       !couleursInterdites.test(zoneAuth), (zoneAuth.match(couleursInterdites) || [])[0]);
 
@@ -290,7 +291,8 @@ function rubriquesVisibles(page, n) {
       && parseFloat(rendu.droite) === 0, JSON.stringify(rendu));
 
     // Une erreur de champ garde son petit repère, et disparaît à la correction.
-    await L.fillStep1(page, 'particulier');
+    // F01-010 : Nettoyage est réservé aux professionnels, y compris dans ce scénario.
+    await L.fillStep1(page, 'pro');
     await L.chooseService(page, 'nettoyage');
     await page.waitForTimeout(150);
     const champ = await page.evaluate(() => {
