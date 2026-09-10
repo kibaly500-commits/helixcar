@@ -346,6 +346,67 @@ async function ouvrirFidelite(page, cas, mouvements) {
   check('G5 : la nomenclature du menu et le titre de page sont des points, pas des récompenses',
     /'client-fidelite':\s*\['Programme de fidélité', 'Vos points HelixCar'\]/.test(dash));
 
+  // ── H. LA VITRINE : PALIERS EN POINTS, ORDRE DES SECTIONS (L02) ──
+  const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const ordre = Array.from(idx.matchAll(/<section[^>]*id="([^"]+)"/g)).map(m => m[1]);
+  check('H1 : ordre de la vitrine — Stockage automobile → Programme de fidélité → Tarifs convoyage → Partenaires',
+    ordre.join(',').indexOf('stockage-automobile,fidelite,devis,convoyeurs') !== -1, ordre.join(','));
+  const menu = Array.from(idx.matchAll(/<li><a href="#([^"]+)"/g)).map(m => m[1]);
+  check('H2 : le menu suit le même ordre (Fidélité avant Devis)',
+    menu.indexOf('fidelite') !== -1 && menu.indexOf('fidelite') < menu.indexOf('devis'), menu.join(','));
+  check('H3 : chaque section n\'existe qu\'une fois (aucune duplication au déplacement)',
+    new Set(ordre).size === ordre.length && ordre.filter(x => x === 'fidelite').length === 1
+    && (idx.match(/id="info-rewards"/g) || []).length === 1);
+  const pageV = await navigateur.newPage({ viewport: { width: 1280, height: 1000 } });
+  await pageV.addInitScript(INIT);
+  const errV = [];
+  pageV.on('pageerror', e => errV.push(e.message));
+  await pageV.goto(urlFichier('index.html'), { waitUntil: 'load' });
+  const vitrine = await pageV.evaluate(() => {
+    const sec = document.getElementById('fidelite');
+    const noeuds = Array.from(sec.querySelectorAll('.track-node')).map(n => ({
+      seuil: n.getAttribute('data-seuil'), libelle: (n.querySelector('.node-km') || {}).textContent || '',
+      nom: (n.querySelector('.node-nom') || {}).textContent || '',
+      icone: n.querySelector('svg') ? n.querySelector('svg').getAttribute('data-icone') : null,
+      trace: n.querySelector('svg') ? n.querySelector('svg').innerHTML : '',
+      classes: n.className
+    }));
+    return {
+      noeuds,
+      barre: !!sec.querySelector('.track-progress'),
+      texte: sec.textContent,
+      ancreMenu: !!document.querySelector('.nav-links a[href="#fidelite"]'),
+      challenge: (document.querySelector('#info-rewards') || {}).textContent || ''
+    };
+  });
+  check('H4 : cinq paliers en points — 2 000, 4 000, 6 000, 8 000, 10 000',
+    vitrine.noeuds.map(n => n.seuil).join(',') === '2000,4000,6000,8000,10000'
+    && vitrine.noeuds.every(n => /points$/.test(n.libelle.trim())), JSON.stringify(vitrine.noeuds.map(n => n.libelle)));
+  check('H5 : cinq icônes sobres et distinctes (cadeau, étoile, insigne, couronne, trophée), sans émoji',
+    vitrine.noeuds.map(n => n.icone).join(',') === 'cadeau,etoile,insigne,couronne,trophee'
+    && new Set(vitrine.noeuds.map(n => n.trace)).size === 5
+    && !/[\u{1F300}-\u{1FAFF}]/u.test(vitrine.texte));
+  check('H6 : aucune progression fictive (ni palier « atteint », ni barre remplie), aucun kilomètre, aucun « Palier Entreprises »',
+    vitrine.barre === false && vitrine.noeuds.every(n => !/done|active/.test(n.classes))
+    && motsInterdits(vitrine.texte).length === 0, motsInterdits(vitrine.texte).join(', '));
+  check('H7 : la continuité au-delà de 10 000 points et la Box mystère sont annoncées, sans contenu ni valeur',
+    /12\s?000/.test(vitrine.texte.replace(/\u00a0/g, ' ')) && /Box mystère/.test(vitrine.texte)
+    && !/€\s*de valeur|d'une valeur|vaut/i.test(vitrine.texte));
+  check('H8 : la récompense vérifiée du palier 1 est reprise, les autres sont dévoilées à chaque palier',
+    /10\s?% sur une box surprise automobile/.test(vitrine.texte.replace(/\u00a0/g, ' '))
+    && /dévoilées à chaque palier/.test(vitrine.texte));
+  // Le challenge des convoyeurs ne change pas : son paragraphe est
+  // textuellement celui d'origin/main.
+  let ancienIdx = '';
+  try { ancienIdx = execSync('git show origin/main:index.html', { cwd: RACINE, maxBuffer: 64 * 1024 * 1024 }).toString(); } catch (e) {}
+  const paraChallenge = t => (t.match(/Pour nos convoyeurs, un challenge[^<]*/) || [''])[0].trim();
+  check('H9 : le challenge des convoyeurs est textuellement inchangé (L01-001)',
+    !ancienIdx || (paraChallenge(idx) !== '' && paraChallenge(idx) === paraChallenge(ancienIdx)),
+    paraChallenge(idx).slice(0, 80));
+  check('H10 : l\'ancre du menu existe et aucune erreur JavaScript sur la vitrine',
+    vitrine.ancreMenu && errV.length === 0, errV.join(' | '));
+  await pageV.close();
+
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));
   await navigateur.close();
