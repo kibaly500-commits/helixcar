@@ -1,5 +1,5 @@
 # Exécuté après 112 par t_rls.sh : vrais privilèges et transitions SQL.
-for n in 107_reconciliation_partenaires_historiques 113_devis_identite_et_archives 114_video_verification_serveur 115_durcissement_analyseur_supabase; do
+for n in 107_reconciliation_partenaires_historiques 113_devis_identite_et_archives 114_video_verification_serveur 115_durcissement_analyseur_supabase 116_fermeture_vues_historiques; do
   err=$(appliquer "migrations/$n.sql");check "$n : migration appliquée" "" "$err"
   err=$(appliquer "migrations/$n.sql");check "$n : seconde application idempotente" "" "$err"
 done
@@ -37,3 +37,5 @@ check "SEC : aucun search_path mutable dans public" "0" \
  "$(sql "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and not exists(select 1 from unnest(coalesce(p.proconfig,'{}')) x where x like 'search_path=%');")"
 check "SEC : création directe de mission anonyme retirée" "0" \
  "$(sql "select count(*) from pg_policies where schemaname='public' and tablename='missions' and 'anon'=any(roles) and cmd='INSERT';")"
+check "SEC : v_mes_demandes refuse anon et reste lisible authentifié" "0|1" \
+ "$(sql "select count(*) filter(where grantee='anon')||'|'||count(*) filter(where grantee='authenticated' and privilege_type='SELECT') from information_schema.role_table_grants where table_schema='public' and table_name='v_mes_demandes' and grantee in ('anon','authenticated');")"
