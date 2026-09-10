@@ -54,6 +54,8 @@ export const ORIGINE_PRODUCTION = "https://helixcar.vercel.app";
 export const ORIGINES_AUTORISEES: string[] = [
   "https://helixcar.vercel.app",       // site de production
   "https://helixcar-i89b.vercel.app",  // déploiement d'aperçu
+  "https://helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app",
+  "https://helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app",
 ];
 export function originesSupplementaires(valeur: string | null | undefined): string[] {
   return String(valeur || "")
