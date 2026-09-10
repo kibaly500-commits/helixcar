@@ -153,6 +153,13 @@ create table if not exists public.missions (
   distance_km  numeric,
   created_at   timestamptz not null default now()
 );
+-- Colonnes de production lues par la vue v_mes_missions (migration 111)
+-- et par le Dashboard : le schéma réel les porte déjà.
+alter table public.missions
+  add column if not exists date_prise_en_charge timestamptz,
+  add column if not exists date_livraison  timestamptz,
+  add column if not exists marque_modele   text,
+  add column if not exists immatriculation text;
 
 create table if not exists public.clients (
   id                    uuid primary key default gen_random_uuid(),
