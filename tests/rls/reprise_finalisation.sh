@@ -7,8 +7,9 @@ for t in devis_preparations devis_envoi_operations video_verifications; do
   check "$t : aucun accès navigateur y compris admin" "0" "$(sql "select count(*) from information_schema.role_table_grants where table_schema='public' and table_name='$t' and grantee in ('anon','authenticated','PUBLIC');")"
   check "$t : RLS active" "t" "$(sql "select relrowsecurity from pg_class where oid='public.$t'::regclass;")"
 done
-check "Q01 : même un admin ne peut inventer un paiement confirmé" "1" \
- "$(sqlAdmin "update public.devis set paiement_statut='paye',paiement_confirme_le=now() where id='d0d0d0d0-0000-4000-8000-000000000101';" | grep -c 'réservée au serveur' || true)"
+sqlAdmin "update public.devis set paiement_statut='paye',paiement_confirme_le=now() where id='d0d0d0d0-0000-4000-8000-000000000101';" >/dev/null 2>&1 || true
+check "Q01 : même un admin ne peut inventer un paiement confirmé" "t" \
+ "$(sql "select paiement_statut<>'paye' and paiement_confirme_le is null from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
 check "V01 : ancien RPC ne contourne pas le worker" "f" \
  "$(sql "select has_function_privilege('service_role','public.finaliser_video_candidature(uuid,bigint)','execute');")"
 check "V01 : aucun droit direct de remplacement/suppression vidéo" "0" \
