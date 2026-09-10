@@ -43,3 +43,9 @@ verify_jwt = false
 # la vérification JWT globale est donc désactivée ici aussi, et la
 # fonction autorise plus strictement que lui.
 verify_jwt = false
+
+[functions.paiement-recette]
+# La fonction valide elle-même le JWT client, la propriété du devis,
+# l'origine Preview exacte et le préfixe QA. Elle n'appelle aucun
+# prestataire et reste inaccessible depuis le domaine de production.
+verify_jwt = false

@@ -130,6 +130,12 @@
   .statut-final.accepte { background: #E3F2E8; color: #1E5734; }
   .statut-final.refuse { background: #F5E3E3; color: #7A2B2B; }
   .statut-final strong { display: block; font-size: 1rem; margin-bottom: 2px; }
+  .paiement-recette { margin-top:12px; padding:16px 18px; background:#fff; border:1px solid var(--ligne); border-left:4px solid var(--rouge); }
+  .paiement-recette h2 { margin:0 0 6px; font-size:1rem; }
+  .paiement-recette p { margin:0 0 12px; color:var(--anthracite-clair); font-size:.88rem; }
+  .paiement-recette-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .bouton-simulation { background:var(--anthracite); color:#fff; }
+  .paiement-recette-resultat { margin-top:10px; font-size:.88rem; min-height:1.3em; }
 
   footer.pied { text-align: center; padding: 24px; font-size: 0.76rem; color: var(--gris); }
 
@@ -313,6 +319,7 @@
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
   var authDevis = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
   var URL_FONCTION = SUPABASE_URL + "/functions/v1/devis-secure";
+  var URL_PAIEMENT_RECETTE = SUPABASE_URL + "/functions/v1/paiement-recette";
   var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
@@ -333,6 +340,7 @@
 
   var numeroChargement = 0;
   var enCoursTraitement = false; // protection double-clic partagée accept/refuse
+  var hoteProduction = window.location.hostname === 'helixcar.vercel.app';
 
   // ── Échappement HTML (V50.5C.1A, conservé à l'identique) ──
   function echapperHtml(valeur) {
@@ -604,10 +612,16 @@
       var suite = devis.paiement_statut === 'en_attente'
         ? ' Le paiement vous sera proposé prochainement.'
         : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
+      var simulation = (!hoteProduction && devis.paiement_statut === 'en_attente') ?
+        '<section class="paiement-recette" aria-labelledby="titre-paiement-recette"><h2 id="titre-paiement-recette">Simulation de paiement — recette</h2>'+
+        '<p>Aucun paiement réel et aucun débit. Choisissez le résultat à vérifier.</p><div class="paiement-recette-actions">'+
+        '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
+        '<button class="bouton bouton-simulation" data-scenario="refused">Paiement refusé</button><button class="bouton bouton-simulation" data-scenario="abandoned">Paiement abandonné</button></div>'+
+        '<div id="paiement-recette-resultat" class="paiement-recette-resultat" role="status" aria-live="polite"></div></section>' : '';
       return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
         (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
         echapperHtml(suite) +
-        '</div></div>';
+        '</div></div>'+simulation;
     }
     if (devis.statut === 'refuse') {
       // Le motif de refus n'est pas exposé par la réponse GET actuelle
@@ -640,6 +654,22 @@
     var boutonRefuser = document.getElementById('bouton-refuser-devis');
     if (boutonAccepter) boutonAccepter.addEventListener('click', function () { ouvrirModalAccepter(devis); });
     if (boutonRefuser) boutonRefuser.addEventListener('click', function () { ouvrirModalRefuser(devis); });
+    Array.from(document.querySelectorAll('[data-scenario]')).forEach(function(b){b.addEventListener('click',function(){simulerPaiement(devis,b.getAttribute('data-scenario'));});});
+  }
+
+  async function simulerPaiement(devis,scenario){
+    if(enCoursTraitement)return; enCoursTraitement=true;
+    var boutons=Array.from(document.querySelectorAll('[data-scenario]'));boutons.forEach(function(b){b.disabled=true;});
+    var sortie=document.getElementById('paiement-recette-resultat');if(sortie)sortie.textContent='Simulation en cours…';
+    try{
+      var session=(await authDevis.auth.getSession()).data.session;
+      if(!session)throw new Error('UNAUTHORIZED');
+      var rep=await fetch(URL_PAIEMENT_RECETTE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({devis_id:devisId,scenario:scenario})});
+      var corps=await rep.json();if(!rep.ok||!corps.ok)throw new Error(corps.message||'Simulation impossible.');
+      if(sortie)sortie.textContent=corps.message;
+      if(corps.paiement_statut==='paye')setTimeout(chargerEtAfficherDevis,500);
+    }catch(e){if(sortie)sortie.textContent=e&&e.message&&e.message!=='UNAUTHORIZED'?e.message:'Reconnectez-vous puis réessayez.';}
+    finally{enCoursTraitement=false;boutons.forEach(function(b){b.disabled=false;});}
   }
 
   // ────────────────────────────────────────────────────────────

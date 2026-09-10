@@ -507,7 +507,7 @@ select policyname from pg_policies where tablename = 'devis_envois';
    Elles n'apparaissent dans aucun espace client — comportement voulu,
    aucun rattachement automatique par e-mail n'est effectué.
 
-## Stripe
+## Paiement de recette et futur Stripe
 
 Aucun objet Stripe n'existe dans le dépôt. Depuis la migration `110`, le
 serveur sait **recevoir** une confirmation de paiement :
@@ -516,6 +516,10 @@ devise, detail)` — exécutable uniquement avec la clé `service_role`
 (jamais depuis une session), idempotente par événement, et elle crée la
 mission de nettoyage si le dossier est complet (sinon la dernière
 information transmise la crée). Le futur webhook Stripe devra vérifier la
-signature de l'événement puis appeler cette fonction ; tant qu'il n'existe
-pas, aucun devis ne passe « payé » et aucune mission de nettoyage ne se
-crée (décision C02).
+signature de l'événement puis appeler cette fonction.
+
+La fonction `paiement-recette` fournit entre-temps une simulation sans
+prestataire et sans débit, limitée aux Previews exactes et aux dossiers
+`TEST-QA-CLAUDE-HELIXCAR`. Elle réutilise la même RPC serveur pour le cas
+réussi ; elle ne remplace ni Checkout, ni la signature d'un webhook, ni une
+preuve de paiement réel. Voir `tests/RECETTE-PAIEMENT.md`.

@@ -288,6 +288,8 @@ const futur = dansNJours;
     'services/video-validation/serveur.mjs',
     'services/video-validation/valider.mjs',
     'services/video-validation/README.md',
+    // Adaptateur Vercel du validateur vidéo, isolé de la vitrine.
+    'api/video-validation.mjs',
   ];
   // supabase/templates/ — les modèles d'e-mail Supabase, versionnés
   // pour que ce qui part réellement aux clients soit relu et comparé
@@ -300,7 +302,7 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 21,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 22,
     PERIMETRE.length + ' entrées');
   // devis.html et index.ts sont entrés dans le périmètre avec le lot
   // Q01 (voir PERIMETRE) ; les pages annexes, elles, restent interdites.
