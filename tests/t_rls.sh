@@ -2589,6 +2589,60 @@ check "VID-36 : aucune politique Storage accordée à anon sur le bucket vidéo"
   "$(sql "select count(*) from pg_policies where tablename='objects' and schemaname='storage'
      and policyname ilike 'candidature video%' and 'anon' = any(roles);")"
 
+
+echo
+echo "── DEV. LOT Q01 : VERSIONS DE DEVIS ET JOURNAL DES ENVOIS ──"
+errDev106=$(appliquer migrations/106_devis_versions_et_journal_envois.sql)
+check "DEV-1 : 106 s'applique sans erreur" "" "$errDev106"
+check "DEV-2 : les dix colonnes d'état existent sur devis" "10" \
+  "$(sql "select count(*) from information_schema.columns where table_name='devis'
+     and column_name in ('version','version_preparee','version_envoyee','version_acceptee','consulte_le',
+                         'envoi_en_cours_depuis','paiement_statut','paiement_confirme_le','annule_le','expire_le');")"
+sql "insert into public.devis (id, reference, client_id, prix, statut)
+     values ('d0d0d0d0-0000-4000-8000-000000000101','TEST-QA-CLAUDE-HELIXCAR-DEV-1',
+             'cccccccc-0000-0000-0000-00000000000A', 450, 'genere') on conflict (id) do nothing;" >/dev/null
+check "DEV-3 : un devis existant ou nouveau démarre en version 1, paiement « aucun »" "1|aucun" \
+  "$(sql "select version||'|'||paiement_statut from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+sql "update public.devis set statut='envoye', version_envoyee=1, date_envoi=now() where id='d0d0d0d0-0000-4000-8000-000000000101';" >/dev/null
+check "DEV-4 : changer le statut sans changer le prix ne change pas la version" "1" \
+  "$(sql "select version from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+sql "update public.devis set prix=500, statut='genere' where id='d0d0d0d0-0000-4000-8000-000000000101';" >/dev/null
+check "DEV-5 : un prix modifié fait une NOUVELLE version (trigger)" "2|1" \
+  "$(sql "select version||'|'||version_envoyee from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+check "DEV-6 : un paiement_statut inconnu est refusé" "1" \
+  "$(sql "update public.devis set paiement_statut='bidon' where id='d0d0d0d0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'devis_paiement_statut_valide' || true)"
+# Journal : écrit par le serveur (sans session), lu par l'administrateur seul.
+JOURNAL=$(su postgres -c "psql -U postgres -d verif -c \"insert into public.devis_envois (devis_id, version, etape, destinataire, envoi_cle, fournisseur)
+  values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'tentative', 'test-qa-claude-helixcar@example.invalid', 'tentative-1', 'resend'),
+         ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'acceptee_prestataire', 'test-qa-claude-helixcar@example.invalid', 'tentative-1', 'resend');\"" 2>&1 | grep -E '^INSERT|ERROR')
+check "DEV-7 : le serveur (sans session) journalise tentative et acceptation séparément" "INSERT 0 2" "$JOURNAL"
+check "DEV-8 : une étape inconnue est refusée" "1" \
+  "$(sql "insert into public.devis_envois (devis_id, version, etape) values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'envoye');" 2>&1 | grep -c 'devis_envois_etape_check' || true)"
+check "DEV-9 : un administrateur lit le journal" "2" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+check "DEV-10 : un client authentifié ne lit RIEN du journal" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+check "DEV-11 : un partenaire non plus" "0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+ANON_J=$(sql "begin; select public.devenir_anon(); select count(*) from public.devis_envois; commit;" 2>&1 | tail -1)
+check "DEV-12 : anon n'a aucun droit sur le journal" "1" \
+  "$(printf '%s' "$ANON_J" | grep -ci 'permission denied' || true)"
+check "DEV-13 : personne n'écrit dans le journal depuis le navigateur (admin compris : aucune politique d'insertion)" "INSERT 0 0|refus" \
+  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+     insert into public.devis_envois (devis_id, version, etape) values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'echec'); commit;\"" 2>&1 \
+     | grep -qiE 'row-level security|permission denied' && echo 'INSERT 0 0|refus' || echo 'passe')"
+check "DEV-14 : le journal ne contient aucun jeton ni secret (colonnes)" "0" \
+  "$(sql "select count(*) from information_schema.columns where table_name='devis_envois' and column_name ilike '%token%' or table_name='devis_envois' and column_name ilike '%jeton%';")"
+errDev106b=$(appliquer migrations/106_devis_versions_et_journal_envois.sql)
+check "DEV-15 : 106 se rejoue sans erreur" "" "$errDev106b"
+check "DEV-16 : un seul trigger de version, une seule politique de lecture" "1|1" \
+  "$(sql "select (select count(*) from pg_trigger where tgname='trg_devis_nouvelle_version')||'|'||(select count(*) from pg_policies where tablename='devis_envois');")"
+check "DEV-17 : aucun objet Stripe créé par ce lot" "0" \
+  "$(sql "select count(*) from information_schema.columns where column_name ilike '%stripe%';")"
+
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="
 for e in "${ECHECS[@]:-}"; do [ -n "$e" ] && echo "  - $e"; done

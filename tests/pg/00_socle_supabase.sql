@@ -120,6 +120,18 @@ create table if not exists public.devis (
   statut          text not null default 'brouillon',
   date_generation timestamptz not null default now()
 );
+-- Colonnes REELLEMENT presentes en production, lues et ecrites par la
+-- fonction serveur devis-secure (index.ts) : sans elles, la migration
+-- 106 et son journal ne pourraient pas etre eprouves.
+alter table public.devis
+  add column if not exists date_envoi             timestamptz,
+  add column if not exists date_acceptation       timestamptz,
+  add column if not exists date_refus             timestamptz,
+  add column if not exists motif_refus            text,
+  add column if not exists pdf_path               text,
+  add column if not exists acceptation_token_hash text,
+  add column if not exists date_expiration_token  timestamptz,
+  add column if not exists snapshot_devis         jsonb;
 
 create table if not exists public.missions (
   id           uuid primary key default gen_random_uuid(),

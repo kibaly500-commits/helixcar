@@ -3649,6 +3649,9 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// LOT A01-036 — plus d'URL absolue dispersée : la fonction devis-secure
+// est adressée à partir de l'URL du projet Supabase, unique et centralisée.
+const URL_FONCTION_DEVIS = SUPABASE_URL + '/functions/v1/devis-secure';
 
 // RESTAURATION DE « SESSION DÉMO » SUPPRIMÉE.
 // Elle ouvrait l'interface sur la seule foi d'une valeur écrite dans le
@@ -4026,16 +4029,61 @@ async function sbAuthReferencesDevis() {
   return tous;
 }
 
+// Colonnes RELUES après chaque écriture : l'identifiant interne
+// canonique en tête. C'est lui — jamais la référence humaine DEV-…, ni
+// un attribut du DOM — que l'envoi transmet au serveur.
+const CHAMPS_DEVIS_DASHBOARD = 'id, reference, client_id, prix, statut, date_generation, date_envoi, ' +
+  'date_acceptation, date_refus, version, version_envoyee, version_acceptee, consulte_le, paiement_statut';
+
+// LOT Q01 — CAUSE RACINE de « Identifiant interne du devis introuvable ».
+// L'insertion partait en `return=minimal` : le serveur ne renvoyait
+// rien, et la page gardait en mémoire un devis SANS `id`. Le bouton
+// « Envoyer au client » échouait donc juste après la génération, tant
+// que la liste n'avait pas été rechargée. L'insertion RELIT désormais
+// la ligne écrite et renvoie son identifiant canonique.
 async function sbAuthInsertDevis(corps) {
-  const res = await sbAuth.from('devis').insert(corps);
+  const res = await sbAuth.from('devis').insert(corps).select(CHAMPS_DEVIS_DASHBOARD);
   if (res.error) throw new Error('Supabase devis (création) : ' + res.error.message);
-  return null;
+  // Écriture réussie mais relecture vide (cas anormal) : on ne jette
+  // pas — le devis EXISTE — on laisse l'appelant le récupérer par la
+  // relation demande/référence.
+  return (res.data && res.data[0]) || null;
 }
 
-async function sbAuthPatchDevisParReference(reference, corps) {
-  const res = await sbAuth.from('devis').update(corps).eq('reference', reference);
+// Mise à jour par IDENTIFIANT quand il est connu, par référence sinon
+// (anciens objets en mémoire). Relit la ligne : le trigger de version
+// (migration 106) peut l'avoir changée.
+async function sbAuthPatchDevis(d, corps) {
+  let req = sbAuth.from('devis').update(corps);
+  req = d && d.id ? req.eq('id', d.id) : req.eq('reference', d.reference);
+  const res = await req.select(CHAMPS_DEVIS_DASHBOARD).maybeSingle();
   if (res.error) throw new Error('Supabase devis (mise à jour) : ' + res.error.message);
-  return null;
+  return res.data || null;
+}
+
+// RÉCUPÉRATION SÛRE : le devis canonique d'une demande, relu côté
+// serveur à partir de la relation demande → devis (et de la référence
+// si elle est connue). Sert quand l'objet en mémoire a perdu son
+// identifiant — jamais pour créer un second devis.
+async function sbAuthDevisCanonique(clientId, reference) {
+  let req = sbAuth.from('devis').select(CHAMPS_DEVIS_DASHBOARD).eq('client_id', clientId);
+  if (reference) req = req.eq('reference', reference);
+  const res = await req.order('date_generation', { ascending: false }).limit(1).maybeSingle();
+  if (res.error) throw new Error('Supabase devis (relecture) : ' + res.error.message);
+  return res.data || null;
+}
+
+// Journal des envois (migration 106) : préparation, tentative,
+// acceptation par le prestataire, échec — lecture réservée aux
+// administrateurs par la RLS.
+async function sbAuthJournalEnvois(devisId) {
+  const res = await sbAuth.from('devis_envois')
+    .select('etape, version, destinataire, renvoi, fournisseur, detail, created_at')
+    .eq('devis_id', devisId)
+    .order('created_at', { ascending: false })
+    .limit(12);
+  if (res.error) throw new Error('Supabase devis_envois (lecture) : ' + res.error.message);
+  return res.data || [];
 }
 
 // ── RATTACHEMENT APRÈS CONFIRMATION D'ADRESSE ───────────────
@@ -8554,7 +8602,14 @@ function _libelleSource(c) {
   return base;
 }
 
-function _statutDevisBadge(statut) {
+function _statutDevisBadge(statut, d) {
+  // LOT Q01 — états SÉPARÉS (Q01-005) : l'acceptation ouvre le paiement
+  // en attente ; « payé » n'est posé que par un événement serveur
+  // authentifié (aucun dans ce lot) ; la consultation est distinguée de
+  // l'envoi.
+  if (d && statut === 'accepte' && d.paiement_statut === 'paye') return '<span class="badge badge-active">PAYÉ</span>';
+  if (d && statut === 'accepte' && d.paiement_statut === 'en_attente') return '<span class="badge badge-active">ACCEPTÉ — PAIEMENT EN ATTENTE</span>';
+  if (d && statut === 'envoye' && d.consulte_le) return '<span class="badge badge-success">DEVIS CONSULTÉ</span>';
   // V50.5D.3B — Objectif 1/3 : cas accepte/refuse manquants, seule
   // cause du bug d'affichage — statut réel déjà correctement relu
   // depuis Supabase (SELECT * dans sbAuthListeDevisTriee), seul
@@ -8919,22 +8974,33 @@ function _blocDevisHtml(c) {
   if (tableManquante) {
     html += '<div style="font-size:.82rem;color:#8a6d3b">Génération indisponible : la table <b>devis</b> doit d\'abord être créée dans Supabase.</div>';
   } else if (d) {
-    html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1e8e4e">✓ Devis ' + _escapeHtml(d.reference) + ' généré</b></div>';
-    html += '<div style="font-size:.85rem;margin-bottom:10px">Montant : <b>' + Number(d.prix).toLocaleString('fr-FR') + ' €</b> — ' + _statutDevisBadge(d.statut) + '</div>';
-    if (d.statut === 'envoye') {
-      html += '<div style="font-size:.8rem;color:#666;margin-bottom:10px">Envoyé le ' + _dvDateHeure(d.date_envoi) + ' à ' + _escapeHtml(_dv(c.email)) + '</div>';
+    var version = d.version || 1;
+    html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1e8e4e">✓ Devis ' + _escapeHtml(d.reference) + ' généré</b>' +
+      (version > 1 ? ' <span style="color:#666;font-weight:400">— version ' + version + '</span>' : '') + '</div>';
+    html += '<div style="font-size:.85rem;margin-bottom:10px">Montant : <b>' + Number(d.prix).toLocaleString('fr-FR') + ' €</b> — ' + _statutDevisBadge(d.statut, d) + '</div>';
+    if (d.statut === 'envoye' || d.statut === 'accepte' || d.statut === 'refuse') {
+      if (d.date_envoi) {
+        html += '<div style="font-size:.8rem;color:#666;margin-bottom:4px">Envoyé le ' + _dvDateHeure(d.date_envoi) + ' à ' + _escapeHtml(_dv(c.email)) +
+          (d.version_envoyee ? ' (version ' + d.version_envoyee + ')' : '') + '</div>';
+      }
+      if (d.consulte_le) {
+        html += '<div style="font-size:.8rem;color:#666;margin-bottom:4px">Consulté par le client le ' + _dvDateHeure(d.consulte_le) + '</div>';
+      }
+      if (d.version_envoyee && d.version_envoyee !== version) {
+        html += '<div style="font-size:.8rem;color:#8a6d3b;margin-bottom:6px">Le prix a changé depuis l\'envoi : la version ' + version + ' doit être renvoyée, puis acceptée à nouveau.</div>';
+      }
     }
-    html += '<div id="devis-erreur-envoi" style="display:none;font-size:.82rem;color:#c0392b;margin-bottom:10px"></div>';
+    html += '<div id="devis-erreur-envoi" class="hc-note" role="alert"></div>';
+    html += '<div id="devis-succes-envoi" class="hc-note hc-note--succes" role="status"></div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
       '<button class="btn btn-sm btn-secondary" ' + actionHtml('previsualiserDevis', [c.id]) + '>Voir le devis</button>' +
       '<button class="btn btn-sm btn-secondary" ' + actionHtml('modifierPrixDevis', [c.id]) + '>Modifier le prix</button>' +
       ((d.statut === 'accepte' || d.statut === 'refuse') ? '' :
         '<button class="btn btn-sm btn-primary" id="btn-envoyer-devis" ' + actionHtml('envoyerDevis', [c.id]) + '>' +
           (d.statut === 'envoye' ? 'Renvoyer au client' : 'Envoyer au client') + '</button>') +
-      '<button class="btn btn-sm" id="btn-test-qa-prepare" ' + actionHtml('testerPrepareDevisQA', [c.id]) + ' ' +
-        'title="Mode test interne : appelle PREPARE sans envoyer d\'email ni changer le statut" ' +
-        'style="background:#fff3cd;border:1px dashed #b8860b;color:#7a5c00;font-size:.76rem">🧪 Tester PREPARE (QA)</button>' +
       '</div>';
+    // Journal des envois : chargé après le rendu, réservé aux admins.
+    html += '<div id="devis-journal-envois" data-devis-id="' + _escapeHtml(String(d.id || '')) + '" style="margin-top:10px;font-size:.78rem;color:#666"></div>';
   } else {
     html += '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
       '<div><label style="display:block;font-size:.78rem;color:#666;margin-bottom:4px">' +
@@ -8947,6 +9013,32 @@ function _blocDevisHtml(c) {
   }
   html += '</div>';
   return html;
+}
+
+// Affiche le journal des envois du devis ouvert (décision C11 : chaque
+// fait — préparation, tentative, acceptation par le prestataire,
+// échec — a sa ligne ; aucun n'est confondu avec une réception en boîte).
+function _afficherJournalEnvois() {
+  var zone = document.getElementById('devis-journal-envois');
+  if (!zone) return Promise.resolve();
+  var devisId = zone.getAttribute('data-devis-id');
+  if (!devisId || !_sbAuthPret()) return Promise.resolve();
+  var LIB = { preparation: 'PDF et lien préparés', tentative: 'Tentative d\'envoi',
+              acceptee_prestataire: 'Envoi accepté par le prestataire d\'e-mail',
+              echec: 'Échec', reception_prouvee: 'Réception prouvée' };
+  return sbAuthJournalEnvois(devisId).then(function (lignes) {
+    if (!lignes.length) { zone.innerHTML = ''; return; }
+    zone.innerHTML = '<div style="font-weight:600;margin-bottom:4px">Historique des envois</div>' +
+      lignes.map(function (l) {
+        return '<div>' + _dvDateHeure(l.created_at) + ' — ' + _escapeHtml(LIB[l.etape] || l.etape) +
+          (l.renvoi ? ' (renvoi)' : '') + ' — version ' + _escapeHtml(String(l.version || 1)) +
+          (l.destinataire ? ' — ' + _escapeHtml(l.destinataire) : '') +
+          (l.detail ? ' — ' + _escapeHtml(l.detail) : '') + '</div>';
+      }).join('');
+  }).catch(function (e) {
+    console.error('journal des envois :', e && e.message);
+    zone.innerHTML = '';
+  });
 }
 
 function ouvrirFicheDemande(clientId) {
@@ -9458,6 +9550,7 @@ function ouvrirFicheDemande(clientId) {
   if (corps) corps.innerHTML = html;
   openModal('fiche-demande');
     rendreInfosDemandeAdmin(c);
+  _afficherJournalEnvois();
 }
 
 // ── GÉNÉRATION DU DEVIS ─────────────────────────────────────
@@ -9492,13 +9585,23 @@ function genererDevis(clientId) {
       prix: prix,
       statut: 'genere',
       date_generation: new Date().toISOString()
-    }).then(function() {
-      _devisParClient[String(c.id)] = {
+    }).then(function(ligne) {
+      // LOT Q01 — la ligne RELUE porte l'identifiant canonique. Si la
+      // relecture n'a rien rendu (cas anormal), on récupère le devis
+      // par la relation demande/référence — jamais un second devis.
+      if (ligne && ligne.id) return ligne;
+      return sbAuthDevisCanonique(c.id, reference);
+    }).then(function(ligne) {
+      _devisParClient[String(c.id)] = ligne || {
         reference: reference, client_id: c.id, prix: prix,
         statut: 'genere', date_generation: new Date().toISOString()
       };
       _rendreTableDemandesDevis(_demandesDevisListe);
       ouvrirFicheDemande(c.id);
+      if (!ligne || !ligne.id) {
+        _hcNote('devis-erreur-envoi',
+          'Le devis est enregistré mais son identifiant n\'a pas pu être relu. Rechargez la liste avant de l\'envoyer.', 'erreur');
+      }
     });
   }).catch(function(e) {
     console.error('Erreur genererDevis:', e);
@@ -9516,9 +9619,12 @@ function modifierPrixDevis(clientId) {
   var prix = parseFloat(saisie);
   if (!prix || prix <= 0) { alert('Prix invalide.'); return; }
 
-  sbAuthPatchDevisParReference(d.reference, { prix: prix, statut: 'genere' }).then(function() {
-    d.prix = prix;
-    d.statut = 'genere';
+  // Un prix modifié fait une NOUVELLE VERSION (trigger, migration 106) :
+  // le statut repasse à « genere » et le devis devra être renvoyé puis
+  // accepté à nouveau. La ligne est relue pour afficher la version réelle.
+  sbAuthPatchDevis(d, { prix: prix, statut: 'genere' }).then(function(ligne) {
+    if (ligne && ligne.id) { _devisParClient[String(clientId)] = ligne; }
+    else { d.prix = prix; d.statut = 'genere'; }
     _rendreTableDemandesDevis(_demandesDevisListe);
     ouvrirFicheDemande(clientId);
   }).catch(function(e) {
@@ -12037,7 +12143,7 @@ function _corpsDevis(c, d) {
 // secret ajouté au HTML, aucun service_role côté navigateur). Reçoit
 // le PDF déjà généré par le Dashboard (base64Pdf) et le transmet TEL
 // QUEL — jamais régénéré ni modifié ici.
-async function prepareDevisSecure(devisId, base64Pdf) {
+async function prepareDevisSecure(devisId, base64Pdf, envoiCle) {
   if (!sbAuth) {
     return { ok: false, code: 'NO_AUTH_CLIENT', message: 'Client Supabase Auth indisponible.' };
   }
@@ -12063,7 +12169,7 @@ async function prepareDevisSecure(devisId, base64Pdf) {
       pdfBase64Length: base64Pdf ? base64Pdf.length : 0,
       devisId: devisId
     });
-    reponse = await fetch('https://zsetmqnmmupqbkgqbjbo.supabase.co/functions/v1/devis-secure', {
+    reponse = await fetch(URL_FONCTION_DEVIS, {
       method: 'POST',
       headers: {
         // JWT de la session admin réelle — jamais loggé.
@@ -12076,7 +12182,8 @@ async function prepareDevisSecure(devisId, base64Pdf) {
         action: 'prepare',
         devis_id: devisId,
         pdf_base64: base64Pdf,
-        pdf_mime: 'application/pdf'
+        pdf_mime: 'application/pdf',
+        envoi_cle: envoiCle || undefined
       })
     });
   } catch (e) {
@@ -12108,7 +12215,7 @@ async function prepareDevisSecure(devisId, base64Pdf) {
   // Le token brut n'est ni loggé, ni affiché, ni stocké ici — renvoyé
   // uniquement à l'appelant interne pour un usage immédiat par le futur
   // flux d'envoi (non branché à cette étape).
-  return { ok: true, token: corpsReponse.token, date_expiration_token: corpsReponse.date_expiration_token };
+  return { ok: true, token: corpsReponse.token, date_expiration_token: corpsReponse.date_expiration_token, version: corpsReponse.version };
 }
 
 // V50.5D.3 — Appelle l'action `send_email` de l'Edge Function
@@ -12116,7 +12223,7 @@ async function prepareDevisSecure(devisId, base64Pdf) {
 // Resend, exécuté entièrement côté serveur. Même patron d'authentification
 // que prepareDevisSecure (session admin réelle, jamais de secret côté
 // navigateur). Le token brut n'est transmis qu'une fois, jamais loggé.
-async function envoyerEmailDevisSecure(devisId, tokenBrut) {
+async function envoyerEmailDevisSecure(devisId, tokenBrut, envoiCle, renvoi) {
   if (!sbAuth) {
     return { ok: false, code: 'NO_AUTH_CLIENT', message: 'Client Supabase Auth indisponible.' };
   }
@@ -12134,7 +12241,7 @@ async function envoyerEmailDevisSecure(devisId, tokenBrut) {
 
   var reponse;
   try {
-    reponse = await fetch('https://zsetmqnmmupqbkgqbjbo.supabase.co/functions/v1/devis-secure', {
+    reponse = await fetch(URL_FONCTION_DEVIS, {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + session.access_token,
@@ -12143,7 +12250,12 @@ async function envoyerEmailDevisSecure(devisId, tokenBrut) {
       body: JSON.stringify({
         action: 'send_email',
         devis_id: devisId,
-        token: tokenBrut
+        token: tokenBrut,
+        // Clé d'idempotence de CETTE tentative : un double clic ou une
+        // réponse perdue ne provoque jamais un second e-mail.
+        envoi_cle: envoiCle,
+        // Renvoi EXPLICITE depuis « envoyé » : jamais implicite.
+        renvoi: renvoi === true
       })
     });
   } catch (e) {
@@ -12166,209 +12278,175 @@ async function envoyerEmailDevisSecure(devisId, tokenBrut) {
     };
   }
 
-  return { ok: true, statut: corpsReponse.statut, date_envoi: corpsReponse.date_envoi };
+  return { ok: true, statut: corpsReponse.statut, date_envoi: corpsReponse.date_envoi,
+           version_envoyee: corpsReponse.version_envoyee, deja_envoye: corpsReponse.deja_envoye === true };
 }
 
-// Mode TEST-QA admin : exécute PREPARE sur un devis existant SANS
-// jamais envoyer d'email, changer son statut, créer une mission ou
-// déclencher un paiement. N'affiche que "PREPARE OK" ou l'erreur —
-// jamais le token, conformément à la consigne.
-async function testerPrepareDevisQA(clientId) {
-  var c = _demandesDevisListe.filter(function(x) { return String(x.id) === String(clientId); })[0];
-  var d = _devisParClient[String(clientId)];
-  if (!c || !d) { alert('Devis introuvable pour ce test.'); return; }
-  if (!d.id) {
-    alert('❌ PREPARE (test) : identifiant interne du devis introuvable (d.id absent).');
-    return;
-  }
+// LOT Q01 / X01 — l'ancien « mode test interne » du bouton d'envoi
+// (un bouton QA appelant PREPARE) est retiré : il régénérait le lien sécurisé d'un devis déjà
+// envoyé — invalidant celui reçu par le client — et redirigeait
+// l'administrateur vers la page client avec le jeton dans l'URL. Un
+// outil de test n'a pas sa place dans l'interface de production.
 
-  var btn = document.getElementById('btn-test-qa-prepare');
-  if (btn) { btn.disabled = true; btn.textContent = 'Test en cours…'; }
-
-  // Même extraction que envoyerDevis() ci-dessous : un seul PDF généré,
-  // jamais régénéré une seconde fois pour cet appel.
-  var base64Pdf;
+// Identifiant aléatoire d'une tentative d'envoi (clé d'idempotence).
+function _hcCleTentative() {
   try {
-    var doc = _construirePdfDevis(c, d);
-    var dataUri = doc.output('datauristring');
-    var sep = dataUri.indexOf('base64,');
-    if (sep === -1) throw new Error('Format PDF inattendu');
-    base64Pdf = dataUri.substring(sep + 7);
-    if (!base64Pdf) throw new Error('PDF vide');
-  } catch (e) {
-    console.error('Erreur génération PDF (test PREPARE).');
-    if (btn) { btn.disabled = false; btn.textContent = 'Tester PREPARE (QA)'; }
-    alert('❌ PREPARE (test) : impossible de générer le PDF.');
-    return;
-  }
-
-  var resultat = await prepareDevisSecure(d.id, base64Pdf);
-  if (btn) { btn.disabled = false; btn.textContent = 'Tester PREPARE (QA)'; }
-
-  if (resultat.ok) {
-    // V50.5C.2B — abandon de window.open (instabilité constatée avec
-    // certains navigateurs de test) : redirection de l'ONGLET COURANT
-    // uniquement. Le token brut (resultat.token, format confirmé
-    // retourné par prepareDevisSecure() : { ok:true, token,
-    // date_expiration_token }) reste une variable locale, jamais logué,
-    // jamais affiché, jamais stocké dans localStorage/sessionStorage,
-    // jamais écrit dans le DOM — utilisé uniquement pour construire
-    // l'URL client ci-dessous.
-    var tokenBrut = resultat.token;
-    if (!tokenBrut || typeof tokenBrut !== 'string') {
-      alert('❌ PREPARE (test) : PREPARE a réussi mais aucun token exploitable n\'a été reçu.');
-      return; // reste sur le Dashboard, aucune redirection
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    if (window.crypto && window.crypto.getRandomValues) {
+      var t = new Uint8Array(16); window.crypto.getRandomValues(t);
+      return Array.prototype.map.call(t, function (o) { return ('0' + o.toString(16)).slice(-2); }).join('');
     }
-
-    var urlClient = _hcOrigineOfficielle() + '/devis.html?token=' + encodeURIComponent(tokenBrut);
-    tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
-    window.location.href = urlClient; // redirection de l'onglet courant, aucun _blank
-  } else {
-    alert('❌ PREPARE : ' + resultat.message);
-  }
+  } catch (e) {}
+  return String(Date.now()) + Math.random().toString(36).slice(2, 12);
 }
 
+function _devisErreurEnvoi(texte) { _hcNote('devis-erreur-envoi', texte, 'erreur'); _hcNote('devis-succes-envoi', ''); }
+function _devisSuccesEnvoi(texte) { _hcNote('devis-succes-envoi', texte, 'succes'); _hcNote('devis-erreur-envoi', ''); }
+function _devisBoutonEnvoi(libelle, actif) {
+  var btn = document.getElementById('btn-envoyer-devis');
+  if (btn) { btn.disabled = !actif; btn.textContent = libelle; }
+}
+
+// LOT Q01 — l'envoi RÉEL du devis.
+//   1. L'identifiant interne CANONIQUE est exigé. S'il manque en
+//      mémoire, il est RÉCUPÉRÉ côté serveur (relation demande/devis,
+//      référence) — jamais inventé, jamais un second devis.
+//   2. PREPARE fige le PDF et le lien pour la version courante.
+//   3. SEND_EMAIL envoie ; le statut « envoyé » n'est posé que par le
+//      serveur, après acceptation réelle par le prestataire.
+//   4. Un renvoi depuis « envoyé » est EXPLICITE (confirmé, tracé).
+//   5. Chaque tentative porte une clé d'idempotence : double clic et
+//      réponse perdue ne produisent jamais deux e-mails.
+// Aucune alerte native : les messages passent par le composant HelixCar.
 function envoyerDevis(clientId) {
   if (_envoiDevisEnCours) return; // anti double-clic, inchangé
   var c = _demandesDevisListe.filter(function(x) { return String(x.id) === String(clientId); })[0];
   var d = _devisParClient[String(clientId)];
   if (!c || !d) return;
-  if (!c.email) { alert('Ce client n\'a pas d\'adresse email renseignée.'); return; }
-  if (!d.id) { alert('❌ Identifiant interne du devis introuvable (d.id absent). Envoi impossible.'); return; }
-
-  // V50.5D.3A — Objectif 1 : verrou spécifique au flux métier
-  // envoyerDevis() — AVANT toute génération PDF et AVANT tout PREPARE.
-  // actionPrepare() côté serveur garde volontairement son allowlist
-  // ['genere', 'envoye'] pour d'autres usages (QA, renvoi futur) : ce
-  // verrou-ci ne restreint que ce bouton précis, pas l'architecture
-  // serveur.
-  if (d.statut !== 'genere') {
-    alert('Ce devis a déjà été envoyé ou n\'est plus dans un état permettant un premier envoi.');
-    return; // aucun PDF généré, aucun PREPARE, aucun send_email
-  }
-
-  if (!confirm('Envoyer le devis ' + d.reference + ' à ' + c.email + ' ?')) return;
-
-  // V50.5D.3 — EmailJS n'est plus utilisé pour l'envoi des devis
-  // (pièces jointes dynamiques non supportées par notre abonnement) :
-  // l'email et son PDF joint sont désormais envoyés côté SERVEUR via
-  // Resend, dans l'Edge Function devis-secure (action send_email).
-  // EmailJS (SDK, init, template_n26gasf) reste strictement inchangé
-  // et utilisé par tous les autres emails du Dashboard.
-
-  // CAS 1 — une seule génération du PDF par tentative, réutilisée pour
-  // PREPARE ci-dessous — jamais une seconde génération, jamais
-  // renvoyée une deuxième fois par la suite.
-  var base64Pdf;
-  try {
-    var doc = _construirePdfDevis(c, d);
-    var dataUri = doc.output('datauristring');
-    var sep = dataUri.indexOf('base64,');
-    if (sep === -1) throw new Error('Format PDF inattendu');
-    base64Pdf = dataUri.substring(sep + 7);
-    if (!base64Pdf) throw new Error('PDF vide');
-  } catch (e) {
-    console.error('Erreur génération PDF:', e);
-    alert('❌ Impossible de générer le PDF. Le devis reste enregistré.');
-    return; // CAS 1 : aucun PREPARE, aucun email, statut inchangé
-  }
+  if (!c.email) { _devisErreurEnvoi('Ce client n\'a pas d\'adresse e-mail renseignée : aucun envoi possible.'); return; }
+  if (!_sbAuthPret()) { _devisErreurEnvoi('Session administrateur requise. Reconnectez-vous puis réessayez.'); return; }
 
   _envoiDevisEnCours = true;
-  var btn = document.getElementById('btn-envoyer-devis');
-  var erreurEl = document.getElementById('devis-erreur-envoi');
-  if (btn) { btn.disabled = true; btn.textContent = 'Préparation sécurisée…'; }
-  if (erreurEl) erreurEl.style.display = 'none';
+  _devisBoutonEnvoi('Vérification…', false);
 
-  // PREPARE avant tout envoi — réutilise le helper déjà validé
-  // (prepareDevisSecure), aucun second mécanisme PREPARE recréé.
-  prepareDevisSecure(d.id, base64Pdf).then(function (resultatPrepare) {
-    if (!resultatPrepare.ok) {
-      // CAS 2 — PREPARE échoue : aucun email, statut inchangé.
+  // ÉTAPE 0 — l'identifiant canonique, relu côté serveur s'il manque.
+  var pDevis = d.id ? Promise.resolve(d) : sbAuthDevisCanonique(c.id, d.reference).then(function (ligne) {
+    if (ligne && ligne.id) {
+      // On conserve ce que la ligne serveur dit : elle fait foi.
+      _devisParClient[String(clientId)] = ligne;
+      return ligne;
+    }
+    return null;
+  }).catch(function (e) {
+    console.error('récupération du devis :', e && e.message);
+    return null;
+  });
+
+  pDevis.then(function (dv) {
+    if (!dv || !dv.id) {
       _envoiDevisEnCours = false;
-      if (btn) { btn.disabled = false; btn.textContent = 'Envoyer au client'; }
-      if (erreurEl) {
-        erreurEl.style.display = 'block';
-        erreurEl.textContent = 'La préparation sécurisée du devis a échoué (' + resultatPrepare.message + '). Aucun email n\'a été envoyé.';
-      }
+      _devisBoutonEnvoi(d.statut === 'envoye' ? 'Renvoyer au client' : 'Envoyer au client', true);
+      _devisErreurEnvoi('Identifiant interne du devis introuvable, même après relecture côté serveur. ' +
+        'Aucun e-mail n\'a été envoyé et le statut n\'a pas changé. Rechargez la liste des demandes ; ' +
+        'si le problème persiste, contactez le support technique (référence ' + _dv(d.reference) + ').');
+      return;
+    }
+    d = dv;
+
+    if (d.statut === 'accepte' || d.statut === 'refuse') {
+      _envoiDevisEnCours = false;
+      _devisBoutonEnvoi('Envoyer au client', false);
+      _devisErreurEnvoi('Ce devis a déjà reçu une réponse du client : aucun nouvel envoi n\'est possible.');
+      return;
+    }
+    var renvoi = d.statut === 'envoye';
+    var question = renvoi
+      ? 'Renvoyer le devis ' + d.reference + ' à ' + c.email + ' ? Un nouvel e-mail partira, avec un nouveau lien ; l\'ancien lien ne fonctionnera plus.'
+      : 'Envoyer le devis ' + d.reference + ' à ' + c.email + ' ?';
+    if (!confirm(question)) {
+      _envoiDevisEnCours = false;
+      _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
       return;
     }
 
-    // Le token brut ne transite qu'en mémoire, jamais logué, jamais
-    // affiché — transmis une seule fois à l'Edge Function pour
-    // vérification puis construction du lien côté serveur.
-    var tokenBrut = resultatPrepare.token;
-    if (!tokenBrut || typeof tokenBrut !== 'string') {
-      // CAS 3 — PREPARE réussit mais token absent/invalide : aucun email.
+    // Une seule génération du PDF par tentative, réutilisée pour PREPARE.
+    var base64Pdf;
+    try {
+      var doc = _construirePdfDevis(c, d);
+      var dataUri = doc.output('datauristring');
+      var sep = dataUri.indexOf('base64,');
+      if (sep === -1) throw new Error('Format PDF inattendu');
+      base64Pdf = dataUri.substring(sep + 7);
+      if (!base64Pdf) throw new Error('PDF vide');
+    } catch (e) {
+      console.error('Erreur génération PDF:', e);
       _envoiDevisEnCours = false;
-      if (btn) { btn.disabled = false; btn.textContent = 'Envoyer au client'; }
-      if (erreurEl) {
-        erreurEl.style.display = 'block';
-        erreurEl.textContent = 'La préparation a réussi mais aucun lien sécurisé n\'a pu être généré. Aucun email n\'a été envoyé.';
-      }
+      _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
+      _devisErreurEnvoi('Impossible de générer le PDF. Le devis reste enregistré, aucun e-mail n\'a été envoyé.');
       return;
     }
 
-    if (btn) { btn.textContent = 'Envoi en cours…'; }
+    var envoiCle = _hcCleTentative();
+    _devisBoutonEnvoi('Préparation sécurisée…', false);
+    _hcNote('devis-erreur-envoi', '');
 
-    envoyerEmailDevisSecure(d.id, tokenBrut).then(function (resultatEnvoi) {
-      tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
-
-      if (resultatEnvoi.ok) {
-        // Succès complet — le PATCH statut/date_envoi a déjà été fait
-        // CÔTÉ SERVEUR par send_email, uniquement après confirmation
-        // réelle de Resend. Le Dashboard ne fait plus lui-même ce PATCH
-        // pour cette opération : il ne fait que relire l'état renvoyé.
-        d.statut = resultatEnvoi.statut || 'envoye';
-        d.date_envoi = resultatEnvoi.date_envoi || new Date().toISOString();
+    prepareDevisSecure(d.id, base64Pdf, envoiCle).then(function (resultatPrepare) {
+      if (!resultatPrepare.ok) {
         _envoiDevisEnCours = false;
-        if (btn) { btn.disabled = false; btn.textContent = 'Envoyer au client'; }
-        _rendreTableDemandesDevis(_demandesDevisListe);
-        ouvrirFicheDemande(clientId);
-        alert('✓ Devis ' + d.reference + ' envoyé à ' + c.email + ' avec le PDF en pièce jointe et le lien de consultation sécurisé.');
+        _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
+        _devisErreurEnvoi('La préparation sécurisée du devis a échoué (' + resultatPrepare.message + '). Aucun e-mail n\'a été envoyé.');
+        return;
+      }
+      var tokenBrut = resultatPrepare.token;
+      if (!tokenBrut || typeof tokenBrut !== 'string') {
+        _envoiDevisEnCours = false;
+        _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
+        _devisErreurEnvoi('La préparation a réussi mais aucun lien sécurisé n\'a pu être généré. Aucun e-mail n\'a été envoyé.');
         return;
       }
 
-      _envoiDevisEnCours = false;
-      if (resultatEnvoi.code === 'EMAIL_SENT_DB_UPDATE_FAILED') {
-        // CAS 5 — CRITIQUE : l'email est réellement parti (confirmé par
-        // le serveur), mais la mise à jour du statut a échoué côté
-        // serveur. Ne jamais prétendre que l'email n'est pas parti, ne
-        // jamais relancer automatiquement un nouvel envoi.
-        if (btn) { btn.disabled = false; btn.textContent = 'Vérifier le dossier'; }
-        if (erreurEl) {
-          erreurEl.style.display = 'block';
-          erreurEl.textContent = 'Le devis a été envoyé au client, mais la mise à jour du statut a échoué. Vérifiez le dossier avant de réessayer.';
+      _devisBoutonEnvoi('Envoi en cours…', false);
+      envoyerEmailDevisSecure(d.id, tokenBrut, envoiCle, renvoi).then(function (resultatEnvoi) {
+        tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
+        _envoiDevisEnCours = false;
+
+        if (resultatEnvoi.ok) {
+          // Le statut a été posé CÔTÉ SERVEUR, après acceptation réelle
+          // par le prestataire. La page relit l'état renvoyé.
+          d.statut = resultatEnvoi.statut || 'envoye';
+          d.date_envoi = resultatEnvoi.date_envoi || d.date_envoi || new Date().toISOString();
+          if (resultatEnvoi.version_envoyee) d.version_envoyee = resultatEnvoi.version_envoyee;
+          _devisParClient[String(clientId)] = d;
+          _rendreTableDemandesDevis(_demandesDevisListe);
+          ouvrirFicheDemande(clientId);
+          _devisSuccesEnvoi((resultatEnvoi.deja_envoye ? 'Cet envoi avait déjà été accepté par le prestataire : aucun second e-mail. ' : '') +
+            'Devis ' + d.reference + (renvoi ? ' renvoyé' : ' envoyé') + ' à ' + c.email +
+            ' avec le PDF en pièce jointe et le lien sécurisé. La réception en boîte n\'est pas prouvée par cet écran.');
+          return;
         }
-        alert('⚠️ Le devis a été envoyé au client, mais la mise à jour du statut a échoué. Vérifiez le dossier avant de réessayer.');
-        return;
-      }
 
-      // CAS 4 — envoi serveur échoué (Resend, ou tout autre refus de
-      // send_email) : statut reste 'genere', date_envoi non modifiée.
-      // Le token/PDF déjà créés par PREPARE peuvent rester en place —
-      // un nouvel essai refera un nouveau PREPARE qui les invalidera.
-      if (btn) { btn.disabled = false; btn.textContent = 'Réessayer l\'envoi'; }
-      if (erreurEl) {
-        erreurEl.style.display = 'block';
-        erreurEl.textContent = 'L\'envoi de l\'email a échoué (' + resultatEnvoi.message + '). Le devis est conservé — clique sur « Réessayer l\'envoi ».';
-      }
-    }).catch(function (erreurInattendue) {
-      console.error('Erreur inattendue send_email:', erreurInattendue);
+        if (resultatEnvoi.code === 'EMAIL_SENT_DB_UPDATE_FAILED') {
+          _devisBoutonEnvoi('Vérifier le dossier', true);
+          _devisErreurEnvoi('L\'e-mail est parti, mais l\'enregistrement de l\'état a échoué côté serveur. Vérifiez le dossier (historique des envois) avant tout nouvel envoi.');
+          _afficherJournalEnvois();
+          return;
+        }
+        _devisBoutonEnvoi('Réessayer l\'envoi', true);
+        _devisErreurEnvoi('L\'envoi a échoué (' + resultatEnvoi.message + '). Le devis est conservé, son statut n\'a pas changé : vous pouvez réessayer.');
+        _afficherJournalEnvois();
+      }).catch(function (erreurInattendue) {
+        console.error('Erreur inattendue send_email:', erreurInattendue);
+        _envoiDevisEnCours = false;
+        _devisBoutonEnvoi('Réessayer l\'envoi', true);
+        _devisErreurEnvoi('Une erreur inattendue est survenue pendant l\'envoi. Vérifiez l\'historique des envois avant de réessayer.');
+        _afficherJournalEnvois();
+      });
+    }).catch(function (erreurPrepareInattendue) {
+      console.error('Erreur inattendue PREPARE:', erreurPrepareInattendue);
       _envoiDevisEnCours = false;
-      if (btn) { btn.disabled = false; btn.textContent = 'Réessayer l\'envoi'; }
-      if (erreurEl) {
-        erreurEl.style.display = 'block';
-        erreurEl.textContent = 'Une erreur inattendue est survenue pendant l\'envoi. Vérifiez le dossier avant de réessayer.';
-      }
+      _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
+      _devisErreurEnvoi('Une erreur inattendue est survenue pendant la préparation. Aucun e-mail n\'a été envoyé.');
     });
-  }).catch(function (erreurPrepareInattendue) {
-    console.error('Erreur inattendue PREPARE:', erreurPrepareInattendue);
-    _envoiDevisEnCours = false;
-    if (btn) { btn.disabled = false; btn.textContent = 'Envoyer au client'; }
-    if (erreurEl) {
-      erreurEl.style.display = 'block';
-      erreurEl.textContent = 'Une erreur inattendue est survenue pendant la préparation. Aucun email n\'a été envoyé.';
-    }
   });
 }
 
@@ -12792,7 +12870,7 @@ function declencherChampFichier(id) {
   'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
   'ouvrirPhotosMission', 'ouvrirVideoCandidature', 'previsualiserDevis',
   'refuserConvoyeur', 'showPage', 'supprimerConvoyeur', 'terminerMission',
-  'terminerMissionNettoyage', 'testerPrepareDevisQA', 'validerConvoyeur',
+  'terminerMissionNettoyage', 'validerConvoyeur',
   'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',
   'voirPhotosMission'
 ].forEach(function (nom) {

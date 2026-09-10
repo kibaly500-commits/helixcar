@@ -306,8 +306,11 @@
 (function () {
   "use strict";
 
-  var URL_FONCTION = "https://zsetmqnmmupqbkgqbjbo.supabase.co/functions/v1/devis-secure";
-  var HOSTNAME_SUPABASE_ATTENDU = "zsetmqnmmupqbkgqbjbo.supabase.co";
+  // Une seule constante de projet : l'URL de la fonction et l'hôte
+  // attendu des PDF signés en dérivent (lot A01-036).
+  var SUPABASE_URL = "https://zsetmqnmmupqbkgqbjbo.supabase.co";
+  var URL_FONCTION = SUPABASE_URL + "/functions/v1/devis-secure";
+  var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
 
@@ -369,9 +372,12 @@
       '</div>';
   }
 
-  function badgeStatut(statut) {
+  function badgeStatut(statut, devis) {
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Accepté — payé</span>';
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'en_attente') return '<span class="badge accepte">Accepté — paiement en attente</span>';
     if (statut === 'accepte') return '<span class="badge accepte">Accepté</span>';
     if (statut === 'refuse') return '<span class="badge refuse">Refusé</span>';
+    if (devis && devis.version_obsolete) return '<span class="badge attente">Devis mis à jour</span>';
     return '<span class="badge attente">En attente de réponse</span>';
   }
 
@@ -506,6 +512,7 @@
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           afficherErreurModal((corps && corps.message) || 'Une erreur est survenue. Merci de réessayer.');
+          if (corps && corps.code === 'VERSION_OBSOLETE') { fermerModal(); chargerEtAfficherDevis(); }
           return;
         }
         fermerModal();
@@ -564,9 +571,19 @@
   }
 
   function blocActions(devis) {
+    // LOT Q01 — une version modifiée après envoi ne peut plus être
+    // acceptée ni refusée : le client le lit, sans bouton trompeur.
+    if (devis.version_obsolete) {
+      return '<div class="statut-final refuse" style="background:#FDF0D5;color:#5C4200"><div><strong>Ce devis a été mis à jour</strong>' +
+        'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.</div></div>';
+    }
     if (devis.statut === 'accepte') {
+      var suite = devis.paiement_statut === 'en_attente'
+        ? ' Le paiement vous sera proposé prochainement.'
+        : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
       return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
         (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
+        echapperHtml(suite) +
         '</div></div>';
     }
     if (devis.statut === 'refuse') {
@@ -590,7 +607,7 @@
     html += '<div class="entete-devis">';
     html += '<div><div class="titre-devis">Votre devis</div><div class="reference">' + echapperHtml(devis.reference || '—') + '</div></div>';
     html += '</div>';
-    html += '<div>' + badgeStatut(devis.statut) + '</div>';
+    html += '<div>' + badgeStatut(devis.statut, devis) + '</div>';
     html += blocPdf(devis);
     html += blocActions(devis);
 
@@ -630,6 +647,8 @@
           var code = corps && corps.code;
           if (code === 'INVALID_OR_EXPIRED_LINK') {
             afficherEtatSimple('🔒', 'Lien invalide ou expiré.', 'Ce lien de devis est invalide ou a expiré. Contactez HelixCar si vous pensez qu\'il s\'agit d\'une erreur.');
+          } else if (code === 'VERSION_OBSOLETE') {
+            afficherEtatSimple('🔄', 'Ce devis a été mis à jour.', 'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.');
           } else {
             afficherEtatSimple('⚠️', 'Impossible d\'afficher ce devis.', 'Une erreur est survenue. Merci de réessayer dans quelques instants.');
           }
