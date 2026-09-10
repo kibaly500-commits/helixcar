@@ -2069,7 +2069,7 @@ body.scroll-verrouille { overflow: hidden; }
             <button class="btn btn-sm btn-primary" onclick="showPage('client-fidelite')">Voir détail →</button>
           </div>
           <div id="client-fidelite-carte">
-            <div style="font-size:.85rem;color:#666">Chargement…</div>
+            <div class="fid-note">Chargement…</div>
           </div>
         </div>
       </div>
@@ -2152,7 +2152,7 @@ body.scroll-verrouille { overflow: hidden; }
            une Box mystère tous les 2 000 points, sans plafond. -->
       <div class="page" id="page-client-fidelite">
         <div id="client-fidelite-page">
-          <div class="card"><div style="font-size:.85rem;color:#666">Chargement…</div></div>
+          <div class="card"><div class="fid-note">Chargement…</div></div>
         </div>
       </div>
 
@@ -3179,16 +3179,17 @@ function _fidHtmlIndisponible() {
     + 'Impossible de charger votre programme de fidélité pour le moment.</div>';
 }
 
-function _fidHtmlResume(o) {
+function _fidHtmlResume(o, prefixe) {
+  prefixe = prefixe || '';
   var vide = o.solde === 0;
   var prochain = escapeHtml(o.prochainNom || '') + ' · ' + _fidPoints(o.prochainSeuil);
   return '<div class="fid-resume">'
     + '<div class="fid-chiffre"><div class="fid-chiffre-label">Points cumulés</div>'
-    +   '<div class="fid-chiffre-val" id="fid-solde">' + _fidNombre(o.solde) + '</div></div>'
+    +   '<div class="fid-chiffre-val" id="' + prefixe + 'fid-solde">' + _fidNombre(o.solde) + '</div></div>'
     + '<div class="fid-chiffre"><div class="fid-chiffre-label">Prochain palier</div>'
-    +   '<div class="fid-chiffre-val" id="fid-prochain">' + prochain + '</div></div>'
+    +   '<div class="fid-chiffre-val" id="' + prefixe + 'fid-prochain">' + prochain + '</div></div>'
     + '<div class="fid-chiffre"><div class="fid-chiffre-label">Points restants</div>'
-    +   '<div class="fid-chiffre-val" id="fid-restants">' + _fidNombre(o.pointsRestants) + '</div></div>'
+    +   '<div class="fid-chiffre-val" id="' + prefixe + 'fid-restants">' + _fidNombre(o.pointsRestants) + '</div></div>'
     + '</div>'
     + '<div class="fidelite-bar-wrap">'
     +   '<div class="fidelite-bar-track"><div class="fidelite-bar-fill" style="width:' + _fidPourcentage(o) + '%"></div></div>'
@@ -3197,7 +3198,7 @@ function _fidHtmlResume(o) {
     +   '</span><span>' + prochain + '</span></div>'
     + '</div>'
     + (vide
-        ? '<div class="fid-note" id="fid-vide">Vous n\'avez pas encore de points. Ils sont crédités lorsqu\'une '
+        ? '<div class="fid-note" id="' + prefixe + 'fid-vide">Vous n\'avez pas encore de points. Ils vous sont attribués lorsqu\'une '
           + 'prestation est terminée et payée : 1 € payé = 1 point.</div>'
         : '<div class="fid-note">1 € payé sur une prestation terminée = 1 point. Les points n\'expirent pas.</div>');
 }
@@ -3282,7 +3283,7 @@ function rendreFideliteCarte(donnees) {
   if (!zone) return;
   var o = _fidLire(donnees && donnees.fidelite);
   if (!o) { zone.innerHTML = _fidHtmlIndisponible(); return; }
-  zone.innerHTML = _fidHtmlResume(o);
+  zone.innerHTML = _fidHtmlResume(o, 'carte-');
 }
 
 async function loadFideliteClient() {

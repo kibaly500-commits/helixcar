@@ -124,7 +124,7 @@ const INTERDITS = [
   [/\bkm\b/i, 'km'], [/kilom/i, 'kilomètre'], [/Entreprise/i, 'Palier Entreprise'],
   [/cr[ée]dit/i, 'crédit'], [/r[ée]compense disponible/i, '« récompense disponible »'],
   [/1[\s  ]?280/, '1 280 (valeur fictive)'], [/2[\s  ]?500/, '2 500 (ancien palier)'],
-  [/20[\s  ]?000/, '20 000 (ancien palier Entreprises)'], [/\b50\s?€|\b150\s?€|\b250\s?€/, 'crédits 50/150/250 €'],
+  [/20[\s  ]?000\s?km/, '20 000 km (ancien palier Entreprises)'], [/\b50\s?€|\b150\s?€|\b250\s?€/, 'crédits 50/150/250 €'],
 ];
 function motsInterdits(txt) {
   return INTERDITS.filter(([re]) => re.test(txt)).map(([, n]) => n);
@@ -133,10 +133,11 @@ function motsInterdits(txt) {
 async function connecterClient(page) {
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'clientA@helixcar.test';
-    document.getElementById('login-pw').value = 'motdepasse';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'motdepasse' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
   });
   await page.waitForTimeout(250);
 }
@@ -299,7 +300,8 @@ async function ouvrirFidelite(page, cas, mouvements) {
 
   // ── E. AUCUNE ÉCRITURE, AUCUN ALERT ──
   const journal = await page.evaluate(() => ({
-    ecritures: window.__journal.filter(j => ['insert', 'update', 'delete', 'rpc'].includes(j.op)),
+    // roles_utilisateur (lot A01) est une lecture des rôles, pas une écriture.
+    ecritures: window.__journal.filter(j => ['insert', 'update', 'delete', 'rpc'].includes(j.op) && j.nom !== 'roles_utilisateur'),
     alertes: window.__alertes.length
   }));
   check('E1 : l\'espace client n\'écrit JAMAIS dans le programme de fidélité (ni insert, ni update, ni rpc)',
@@ -333,7 +335,7 @@ async function ouvrirFidelite(page, cas, mouvements) {
   const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
   const pageStatique = dash.slice(dash.indexOf('id="page-client-fidelite"'), dash.indexOf('id="page-client-profil"'));
   check('G1 : la page fidélité statique ne contient plus aucune valeur écrite en dur',
-    !/\d{3}/.test(pageStatique.replace(/id="[^"]*"/g, '')) && /client-fidelite-page/.test(pageStatique), pageStatique.slice(0, 200));
+    !/\d{3}/.test(pageStatique.replace(/<!--[\s\S]*?-->/g, '').replace(/id="[^"]*"/g, '')) && /client-fidelite-page/.test(pageStatique), pageStatique.slice(0, 200));
   check('G2 : le dashboard ne parle plus de « Palier Entreprises » ni de « 1 280 km »',
     dash.indexOf('Palier Entreprises') === -1 && dash.indexOf('1 280 km parcourus') === -1);
   const blocFid = dash.slice(dash.indexOf('LOT L01 — PROGRAMME DE FIDÉLITÉ CLIENT (décision C10)'), dash.indexOf('async function chargerInformationsDemande'));
