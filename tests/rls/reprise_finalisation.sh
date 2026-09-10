@@ -1,5 +1,5 @@
 # Exécuté après 112 par t_rls.sh : vrais privilèges et transitions SQL.
-for n in 113_devis_identite_et_archives 114_video_verification_serveur; do
+for n in 107_reconciliation_partenaires_historiques 113_devis_identite_et_archives 114_video_verification_serveur 115_durcissement_analyseur_supabase; do
   err=$(appliquer "migrations/$n.sql");check "$n : migration appliquée" "" "$err"
   err=$(appliquer "migrations/$n.sql");check "$n : seconde application idempotente" "" "$err"
 done
@@ -27,3 +27,12 @@ check "V01 : mesures vérifiées finalisées ensemble" "FINALISEE" "$(sql "selec
 check "V01 : répétition sans deuxième finalisation" "DEJA_FINALISEE" "$(sql "select public.finaliser_video_verifiee('$VID_ID','$v1')->>'code';")"
 check "V01 : fichier immuable et vraie durée persistés" "t" "$(sql "select video_chemin='$vfinal' and video_mime='video/quicktime' and video_taille_octets=225000000 and video_duree_secondes=119 and video_envoyee_le is not null and video_envoi_chemin is null from public.convoyeurs where id='$VID_ID';")"
 check "V01 : admin ne falsifie pas la mesure" "1" "$(sqlAdmin "update public.convoyeurs set video_duree_secondes=1 where id='$VID_ID';" | grep -c 'finalisée par le serveur' || true)"
+
+check "SEC : anon n'exécute qu'un point SECURITY DEFINER explicitement public" "creer_demande_avec_vehicules(jsonb,jsonb,text,text)" \
+ "$(sql "select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosecdef and has_function_privilege('anon',p.oid,'execute') order by 1;")"
+check "SEC : aucune table publique sans RLS" "0" \
+ "$(sql "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity;")"
+check "SEC : aucun search_path mutable dans public" "0" \
+ "$(sql "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and not exists(select 1 from unnest(coalesce(p.proconfig,'{}')) x where x like 'search_path=%');")"
+check "SEC : création directe de mission anonyme retirée" "0" \
+ "$(sql "select count(*) from pg_policies where schemaname='public' and tablename='missions' and 'anon'=any(roles) and cmd='INSERT';")"
