@@ -111,10 +111,11 @@ async function ouvrirDashboard(navigateur, roles) {
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate((r) => { window.__roles = r; }, roles);
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'deux@helixcar.test';
-    document.getElementById('login-pw').value = 'motdepasse-test-qa';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'deux@helixcar.test', password: 'motdepasse-test-qa' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('deux@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'deux@helixcar.test', __uid);
   });
   await page.waitForTimeout(250);
   page.jsErrors = erreurs;
@@ -250,10 +251,11 @@ function etatEspace(page) {
     await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
     await page.evaluate(() => { window.__rpcEnPanne = true; window.__roles = ['client']; });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'deux@helixcar.test';
-      document.getElementById('login-pw').value = 'motdepasse-test-qa';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'deux@helixcar.test', password: 'motdepasse-test-qa' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('deux@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'deux@helixcar.test', __uid);
     });
     await page.waitForTimeout(300);
     const e = await etatEspace(page);

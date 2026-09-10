@@ -115,10 +115,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
 
@@ -215,10 +216,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
     await page.evaluate(() => ouvrirNouvelleDemande());
@@ -260,10 +262,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
     const usurpation = await page.evaluate(async () => {

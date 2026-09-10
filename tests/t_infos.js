@@ -152,10 +152,11 @@ window.emailjs = { init: function () {},
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   page.on('dialog', d => d.accept());
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'clientA@helixcar.test';
-    document.getElementById('login-pw').value = 'x';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     showPage('client-infos');
   });
   await page.waitForTimeout(600);

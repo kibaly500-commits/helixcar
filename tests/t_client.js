@@ -147,10 +147,11 @@ window.fetch = function (url, options) {
   // ── A. ESPACE CLIENT : session réelle et action visible ──
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   const connexion = await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'clientA@helixcar.test';
-    document.getElementById('login-pw').value = 'motdepasse';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'motdepasse' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     return {
       role: currentRole,
       client: !!window._currentClient,

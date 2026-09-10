@@ -632,8 +632,9 @@ async function modesParVehicule(page, n) {
   }
 
   // ══ G. LE FAUX SUCCÈS DE CRÉATION DE COMPTE ══
-  check('G1 : la phrase « compte créé » dépend de l\'issue réelle du signUp',
-    /_compteEtat === 'cree' \|\| _compteEtat === 'existe_deja' \|\| _compteEtat === 'non_demande'/.test(idx));
+  check('G1 : la phrase « compte créé » n\'accompagne QUE la création réelle (lot A01)',
+    /_compteEtat === 'cree'\) \{\s*html \+= '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé/.test(idx)
+    && (idx.match(/hc-succes-txt">Votre compte HelixCar est maintenant créé/g) || []).length === 1);
   check('G2 : un refus du serveur est dit tel quel',
     /_compteEtat === 'echec'/.test(idx) && /Votre compte n\\'a pas pu être créé/.test(idx));
   check('G3 : une adresse déjà inscrite n\'est pas un échec',

@@ -16,6 +16,10 @@ const INIT = `
 window.__db = { decisions: [], historique: [], convoyeurs: {}, emails: [] };
 window.__role = 'admin';               // admin | partenaire | client
 window.__journal = [];
+// Lot A01 : la déconnexion renvoie au site public ; en file://, on observe
+// la destination demandée au lieu de naviguer.
+window.__retours = [];
+window._hcRetourVitrine = function (motif) { window.__retours.push(motif || ''); };
 window.__refusRls = function (table, operation) {
   if (window.__role === 'admin') return null;
   return { message: 'new row violates row-level security policy for table "' + table + '"' };

@@ -67,12 +67,23 @@ html, body { height: 100%; font-family: 'Instrument Sans', system-ui, sans-serif
 .table-wrap { border-radius: var(--radius); }
 .card .table-wrap, .card .card { border: 0; }
 
-/* ── LOGIN SCREEN ── */
+/* ── ÉCRAN D'ATTENTE (lot A01) ──
+   Le Dashboard ne porte plus aucun formulaire de connexion : la
+   connexion se fait sur le site (index.html, fenêtre « Connexion »), et
+   cette page ne fait qu'attendre la session, puis ouvrir l'espace que
+   le serveur confirme. L'écran ci-dessous est donc neutre : ni choix de
+   rôle, ni champ. */
 #login-screen {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--navy);
   position: fixed; inset: 0; z-index: 999;
 }
+/* La fenêtre « Nouveau mot de passe » doit rester atteignable même
+   quand l'écran d'attente est affiché (aucun espace ouvert). */
+#modal-reinit-mdp { z-index: 1000; }
+/* Edge (Chromium) ajoute son propre bouton de révélation dans les
+   champs de mot de passe : il ferait doublon avec le bouton œil. */
+input::-ms-reveal, input::-ms-clear { display: none; }
 
 .login-box {
   background: var(--white); border-radius: 20px;
@@ -98,20 +109,6 @@ html, body { height: 100%; font-family: 'Instrument Sans', system-ui, sans-serif
 }
 
 .login-box p { color: var(--gray); font-size: 0.88rem; margin-bottom: 28px; }
-
-.login-tabs {
-  display: flex; gap: 0; margin-bottom: 24px;
-  background: var(--gray-light); border-radius: 8px; padding: 4px;
-}
-
-.login-tab {
-  flex: 1; padding: 8px; text-align: center;
-  border-radius: 6px; cursor: pointer;
-  font-size: 0.82rem; font-weight: 600; color: var(--gray);
-  transition: all var(--t); border: none; background: transparent;
-}
-
-.login-tab.active { background: var(--white); color: var(--black); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 6px; }
@@ -483,12 +480,6 @@ body.scroll-verrouille { overflow: hidden; }
    vitrine. `background-clip: text` limite le fond peint par le
    navigateur aux seules glyphes ; l'autocompletion, les suggestions et
    les gestionnaires de mots de passe continuent de fonctionner. */
-#login-email:-webkit-autofill,
-#login-email:-webkit-autofill:hover,
-#login-email:-webkit-autofill:focus,
-#login-pw:-webkit-autofill,
-#login-pw:-webkit-autofill:hover,
-#login-pw:-webkit-autofill:focus,
 #modal-reinit-mdp input:-webkit-autofill,
 #modal-reinit-mdp input:-webkit-autofill:hover,
 #modal-reinit-mdp input:-webkit-autofill:focus {
@@ -498,8 +489,6 @@ body.scroll-verrouille { overflow: hidden; }
   caret-color: #3A3F45;
   transition: background-color 100000s ease-in-out 0s;
 }
-#login-email:autofill,
-#login-pw:autofill,
 #modal-reinit-mdp input:autofill {
   background-clip: text;
   -webkit-text-fill-color: #3A3F45;
@@ -939,76 +928,52 @@ body.scroll-verrouille { overflow: hidden; }
   .btn-oeil:hover, .btn-oeil:focus-visible { color: var(--red); }
   .btn-oeil.actif { color: var(--red); }
 </style>
-<div id="login-screen">
-  <div class="login-box">
+<div id="login-screen" aria-live="polite">
+  <div class="login-box" role="status">
     <div class="login-logo">
       <div class="logo-badge">HC</div>
       HelixCar
     </div>
-    <h2>Connexion à votre espace</h2>
-    <p>Choisissez votre profil pour accéder à votre tableau de bord.</p>
-
-    <div class="login-tabs">
-      <button class="login-tab active" onclick="setLoginRole('admin', this)">⚙️ Admin</button>
-      <button class="login-tab" onclick="setLoginRole('convoyeur', this)">🚗 Convoyeur</button>
-      <button class="login-tab" onclick="setLoginRole('client', this)">👤 Client</button>
+    <h2 id="attente-titre">Ouverture de votre espace…</h2>
+    <p id="attente-texte">Un instant : votre session est en cours de vérification.</p>
+    <div id="attente-lien" style="display:none">
+      <a href="index.html#connexion" class="btn btn-primary btn-full" style="text-decoration:none">Aller à la page de connexion</a>
     </div>
-
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="login-email" placeholder="votre@email.com">
-    </div>
-    <div class="form-group">
-      <label>Mot de passe</label>
-      <div style="position:relative">
-        <input type="password" id="login-pw" placeholder="••••••••" data-mdp="1"
-               autocomplete="current-password" style="padding-right:44px" onkeydown="if(event.key==='Enter')doLogin()">
-        <button type="button" class="btn-oeil" onclick="basculerMotDePasse('login-pw', this)"
-                aria-label="Afficher le mot de passe" title="Afficher le mot de passe" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-      </div>
-      <div style="text-align:right;margin-top:6px">
-        <a href="#" onclick="ouvrirMotDePasseOublie(event)" style="font-size:.78rem;color:var(--blue-mid);text-decoration:none">Mot de passe oublié ?</a>
-      </div>
-    </div>
-
-    <div id="login-alert" class="hc-note" role="alert">Identifiants incorrects. Réessayez.</div>
-
-    <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="doLogin()">
-      Se connecter →
-    </button>
-
-    <p style="text-align:center;font-size:0.78rem;color:var(--gray);margin-top:16px">
-      Convoyeur : connexion avec le compte créé après validation du dossier.<br>
-      Client : connexion avec le compte créé lors de votre demande.
-    </p>
   </div>
 </div>
 
 <script>
-// Masque l'écran de connexion tout de suite s'il y a une VRAIE session
-// Supabase à restaurer, avant même que le reste de la page ne s'affiche
-// — évite le flash visuel pendant que la logique complète de
-// restauration (plus bas) fait le vrai travail. L'ancienne clé de
-// « session démo » n'est plus consultée : elle permettait de masquer
-// l'écran de connexion sans qu'aucune session n'existe.
-(function masquagePrecoceLoginScreen() {
+// Lot A01 — garde précoce, exécutée avant tout le reste de la page.
+//  * Un lien de récupération périmé ou altéré (error_code dans le
+//    fragment) est renvoyé au site public, qui sait l'annoncer.
+//  * Un fragment de récupération (type=recovery) est mémorisé AVANT que
+//    la bibliothèque Supabase ne le consomme : la session qui va
+//    s'ouvrir sert à choisir un mot de passe, jamais à ouvrir un espace.
+//  * Filet : si ni session ni écran de récupération n'apparaît, la page
+//    ne reste pas muette — elle propose la page de connexion du site.
+(function gardePrecoceDashboard() {
   try {
-    var aUneSessionSupabase = Object.keys(localStorage).some(function(k) {
-      return k.indexOf('-auth-token') !== -1;
-    });
-    if (aUneSessionSupabase) {
-      document.getElementById('login-screen').style.display = 'none';
-      // Filet de sécurité : si la vraie restauration (plus bas dans la page) échoue en
-      // silence, on ne veut pas rester sur une page blanche — on rétablit l'écran de connexion.
-      setTimeout(function() {
-        var appEl = document.getElementById('app');
-        var loginEl = document.getElementById('login-screen');
-        if (appEl && loginEl && !appEl.classList.contains('visible')) {
-          loginEl.style.display = 'flex';
-        }
-      }, 3000);
+    var brut = (location.hash || '').replace(/^#/, '') + '&' + (location.search || '').replace(/^\?/, '');
+    var p = new URLSearchParams(brut);
+    if (p.get('error_code') || p.get('error')) {
+      location.replace('index.html' + (location.hash || ''));
+      return;
     }
+    if (p.get('type') === 'recovery') window._hcRecuperationAttendue = true;
   } catch (e) {}
+  setTimeout(function () {
+    try {
+      var appEl = document.getElementById('app');
+      var modale = document.getElementById('modal-reinit-mdp');
+      if (window._hcAttenteResolue) return;
+      if (appEl && appEl.classList.contains('visible')) return;
+      if (modale && modale.classList.contains('open')) return;
+      if (typeof window._hcEcranAttente === 'function') {
+        window._hcEcranAttente('Votre session n\'a pas pu être vérifiée.',
+          'Reconnectez-vous depuis le site pour ouvrir votre espace.', true);
+      }
+    } catch (e) {}
+  }, 12000);
 })();
 </script>
 
@@ -2492,6 +2457,10 @@ body.scroll-verrouille { overflow: hidden; }
 
       <button class="btn btn-primary btn-full" id="reinit-valider"
               onclick="enregistrerNouveauMotDePasse()">Enregistrer le mot de passe</button>
+      <p style="text-align:center;margin:14px 0 0">
+        <a href="#" id="reinit-annuler" onclick="_hcAbandonnerReinit(event)"
+           style="font-size:.8rem;color:#666">Annuler et revenir au site</a>
+      </p>
     </div>
 
     <div id="reinit-succes" style="display:none">
@@ -2527,11 +2496,10 @@ body.scroll-verrouille { overflow: hidden; }
 <script>
 // ── STATE ──────────────────────────────────────────────────
 let currentRole = 'admin';
-let loginRole = 'admin';
 
 // TABLE DE COMPTES DE DÉMONSTRATION SUPPRIMÉE.
-// Les trois rôles s'authentifient réellement via Supabase Auth
-// (doLoginAdmin, doLoginConvoyeur, doLoginClient). Cette table ne
+// Les trois rôles s'authentifient réellement via Supabase Auth, depuis
+// la fenêtre « Connexion » du site public (lot A01). Cette table ne
 // servait plus à aucune connexion, mais elle restait lue au démarrage
 // par une restauration de « session démo » : il suffisait d'écrire
 // helixcar_demo_email dans le stockage local du navigateur pour ouvrir
@@ -2622,43 +2590,32 @@ function reinitialiserAffichageMotsDePasse(racine) {
   }
 }
 
-// ── LOGIN ──────────────────────────────────────────────────
-function setLoginRole(role, btn) {
-  loginRole = role;
-  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
+// ── CONNEXION ──────────────────────────────────────────────
+// Lot A01 — cette page ne connecte plus personne. La connexion se fait
+// sur le site public (fenêtre « Connexion », un seul formulaire, sans
+// choix de rôle) ; la session est ensuite reconnue ici par
+// onAuthStateChange, et l'espace ouvert est celui que le serveur
+// confirme (roles_utilisateur). Sans session, la page renvoie au site.
+
+// Écran d'attente : un seul point d'écriture, jamais de HTML injecté.
+function _hcEcranAttente(titre, texte, avecLien) {
+  const t = document.getElementById('attente-titre');
+  const x = document.getElementById('attente-texte');
+  const l = document.getElementById('attente-lien');
+  const e = document.getElementById('login-screen');
+  if (t && titre) t.textContent = titre;
+  if (x) x.textContent = texte || '';
+  if (l) l.style.display = avecLien ? '' : 'none';
+  if (e) e.style.display = 'flex';
 }
 
-async function doLogin() {
-  try {
-    const emailEl = document.getElementById('login-email');
-    const pwEl    = document.getElementById('login-pw');
-    const alertEl = document.getElementById('login-alert');
-    if (!emailEl || !pwEl) { alert('Erreur : champs introuvables'); return; }
-    const email = emailEl.value.trim().toLowerCase();
-    const pw    = pwEl.value;
-    if (alertEl) _hcNoteEl(alertEl, '');
-
-    if (loginRole === 'convoyeur') {
-      await doLoginConvoyeur(email, pw, alertEl);
-      return;
-    }
-
-    // V50.5B.2 — l'admin utilise désormais une vraie session Supabase
-    // Auth, vérifiée ensuite contre public.admins (cf. finaliserSessionAdmin).
-    if (loginRole === 'admin') {
-      await doLoginAdmin(email, pw, alertEl);
-      return;
-    }
-
-    // Client : vraie session Supabase Auth, comme l'admin et le
-    // convoyeur. Le compte est créé par le formulaire public au moment
-    // où le client choisit son mot de passe.
-    await doLoginClient(email, pw, alertEl);
-  } catch(e) {
-    alert('Erreur connexion : ' + e.message);
-  }
-}
+// Retour au site public, sur la fenêtre « Connexion ». Le motif ne
+// porte qu'un mot-clé : le site choisit lui-même la phrase affichée.
+// Remplaçable par les tests (aucune navigation réelle en file://).
+window._hcRetourVitrine = window._hcRetourVitrine || function (motif) {
+  const cible = 'index.html#connexion' + (motif ? '=' + encodeURIComponent(motif) : '');
+  try { location.replace(cible); } catch (e) { location.href = cible; }
+};
 
 async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEchec) {
   if (signOutSiEchec === undefined) signOutSiEchec = true;
@@ -2751,80 +2708,9 @@ async function remplirStatsAccueilConvoyeur(conv) {
   }
 }
 
-async function doLoginConvoyeur(email, pw, alertEl) {
-  const btn = document.querySelector('#login-screen .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
-  try {
-    const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
-    if (error) {
-      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
-      return;
-    }
-    const uidConv = data.user ? data.user.id : null;
-    const okConv = await finaliserSessionConvoyeur(email, alertEl, uidConv);
-    if (okConv !== false) await _hcPreparerRoles('partenaire', email, uidConv);
-  } catch (e) {
-    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
-    console.error(e);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
-  }
-}
-
-// V50.5B.2 — patron STRICTEMENT calqué sur doLoginConvoyeur/
-// finaliserSessionConvoyeur ci-dessus (non modifiées). Une fonction
-// générique partagée aurait légèrement réduit la duplication, mais
-// aurait nécessité de toucher finaliserSessionConvoyeur — un code déjà
-// en production et non concerné par cette version — pour un gain
-// marginal sur une fonction de quelques lignes. Le risque de régression
-// sur l'auth convoyeur existante l'emportait sur ce gain : préférée une
-// duplication ciblée et lisible, plutôt qu'une abstraction partagée
-// touchant du code fonctionnel non demandé ici.
-async function doLoginAdmin(email, pw, alertEl) {
-  const btn = document.querySelector('#login-screen .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
-  try {
-    const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
-    if (error) {
-      if (alertEl) _hcNoteEl(alertEl, error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message);
-      return;
-    }
-    const uidAdm = data.user ? data.user.id : null;
-    const okAdm = await finaliserSessionAdmin(email, alertEl, uidAdm);
-    if (okAdm !== false) await _hcPreparerRoles('admin', email, uidAdm);
-  } catch (e) {
-    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
-    console.error(e);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
-  }
-}
-
-async function doLoginClient(email, pw, alertEl) {
-  const btn = document.querySelector('#login-screen .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
-  try {
-    const { data, error } = await sbAuth.auth.signInWithPassword({ email: email, password: pw });
-    if (error) {
-      if (alertEl) {
-        _hcNoteEl(alertEl, '' + (error.message === 'Invalid login credentials'
-          ? 'Email ou mot de passe incorrect.' : error.message));
-      }
-      return;
-    }
-    const uid = data.user ? data.user.id : null;
-    const ok = await finaliserSessionClient(email, alertEl, uid);
-    // LOT B1 — une connexion directe doit offrir le meme choix qu'une
-    // arrivee par onAuthStateChange : sans cela, une personne a deux
-    // casquettes n'atteignait jamais la seconde.
-    if (ok !== false) await _hcPreparerRoles('client', email, uid);
-  } catch (e) {
-    if (alertEl) _hcNoteEl(alertEl, 'Erreur de connexion (voir la console).');
-    console.error(e);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter →'; }
-  }
-}
+// Lot A01 — doLoginConvoyeur / doLoginAdmin / doLoginClient ont été
+// retirées avec l'écran de connexion à trois onglets : le rôle n'est
+// plus choisi par la personne, il est confirmé par le serveur.
 
 // Ouvre l'espace client sur une session RÉELLE. On lit la vue
 // v_mes_demandes (jamais la table clients) : elle filtre elle-même sur
@@ -3338,8 +3224,8 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 window._hcRolesAutorises = [];
 window._hcRoleActif = null;
 
-const HC_LIB_ROLE = { admin: 'Admin', partenaire: 'Convoyeur', client: 'Client' };
-const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace convoyeur', client: 'Espace client' };
+const HC_LIB_ROLE = { admin: 'Admin', partenaire: 'Partenaire', client: 'Client' };
+const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace partenaire', client: 'Espace client' };
 
 // Les roles REELLEMENT attribues a la session en cours. En cas de
 // panne, on repart sur une liste vide : l'ancien enchainement prend
@@ -3483,16 +3369,35 @@ function buildNav(role) {
   });
 }
 
-function doLogout() {
-  if ((window._currentConvoyeur || window._currentAdmin || window._currentClient) && sbAuth) { sbAuth.auth.signOut(); }
+// Lot A01 — la déconnexion ferme VRAIMENT la session (attendue), remet
+// à zéro tout ce que la connexion avait laissé (rôles, sélecteur
+// d'espace, barre mobile, drapeau de récupération, mémoire du dernier
+// utilisateur traité), puis renvoie au site public. Rien de l'identité
+// précédente ne peut réapparaître à la connexion suivante dans le même
+// onglet.
+async function doLogout() {
   window._currentConvoyeur = null;
   window._currentAdmin = null;
   window._currentClient = null;
+  window._hcRolesAutorises = [];
+  window._hcRoleActif = null;
+  window._dernierAuthUserTraite = null;
   try { localStorage.removeItem('helixcar_demo_email'); } catch (e) {}
+  _hcEffacerDrapeauReinit();
+  const zoneRoles = document.getElementById('sb-roles');
+  if (zoneRoles) { zoneRoles.style.display = 'none'; zoneRoles.innerHTML = ''; }
+  const mbn = document.getElementById('mobile-bottom-nav');
+  if (mbn) mbn.style.display = 'none';
+  try {
+    const menu = document.getElementById('mobile-menu-overlay');
+    if (menu && menu.style.display === 'block') _fermerMenuMobile();
+  } catch (e) {}
   document.getElementById('app').classList.remove('visible');
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('login-email').value = '';
-  document.getElementById('login-pw').value = '';
+  _hcEcranAttente('Déconnexion en cours…', '', false);
+  if (sbAuth && sbAuth.auth) {
+    try { await sbAuth.auth.signOut(); } catch (e) { console.warn('signOut :', e); }
+  }
+  _hcRetourVitrine('deconnecte');
 }
 
 // ── PAGES ──────────────────────────────────────────────────
@@ -3632,11 +3537,18 @@ function closeModal(id) {
   reinitialiserAffichageMotsDePasse(el);
   el.classList.remove('open');
   _retirerVerrouScroll('modal:' + id);
+  // Lot A01 — quitter le parcours « nouveau mot de passe », par quelque
+  // chemin que ce soit, ne laisse jamais un drapeau derrière : une
+  // connexion normale ultérieure ne rouvrira pas ce formulaire.
+  if (id === 'reinit-mdp') _hcEffacerDrapeauReinit();
 }
 
 document.querySelectorAll('.modal-overlay').forEach(o => {
   o.addEventListener('click', e => {
     if (e.target !== o) return;
+    // La fenêtre « Nouveau mot de passe » ne se ferme pas par un clic à
+    // côté : on la quitte par « Annuler » ou par « Aller à la connexion ».
+    if (o.id === 'modal-reinit-mdp') return;
     // Réutilise closeModal() (jamais dupliqué) : garantit que le clic
     // extérieur libère exactement la même clé que le bouton Fermer/X
     // de cette modale précise, jamais une autre.
@@ -3759,26 +3671,10 @@ async function envoyerLienReinitialisation(email) {
   }
 }
 
-// Entrée depuis l'écran de connexion du Dashboard.
-async function ouvrirMotDePasseOublie(e) {
-  if (e) e.preventDefault();
-  // LOT E1 — ni prompt(), ni alert() : le champ e-mail de l'ecran de
-  // connexion est deja la, et le message s'affiche dans le composant
-  // discret partage, juste sous le formulaire.
-  const champ = document.getElementById('login-email');
-  const adresse = champ ? champ.value.trim() : '';
-  if (!adresse) {
-    _hcNote('login-alert',
-      'Renseignez votre adresse e-mail ci-dessus, puis cliquez à nouveau sur « Mot de passe oublié ? ».',
-      'info');
-    if (champ) champ.focus();
-    return;
-  }
-  _hcNote('login-alert', 'Envoi en cours…', 'info');
-  const r = await envoyerLienReinitialisation(adresse);
-  if (r.enCours) return;
-  _hcNote('login-alert', r.message, r.ok ? 'info' : 'erreur');
-}
+// Lot A01 — la demande de lien (« Mot de passe oublié ? ») se fait
+// depuis la fenêtre « Connexion » du site public ; cette page n'a plus
+// de formulaire de connexion. envoyerLienReinitialisation reste ici
+// pour l'espace ouvert (changement de mot de passe depuis le profil).
 
 // ------------------------------------------------------------
 // Écran « Nouveau mot de passe »
@@ -3803,11 +3699,58 @@ function _reinitAfficherErreur(texte) {
   _hcNote('reinit-alert', texte, 'erreur');
 }
 
+// Lot A01 — le drapeau « réinitialisation en cours » ne sert qu'à UNE
+// chose : faire revenir le formulaire après un rechargement (F5) de la
+// MÊME session de récupération. Il porte l'identifiant de cette session
+// quand on le connaît, n'est honoré qu'à la reprise (INITIAL_SESSION),
+// jamais à une connexion normale (SIGNED_IN), et il est effacé à toute
+// sortie du parcours : succès, abandon, fermeture, déconnexion.
+function _hcMemoriserReinit(session) {
+  try {
+    sessionStorage.setItem('helixcar_reinit_en_cours', '1');
+    if (session && session.user && session.user.id) {
+      sessionStorage.setItem('helixcar_reinit_uid', session.user.id);
+    }
+  } catch (e) {}
+}
+function _hcEffacerDrapeauReinit() {
+  try {
+    sessionStorage.removeItem('helixcar_reinit_en_cours');
+    sessionStorage.removeItem('helixcar_reinit_uid');
+  } catch (e) {}
+}
+function _hcReinitEnCoursPour(session) {
+  let drapeau = null, uid = null;
+  try {
+    drapeau = sessionStorage.getItem('helixcar_reinit_en_cours');
+    uid = sessionStorage.getItem('helixcar_reinit_uid');
+  } catch (e) {}
+  if (drapeau !== '1') return false;
+  if (!session || !session.user) return false;
+  return !uid || uid === session.user.id;
+}
+
+// Abandon explicite du parcours (lien « Annuler »). Sans espace ouvert,
+// la session de récupération est fermée : elle ne doit jamais servir à
+// autre chose qu'à choisir un mot de passe.
+async function _hcAbandonnerReinit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  _hcEffacerDrapeauReinit();
+  window._hcReinitFermetureVolontaire = true;
+  try { closeModal('reinit-mdp'); } finally { window._hcReinitFermetureVolontaire = false; }
+  const app = document.getElementById('app');
+  if (app && app.classList.contains('visible')) return;
+  _hcEcranAttente('Retour au site…', '', false);
+  try { if (sbAuth && sbAuth.auth) await sbAuth.auth.signOut(); } catch (err) {}
+  _hcRetourVitrine('mdp-inchange');
+}
+
 function ouvrirFormulaireNouveauMotDePasse() {
   // Mémorisé pour survivre à un F5 : après rechargement, Supabase ne
   // rejoue pas l'événement PASSWORD_RECOVERY, mais la session de
   // récupération est toujours ouverte — le formulaire doit revenir.
-  try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+  _hcMemoriserReinit(null);
+  window._hcAttenteResolue = true;
   const f = document.getElementById('reinit-formulaire');
   const s = document.getElementById('reinit-succes');
   if (f) f.style.display = '';
@@ -3859,7 +3802,7 @@ async function enregistrerNouveauMotDePasse() {
       }
       return;
     }
-    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    _hcEffacerDrapeauReinit();
     const f = document.getElementById('reinit-formulaire');
     const s = document.getElementById('reinit-succes');
     if (f) f.style.display = 'none';
@@ -3872,14 +3815,18 @@ async function enregistrerNouveauMotDePasse() {
   }
 }
 
-// Ferme le parcours et rend la main à la connexion normale. On ferme la
-// session de récupération : le compte se reconnecte avec le NOUVEAU mot
-// de passe, ce qui vérifie du même coup qu'il fonctionne.
+// Ferme le parcours et rend la main à la connexion normale, sur le site
+// public. On ferme la session de récupération : le compte se reconnecte
+// avec le NOUVEAU mot de passe, ce qui vérifie du même coup qu'il
+// fonctionne.
 async function terminerReinitialisation() {
-  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
-  closeModal('reinit-mdp');
+  _hcEffacerDrapeauReinit();
+  window._hcReinitFermetureVolontaire = true;
+  try { closeModal('reinit-mdp'); } finally { window._hcReinitFermetureVolontaire = false; }
+  document.getElementById('app').classList.remove('visible');
+  _hcEcranAttente('Retour à la connexion…', '', false);
   try { if (sbAuth && sbAuth.auth) await sbAuth.auth.signOut(); } catch (e) {}
-  try { doLogout(); } catch (e) {}
+  _hcRetourVitrine('mdp-modifie');
 }
 
 // Déclenché quand la personne arrive via un lien reçu par email (confirmation de compte,
@@ -3889,27 +3836,64 @@ async function terminerReinitialisation() {
 // mémoire avant que la nouvelle (issue du lien cliqué) ait fini de s'installer.
 if (sbAuth) {
   sbAuth.auth.onAuthStateChange(function(event, session) {
+    const aSession = !!(session && session.user);
+    const modaleReinit = document.getElementById('modal-reinit-mdp');
+    const reinitOuverte = !!(modaleReinit && modaleReinit.classList.contains('open'));
+
+    // 1. Lien de récupération : le formulaire, et rien d'autre.
     if (event === 'PASSWORD_RECOVERY') {
+      _hcMemoriserReinit(session);
       ouvrirFormulaireNouveauMotDePasse();
       return;
     }
-    // Réagit à toute session valide détectée (connexion fraîche, lien cliqué, ou session
-    // déjà active en revenant sur la page) — la reconnexion automatique reste active.
-    // Reprise après un F5 en pleine réinitialisation : Supabase ne
-    // rejoue pas PASSWORD_RECOVERY, mais la session de récupération est
-    // encore ouverte. On rouvre le formulaire au lieu d'ouvrir l'espace,
-    // sans quoi la personne se retrouverait connectée sans jamais avoir
-    // choisi son nouveau mot de passe.
-    let _reinitEnCours = false;
-    try { _reinitEnCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
-    if (_reinitEnCours && session && session.user) {
+    // Le fragment portait type=recovery (mémorisé par la garde précoce)
+    // et la bibliothèque vient d'établir la session correspondante :
+    // même traitement, même si PASSWORD_RECOVERY n'était pas rejoué.
+    if (window._hcRecuperationAttendue && aSession
+        && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      window._hcRecuperationAttendue = false;
+      _hcMemoriserReinit(session);
       ouvrirFormulaireNouveauMotDePasse();
       return;
     }
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session && session.user && session.user.email) {
+
+    // 2. Aucune session : cette page ne connecte personne, elle renvoie
+    //    au site public. Un lien de récupération sans session est un
+    //    lien qui ne vaut plus rien : on le dit, sans ouvrir d'espace.
+    if (event === 'INITIAL_SESSION' && !aSession) {
+      window._hcAttenteResolue = true;
+      if (window._hcRecuperationAttendue) {
+        window._hcRecuperationAttendue = false;
+        _hcEcranAttente('Ce lien n\'est plus valide.',
+          'Il a expiré ou a déjà été utilisé. Demandez un nouveau lien depuis « Mot de passe oublié ? » sur la page de connexion.', true);
+        return;
+      }
+      _hcRetourVitrine();
+      return;
+    }
+
+    // 3. Reprise après un F5 en pleine réinitialisation : Supabase ne
+    //    rejoue pas PASSWORD_RECOVERY, mais la session de récupération
+    //    est encore ouverte. Le formulaire revient, pour la MÊME
+    //    session seulement, et seulement à la reprise — jamais à une
+    //    connexion normale ultérieure.
+    if (event === 'INITIAL_SESSION' && aSession && _hcReinitEnCoursPour(session)) {
+      ouvrirFormulaireNouveauMotDePasse();
+      return;
+    }
+    if (event === 'SIGNED_IN') _hcEffacerDrapeauReinit();
+
+    // 4. Session valide (connexion depuis le site, retour sur la page,
+    //    jeton rafraîchi) : on ouvre l'espace que le serveur confirme.
+    //    Tant que le nouveau mot de passe n'est pas choisi, aucun
+    //    espace ne s'ouvre.
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')
+        && aSession && session.user.email) {
+      if (reinitOuverte) return;
       const cleUser = session.user.id;
       if (window._dernierAuthUserTraite === cleUser) return; // déjà traité cet utilisateur, évite les doublons
       window._dernierAuthUserTraite = cleUser;
+      window._hcAttenteResolue = true;
       finaliserSessionParUid(session.user.email, session.user.id);
     }
   });
@@ -7951,6 +7935,32 @@ function openMobileMenu() {
   const nav = document.getElementById('sidebar-nav');
   const items = document.getElementById('mobile-menu-items');
   items.innerHTML = '';
+  // Lot A01 / D01 — le sélecteur d'espace (deux casquettes ou plus) est
+  // aussi proposé ici : sur mobile, la barre latérale n'est pas visible.
+  // Chaque bouton délègue au bouton d'origine : même contrôle serveur,
+  // aucune reconnexion, aucun droit élargi.
+  const zoneRoles = document.getElementById('sb-roles');
+  if (zoneRoles && zoneRoles.style.display !== 'none' && zoneRoles.children.length > 1) {
+    const bloc = document.createElement('div');
+    bloc.id = 'mobile-menu-roles';
+    bloc.setAttribute('role', 'group');
+    bloc.setAttribute('aria-label', 'Changer d\'espace');
+    bloc.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px';
+    Array.prototype.forEach.call(zoneRoles.children, function (origine) {
+      const courant = origine.getAttribute('aria-current') === 'true';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = origine.textContent;
+      b.setAttribute('data-hc-role', origine.getAttribute('data-hc-role') || '');
+      if (courant) b.setAttribute('aria-current', 'true');
+      b.style.cssText = 'flex:1;min-width:120px;padding:10px 12px;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;'
+        + 'border:1px solid rgba(255,255,255,.35);'
+        + (courant ? 'background:#fff;color:var(--navy)' : 'background:transparent;color:#fff');
+      b.onclick = function () { _fermerMenuMobile(); origine.click(); };
+      bloc.appendChild(b);
+    });
+    items.appendChild(bloc);
+  }
   nav.querySelectorAll('.nav-item').forEach(item => {
     const btn = document.createElement('button');
     btn.style.cssText = 'width:100%;text-align:left;padding:14px 16px;background:rgba(255,255,255,.06);border:none;border-radius:8px;color:#fff;font-family:DM Sans,sans-serif;font-size:.92rem;cursor:pointer;display:flex;align-items:center;gap:10px;margin-bottom:4px';

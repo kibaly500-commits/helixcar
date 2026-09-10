@@ -100,7 +100,7 @@ window.fetch = function(u, o){
   }));
   check('A1 : une clé de « session démo » n\'ouvre PLUS l\'interface',
     apresBypass.appVisible === false, JSON.stringify(apresBypass));
-  check('A2 : l\'écran de connexion reste affiché',
+  check('A2 : l\'écran d\'attente reste affiché, l\'interface fermée',
     apresBypass.loginVisible === true, JSON.stringify(apresBypass));
   check('A3 : la clé résiduelle est effacée, pas laissée derrière',
     apresBypass.cleRestante === null, String(apresBypass.cleRestante));

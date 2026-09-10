@@ -261,7 +261,7 @@ function rubriquesVisibles(page, n) {
     const couleursInterdites = /#FEF2F2|#FCA5A5|#991B1B|#ECFDF5|#6EE7B7|#065F46/;
     check('E1-3 : aucune couleur de grand encadré rouge ou vert dans index.html',
       !couleursInterdites.test(idx), (idx.match(couleursInterdites) || [])[0]);
-    const zoneAuth = dash.slice(0, dash.indexOf('function doLogin') + 4000);
+    const zoneAuth = dash.slice(0, dash.indexOf('async function finaliserSessionConvoyeur') + 4000);
     check('E1-4 : ni dans les écrans d\'authentification du Dashboard',
       !couleursInterdites.test(zoneAuth), (zoneAuth.match(couleursInterdites) || [])[0]);
 

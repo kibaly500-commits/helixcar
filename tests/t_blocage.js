@@ -30,6 +30,10 @@ function _ecrireBase() {
 window.__ecrireBase = _ecrireBase;
 window.__journal = [];
 window.__role = 'admin';
+// Lot A01 : la déconnexion renvoie au site public ; en file://, on observe
+// la destination demandée au lieu de naviguer.
+window.__retours = [];
+window._hcRetourVitrine = function (motif) { window.__retours.push(motif || ''); };
 
 function _table(nom) {
   const req = { table: nom, filtres: {} };

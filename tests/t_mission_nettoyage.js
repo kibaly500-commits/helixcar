@@ -45,7 +45,17 @@ const INCOMPLETE = Object.assign({}, DEMANDE, {
 });
 
 const INIT = `
-window.__db = { missions: [], mission_photos: [], objets: [], devis: [] };
+// Lot A01 : la déconnexion renvoie au site public ; en file://, on observe
+// la destination demandée au lieu de naviguer.
+window.__retours = [];
+window._hcRetourVitrine = function (motif) { window.__retours.push(motif || ''); };
+window.__db = { missions: [], mission_photos: [], objets: [], devis: [],
+  // Les deux partenaires du scénario existent et sont actifs : le
+  // Dashboard revérifie l'accès avant chaque écriture (verifierAccesPartenaireEnCours).
+  convoyeurs: [
+    { id: 'p-nett', prenom: 'TEST-QA', nom: 'Nettoyeur', statut: 'actif', bloque: false, activites: ['nettoyage'] },
+    { id: 'p-conv', prenom: 'TEST-QA', nom: 'Convoyeur', statut: 'actif', bloque: false, activites: ['convoyage'] }
+  ] };
 window.__demandes = [];
 window.__ecritures = [];
 window.__signatures = [];
@@ -141,6 +151,7 @@ async function _rpcMissionNettoyage(params) {
 
 window.supabase = { createClient: function(){ return {
   auth: { onAuthStateChange:function(){ return { data:{ subscription:{ unsubscribe(){} } } }; },
+          signOut: async function(){ window.__ecritures.push({ op: 'signOut' }); return {}; },
           getSession: async function(){ return { data:{ session:{ access_token:'jwt-test' } } }; } },
   rpc: async function (nom, params) {
     window.__rpc.push({ nom: nom, params: params });

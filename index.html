@@ -2379,6 +2379,10 @@
     outline: none;
   }
 
+  /* Lot A01 — Edge (Chromium) ajoute son propre bouton de révélation
+     dans les champs de mot de passe : il ferait doublon avec l'œil. */
+  input::-ms-reveal, input::-ms-clear { display: none; }
+
   #modal-client input:-webkit-autofill,
   #modal-client input:-webkit-autofill:hover,
   #modal-client input:-webkit-autofill:focus,
@@ -9225,7 +9229,35 @@ document.addEventListener('DOMContentLoaded', function () {
     _hcDemarrerDepuisEspaceClient().catch(function () {});
     _hcOuvrirCompletionDepuisUrl().catch(function () {});
   } catch (e) {}
+  try { _hcOuvrirConnexionDepuisHash(); } catch (e) {}
 });
+
+// Lot A01 — le Dashboard ne porte plus de formulaire de connexion : il
+// renvoie ici avec #connexion, éventuellement suivi d'un motif
+// (deconnecte, mdp-modifie, mdp-inchange). La fenêtre « Connexion »
+// s'ouvre, la phrase correspondante s'affiche, et le fragment est
+// retiré de la barre d'adresse : un rechargement ne rejoue rien.
+var HC_MOTIFS_CONNEXION = {
+  'deconnecte':   ['Vous êtes bien déconnecté.', 'info'],
+  'mdp-modifie':  ['Votre mot de passe a bien été modifié. Connectez-vous avec ce nouveau mot de passe.', 'succes'],
+  'mdp-inchange': ['Votre mot de passe n\'a pas été modifié. Pour recevoir un nouveau lien, utilisez « Mot de passe oublié ? ».', 'info']
+};
+function _hcOuvrirConnexionDepuisHash() {
+  var h = '';
+  try { h = (window.location.hash || '').replace(/^#/, ''); } catch (e) { return false; }
+  if (!/^connexion(=|$)/.test(h)) return false;
+  var motif = '';
+  try { motif = decodeURIComponent(h.split('=').slice(1).join('=')); } catch (e) { motif = ''; }
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  } catch (e) {}
+  openModal('connexion');
+  var phrase = HC_MOTIFS_CONNEXION[motif];
+  if (phrase) _hcNote('connexion-message', phrase[0], phrase[1]);
+  return true;
+}
 
 
 function _hcCompteIdentite() {
@@ -15209,6 +15241,16 @@ function toggleClientType() {
 
   document.getElementById('client-siret-group').style.display   = isPro ? 'block' : 'none';
 
+  // Lot A01 — revenir sur « Particulier » efface ce qui n'a plus de sens :
+  // une société ou un SIRET saisis puis masqués ne doivent jamais partir
+  // avec la demande (le payload les force aussi à null, voir plus bas).
+  if (!isPro) {
+    const soc = document.getElementById('client-societe');
+    const sir = document.getElementById('client-siret');
+    if (soc) soc.value = '';
+    if (sir) sir.value = '';
+  }
+
 }
 
 
@@ -15669,8 +15711,8 @@ async function _submitClientFormInterne() {
       email:           email_val,
       telephone:       tel_val,
       type_client:     type_val,
-      societe:         societe_val || null,
-      siret:           siret_val || null,
+      societe:         type_val === 'pro' ? (societe_val || null) : null,
+      siret:           type_val === 'pro' ? (siret_val || null) : null,
       disponibilite:   'planifie',
       source_acquisition:        source_val || null,
       source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
@@ -15696,8 +15738,8 @@ async function _submitClientFormInterne() {
       email:           email_val,
       telephone:       tel_val,
       type_client:     type_val,
-      societe:         societe_val || null,
-      siret:           siret_val || null,
+      societe:         type_val === 'pro' ? (societe_val || null) : null,
+      siret:           type_val === 'pro' ? (siret_val || null) : null,
       disponibilite:   'planifie',
       source_acquisition:        source_val || null,
       source_acquisition_detail: (source_val === 'autre' ? (source_detail_val || null) : null),
@@ -15824,8 +15866,8 @@ async function _submitClientFormInterne() {
     email:                  email_val,
     telephone:              tel_val,
     type_client:            type_val,
-    societe:                societe_val || null,
-    siret:                  siret_val || null,
+    societe:                type_val === 'pro' ? (societe_val || null) : null,
+    siret:                  type_val === 'pro' ? (siret_val || null) : null,
     disponibilite:          val,
     adresse_depart_rue:     (pcActif ? from_rue : '') || null,
     code_postal_depart:     (pcActif ? from_cp : '') || null,
@@ -16166,8 +16208,16 @@ async function _submitClientFormInterne() {
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
           '</div>' +
           '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
-      } else if (_compteEtat === 'cree' || _compteEtat === 'existe_deja' || _compteEtat === 'non_demande') {
+      } else if (_compteEtat === 'cree') {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
+      } else if (_compteEtat === 'existe_deja') {
+        html += '<div class="hc-succes-txt">Vous avez déjà un compte HelixCar avec cette adresse.</div>';
+      } else if (_compteEtat === 'non_demande' && _idCompteDepot) {
+        // Lot A01 — dépôt depuis un compte déjà connecté : rien n'a été
+        // créé, et on ne prétend pas le contraire.
+        html += '<div class="hc-succes-txt">Vous êtes déjà connecté à votre compte HelixCar : rien de plus à faire.</div>';
+      } else if (_compteEtat === 'non_demande') {
+        html += '<div class="hc-succes-txt">Aucun compte n\'a été créé pour le moment. Reprenez la création depuis « Connexion » quand vous le souhaitez.</div>';
       }
 
       // ── CE QUI EST ANNONCÉ EST CE QUI S'EST RÉELLEMENT PASSÉ ──
@@ -16448,6 +16498,10 @@ function openModal(type) {
 
   document.getElementById('modal-' + type).classList.add('open');
 
+  // Lot A01 — aucun message d'une tentative précédente (lien envoyé,
+  // erreur de connexion) n'accueille la fenêtre « Connexion ».
+  if (type === 'connexion') _hcNoteEffacer('connexion-message');
+
   // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
   // l'état laissé lors de la fermeture précédente.
   reinitialiserAffichageMotsDePasse(document.getElementById('modal-' + type));
@@ -16478,6 +16532,12 @@ function closeModal(type) {
 
   document.body.style.overflow = '';
   document.body.classList.remove('hc-modal-open');
+
+  // Lot A01 — fermer la fenêtre « Connexion » ne laisse aucun message
+  // derrière ; quitter « Nouveau mot de passe » par le bouton ✕ efface le
+  // drapeau de reprise : une connexion normale ne le rouvrira pas.
+  if (type === 'connexion') _hcNoteEffacer('connexion-message');
+  if (type === 'reinit') _hcEffacerDrapeauReinit();
 
   // Réinitialise le formulaire client une fois l'animation terminée,
   // pour éviter que le retour à l'étape 1 soit visible pendant la fermeture.
@@ -16595,6 +16655,37 @@ function _hcFragmentRecuperation() {
   } catch (e) { return false; }
 }
 
+// Lot A01 — le drapeau « réinitialisation en cours » ne sert qu'à faire
+// revenir le formulaire après un rechargement (F5) de la MÊME session de
+// récupération. Il porte l'identifiant de cette session quand on le
+// connaît, n'est honoré qu'à la reprise (INITIAL_SESSION), jamais à une
+// connexion normale (SIGNED_IN), et il est effacé à toute sortie :
+// succès, fermeture, connexion.
+function _hcMemoriserReinit(session) {
+  try {
+    sessionStorage.setItem('helixcar_reinit_en_cours', '1');
+    if (session && session.user && session.user.id) {
+      sessionStorage.setItem('helixcar_reinit_uid', session.user.id);
+    }
+  } catch (e) {}
+}
+function _hcEffacerDrapeauReinit() {
+  try {
+    sessionStorage.removeItem('helixcar_reinit_en_cours');
+    sessionStorage.removeItem('helixcar_reinit_uid');
+  } catch (e) {}
+}
+function _hcReinitEnCoursPour(session) {
+  var drapeau = null, uid = null;
+  try {
+    drapeau = sessionStorage.getItem('helixcar_reinit_en_cours');
+    uid = sessionStorage.getItem('helixcar_reinit_uid');
+  } catch (e) {}
+  if (drapeau !== '1') return false;
+  if (!session || !session.user) return false;
+  return !uid || uid === session.user.id;
+}
+
 function ouvrirEcranNouveauMotDePasse(etat) {
   var f = document.getElementById('reinit-bloc-formulaire');
   var ok = document.getElementById('reinit-bloc-succes');
@@ -16606,7 +16697,7 @@ function ouvrirEcranNouveauMotDePasse(etat) {
     // Memorise pour survivre a un F5 : Supabase ne rejoue pas
     // PASSWORD_RECOVERY apres rechargement, mais la session de
     // recuperation est toujours ouverte.
-    try { sessionStorage.setItem('helixcar_reinit_en_cours', '1'); } catch (e) {}
+    _hcMemoriserReinit(null);
     _hcNoteEffacer('reinit-message');
     var a = document.getElementById('reinit-mdp');
     var b = document.getElementById('reinit-mdp2');
@@ -16677,7 +16768,7 @@ async function enregistrerNouveauMotDePasse() {
     }
     // Succes REEL, confirme par le serveur. Le contexte de
     // recuperation est referme : le lien ne sert plus a rien.
-    try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+    _hcEffacerDrapeauReinit();
     try { _hcNettoyerFragmentRecuperation(); } catch (e) {}
     ouvrirEcranNouveauMotDePasse('succes');
   } catch (e) {
@@ -16699,7 +16790,7 @@ function _hcNettoyerFragmentRecuperation() {
 }
 
 async function terminerReinitialisation() {
-  try { sessionStorage.removeItem('helixcar_reinit_en_cours'); } catch (e) {}
+  _hcEffacerDrapeauReinit();
   try { if (_sb && _sb.auth) await _sb.auth.signOut(); } catch (e) {}
   _hcNettoyerFragmentRecuperation();
   var m = document.getElementById('modal-reinit');
@@ -16762,18 +16853,27 @@ function _hcAnnoncerAdresseConfirmee(avecSession) {
   }
   if (!_sb || !_sb.auth || !_sb.auth.onAuthStateChange) return;
   _sb.auth.onAuthStateChange(function (evenement, session) {
+    var aSession = !!(session && session.user);
     if (evenement === 'PASSWORD_RECOVERY') {
+      _hcMemoriserReinit(session);
       ouvrirEcranNouveauMotDePasse('formulaire');
       return;
     }
-    // Reprise apres un F5 en pleine reinitialisation, ou arrivee sur un
-    // fragment de recuperation que la bibliotheque a deja consomme.
-    var enCours = false;
-    try { enCours = sessionStorage.getItem('helixcar_reinit_en_cours') === '1'; } catch (e) {}
-    if ((enCours || _hcFragmentRecuperation()) && session && session.user) {
+    // Arrivee sur un fragment de recuperation que la bibliotheque a deja
+    // consomme sans rejouer PASSWORD_RECOVERY.
+    if (_hcFragmentRecuperation() && aSession) {
+      _hcMemoriserReinit(session);
       ouvrirEcranNouveauMotDePasse('formulaire');
       return;
     }
+    // Reprise apres un F5 en pleine reinitialisation : la MEME session,
+    // et seulement a la reprise. Une connexion normale ulterieure
+    // (SIGNED_IN) ne rouvre jamais ce formulaire : le drapeau est efface.
+    if (evenement === 'INITIAL_SESSION' && aSession && _hcReinitEnCoursPour(session)) {
+      ouvrirEcranNouveauMotDePasse('formulaire');
+      return;
+    }
+    if (evenement === 'SIGNED_IN') _hcEffacerDrapeauReinit();
     // LOT B2 — confirmation d'adresse. On n'annonce le succes qu'apres
     // un evenement REEL de Supabase, jamais sur le seul fragment d'URL.
     if (_hcFragmentConfirmation()
@@ -16880,8 +16980,10 @@ async function submitConnexionForm() {
     afficher('Adresse e-mail ou mot de passe incorrect.');
     return;
   }
-  // La session est ouverte : l'espace client la retrouve tel quel,
-  // puisque les deux pages partagent la même origine.
+  // La session est ouverte : l'espace la retrouve tel quel, puisque les
+  // deux pages partagent la même origine. Aucun reste d'un parcours de
+  // récupération abandonné ne doit la suivre.
+  _hcEffacerDrapeauReinit();
   window.location.href = 'dashboard.html';
 }
 
