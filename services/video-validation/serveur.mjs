@@ -9,4 +9,4 @@ const serveur=createServer(async(req,res)=>{
     res.writeHead(reponse.status,Object.fromEntries(reponse.headers));res.end(await reponse.text());
   }catch{res.writeHead(503,{'Content-Type':'application/json'});res.end('{"ok":false,"code":"VERIFICATION_INDISPONIBLE"}');}
 });
-serveur.requestTimeout=100000;serveur.headersTimeout=10000;serveur.listen(Number(process.env.PORT||8080),'0.0.0.0');
+serveur.requestTimeout=280000;serveur.headersTimeout=10000;serveur.listen(Number(process.env.PORT||8080),'0.0.0.0');

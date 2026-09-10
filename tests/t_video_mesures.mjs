@@ -28,6 +28,16 @@ try{
    const req=new Request('https://worker.invalid/verifier',{method:'POST',headers:{Authorization:'Bearer '+secret},body:JSON.stringify({url,candidature_id:id,mime:'video/quicktime',duree_max:120})});
    const r=await traiter(req,{SUPABASE_URL:'https://projet.supabase.co',HELIXCAR_VIDEO_VALIDATION_SECRET:secret},async(_url,options)=>{assert.equal(options.redirect,'error');return new Response(await readFile(mov));});assert.equal(r.status,200);assert.equal((await r.json()).duree_secondes,1);
  });
+ await cas('Worker : jeton unique échangé côté serveur avant lecture privée',async()=>{
+   const token='A'.repeat(43),claim='https://projet.supabase.co/functions/v1/candidature-video';let appels=0;
+   const req=new Request('https://worker.invalid/api/video-validation',{method:'POST',body:JSON.stringify({claim_url:claim,token,candidature_id:id})});
+   const r=await traiter(req,{SUPABASE_URL:'https://projet.supabase.co'},async(u,options)=>{
+     appels++;
+     if(appels===1){assert.equal(u,claim);assert.equal(options.headers.Authorization,'HelixCar-Video '+token);return Response.json({ok:true,url,mime:'video/quicktime',duree_max:120});}
+     assert.equal(u,url);assert.equal(options.redirect,'error');return new Response(await readFile(mov));
+   });
+   assert.equal(r.status,200);assert.equal((await r.json()).duree_secondes,1);assert.equal(appels,2);
+ });
  if(process.env.HC_VIDEO_GRANDE==='1')await cas('MOV réel comparable : 119 secondes et environ 214,6 Mo',async()=>{
    const p=join(dossier,'TEST-QA-CLAUDE-HELIXCAR-119s.mov');
    const cmd=spawnSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=gray:s=640x328:r=3','-t','119','-c:v','rawvideo','-pix_fmt','rgb24','-threads','1','-y',p],{timeout:90000});assert.equal(cmd.status,0,cmd.stderr?.toString());

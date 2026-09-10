@@ -85,6 +85,7 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 27 | **E** | `114_video_verification_serveur.sql` | Mesures vidéo serveur et objet final immuable ; à appliquer avec le worker et la fonction correspondante. |
 | 28 | **E** | `115_durcissement_analyseur_supabase.sql` | Ferme les droits `SECURITY DEFINER` hérités, active RLS sur les tables historiques et définit les politiques des factures, états des lieux et documents. |
 | 29 | **E** | `116_fermeture_vues_historiques.sql` | Retire les privilèges Data API implicites des anciennes vues administratives et limite `v_mes_demandes` à la lecture authentifiée. |
+| 30 | **E** | `117_jeton_worker_video.sql` | Jeton serveur à usage unique pour donner au worker vidéo une URL de lecture courte sans lui fournir de clé privée Supabase. |
 
 ### Deux secrets, et pourquoi `92` retire une signature
 

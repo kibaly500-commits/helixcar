@@ -1,5 +1,5 @@
 # Exécuté après 112 par t_rls.sh : vrais privilèges et transitions SQL.
-for n in 107_reconciliation_partenaires_historiques 113_devis_identite_et_archives 114_video_verification_serveur 115_durcissement_analyseur_supabase 116_fermeture_vues_historiques; do
+for n in 107_reconciliation_partenaires_historiques 113_devis_identite_et_archives 114_video_verification_serveur 115_durcissement_analyseur_supabase 116_fermeture_vues_historiques 117_jeton_worker_video; do
   err=$(appliquer "migrations/$n.sql");check "$n : migration appliquée" "" "$err"
   err=$(appliquer "migrations/$n.sql");check "$n : seconde application idempotente" "" "$err"
 done
@@ -23,6 +23,10 @@ check "V01 : aucune fausse date avant vérification" "t" "$(sql "select video_en
 check "V01 : finalisation sans mesures refusée" "VERIFICATION_REQUISE" "$(sql "select public.finaliser_video_verifiee('$VID_ID','$v1')->>'code';")"
 vfinal="candidatures/$VID_ID/verifie/test-qa-claude-helixcar.mov"
 sql "insert into public.video_verifications(chemin_source,convoyeur_id,chemin_final,etat,taille_octets,duree_secondes,mime,codec,sha256,verifie_le) values('$v1','$VID_ID','$vfinal','verifie',225000000,119,'video/quicktime','rawvideo',repeat('a',64),now());" >/dev/null
+sql "update public.video_verifications set etat='en_attente',taille_octets=null,duree_secondes=null,mime=null,codec=null,sha256=null,verifie_le=null,jeton_worker_hash=repeat('b',64),jeton_worker_expire_le=now()+interval '3 minutes' where chemin_source='$v1';" >/dev/null
+check "V01 : le worker consomme son jeton une seule fois" "true|JETON_INVALIDE" \
+ "$(sql "select public.reclamer_verification_video('$VID_ID',repeat('b',64))->>'ok';")|$(sql "select public.reclamer_verification_video('$VID_ID',repeat('b',64))->>'code';")"
+sql "update public.video_verifications set etat='verifie',taille_octets=225000000,duree_secondes=119,mime='video/quicktime',codec='rawvideo',sha256=repeat('a',64),verifie_le=now() where chemin_source='$v1';" >/dev/null
 check "V01 : ancien upload concurrent refusé" "ENVOI_REMPLACE" "$(sql "select public.finaliser_video_verifiee('$VID_ID','autre-chemin')->>'code';")"
 check "V01 : mesures vérifiées finalisées ensemble" "FINALISEE" "$(sql "select public.finaliser_video_verifiee('$VID_ID','$v1')->>'code';")"
 check "V01 : répétition sans deuxième finalisation" "DEJA_FINALISEE" "$(sql "select public.finaliser_video_verifiee('$VID_ID','$v1')->>'code';")"

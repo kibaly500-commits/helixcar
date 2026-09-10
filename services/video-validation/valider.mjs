@@ -11,14 +11,15 @@ import {pipeline} from 'node:stream/promises';
 export const LIMITE=314572800;
 function faute(code){const e=new Error(code);e.code=code;return e;}
 function commande(programme,args,signal){return new Promise((resolve,reject)=>{
-  const p=spawn(programme,args,{shell:false,stdio:['ignore','pipe','pipe'],signal});
+  const executable=programme==='ffmpeg'?(process.env.FFMPEG_PATH||programme):programme==='ffprobe'?(process.env.FFPROBE_PATH||programme):programme;
+  const p=spawn(executable,args,{shell:false,stdio:['ignore','pipe','pipe'],signal});
   let stdout='',stderr='',fini=false;
   p.stdout.on('data',b=>{stdout+=b;if(stdout.length>1048576)p.kill('SIGKILL');});
   p.stderr.on('data',b=>{stderr+=b;if(stderr.length>1048576)p.kill('SIGKILL');});
   p.on('error',()=>{fini=true;reject(faute('VERIFICATION_INDISPONIBLE'));});
   p.on('close',code=>{if(fini)return;if(code!==0)reject(faute('VIDEO_ILLISIBLE'));else resolve({stdout,stderr});});
 });}
-export async function analyserFichier(fichier,mime,dureeMax,signal=AbortSignal.timeout(80000)){
+export async function analyserFichier(fichier,mime,dureeMax,signal=AbortSignal.timeout(250000)){
   const taille=(await stat(fichier)).size;
   if(!Number.isSafeInteger(taille)||taille<1||taille>LIMITE)throw faute('TAILLE_REFUSEE');
   const probe=await commande('ffprobe',['-v','error','-protocol_whitelist','file,pipe','-show_format','-show_streams','-of','json',fichier],signal);
@@ -68,17 +69,24 @@ export function urlAutorisee(url,origine,candidature){
 let actifs=0;
 export async function traiter(req,env=process.env,fetchFn=fetch){
   const json=(code,status)=>Response.json(typeof code==='string'?{ok:false,code}:code,{status,headers:{'Cache-Control':'no-store'}});
-  const secret=env.HELIXCAR_VIDEO_VALIDATION_SECRET||'';
-  const recu=(req.headers.get('authorization')||'').replace(/^Bearer /,'');
-  if(secret.length<32||Buffer.byteLength(recu)!==Buffer.byteLength(secret)||!timingSafeEqual(Buffer.from(recu),Buffer.from(secret)))return json('UNAUTHORIZED',401);
   if(req.method!=='POST')return json('METHOD_NOT_ALLOWED',405);
-  if(actifs>=2)return json('VERIFICATION_INDISPONIBLE',503);
+  if(actifs>=1)return json('VERIFICATION_INDISPONIBLE',503);
   let corps;try{const texte=await req.text();if(texte.length>8192)throw 0;corps=JSON.parse(texte);}catch{return json('BAD_REQUEST',400);}
-  if(!urlAutorisee(corps.url,env.SUPABASE_URL,corps.candidature_id)||![60,120].includes(corps.duree_max))return json('BAD_REQUEST',400);
+  const base=env.SUPABASE_URL||'https://zsetmqnmmupqbkgqbjbo.supabase.co';
+  if(corps.claim_url){
+    if(corps.claim_url!==base+'/functions/v1/candidature-video'||!/^[A-Za-z0-9_-]{43}$/.test(String(corps.token||''))||!/^[a-f0-9-]{36}$/i.test(String(corps.candidature_id||'')))return json('BAD_REQUEST',400);
+    let claim;try{const r=await fetchFn(corps.claim_url,{method:'POST',headers:{Authorization:'HelixCar-Video '+corps.token,'Content-Type':'application/json'},body:JSON.stringify({candidature_id:corps.candidature_id}),redirect:'error',signal:AbortSignal.timeout(15000)});claim=await r.json();if(!r.ok||claim.ok!==true)return json('UNAUTHORIZED',401);}catch{return json('VERIFICATION_INDISPONIBLE',503);}
+    corps={...corps,url:claim.url,mime:claim.mime,duree_max:claim.duree_max};
+  }else{
+    const secret=env.HELIXCAR_VIDEO_VALIDATION_SECRET||'';
+    const recu=(req.headers.get('authorization')||'').replace(/^Bearer /,'');
+    if(secret.length<32||Buffer.byteLength(recu)!==Buffer.byteLength(secret)||!timingSafeEqual(Buffer.from(recu),Buffer.from(secret)))return json('UNAUTHORIZED',401);
+  }
+  if(!urlAutorisee(corps.url,base,corps.candidature_id)||![60,120].includes(corps.duree_max))return json('BAD_REQUEST',400);
   actifs++;let dossier;
   try{
     dossier=await mkdtemp(join(tmpdir(),'helixcar-video-'));const fichier=join(dossier,'objet');
-    const signal=AbortSignal.timeout(85000);
+    const signal=AbortSignal.timeout(250000);
     const rep=await fetchFn(corps.url,{redirect:'error',signal});
     if(!rep.ok||!rep.body)throw faute('VERIFICATION_INDISPONIBLE');
     if(Number(rep.headers.get('content-length'))>LIMITE)throw faute('TAILLE_REFUSEE');

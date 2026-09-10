@@ -558,8 +558,24 @@ export async function actionReconcilier(sb:any,req:Request,corps:any,cors:Record
   const bilan=await reconcilierVideos(sb,corps.appliquer===true,Date.now(),corps.apres||null);
   return reponseJson({ok:bilan.erreurs===0,simulation:corps.appliquer!==true,...bilan},bilan.erreurs?503:200,cors);
 }
+// Échange serveur à serveur : le worker présente un jeton opaque, utilisable
+// une seule fois et conservé seulement sous forme de SHA-256 en base.
+export async function actionWorkerClaim(sb:any,req:Request,corps:any){
+  const brut=(req.headers.get('authorization')||'').replace(/^HelixCar-Video\s+/,'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(brut)||!/^[a-f0-9-]{36}$/i.test(String(corps?.candidature_id||'')))
+    return erreur('JETON_INVALIDE','Autorisation de vérification invalide.',403,{'Cache-Control':'no-store'});
+  const {data,error:e}=await sb.rpc('reclamer_verification_video',{p_id:corps.candidature_id,p_jeton_hash:await hasherJeton(brut)});
+  if(e||!data?.ok)return erreur(String(data?.code||'JETON_INVALIDE'),'Autorisation de vérification invalide ou expirée.',403,{'Cache-Control':'no-store'});
+  const sig=await sb.storage.from(BUCKET).createSignedUrl(String(data.chemin),180);
+  if(sig.error||!sig.data?.signedUrl)return erreur('STOCKAGE_INDISPONIBLE','Lecture privée indisponible.',503,{'Cache-Control':'no-store'});
+  return reponseJson({ok:true,url:sig.data.signedUrl,mime:data.mime,duree_max:data.duree_max},200,{'Cache-Control':'no-store'});
+}
 export async function traiterRequete(sb: any, req: Request, env: Record<string,string|undefined> = {}): Promise<Response> {
   const origine = req.headers.get("origin");
+  if(!origine&&req.method==='POST'&&(req.headers.get('authorization')||'').startsWith('HelixCar-Video ')){
+    let corps:any;try{corps=await req.json();}catch{return erreur('BAD_REQUEST','Corps JSON invalide.',400,{'Cache-Control':'no-store'});}
+    return actionWorkerClaim(sb,req,corps);
+  }
   const { entetes: cors, autorisee } = enTetesCors(origine);
 
   if (req.method === "OPTIONS") {
@@ -610,6 +626,6 @@ if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
     }
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const sb = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-    return await traiterRequete(sb, req, {HELIXCAR_VIDEO_VALIDATION_URL:Deno.env.get("HELIXCAR_VIDEO_VALIDATION_URL"),HELIXCAR_VIDEO_VALIDATION_SECRET:Deno.env.get("HELIXCAR_VIDEO_VALIDATION_SECRET")});
+    return await traiterRequete(sb, req, {SUPABASE_URL:supabaseUrl,HELIXCAR_ORIGINE:req.headers.get('origin')||undefined,HELIXCAR_VIDEO_VALIDATION_URL:Deno.env.get("HELIXCAR_VIDEO_VALIDATION_URL"),HELIXCAR_VIDEO_VALIDATION_SECRET:Deno.env.get("HELIXCAR_VIDEO_VALIDATION_SECRET")});
   });
 }

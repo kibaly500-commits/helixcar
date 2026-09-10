@@ -38,12 +38,23 @@ les mesures. La connexion du candidat ne le valide pas professionnellement.
 - Décodage réel `ffprobe` + `ffmpeg`, un flux vidéo, au moins une image.
   Codecs validés localement : H.264, VP8 et rawvideo. HEVC et les codecs
   des appareils physiques restent à mesurer dans l'environnement cible.
-- Worker : au maximum deux vérifications simultanées, 85 s de budget,
+- Worker : une vérification simultanée par instance, 250 s de budget,
   fichiers supprimés en fin d'opération. Un timeout est réessayable et
   ne finalise rien. Les performances d'un iPhone réel ou d'un hébergeur
   de recette ne sont pas prouvées par les tests Linux.
 
-## Configuration à prévoir dans l'environnement de recette autorisé
+## Déploiement Preview sans secret partagé
+
+`api/video-validation.mjs` embarque ce worker dans Vercel avec les binaires
+FFmpeg/FFprobe épinglés. L'Edge crée un jeton aléatoire, n'en stocke que le
+SHA-256 et appelle le worker de la même origine que le formulaire. Le worker
+échange ce jeton une seule fois auprès de l'Edge contre une URL de lecture
+signée trois minutes. Il ne possède aucune clé Supabase privée.
+
+Les variables ci-dessous restent prises en charge pour un worker privé séparé,
+mais ne sont plus nécessaires au parcours Preview Vercel.
+
+## Configuration d'un worker privé séparé
 
 Exécution : Node 24.19.0 et binaires `ffmpeg`, `ffprobe` disponibles.
 Commande du service : `node services/video-validation/serveur.mjs`.
@@ -56,7 +67,7 @@ Variables, à configurer dans les gestionnaires de secrets habituels :
 
 | Composant | Variable | Usage |
 |---|---|---|
-| Worker | `SUPABASE_URL` | Une seule origine de lecture privée autorisée |
+| Worker | `SUPABASE_URL` | Une seule origine de lecture privée autorisée ; valeur HelixCar intégrée pour la Preview |
 | Worker et Edge | `HELIXCAR_VIDEO_VALIDATION_SECRET` | Secret serveur partagé, au moins 32 caractères ; jamais côté client |
 | Edge | `HELIXCAR_VIDEO_VALIDATION_URL` | URL HTTPS exacte terminant par `/verifier` |
 | Worker | `PORT` | Port interne, 8080 par défaut |
