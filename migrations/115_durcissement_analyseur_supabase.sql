@@ -48,86 +48,85 @@ grant execute on function public.evaluer_mission(uuid,jsonb,text) to authenticat
 drop policy if exists insert_missions on public.missions;
 drop policy if exists "clients : depot public" on public.clients;
 
--- Formulaires publics simples : insertion seulement, aucune relecture.
-alter table public.recontacts enable row level security;
-alter table public.parrainages enable row level security;
-revoke all on public.recontacts,public.parrainages from anon,authenticated;
-grant insert on public.recontacts,public.parrainages to anon,authenticated;
-drop policy if exists insert_recontacts on public.recontacts;
-create policy insert_recontacts on public.recontacts for insert to anon,authenticated with check(true);
-drop policy if exists insert_parrainages on public.parrainages;
-create policy insert_parrainages on public.parrainages for insert to anon,authenticated with check(true);
-drop policy if exists "recontacts : lecture admin" on public.recontacts;
-create policy "recontacts : lecture admin" on public.recontacts for select to authenticated using(public.est_admin());
-drop policy if exists "recontacts : ecriture admin" on public.recontacts;
-create policy "recontacts : ecriture admin" on public.recontacts for update to authenticated using(public.est_admin()) with check(public.est_admin());
-drop policy if exists "parrainages : lecture admin" on public.parrainages;
-create policy "parrainages : lecture admin" on public.parrainages for select to authenticated using(public.est_admin());
-drop policy if exists "parrainages : ecriture admin" on public.parrainages;
-create policy "parrainages : ecriture admin" on public.parrainages for update to authenticated using(public.est_admin()) with check(public.est_admin());
+-- Certains environnements historiques n'ont pas toutes ces tables. Chaque bloc
+-- est donc autonome : une table absente n'annule jamais le durcissement global.
+do $$
+begin
+  if to_regclass('public.recontacts') is not null then
+    execute 'alter table public.recontacts enable row level security';
+    execute 'revoke all on public.recontacts from anon,authenticated';
+    execute 'grant insert on public.recontacts to anon,authenticated';
+    execute 'drop policy if exists insert_recontacts on public.recontacts';
+    execute 'create policy insert_recontacts on public.recontacts for insert to anon,authenticated with check(true)';
+    execute 'drop policy if exists "recontacts : lecture admin" on public.recontacts';
+    execute 'create policy "recontacts : lecture admin" on public.recontacts for select to authenticated using(public.est_admin())';
+    execute 'drop policy if exists "recontacts : ecriture admin" on public.recontacts';
+    execute 'create policy "recontacts : ecriture admin" on public.recontacts for update to authenticated using(public.est_admin()) with check(public.est_admin())';
+  end if;
+  if to_regclass('public.parrainages') is not null then
+    execute 'alter table public.parrainages enable row level security';
+    execute 'revoke all on public.parrainages from anon,authenticated';
+    execute 'grant insert on public.parrainages to anon,authenticated';
+    execute 'drop policy if exists insert_parrainages on public.parrainages';
+    execute 'create policy insert_parrainages on public.parrainages for insert to anon,authenticated with check(true)';
+    execute 'drop policy if exists "parrainages : lecture admin" on public.parrainages';
+    execute 'create policy "parrainages : lecture admin" on public.parrainages for select to authenticated using(public.est_admin())';
+    execute 'drop policy if exists "parrainages : ecriture admin" on public.parrainages';
+    execute 'create policy "parrainages : ecriture admin" on public.parrainages for update to authenticated using(public.est_admin()) with check(public.est_admin())';
+  end if;
+end $$;
 
--- Tables privées historiques.
-alter table public.demandes enable row level security;
-alter table public.convoyeurs_rattachement_sauvegarde enable row level security;
-alter table public.convoyeurs_rattachement_canonique_sauvegarde enable row level security;
-revoke all on public.demandes,public.convoyeurs_rattachement_sauvegarde,
-  public.convoyeurs_rattachement_canonique_sauvegarde from anon,authenticated;
+do $$
+declare nom text;
+begin
+  foreach nom in array array['demandes','convoyeurs_rattachement_sauvegarde','convoyeurs_rattachement_canonique_sauvegarde'] loop
+    if to_regclass('public.'||nom) is not null then
+      execute format('alter table public.%I enable row level security',nom);
+      execute format('revoke all on public.%I from anon,authenticated',nom);
+    end if;
+  end loop;
+end $$;
 
--- Factures partenaire : propriétaire en lecture/création, administration en
--- lecture et mise à jour. Les validations/paiements ne sont jamais modifiables
--- par le partenaire.
-alter table public.factures_convoyeur enable row level security;
-revoke all on public.factures_convoyeur from anon,authenticated;
-grant select,insert,update on public.factures_convoyeur to authenticated;
-drop policy if exists "factures : lecture admin" on public.factures_convoyeur;
-create policy "factures : lecture admin" on public.factures_convoyeur for select to authenticated using(public.est_admin());
-drop policy if exists "factures : lecture partenaire" on public.factures_convoyeur;
-create policy "factures : lecture partenaire" on public.factures_convoyeur for select to authenticated
-  using(public.est_proprietaire_convoyeur(convoyeur_id));
-drop policy if exists "factures : creation partenaire" on public.factures_convoyeur;
-create policy "factures : creation partenaire" on public.factures_convoyeur for insert to authenticated
-  with check(public.est_proprietaire_convoyeur(convoyeur_id) and statut='en_attente');
-drop policy if exists "factures : ecriture admin" on public.factures_convoyeur;
-create policy "factures : ecriture admin" on public.factures_convoyeur for update to authenticated
-  using(public.est_admin()) with check(public.est_admin());
+do $$
+begin
+  if to_regclass('public.factures_convoyeur') is not null then
+    execute 'alter table public.factures_convoyeur enable row level security';
+    execute 'revoke all on public.factures_convoyeur from anon,authenticated';
+    execute 'grant select,insert,update on public.factures_convoyeur to authenticated';
+    execute 'drop policy if exists "factures : lecture admin" on public.factures_convoyeur';
+    execute 'create policy "factures : lecture admin" on public.factures_convoyeur for select to authenticated using(public.est_admin())';
+    execute 'drop policy if exists "factures : lecture partenaire" on public.factures_convoyeur';
+    execute 'create policy "factures : lecture partenaire" on public.factures_convoyeur for select to authenticated using(public.est_proprietaire_convoyeur(convoyeur_id))';
+    execute 'drop policy if exists "factures : creation partenaire" on public.factures_convoyeur';
+    execute 'create policy "factures : creation partenaire" on public.factures_convoyeur for insert to authenticated with check(public.est_proprietaire_convoyeur(convoyeur_id) and statut=''en_attente'')';
+    execute 'drop policy if exists "factures : ecriture admin" on public.factures_convoyeur';
+    execute 'create policy "factures : ecriture admin" on public.factures_convoyeur for update to authenticated using(public.est_admin()) with check(public.est_admin())';
+  end if;
+end $$;
 
--- États des lieux et documents : seulement l'administration, le partenaire
--- attribué et, en lecture, le client propriétaire de la mission.
-alter table public.etats_des_lieux enable row level security;
-alter table public.documents enable row level security;
-revoke all on public.etats_des_lieux,public.documents from anon,authenticated;
-grant select,insert,update on public.etats_des_lieux to authenticated;
-grant select,insert on public.documents to authenticated;
-
-drop policy if exists "edl : lecture acteurs" on public.etats_des_lieux;
-create policy "edl : lecture acteurs" on public.etats_des_lieux for select to authenticated using(
-  public.est_admin() or exists(
-    select 1 from public.missions m left join public.convoyeurs c on c.id=m.convoyeur_id
-    left join public.clients cl on cl.id=m.client_id
-    where m.id=mission_id and (c.auth_user_id=auth.uid() or cl.auth_user_id=auth.uid())
-  ));
-drop policy if exists "edl : creation partenaire" on public.etats_des_lieux;
-create policy "edl : creation partenaire" on public.etats_des_lieux for insert to authenticated with check(
-  exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id
-         where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()));
-drop policy if exists "edl : ecriture partenaire" on public.etats_des_lieux;
-create policy "edl : ecriture partenaire" on public.etats_des_lieux for update to authenticated using(
-  public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id
-         where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()))
-  with check(public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id
-         where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()));
-
-drop policy if exists "documents : lecture acteurs" on public.documents;
-create policy "documents : lecture acteurs" on public.documents for select to authenticated using(
-  public.est_admin() or exists(
-    select 1 from public.missions m left join public.convoyeurs c on c.id=m.convoyeur_id
-    left join public.clients cl on cl.id=m.client_id
-    where m.id=mission_id and (c.auth_user_id=auth.uid() or cl.auth_user_id=auth.uid())
-  ));
-drop policy if exists "documents : creation admin partenaire" on public.documents;
-create policy "documents : creation admin partenaire" on public.documents for insert to authenticated with check(
-  public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id
-    where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()));
+do $$
+begin
+  if to_regclass('public.etats_des_lieux') is not null then
+    execute 'alter table public.etats_des_lieux enable row level security';
+    execute 'revoke all on public.etats_des_lieux from anon,authenticated';
+    execute 'grant select,insert,update on public.etats_des_lieux to authenticated';
+    execute 'drop policy if exists "edl : lecture acteurs" on public.etats_des_lieux';
+    execute $p$create policy "edl : lecture acteurs" on public.etats_des_lieux for select to authenticated using(public.est_admin() or exists(select 1 from public.missions m left join public.convoyeurs c on c.id=m.convoyeur_id left join public.clients cl on cl.id=m.client_id where m.id=mission_id and (c.auth_user_id=auth.uid() or cl.auth_user_id=auth.uid())))$p$;
+    execute 'drop policy if exists "edl : creation partenaire" on public.etats_des_lieux';
+    execute $p$create policy "edl : creation partenaire" on public.etats_des_lieux for insert to authenticated with check(exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()))$p$;
+    execute 'drop policy if exists "edl : ecriture partenaire" on public.etats_des_lieux';
+    execute $p$create policy "edl : ecriture partenaire" on public.etats_des_lieux for update to authenticated using(public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif())) with check(public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()))$p$;
+  end if;
+  if to_regclass('public.documents') is not null then
+    execute 'alter table public.documents enable row level security';
+    execute 'revoke all on public.documents from anon,authenticated';
+    execute 'grant select,insert on public.documents to authenticated';
+    execute 'drop policy if exists "documents : lecture acteurs" on public.documents';
+    execute $p$create policy "documents : lecture acteurs" on public.documents for select to authenticated using(public.est_admin() or exists(select 1 from public.missions m left join public.convoyeurs c on c.id=m.convoyeur_id left join public.clients cl on cl.id=m.client_id where m.id=mission_id and (c.auth_user_id=auth.uid() or cl.auth_user_id=auth.uid())))$p$;
+    execute 'drop policy if exists "documents : creation admin partenaire" on public.documents';
+    execute $p$create policy "documents : creation admin partenaire" on public.documents for insert to authenticated with check(public.est_admin() or exists(select 1 from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id where m.id=mission_id and c.auth_user_id=auth.uid() and public.partenaire_actif()))$p$;
+  end if;
+end $$;
 
 -- Search path fixé pour toutes les fonctions existantes du schéma public.
 do $$
