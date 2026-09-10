@@ -278,6 +278,14 @@ const futur = dansNJours;
     'index.ts',
     // Le dossier de recette de la révision experte P0/P1.
     'RECETTE-EXPERT-P0-P1.md',
+    // X01 : retrait demandé des pages de démonstration et faux contrats.
+    'helixcar-cgv-client.html',
+    'helixcar-contrat-convoyeur.html',
+    'helixcar-emails.html',
+    // V01 : mesure réelle des vidéos hors des limites d'une Edge Function.
+    'services/video-validation/serveur.mjs',
+    'services/video-validation/valider.mjs',
+    'services/video-validation/README.md',
   ];
   // supabase/templates/ — les modèles d'e-mail Supabase, versionnés
   // pour que ce qui part réellement aux clients soit relu et comparé
@@ -290,14 +298,13 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 15,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 21,
     PERIMETRE.length + ' entrées');
   // devis.html et index.ts sont entrés dans le périmètre avec le lot
   // Q01 (voir PERIMETRE) ; les pages annexes, elles, restent interdites.
   L.check('E6b : aucun fichier hors périmètre (edl.html, fiche-mission.html…)',
     !fichiers.some(f => ['edl.html', 'fiche-mission.html',
-                         'lettre-voiture.html',
-                         'helixcar-emails.html'].indexOf(f) !== -1),
+                         'lettre-voiture.html'].indexOf(f) !== -1),
     fichiers.join(', '));
   L.check('E6d : la fonction devis-secure n\'est plus à la racine du dépôt',
     !fs.existsSync(fichier('index.ts')) && fs.existsSync(fichier('supabase/functions/devis-secure/index.ts')));

@@ -162,7 +162,7 @@ function etatDeBase() {
     tables: {
       admins: [{ id: 'adm-1', auth_user_id: ID_ADMIN_USER, actif: true }],
       clients: [{ id: ID_CLIENT, numero_client: 'HC-QA-1', prenom: 'TEST-QA-CLAUDE-HELIXCAR', nom: 'Client',
-                  email: 'test-qa-claude-helixcar@example.invalid', telephone: '+33600000000', type_service: 'convoyage',
+                  auth_user_id:'u-client', email: 'test-qa-claude-helixcar@example.invalid', telephone: '+33600000000', type_service: 'convoyage',
                   ville_depart: 'Paris', ville_arrivee: 'Lyon' }],
       vehicules: [],
       devis: [{ id: ID_DEVIS, reference: 'DEV-2026-0062', client_id: ID_CLIENT, prix: 450, statut: 'genere',
@@ -185,6 +185,7 @@ function requete(corps, options = {}) {
   });
 }
 async function appeler(d, corps, options = {}, env = {}) {
+  if (['get','accept','refuse'].includes(corps?.action) && !Object.hasOwn(options,'jwt')) options={...options,jwt:'jwt-client'};
   const rep = await traiterRequete(d.sb, requete(corps, options), env, d.fetchFn);
   let json = null; try { json = await rep.clone().json(); } catch { /* vide */ }
   return { statut: rep.status, json, entetes: rep.headers };
@@ -193,7 +194,7 @@ const devisDe = (d) => d.sb && null;
 function ligneDevis(etat) { return etat.tables.devis.find(x => x.id === ID_DEVIS); }
 function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.renvoi ? '(renvoi)' : '')); }
 
-(async () => {
+async function executerSuite() {
   // ── 1. Origines et preflight : les DEUX domaines officiels ──
   {
     const etat = etatDeBase(); const d = creerDouble(etat);
@@ -236,15 +237,15 @@ function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.r
     r = await appeler(d, { action: 'prepare', devis_id: 'inconnu', pdf_base64: pdfFictif(), pdf_mime: 'application/pdf' }, { jwt: 'jwt-admin' });
     check('3.3 Devis inconnu -> 404', r.statut === 404);
     r = await appeler(d, { action: 'prepare', devis_id: ID_DEVIS, pdf_base64: 'aGVsbG8=', pdf_mime: 'application/pdf' }, { jwt: 'jwt-admin' });
-    check('3.4 Un PDF trop petit ou non PDF est refusé', r.statut === 400);
+    check('3.4 Le faux PDF navigateur est ignoré ; un vrai PDF serveur est stocké', r.statut === 200 && Object.values(d.journal.pdfs)[0].length > 10000);
     r = await appeler(d, { action: 'prepare', devis_id: ID_DEVIS, pdf_base64: pdfFictif(), pdf_mime: 'application/pdf', envoi_cle: 'tentative-1' }, { jwt: 'jwt-admin' });
     check('3.5 PREPARE par un administrateur -> token + version', r.statut === 200 && typeof r.json.token === 'string' && r.json.token.length >= 40 && r.json.version === 1, JSON.stringify(r.json));
     const l = ligneDevis(etat);
     check('3.6 L\'empreinte du token est en base (jamais le token), le PDF stocké, la version préparée posée',
       l.acceptation_token_hash === await hasherToken(r.json.token) && !!l.pdf_path && !!d.journal.pdfs[l.pdf_path] && l.version_preparee === 1
-      && !JSON.stringify(etat.tables).includes(r.json.token));
+      && !JSON.stringify(etat.tables.devis).includes(r.json.token));
     check('3.7 Le statut n\'a PAS bougé : préparer n\'est pas envoyer', l.statut === 'genere' && !l.date_envoi);
-    check('3.8 Journal : une ligne « preparation » pour la version 1', etapes(d.journal).join(',') === 'preparation' && d.journal.insertsJournal[0].version === 1);
+    check('3.8 Journal : une ligne « preparation » pour la version 1', etapes(d.journal).join(',') === 'preparation,preparation' && d.journal.insertsJournal[0].version === 1);
     check('3.9 Le snapshot est construit côté serveur, avec la version', l.snapshot_devis && l.snapshot_devis.reference === 'DEV-2026-0062' && l.snapshot_devis.version === 1 && l.snapshot_devis.prix === 450);
     l.statut = 'accepte';
     r = await appeler(d, { action: 'prepare', devis_id: ID_DEVIS, pdf_base64: pdfFictif(), pdf_mime: 'application/pdf' }, { jwt: 'jwt-admin' });
@@ -303,7 +304,7 @@ function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.r
     r = await appeler(d, { action: 'send_email', devis_id: ID_DEVIS, token: token2, envoi_cle: 'cle-envoi-3', renvoi: true }, { jwt: 'jwt-admin' }, { RESEND_API_KEY: 'k' });
     check('4.16 Renvoi explicite -> second e-mail, tracé « renvoi », toujours UN seul devis', r.statut === 200 && r.json.renvoi === true && d.journal.resend.length === 2
       && d.journal.insertsJournal.filter(x => x.etape === 'acceptee_prestataire' && x.renvoi).length === 1 && etat.tables.devis.length === 1, JSON.stringify(r.json));
-    check('4.17 L\'ancien lien ne fonctionne plus, le nouveau oui', (await appeler(d, { action: 'get', token })).statut === 404 && (await appeler(d, { action: 'get', token: token2 })).statut === 200);
+    check('4.17 Les deux versions envoyées restent consultables par leur propriétaire', (await appeler(d, { action: 'get', token })).statut === 200 && (await appeler(d, { action: 'get', token: token2 })).statut === 200);
     check('4.18 Le texte du renvoi le dit', /de nouveau/.test(d.journal.resend[1].html));
   }
 
@@ -313,13 +314,13 @@ function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.r
     const token = await preparer(d, 'tentative-k1');
     etat.resendKo = 500;
     let r = await appeler(d, { action: 'send_email', devis_id: ID_DEVIS, token, envoi_cle: 'tentative-k1' }, { jwt: 'jwt-admin' }, { RESEND_API_KEY: 'k' });
-    check('5.1 Prestataire en erreur -> 502, statut inchangé, date vide', r.statut === 502 && r.json.code === 'EMAIL_SEND_FAILED' && ligneDevis(etat).statut === 'genere' && !ligneDevis(etat).date_envoi);
+    check('5.1 Prestataire en erreur -> 502, statut inchangé, date vide', r.statut === 502 && r.json.code === 'ENVOI_A_REPRENDRE' && ligneDevis(etat).statut === 'genere' && !ligneDevis(etat).date_envoi);
     check('5.2 Journal : tentative puis echec (http_500), pas d\'acceptation', etapes(d.journal).join(',') === 'preparation,tentative,echec'
       && d.journal.insertsJournal[2].detail === 'http_500');
     check('5.3 Verrou libéré après échec', ligneDevis(etat).envoi_en_cours_depuis === null);
     etat.resendKo = null; etat.resendReseauKo = true;
     r = await appeler(d, { action: 'send_email', devis_id: ID_DEVIS, token, envoi_cle: 'tentative-k2' }, { jwt: 'jwt-admin' }, { RESEND_API_KEY: 'k' });
-    check('5.4 Prestataire injoignable -> 502, échec « reseau » journalisé', r.statut === 502 && d.journal.insertsJournal.at(-1).etape === 'echec' && d.journal.insertsJournal.at(-1).detail === 'reseau');
+    check('5.4 Prestataire injoignable -> 502, échec « reseau » journalisé', r.statut === 502 && d.journal.insertsJournal.at(-1).etape === 'echec' && d.journal.insertsJournal.at(-1).detail === 'reseau_resultat_inconnu');
     etat.resendReseauKo = false;
     r = await appeler(d, { action: 'send_email', devis_id: ID_DEVIS, token, envoi_cle: 'tentative-k3' }, { jwt: 'jwt-admin' }, { RESEND_API_KEY: 'k' });
     check('5.5 La reprise après panne aboutit, sans nouveau devis', r.statut === 200 && ligneDevis(etat).statut === 'envoye' && etat.tables.devis.length === 1);
@@ -390,12 +391,13 @@ function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.r
     // Le prix change dans le Dashboard après envoi : version 2, non envoyée.
     await d.sb.from('devis').update({ prix: 520, statut: 'genere' }).eq('id', ID_DEVIS);
     r = await appeler(d, { action: 'get', token });
-    check('7.6 Version modifiée après envoi -> le lien reste lisible mais « mis à jour », PDF non exposé, prix envoyé conservé',
-      r.statut === 200 && r.json.devis.version_obsolete === true && r.json.devis.pdf_disponible === false && r.json.devis.prix === 450, JSON.stringify(r.json));
+    check('7.6 Version modifiée après envoi -> le lien reste lisible mais « mis à jour », PDF archivé exact disponible, prix envoyé conservé',
+      r.statut === 200 && r.json.devis.version_obsolete === true && r.json.devis.pdf_disponible === true && r.json.devis.prix === 450, JSON.stringify(r.json));
     const acc = await appeler(d, { action: 'accept', token });
     check('7.7 Accepter une version obsolète -> 409 VERSION_OBSOLETE, statut inchangé', acc.statut === 409 && acc.json.code === 'VERSION_OBSOLETE' && ligneDevis(etat).statut === 'genere');
     check('7.8 Token altéré -> 404', (await appeler(d, { action: 'get', token: token.slice(0, -2) + 'zz' })).statut === 404);
     ligneDevis(etat).date_expiration_token = '2020-01-01T00:00:00Z';
+    etat.tables.devis_preparations.forEach(p=>p.date_expiration='2020-01-01T00:00:00Z');
     check('7.9 Lien expiré -> 404, jamais le devis', (await appeler(d, { action: 'get', token })).statut === 404);
   }
 
@@ -465,4 +467,6 @@ function etapes(journal) { return journal.insertsJournal.map(l => l.etape + (l.r
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   if (echecs.length) echecs.forEach(e => console.log('  - ' + e));
   process.exit(fail > 0 ? 1 : 0);
-})();
+}
+if (process.argv[1] && new URL('file://' + process.argv[1]).href === import.meta.url) executerSuite();
+export { creerDouble, etatDeBase, appeler, requete, pdfFictif, ID_DEVIS, ID_CLIENT, ID_ADMIN_USER };

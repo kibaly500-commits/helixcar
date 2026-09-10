@@ -16694,7 +16694,7 @@ async function _submitClientFormInterne() {
             titre: 'Bienvenue chez HelixCar, ' + prenom_val + ' !',
             message: msgClient
           }).then(function() {
-            console.log('Email bienvenue envoye a', email_val);
+            /* Acceptation prestataire, réception non prouvée. */
           }, function(err) {
             console.error('Erreur envoi email:', err);
           });
@@ -16794,7 +16794,7 @@ function _hcAfficherBandeauErreur(texte) {
 
 function openModal(type) {
 
-  event && event.preventDefault();
+  typeof event !== 'undefined' && event && event.preventDefault();
 
   // Aucune erreur d'une tentative precedente ne doit accueillir la
   // suivante — surtout pas celle d'une AUTRE fenetre.
@@ -17260,8 +17260,21 @@ async function demanderReinitialisationMotDePasse() {
   }
 }
 
+// Retour de devis limité à cette page : aucune URL arbitraire acceptée.
+function _hcDestinationApresConnexion() {
+  var params = new URLSearchParams(window.location.search || '');
+  var id = params.get('devis_id');
+  if (params.get('connexion') === '1' && /^[0-9a-f-]{36}$/i.test(id || '')) return 'devis.html?id=' + encodeURIComponent(id);
+  var lien = new URLSearchParams((window.location.hash || '').slice(1)).get('devis');
+  if (params.get('connexion') === '1' && /^[A-Za-z0-9_-]{20,256}$/.test(lien || '')) return 'devis.html#token=' + encodeURIComponent(lien);
+  return 'dashboard.html';
+}
+window.addEventListener('DOMContentLoaded', function () {
+  if (new URLSearchParams(window.location.search || '').get('connexion') === '1') openModal('connexion');
+});
+
 async function submitConnexionForm() {
-  event && event.preventDefault();
+  typeof event !== 'undefined' && event && event.preventDefault();
   var afficher = function (texte, ton) { _hcNote('connexion-message', texte, ton || 'erreur'); };
   var email = ((document.getElementById('connexion-email') || {}).value || '').trim();
   var mdp   = ((document.getElementById('connexion-password') || {}).value || '');
@@ -17291,7 +17304,7 @@ async function submitConnexionForm() {
   // deux pages partagent la même origine. Aucun reste d'un parcours de
   // récupération abandonné ne doit la suivre.
   _hcEffacerDrapeauReinit();
-  window.location.href = 'dashboard.html';
+  window.location.href = _hcDestinationApresConnexion();
 }
 
 
@@ -17363,7 +17376,7 @@ function toggleFaq(el) {
 
 function showExpand(id) {
 
-  event && event.preventDefault();
+  typeof event !== 'undefined' && event && event.preventDefault();
 
   document.getElementById(id).classList.add('visible');
 
@@ -18834,7 +18847,7 @@ async function submitConvoyeurForm() {
             titre: 'Votre candidature partenaire HelixCar a bien été reçue',
             message: msgConv
           }).then(function() {
-            console.log('Email candidature envoye a', email);
+            /* Acceptation prestataire, réception non prouvée. */
           }, function(err) {
             console.error('Erreur envoi email candidature:', err);
           });
@@ -18922,7 +18935,7 @@ function submitParrainage() {
           email: email,
           titre: 'Votre parrainage est enregistré, ' + prenom + ' !',
           message: msgParrain
-        }).then(function(){ console.log('Email parrain envoye a', email); },
+        }).then(function(){ /* Acceptation prestataire, réception non prouvée. */ },
           function(err){ console.error('Erreur email parrain:', err); });
       }
     }
@@ -18982,7 +18995,7 @@ async function submitRecontact() {
         email: email,
         titre: 'Nous avons bien recu votre demande, ' + prenom + ' !',
         message: msgRC
-      }).then(function() { console.log('Email recontact envoye a', email); },
+      }).then(function() { /* Acceptation prestataire, réception non prouvée. */ },
         function(err) { console.error('Erreur envoi email recontact:', err); });
     }
   } catch(e) { console.error('EmailJS exception:', e); }

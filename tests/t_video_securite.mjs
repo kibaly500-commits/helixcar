@@ -27,6 +27,7 @@ function check(l, c, e) {
 
 const ORIGINE = 'https://helixcar-i89b.vercel.app';
 const BUCKET = 'candidatures-videos';
+const finalDe = p => p.slice(0,p.lastIndexOf('/')+1)+'verifie/'+p.slice(p.lastIndexOf('/')+1);
 const HOTE_SIGNE = 'https://stockage.invalid/signe/';
 
 // Lecture des fichiers du dépôt. Chemins résolus depuis CE fichier :
@@ -82,6 +83,7 @@ function erreurContrainte(nom) {
 function creerDouble(etat) {
   const journal = { signatures: [], suppressions: [], majs: [], refus: [], rpc: [], lecturesEnTete: [] };
   etat.objets = etat.objets || {};
+  etat.verifications = etat.verifications || [];
   const sb = {
     auth: {
       async getUser(jwt) {
@@ -91,18 +93,20 @@ function creerDouble(etat) {
       },
     },
     from(table) {
+      const lignes=table==='video_verifications'?etat.verifications:etat.convoyeurs;
       const req = { table, filtres: {}, _maj: null };
       const api = {
         select() { return api; },
         eq(col, val) { req.filtres[col] = val; return api; },
         async maybeSingle() {
-          const ligne = etat.convoyeurs.find(c =>
+          const ligne = lignes.find(c =>
             Object.entries(req.filtres).every(([k, v]) => c[k] === v));
           return { data: ligne ? { ...ligne } : null, error: null };
         },
+        insert(valeurs) { lignes.push({...valeurs,created_at:new Date().toISOString()});return Promise.resolve({error:null}); },
         update(valeurs) { req._maj = valeurs; return api; },
         then(resolve) {   // `await sb.from().update().eq()` termine ici
-          const cible = etat.convoyeurs.find(c =>
+          const cible = lignes.find(c =>
             Object.entries(req.filtres).every(([k, v]) => c[k] === v));
           if (cible && req._maj) {
             // COMME POSTGRESQL : la ligne candidate est évaluée AVANT
@@ -127,7 +131,24 @@ function creerDouble(etat) {
     // tests/t_rls.sh (section VID) sur PostgreSQL 16.
     async rpc(nom, args) {
       journal.rpc.push({ nom, args: { ...args } });
-      if (nom !== 'finaliser_video_candidature') return { data: null, error: { message: 'function ' + nom + ' does not exist' } };
+      if(nom==='preparer_video_candidature'){
+        const c=etat.convoyeurs.find(x=>x.id===args.p_id);if(!c)return{data:{ok:false},error:null};
+        if(c.video_envoyee_le)return{data:{ok:true,deja_confirmee:true,chemin:c.video_chemin},error:null};
+        const reprise=!!(c.video_envoi_chemin&&c.video_envoi_mime===args.p_mime&&c.video_envoi_taille_octets===args.p_taille&&c.video_envoi_duree_secondes===args.p_duree&&!etat.verifications.some(v=>v.chemin_source===c.video_envoi_chemin&&v.etat==='refuse'));
+        const ext={'video/webm':'.webm','video/quicktime':'.mov','video/mp4':'.mp4'}[args.p_mime];
+        const chemin=reprise?c.video_envoi_chemin:'candidatures/'+c.id+'/'+crypto.randomUUID()+ext;
+        Object.assign(c,{video_envoi_chemin:chemin,video_envoi_mime:args.p_mime,video_envoi_taille_octets:args.p_taille,video_envoi_duree_secondes:args.p_duree,video_envoi_commence_le:reprise?c.video_envoi_commence_le:new Date().toISOString()});
+        journal.majs.push({id:c.id,...c});return{data:{ok:true,chemin,reprise},error:null};
+      }
+      if(nom==='finaliser_video_verifiee'){
+        const c=etat.convoyeurs.find(x=>x.id===args.p_id);
+        if(!c)return{data:{ok:false},error:null};
+        if(c.video_envoyee_le)return{data:{ok:true,code:'DEJA_FINALISEE',chemin:c.video_chemin,statut:c.statut},error:null};
+        const v=etat.verifications.find(x=>x.chemin_source===args.p_chemin_source&&x.etat==='verifie');
+        if(c.video_envoi_chemin!==args.p_chemin_source||!v)return{data:{ok:false,code:'ENVOI_REMPLACE'},error:null};
+        args={...args,p_convoyeur_id:args.p_id,p_taille_reelle:v.taille_octets,verification:v};
+      }
+      if (nom !== 'finaliser_video_verifiee') return { data: null, error: { message: 'function ' + nom + ' does not exist' } };
       if (etat.rpcKo) return { data: null, error: { message: 'connection reset' } };
       const c = etat.convoyeurs.find(x => x.id === args.p_convoyeur_id);
       if (!c) return { data: { ok: false, code: 'INTROUVABLE' }, error: null };
@@ -144,9 +165,9 @@ function creerDouble(etat) {
       const statut = c.statut === 'video_attendue' ? 'en_attente' : c.statut;
       const maintenant = new Date().toISOString();
       const candidate = Object.assign({}, c, {
-        video_chemin: c.video_envoi_chemin, video_mime: c.video_envoi_mime,
+        video_chemin: args.verification.chemin_final, video_mime: c.video_envoi_mime,
         video_taille_octets: args.p_taille_reelle != null ? args.p_taille_reelle : c.video_envoi_taille_octets,
-        video_duree_secondes: c.video_envoi_duree_secondes, video_envoyee_le: maintenant,
+        video_duree_secondes: args.verification.duree_secondes, video_envoyee_le: maintenant,
         video_envoi_chemin: null, video_envoi_mime: null, video_envoi_taille_octets: null,
         video_envoi_duree_secondes: null, video_envoi_commence_le: null,
         video_upload_jeton_consomme_le: c.video_upload_jeton_consomme_le || maintenant,
@@ -154,7 +175,7 @@ function creerDouble(etat) {
       });
       const viol = contrainteViolee(candidate);
       if (viol) { journal.refus.push({ id: c.id, contrainte: viol, maj: 'rpc' }); return { data: null, error: erreurContrainte(viol) }; }
-      const chemin = c.video_envoi_chemin;
+      const chemin = candidate.video_chemin;
       Object.assign(c, candidate);
       journal.majs.push({ id: c.id, rpc: 'finaliser', chemin });
       return { data: { ok: true, code: 'FINALISEE', chemin, ancien_chemin: ancien, statut }, error: null };
@@ -162,6 +183,7 @@ function creerDouble(etat) {
     storage: {
       from(bucket) {
         return {
+          async copy(source,cible){if(etat.objets[cible])return{error:{code:'exists'}};if(!etat.objets[source])return{error:{code:'missing'}};etat.objets[cible]=etat.objets[source].slice();return{error:null};},
           async createSignedUploadUrl(chemin, options) {
             journal.signatures.push({ bucket, chemin, upsert: !!(options && options.upsert) });
             if (etat.stockageKo) return { data: null, error: { message: 'storage down' } };
@@ -199,6 +221,12 @@ function creerDouble(etat) {
 const ETATS_PAR_HOTE = { courant: null };
 globalThis.fetch = async function (url, options) {
   const u = String(url);
+  if(u==='https://validation.invalid/verifier'){
+    const etat=ETATS_PAR_HOTE.courant,corps=JSON.parse(options.body);
+    const c=etat.convoyeurs.find(c=>c.id===corps.candidature_id);
+    if(etat.workerCode)return Response.json({ok:false,code:etat.workerCode},{status:422});
+    return Response.json({ok:true,taille_octets:c.video_envoi_taille_octets,duree_secondes:etat.workerDuree??c.video_envoi_duree_secondes,mime:c.video_envoi_mime,codec:'TEST-QA-double',sha256:'a'.repeat(64)});
+  }
   if (!u.startsWith(HOTE_SIGNE)) throw new Error('réseau coupé : ' + u);
   const chemin = u.slice(HOTE_SIGNE.length).split('?')[0];
   const etat = ETATS_PAR_HOTE.courant;
@@ -226,7 +254,7 @@ function requete(corps, options = {}) {
   });
 }
 async function appeler(sb, corps, options) {
-  const rep = await traiterRequete(sb, requete(corps, options));
+  const rep = await traiterRequete(sb, requete(corps, options),{HELIXCAR_VIDEO_VALIDATION_URL:'https://validation.invalid/verifier',HELIXCAR_VIDEO_VALIDATION_SECRET:'TEST-QA-CLAUDE-HELIXCAR-secret-double'});
   let json = null;
   try { json = await rep.clone().json(); } catch { /* corps vide */ }
   return { statut: rep.status, json, entetes: rep.headers };
@@ -263,7 +291,7 @@ function toutesLignesCoherentes(etat) {
 const JETON_A = 'a'.repeat(64);
 const JETON_B = 'b'.repeat(64);
 
-(async () => {
+async function executerSuite() {
   const hashA = await hasherJeton(JETON_A);
   const hashB = await hasherJeton(JETON_B);
 
@@ -478,24 +506,24 @@ const JETON_B = 'b'.repeat(64);
     etat.objets[chemin] = fichierDe(ENTETE_WEBM, TAILLE);
     r = await appeler(sb, { action: 'confirmer', jeton: JETON_A });
     check('6.3 Confirmation acceptée une fois le fichier présent, complet et lisible', r.statut === 200 && r.json.ok === true, JSON.stringify(r.json));
-    check('6.4 Remplacement : l\'ancien fichier est SUPPRIMÉ',
-      journal.suppressions.includes(`candidatures/${ID_A}/ancienne.webm`), JSON.stringify(journal.suppressions));
+    check('6.4 Un dépôt potentiellement actif n’est pas supprimé pendant la finalisation',
+      !journal.suppressions.includes(`candidatures/${ID_A}/ancienne.webm`), JSON.stringify(journal.suppressions));
     check('6.5 Remplacement : la vidéo confirmée est CONSERVÉE', chemin in etat.objets);
-    check('6.6 Aucun orphelin restant dans le dossier',
-      Object.keys(etat.objets).filter(o => o.startsWith(`candidatures/${ID_A}/`)).length === 1, JSON.stringify(Object.keys(etat.objets)));
+    check('6.6 Copie validée distincte et trace de réconciliation conservée',
+      finalDe(chemin) in etat.objets && etat.verifications.some(v=>v.chemin_source===chemin&&v.etat==='verifie'), JSON.stringify(Object.keys(etat.objets)));
     check('6.7 Vidéo déclarée reçue', !!etat.convoyeurs[0].video_envoyee_le);
     check('6.8 Statut passé de video_attendue à en_attente', etat.convoyeurs[0].statut === 'en_attente');
     check('6.9 Jeton consommé (usage unique) : instant de consommation posé', !!etat.convoyeurs[0].video_upload_jeton_consomme_le);
     check('6.9b LOT V01 : les QUATRE colonnes finales écrites ENSEMBLE, valeurs cohérentes',
-      etat.convoyeurs[0].video_chemin === chemin && etat.convoyeurs[0].video_mime === 'video/webm'
+      etat.convoyeurs[0].video_chemin === finalDe(chemin) && etat.convoyeurs[0].video_mime === 'video/webm'
       && etat.convoyeurs[0].video_taille_octets === TAILLE && etat.convoyeurs[0].video_duree_secondes === 30
       && !!etat.convoyeurs[0].video_envoyee_le, JSON.stringify(etat.convoyeurs[0]));
     check('6.9c LOT V01 : les colonnes d\'envoi en cours sont vidées',
       etat.convoyeurs[0].video_envoi_chemin === null && etat.convoyeurs[0].video_envoi_mime === null
       && etat.convoyeurs[0].video_envoi_taille_octets === null && etat.convoyeurs[0].video_envoi_commence_le === null);
     check('6.9d LOT V01 : la finalisation est passée par la fonction SQL, avec la taille RÉELLE de l\'objet',
-      journal.rpc.length === 1 && journal.rpc[0].nom === 'finaliser_video_candidature'
-      && journal.rpc[0].args.p_taille_reelle === TAILLE, JSON.stringify(journal.rpc));
+      journal.rpc.filter(x=>x.nom==='finaliser_video_verifiee').length === 1
+      && etat.verifications[0].taille_octets === TAILLE, JSON.stringify(journal.rpc));
     check('6.9e LOT V01 : aucune contrainte violée sur tout le parcours',
       journal.refus.length === 0 && toutesLignesCoherentes(etat), JSON.stringify(journal.refus));
     check('6.9f La lecture d\'en-tête n\'a demandé que les 64 premiers octets (Range), jamais le fichier entier',
@@ -538,7 +566,7 @@ const JETON_B = 'b'.repeat(64);
     check('6b.2 ... l\'instant de début d\'envoi n\'est pas remis à zéro',
       journal.majs.length === 2 && journal.majs[0].video_envoi_commence_le === journal.majs[1].video_envoi_commence_le);
     check('6b.3 ... la signature de reprise autorise l\'écrasement du même objet (upsert)',
-      journal.signatures[1].upsert === true && journal.signatures[0].upsert === false, JSON.stringify(journal.signatures));
+      journal.signatures[1].upsert === true && journal.signatures[0].upsert === true, JSON.stringify(journal.signatures));
     const r3 = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/webm', taille_octets: 5000, duree_secondes: 20 });
     check('6b.4 Un autre format -> un nouveau chemin, toujours dans SON dossier',
       r3.json.chemin !== r1.json.chemin && r3.json.chemin.endsWith('.webm') && r3.json.chemin.startsWith(`candidatures/${ID_A}/`));
@@ -552,22 +580,22 @@ const JETON_B = 'b'.repeat(64);
     etat.objets[r3.json.chemin] = fichierDe(ENTETE_WEBM, 5000);
     const c1 = await appeler(sb, { action: 'confirmer', jeton: JETON_A });
     check('6b.6 Finalisation sur le chemin en cours, l\'objet abandonné est supprimé',
-      c1.statut === 200 && etat.convoyeurs[0].video_chemin === r3.json.chemin && !(r1.json.chemin in etat.objets)
-      && c1.json.orphelins_supprimes === 1, JSON.stringify(c1.json));
+      c1.statut === 200 && etat.convoyeurs[0].video_chemin === finalDe(r3.json.chemin) && r1.json.chemin in etat.objets
+      && c1.json.orphelins_supprimes === 0, JSON.stringify(c1.json));
 
     // REMPLACEMENT PAR LE PROPRIÉTAIRE AUTHENTIFIÉ, plus tard.
     etat.convoyeurs[0].auth_user_id = 'user-A';
     etat.sessions['jwt-A'] = 'user-A';
     const anc = etat.convoyeurs[0].video_chemin;
     const rr = await appeler(sb, { action: 'autoriser', mime: 'video/mp4', taille_octets: 7000, duree_secondes: 25 }, { jwt: 'jwt-A' });
-    check('6b.7 Le propriétaire peut préparer un remplacement : nouveau chemin, vidéo actuelle INTACTE',
-      rr.statut === 200 && rr.json.chemin !== anc && etat.convoyeurs[0].video_chemin === anc
+    check('6b.7 Une autorisation répétée par le propriétaire garde la vidéo finalisée',
+      rr.statut === 200 && rr.json.chemin === anc && rr.json.deja_confirmee === true && etat.convoyeurs[0].video_chemin === anc
       && !!etat.convoyeurs[0].video_envoyee_le && toutesLignesCoherentes(etat), JSON.stringify(rr.json));
-    etat.objets[rr.json.chemin] = fichierDe(ENTETE_MP4, 7000);
+    const tailleFinale=etat.convoyeurs[0].video_taille_octets;
     const cc = await appeler(sb, { action: 'confirmer' }, { jwt: 'jwt-A' });
-    check('6b.8 Après finalisation du remplacement : nouvelle vidéo en place, ancienne supprimée du bucket',
-      cc.statut === 200 && etat.convoyeurs[0].video_chemin === rr.json.chemin && etat.convoyeurs[0].video_taille_octets === 7000
-      && !(anc in etat.objets) && Object.keys(etat.objets).filter(o => o.startsWith(`candidatures/${ID_A}/`)).length === 1,
+    check('6b.8 Après nouvelle confirmation : même vidéo et aucune nouvelle écriture finale',
+      cc.statut === 200 && etat.convoyeurs[0].video_chemin === rr.json.chemin && etat.convoyeurs[0].video_taille_octets === tailleFinale
+      && anc in etat.objets && cc.json.deja_confirmee === true,
       JSON.stringify({ cc: cc.json, objets: Object.keys(etat.objets) }));
     check('6b.9 Le statut d\'un partenaire déjà validé n\'est PAS rétrogradé par un remplacement',
       etat.convoyeurs[0].statut === 'en_attente');
@@ -598,8 +626,8 @@ const JETON_B = 'b'.repeat(64);
     etat.rpcKo = false;
     r = await appeler(sb, { action: 'confirmer', jeton: JETON_A });
     check('6t.3 La reprise après panne finalise sans double candidature ni double fichier',
-      r.statut === 200 && etat.convoyeurs.length === 2 && etat.convoyeurs[0].video_chemin === a.json.chemin
-      && Object.keys(etat.objets).length === 1, JSON.stringify(r.json));
+      r.statut === 200 && etat.convoyeurs.length === 2 && etat.convoyeurs[0].video_chemin === finalDe(a.json.chemin)
+      && Object.keys(etat.objets).filter(p=>p.includes('/verifie/')).length === 1, JSON.stringify(r.json));
     // Sans métadonnées de taille (plateforme qui ne les renvoie pas) :
     // la finalisation reste possible, la taille annoncée fait foi.
     const etat2 = etatDeBase();
@@ -609,8 +637,8 @@ const JETON_B = 'b'.repeat(64);
     const a2 = await appeler(d2.sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 4000, duree_secondes: 30 });
     etat2.objets[a2.json.chemin] = fichierDe(ENTETE_MP4, 4000);
     r = await appeler(d2.sb, { action: 'confirmer', jeton: JETON_A });
-    check('6t.4 Sans taille dans les métadonnées : finalisation avec la taille annoncée, en-tête toujours vérifié',
-      r.statut === 200 && etat2.convoyeurs[0].video_taille_octets === 4000 && d2.journal.rpc[0].args.p_taille_reelle === null,
+    check('6t.4 Sans taille dans les métadonnées : refus temporaire, aucune finalisation déclarative',
+      r.statut === 503 && etat2.convoyeurs[0].video_taille_octets === null && !d2.journal.rpc.some(x=>x.nom==='finaliser_video_verifiee'),
       JSON.stringify(r.json));
     // Fichier VIDE déposé (0 octet).
     const etat3 = etatDeBase();
@@ -655,7 +683,7 @@ const JETON_B = 'b'.repeat(64);
     check('10.4 Cas réel : confirmation acceptée, vidéo finalisée', c.statut === 200 && c.json.ok === true, JSON.stringify(c.json));
     const l = etat.convoyeurs[1];
     check('10.5 Cas réel : la ligne finale respecte la contrainte de 03 (chemin, MIME, taille, date ensemble)',
-      contrainteViolee(l) === null && l.video_chemin === a.json.chemin && l.video_mime === 'video/quicktime'
+      contrainteViolee(l) === null && l.video_chemin === finalDe(a.json.chemin) && l.video_mime === 'video/quicktime'
       && l.video_taille_octets === TAILLE_REELLE && !!l.video_envoyee_le, JSON.stringify(l));
     check('10.6 Cas réel : AUCUN refus de contrainte sur tout le parcours (autoriser + confirmer)',
       journal.refus.length === 1 /* uniquement la reproduction 10.1 */, JSON.stringify(journal.refus));
@@ -891,11 +919,13 @@ const JETON_B = 'b'.repeat(64);
       && !/video_envoyee_le\s*=\s*p_/.test(m105));
     check('9.12 La fonction serveur n\'écrit JAMAIS les colonnes finales elle-même (seule la fonction SQL le fait)',
       !/video_envoyee_le:\s*/.test(fonction) && !/video_chemin:\s*chemin/.test(fonction)
-      && /rpc\("finaliser_video_candidature"/.test(fonction));
+      && /rpc\("finaliser_video_verifiee"/.test(fonction));
 
   }
 
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   if (echecs.length) echecs.forEach(e => console.log('  - ' + e));
   process.exit(fail > 0 ? 1 : 0);
-})();
+}
+if(process.argv[1]===new URL(import.meta.url).pathname)await executerSuite();
+export {creerDouble,etatDeBase,appeler,ID_A,ID_B,JETON_A,ENTETE_WEBM};

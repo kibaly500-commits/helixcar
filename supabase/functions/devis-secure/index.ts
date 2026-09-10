@@ -48,6 +48,8 @@
 //   HELIXCAR_URL_PUBLIQUE (facultative), HELIXCAR_ORIGINES_SUPPLEMENTAIRES
 //   (facultative), RESEND_FROM (facultative, une fois le domaine vérifié)
 
+import { construirePdfServeur } from "../_shared/devis-pdf.mjs";
+
 export const ORIGINE_PRODUCTION = "https://helixcar.vercel.app";
 export const ORIGINES_AUTORISEES: string[] = [
   "https://helixcar.vercel.app",       // site de production
@@ -183,6 +185,7 @@ function resoudreAdresse(rue: any, cp: any, ville: any): string | null {
 // restitution mono (dossier) / multi (véhicule).
 function construireSnapshot(devis: any, client: any, vehicules: any[]) {
   const monoPdf = !vehicules || vehicules.length === 0;
+  const sansVehicule = client.type_service === 'professionnel' && client.professionnel_details?.categorie === 'technicien';
 
   const snapshot: Record<string, unknown> = {
     version_snapshot: 1,
@@ -196,10 +199,10 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
       telephone: client.telephone || null,
     },
     type_service: client.type_service || null,
-    nombre_vehicules: monoPdf ? 1 : vehicules.length,
+    nombre_vehicules: sansVehicule ? 0 : monoPdf ? 1 : vehicules.length,
   };
 
-  if (monoPdf) {
+  if (monoPdf && !sansVehicule) {
     snapshot.trajet = {
       ville_depart: client.ville_depart || null,
       adresse_depart_rue: client.adresse_depart_rue || null,
@@ -228,7 +231,7 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
     };
   }
 
-  if (!monoPdf) {
+  if (!monoPdf && !sansVehicule) {
     snapshot.vehicules = vehicules.map((v: any) => ({
       position: v.position ?? null,
       type_vehicule: v.type_vehicule || null,
@@ -260,7 +263,7 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
         horaire: resoudreHoraire(v, "restit", "restit_heure"),
       } : null,
     }));
-  } else if (client.marque_modele || client.type_vehicule) {
+  } else if (!sansVehicule && (client.marque_modele || client.type_vehicule)) {
     snapshot.vehicules = [{
       position: 1,
       type_vehicule: client.type_vehicule || null,
@@ -274,7 +277,7 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
   // réels, différents des colonnes véhicule : adresse_restit_rue /
   // code_postal_restit / ville_restit / date_restitution /
   // heure_restitution — jamais restit_*.
-  if (monoPdf && client.restitution === "Oui") {
+  if (monoPdf && !sansVehicule && client.restitution === "Oui") {
     const adresseLegacy = client.adresse_restit_rue
       ? null
       : (client.adresse_restitution || null);
@@ -284,6 +287,9 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
       horaire: resoudreHoraire(client, "restit", "heure_restitution"),
     };
   }
+
+  snapshot.nettoyage_details = client.nettoyage_details || null;
+  snapshot.professionnel_details = client.professionnel_details || null;
 
   snapshot.options = {
     urgence: client.urgence === "Oui",
@@ -296,8 +302,7 @@ function construireSnapshot(devis: any, client: any, vehicules: any[]) {
 
 // ------------------------------------------------------------
 // JOURNAL DES ENVOIS (migration 106) — un fait par ligne, jamais un
-// secret. Un échec d'écriture du journal ne fait jamais échouer
-// l'opération métier : il est signalé dans les journaux serveur.
+// secret. Le résultat permet au transport de refuser un envoi non tracé.
 // ------------------------------------------------------------
 async function journaliser(sb: any, ligne: {
   devis_id: string; version: number; etape: string; destinataire?: string | null;
@@ -317,9 +322,11 @@ async function journaliser(sb: any, ligne: {
       detail: ligne.detail ?? null,
       auteur: ligne.auteur ?? null,
     });
-    if (error) console.error("journal devis_envois :", error.code || "", error.message || error);
+    if (error) { console.error("Écriture du journal devis impossible."); return false; }
+    return true;
   } catch (e) {
-    console.error("journal devis_envois :", e instanceof Error ? e.message : String(e));
+    console.error("Écriture du journal devis impossible.");
+    return false;
   }
 }
 
@@ -344,8 +351,8 @@ async function adminAuthentifie(sb: any, req: Request, cors: Record<string, stri
 }
 
 const CHAMPS_DEVIS =
-  "id, reference, prix, statut, client_id, pdf_path, acceptation_token_hash, date_expiration_token, " +
-  "version, version_preparee, version_envoyee, version_acceptee, envoi_en_cours_depuis, paiement_statut, date_envoi";
+  "id, reference, prix, statut, client_id, date_generation, snapshot_devis, pdf_path, acceptation_token_hash, date_expiration_token, " +
+  "version, version_preparee, version_envoyee, version_acceptee, envoi_en_cours_depuis, paiement_statut, date_envoi, annule_le, expire_le";
 
 // ============================================================
 // ACTION 1 — PREPARE : PDF figé + lien sécurisé, pour LA version courante
@@ -361,9 +368,14 @@ export async function actionPrepare(sb: any, req: Request, corps: any, cors: Rec
     .from("devis").select(CHAMPS_DEVIS).eq("id", devisId).maybeSingle();
   if (erreurLecture || !devisActuel) return erreur("NOT_FOUND", "Devis introuvable.", 404, cors);
 
+  const { data: operationActive, error: operationError } = await sb.from("devis_envoi_operations")
+    .select("id").eq("devis_id", devisId).in("etat", ["en_cours", "a_reconcilier"]).limit(1).maybeSingle();
+  if (operationError) return erreur("INTERNAL_ERROR", "Impossible de vérifier les envois précédents.", 500, cors);
+  if (operationActive) return erreur("ENVOI_A_REPRENDRE", "Un envoi attend sa confirmation. Reprenez cet envoi avant de préparer un nouveau devis.", 409, cors);
+
   // ALLOWLIST : tout statut qui n'est ni 'genere' ni 'envoye' est refusé.
   const STATUTS_PREPARABLES = ["genere", "envoye"];
-  if (!STATUTS_PREPARABLES.includes(devisActuel.statut)) {
+  if (!STATUTS_PREPARABLES.includes(devisActuel.statut) || devisActuel.annule_le || devisActuel.expire_le) {
     return erreur("INVALID_STATE", "Ce devis n'est pas dans un état permettant sa préparation.", 409, cors);
   }
 
@@ -373,15 +385,7 @@ export async function actionPrepare(sb: any, req: Request, corps: any, cors: Rec
 
   const { data: vehicules, error: erreurVehicules } = await sb
     .from("vehicules")
-    .select(`
-      position, type_vehicule, marque_modele, immatriculation, mode_transport,
-      ville_depart, adresse_depart_rue, code_postal_depart,
-      ville_arrivee, adresse_arrivee_rue, code_postal_arrivee,
-      date_prise_en_charge, pc_heure_type, pc_creneau_debut, pc_creneau_fin, heure_prise_en_charge,
-      date_livraison, liv_heure_type, liv_creneau_debut, liv_creneau_fin, heure_livraison,
-      restitution_concernee, restit_adresse_rue, restit_code_postal, restit_ville,
-      restit_date, restit_heure_type, restit_creneau_debut, restit_creneau_fin, restit_heure
-    `)
+    .select("*")
     .eq("dossier_id", devisActuel.client_id)
     .order("position", { ascending: true });
   // Une erreur ici ne doit JAMAIS être traitée comme « 0 véhicule ».
@@ -391,28 +395,29 @@ export async function actionPrepare(sb: any, req: Request, corps: any, cors: Rec
   }
 
   const snapshot = construireSnapshot(devisActuel, client, vehicules || []);
+  const comparable = (v:any) => { const r={...v};delete r.date_snapshot;delete r.version;return JSON.stringify(r); };
+  if (devisActuel.snapshot_devis && devisActuel.version_preparee === devisActuel.version &&
+      comparable(snapshot) !== comparable(devisActuel.snapshot_devis)) {
+    const ancienneVersion=devisActuel.version;
+    const {data:revisee,error:e}=await sb.from("devis").update({version:ancienneVersion+1,consulte_le:null})
+      .eq("id",devisId).eq("version",ancienneVersion).in("statut",STATUTS_PREPARABLES).select("version").maybeSingle();
+    if(e || !revisee) return erreur("INVALID_STATE","Le devis a changé. Rouvrez le dossier avant de préparer son envoi.",409,cors);
+    devisActuel.version=revisee.version;
+  }
   (snapshot as any).version = devisActuel.version ?? 1;
 
-  // PDF — validation de contenu.
-  const pdfBase64 = corps?.pdf_base64;
-  const pdfMime = corps?.pdf_mime;
-  if (typeof pdfBase64 !== "string" || !pdfBase64.length) return erreur("BAD_REQUEST", "Le PDF est requis.", 400, cors);
-  if (pdfMime !== "application/pdf") return erreur("BAD_REQUEST", "Type de fichier invalide.", 400, cors);
-  let octetsPdf: Uint8Array;
-  try { octetsPdf = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0)); }
-  catch { return erreur("BAD_REQUEST", "Contenu PDF invalide (décodage échoué).", 400, cors); }
-  const TAILLE_MIN = 1024, TAILLE_MAX = 10 * 1024 * 1024;
-  if (octetsPdf.length < TAILLE_MIN || octetsPdf.length > TAILLE_MAX) {
-    return erreur("BAD_REQUEST", "Taille du PDF hors limites acceptables.", 400, cors);
-  }
-  const enteteAttendue = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
-  if (!enteteAttendue.every((o, i) => octetsPdf[i] === o)) {
-    return erreur("BAD_REQUEST", "Le contenu reçu n'est pas un PDF valide.", 400, cors);
+  // Q01-009 : le navigateur ne fournit plus aucun contenu PDF faisant foi.
+  // Le moteur de rendu est dérivé du PDF validé, contrôlé à chaque test.
+  const jspdf = typeof Deno !== "undefined"
+    ? await import("npm:jspdf@4.2.1") : await import("jspdf");
+  const dossierPdf = { ...client, _vehicules: vehicules || [] };
+  const documentPdf = construirePdfServeur(jspdf.jsPDF, dossierPdf, devisActuel);
+  const octetsPdf = new Uint8Array(documentPdf.output("arraybuffer"));
+  if (octetsPdf.length < 1024 || octetsPdf.length > 10 * 1024 * 1024) {
+    return erreur("PDF_GENERATION_FAILED", "Le PDF ne peut pas être préparé. Contactez HelixCar.", 500, cors);
   }
 
-  // Chemin UNIQUE à chaque préparation. L'ancien fichier n'est supprimé
-  // qu'APRÈS succès confirmé de l'écriture en base — jamais avant.
-  const ancienPdfPath = devisActuel.pdf_path || null;
+  // Chemin UNIQUE à chaque préparation. Les anciennes versions sont conservées.
   const nouveauPdfPath = `${devisActuel.id}/devis-v${devisActuel.version ?? 1}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.pdf`;
 
   const { error: erreurUpload } = await sb.storage
@@ -454,9 +459,13 @@ export async function actionPrepare(sb: any, req: Request, corps: any, cors: Rec
     try { await sb.storage.from("devis").remove([nouveauPdfPath]); } catch { /* nettoyage au mieux */ }
     return erreur("INVALID_STATE", "Ce devis a changé d'état entre-temps et ne peut plus être préparé. Rouvrez le dossier.", 409, cors);
   }
-  if (ancienPdfPath && ancienPdfPath !== nouveauPdfPath) {
-    try { await sb.storage.from("devis").remove([ancienPdfPath]); } catch { /* nettoyage au mieux */ }
-  }
+  const { error: archiveError } = await sb.from("devis_preparations").insert({
+    devis_id: devisActuel.id, version: devisActuel.version ?? 1,
+    token_hash: tokenHash, pdf_path: nouveauPdfPath, snapshot_devis: snapshot,
+    date_expiration: dateExpiration, envoyee_le: null,
+  });
+  if (archiveError) return erreur("ARCHIVE_FAILED", "Le PDF est préparé mais son archivage doit être repris. Aucun envoi effectué.", 500, cors);
+  // Les PDF antérieurs sont conservés : un renvoi ne détruit jamais une version envoyée.
 
   await journaliser(sb, {
     devis_id: devisActuel.id, version: devisActuel.version ?? 1, etape: "preparation",
@@ -489,6 +498,10 @@ export async function actionSendEmail(
   const renvoi = corps?.renvoi === true;
   const envoiCle = typeof corps?.envoi_cle === "string" && corps.envoi_cle.length >= 8 ? corps.envoi_cle.slice(0, 80) : null;
   if (typeof devisId !== "string" || !devisId) return erreur("BAD_REQUEST", "devis_id est requis.", 400, cors);
+  const { data: operationAReprendre, error: lectureOperation } = await sb.from("devis_envoi_operations")
+    .select("*").eq("devis_id", devisId).in("etat", ["en_cours", "a_reconcilier"]).limit(1).maybeSingle();
+  if (lectureOperation) return erreur("INTERNAL_ERROR", "Impossible de vérifier les envois précédents.", 500, cors);
+  if (operationAReprendre) return await livrerOperation(sb, operationAReprendre, cors, env, fetchFn);
   if (typeof tokenBrut !== "string" || tokenBrut.length < 20) return erreur("BAD_REQUEST", "Token invalide.", 400, cors);
   if (!envoiCle) return erreur("BAD_REQUEST", "Clé de tentative (envoi_cle) requise.", 400, cors);
 
@@ -500,6 +513,12 @@ export async function actionSendEmail(
   if (erreurLecture || !devisActuel) return erreur("NOT_FOUND", "Devis introuvable.", 404, cors);
   const version = devisActuel.version ?? 1;
 
+  const { data: operationAcceptee, error: erreurOperationAcceptee } = await sb
+    .from("devis_envoi_operations").select("*").eq("devis_id", devisId)
+    .eq("envoi_cle", envoiCle).eq("etat", "acceptee").maybeSingle();
+  if (erreurOperationAcceptee) return erreur("INTERNAL_ERROR", "Impossible de relire cet envoi.", 500, cors);
+  if (operationAcceptee) return await livrerOperation(sb, operationAcceptee, cors, env, fetchFn);
+
   // IDEMPOTENCE : cette tentative a déjà abouti (double clic, réponse
   // perdue) → on répond le résultat déjà obtenu, sans second e-mail.
   const { data: dejaFaite } = await sb
@@ -507,6 +526,9 @@ export async function actionSendEmail(
     .eq("devis_id", devisId).eq("envoi_cle", envoiCle).eq("etape", "acceptee_prestataire")
     .limit(1).maybeSingle();
   if (dejaFaite) {
+    if (!devisActuel.date_envoi || devisActuel.version_envoyee == null || devisActuel.statut === "genere") {
+      return erreur("ENVOI_A_RECONCILIER", "L'e-mail a été accepté par le prestataire ; son état doit être réconcilié avant tout renvoi.", 409, cors);
+    }
     return reponseJson({
       ok: true, deja_envoye: true, statut: devisActuel.statut,
       date_envoi: devisActuel.date_envoi || dejaFaite.created_at, version_envoyee: devisActuel.version_envoyee,
@@ -530,7 +552,7 @@ export async function actionSendEmail(
   if (devisActuel.statut === "envoye" && !renvoi) {
     return erreur("INVALID_STATE", "Ce devis a déjà été envoyé. Utilisez « Renvoyer au client » pour un renvoi explicite.", 409, cors);
   }
-  if (devisActuel.statut !== "genere" && devisActuel.statut !== "envoye") {
+  if ((devisActuel.statut !== "genere" && devisActuel.statut !== "envoye") || devisActuel.annule_le || devisActuel.expire_le) {
     return erreur("INVALID_STATE", "Ce devis n'est plus dans un état permettant un envoi.", 409, cors);
   }
 
@@ -601,7 +623,7 @@ export async function actionSendEmail(
 
   const htmlEmail = `<!DOCTYPE html><html><body style="font-family:-apple-system,Helvetica,Arial,sans-serif;background:#F7F3EC;padding:24px;margin:0">
 <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border-radius:3px;overflow:hidden">
-  <div style="background:#14181D;padding:20px 24px"><span style="color:#FFFFFF;font-size:1.3rem;font-weight:800">HELIX<span style="color:#E5484D">CAR</span></span></div>
+  <div style="background:#14181D;padding:20px 24px"><span style="color:#FFFFFF;font-size:1.3rem;font-weight:800">HELI<span style="color:#E5484D">X</span>CAR</span></div>
   <div style="padding:28px 24px">
     <p>Bonjour ${nomClientHtml},</p>
     <p>${introduction}</p>
@@ -623,97 +645,164 @@ export async function actionSendEmail(
     `Ce lien sécurisé vous permet de consulter votre devis et de l'accepter ou de le refuser en ligne.\n\n` +
     `Cordialement,\nL'équipe HelixCar`;
 
-  // JOURNAL : la TENTATIVE, avant de parler au prestataire.
-  await journaliser(sb, {
-    devis_id: devisId, version, etape: "tentative", destinataire, renvoi, envoi_cle: envoiCle,
-    fournisseur: "resend", auteur: auth.uid,
-  });
-
-  let reponseResend: Response;
-  try {
-    reponseResend = await fetchFn("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: env.RESEND_FROM || RESEND_FROM_TEMPORAIRE,
-        to: [destinataire],
-        subject: sujet,
-        html: htmlEmail,
-        text: texteEmail,
-        attachments: [{ filename: nomPieceJointe, content: pdfBase64Standard }],
-      }),
-    });
-  } catch (e) {
-    console.error("Erreur réseau Resend (sans détail sensible).");
-    await journaliser(sb, { devis_id: devisId, version, etape: "echec", destinataire, renvoi, envoi_cle: envoiCle,
-      fournisseur: "resend", detail: "reseau", auteur: auth.uid });
+  const payload = {
+    from: env.RESEND_FROM || RESEND_FROM_TEMPORAIRE, to: [destinataire], subject: sujet,
+    html: htmlEmail, text: texteEmail,
+    attachments: [{ filename: nomPieceJointe, content: pdfBase64Standard }],
+  };
+  const { data: operation, error: creationError } = await sb.from("devis_envoi_operations").insert({
+    id: crypto.randomUUID(), devis_id: devisId, version, envoi_cle: envoiCle,
+    token_hash: tokenHash, payload, destinataire, auteur: auth.uid, renvoi, etat: "en_cours",
+  }).select("*").single();
+  if (creationError || !operation) {
     await libererVerrou();
-    return erreur("EMAIL_SEND_FAILED", "Le prestataire d'e-mail est injoignable. Le devis reste enregistré : réessayez.", 502, cors);
+    return erreur("ENVOI_EN_COURS", "Cet envoi doit être relu avant une nouvelle tentative.", 409, cors);
   }
+  return await livrerOperation(sb, operation, cors, env, fetchFn);
+}
 
-  let idFournisseur: string | null = null;
-  try { const j = await reponseResend.clone().json(); idFournisseur = j && typeof j.id === "string" ? j.id : null; } catch { /* corps non JSON */ }
-
-  if (!reponseResend.ok) {
-    console.error("Resend a refusé l'envoi, statut HTTP:", reponseResend.status);
-    await journaliser(sb, { devis_id: devisId, version, etape: "echec", destinataire, renvoi, envoi_cle: envoiCle,
-      fournisseur: "resend", detail: "http_" + reponseResend.status, auteur: auth.uid });
-    await libererVerrou();
-    return erreur("EMAIL_SEND_FAILED", "Le prestataire d'e-mail a refusé l'envoi (code " + reponseResend.status + "). Le devis reste enregistré : réessayez.", 502, cors);
+// Rejoue le MÊME payload avec la MÊME clé fournisseur, même après refresh.
+// Resend ne conserve sa déduplication que 24 h : au-delà, aucun renvoi
+// aveugle. L'opération reste à réconcilier avec le prestataire.
+async function livrerOperation(sb: any, op: any, cors: Record<string,string>, env: Record<string,string|undefined>, fetchFn: typeof fetch) {
+  const ligne = { devis_id: op.devis_id, version: op.version, destinataire: op.destinataire,
+    renvoi: op.renvoi, envoi_cle: op.envoi_cle, fournisseur: "resend", auteur: op.auteur };
+  const liberer = async () => { await sb.from("devis").update({envoi_en_cours_depuis:null}).eq("id",op.devis_id); };
+  if (!env.RESEND_API_KEY) { await liberer(); return erreur("SERVER_MISCONFIGURED", "L'envoi d'e-mail n'est pas configuré sur le serveur.", 500, cors); }
+  if (env.HELIXCAR_ENV === "recette") {
+    const autorises = (env.HELIXCAR_DESTINATAIRES_RECETTE || "").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+    if (!autorises.includes(String(op.destinataire).toLowerCase())) {
+      await liberer(); return erreur("DESTINATAIRE_NON_AUTORISE", "Cette adresse n'est pas autorisée pour la recette.", 403, cors);
+    }
   }
-
-  // Le prestataire a ACCEPTÉ l'envoi — c'est un fait, tracé comme tel.
-  // Ce n'est pas encore une réception en boîte (reception_prouvee
-  // exigerait son webhook).
-  await journaliser(sb, { devis_id: devisId, version, etape: "acceptee_prestataire", destinataire, renvoi,
-    envoi_cle: envoiCle, fournisseur: "resend", fournisseur_id: idFournisseur, auteur: auth.uid });
-
-  // SEULEMENT MAINTENANT le statut passe à « envoye », la version envoyée
-  // est posée, et uniquement si la ligne est encore dans l'état attendu.
-  const dateEnvoi = new Date().toISOString();
-  const { data: ligneMiseAJour, error: erreurEcriture } = await sb
-    .from("devis")
-    .update({ statut: "envoye", date_envoi: dateEnvoi, version_envoyee: version, envoi_en_cours_depuis: null })
-    .eq("id", devisId)
-    .in("statut", ["genere", "envoye"])
-    .eq("version", version)
-    .select("id, statut, date_envoi, version_envoyee")
-    .maybeSingle();
-
-  if (erreurEcriture || !ligneMiseAJour) {
-    console.error("Email envoyé mais échec de la mise à jour du statut:", erreurEcriture?.message || "aucune ligne mise à jour");
-    await journaliser(sb, { devis_id: devisId, version, etape: "echec", destinataire, renvoi, envoi_cle: envoiCle,
-      fournisseur: "resend", fournisseur_id: idFournisseur, detail: "maj_statut_echouee_apres_envoi", auteur: auth.uid });
-    await libererVerrou();
-    return erreur("EMAIL_SENT_DB_UPDATE_FAILED",
-      "L'e-mail est parti, mais l'enregistrement de l'état a échoué. Vérifiez le dossier avant tout nouvel envoi.", 500, cors);
+  let fournisseurId = op.fournisseur_id;
+  let dateAcceptee = op.acceptee_le;
+  if (!fournisseurId) {
+    const {data:source,error:lectureSource}=await sb.from('devis').select('statut,annule_le,expire_le,version').eq('id',op.devis_id).maybeSingle();
+    if(lectureSource || !source){await liberer();return erreur('INTERNAL_ERROR','Le dossier ne peut pas être relu.',500,cors);}
+    if(source.annule_le || source.expire_le || !['genere','envoye'].includes(source.statut) || source.version!==op.version){
+      await liberer();return erreur('ENVOI_A_RECONCILIER','Le dossier a changé. Vérifiez le résultat auprès du prestataire avant toute reprise.',409,cors);
+    }
+    if (Date.now() - Date.parse(op.created_at) >= 23 * 60 * 60 * 1000) {
+      await liberer(); return erreur("ENVOI_A_RECONCILIER", "Le résultat de cet envoi doit être vérifié auprès du prestataire avant toute nouvelle tentative.", 409, cors);
+    }
+    if (!await journaliser(sb, {...ligne, etape:"tentative"})) {
+      await liberer(); return erreur("JOURNAL_UNAVAILABLE", "L'envoi ne peut pas être enregistré. Aucun nouvel appel au prestataire.", 503, cors);
+    }
+    let reponse: Response;
+    try {
+      reponse = await fetchFn("https://api.resend.com/emails", {
+        method:"POST", signal:AbortSignal.timeout(15000),
+        headers:{Authorization:"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json","Idempotency-Key":"helixcar-devis/"+op.id},
+        body:JSON.stringify(op.payload),
+      });
+    } catch {
+      await sb.from("devis_envoi_operations").update({etat:"a_reconcilier"}).eq("id",op.id);
+      await journaliser(sb,{...ligne,etape:"echec",detail:"reseau_resultat_inconnu"});
+      await liberer();
+      return erreur("ENVOI_A_REPRENDRE", "La confirmation d'envoi n'est pas arrivée. Reprenez cet envoi : aucune nouvelle préparation n'est nécessaire.",502,cors);
+    }
+    let contenu:any=null;try {contenu=await reponse.json();} catch {}
+    fournisseurId=contenu && typeof contenu.id==="string" && contenu.id.trim() ? contenu.id : null;
+    if (!reponse.ok || !fournisseurId) {
+      const incertain = reponse.status >= 500 || reponse.ok || reponse.status === 409;
+      await sb.from("devis_envoi_operations").update({etat:incertain?"a_reconcilier":"echec"}).eq("id",op.id);
+      await journaliser(sb,{...ligne,etape:"echec",detail:reponse.ok?"reponse_prestataire_invalide":"http_"+reponse.status});
+      await liberer();
+      return erreur(incertain?"ENVOI_A_REPRENDRE":"EMAIL_SEND_FAILED",incertain
+        ? "Le résultat de l'envoi n'est pas confirmé. Reprenez la tentative existante."
+        : "Le prestataire a refusé l'envoi. Le devis reste enregistré.",502,cors);
+    }
+    dateAcceptee=new Date().toISOString();
+    const { error: suiviError }=await sb.from("devis_envoi_operations").update({etat:"acceptee",fournisseur_id:fournisseurId,acceptee_le:dateAcceptee}).eq("id",op.id);
+    if(suiviError) {await liberer();return erreur("EMAIL_SENT_DB_UPDATE_FAILED","Le prestataire a accepté l'e-mail mais sa confirmation doit être réconciliée.",500,cors);}
   }
+  if(!await journaliser(sb,{...ligne,etape:"acceptee_prestataire",fournisseur_id:fournisseurId})) {
+    await liberer();return erreur("EMAIL_SENT_DB_UPDATE_FAILED","Le prestataire a accepté l'e-mail mais le journal doit être réconcilié.",500,cors);
+  }
+  const {data: archive,error: archiveError}=await sb.from("devis_preparations").update({envoyee_le:dateAcceptee}).eq("devis_id",op.devis_id).eq("token_hash",op.token_hash).select("id").maybeSingle();
+  if (archiveError || !archive) {
+    await liberer();return erreur("EMAIL_SENT_DB_UPDATE_FAILED","L'envoi a été accepté mais son archive doit être réconciliée.",500,cors);
+  }
+  const {data: actuel,error:lectureActuel}=await sb.from("devis").select("id,version,statut,date_envoi,version_envoyee,annule_le,expire_le").eq("id",op.devis_id).maybeSingle();
+  if (lectureActuel || !actuel) {await liberer();return erreur("INTERNAL_ERROR","Le dossier ne peut pas être relu.",500,cors);}
+  if(actuel.annule_le || actuel.expire_le){await liberer();return erreur('OPERATION_DEJA_TRAITEE','Le prestataire a accepté cet envoi. Le devis est désormais annulé ou expiré ; son état est conservé.',409,cors);}
+  if (actuel.version !== op.version) {
+    await liberer();return erreur("OPERATION_DEJA_TRAITEE","Cet envoi concerne une version antérieure. Rechargez le devis courant.",409,cors);
+  }
+  if (!["genere","envoye"].includes(actuel.statut) && actuel.version_envoyee === op.version && actuel.date_envoi) {
+    await liberer();return reponseJson({ok:true,deja_envoye:true,statut:actuel.statut,date_envoi:actuel.date_envoi,version_envoyee:actuel.version_envoyee,destinataire:op.destinataire},200,cors);
+  }
+  const {data: updated,error:updateError}=await sb.from("devis")
+    .update({statut:"envoye",date_envoi:dateAcceptee,version_envoyee:op.version,envoi_en_cours_depuis:null})
+    .eq("id",op.devis_id).eq("version",op.version).eq("acceptation_token_hash",op.token_hash)
+    .in("statut",["genere","envoye"]).select("id,statut,date_envoi,version_envoyee").maybeSingle();
+  if(archiveError || updateError || !updated) {
+    await journaliser(sb,{...ligne,etape:"echec",fournisseur_id:fournisseurId,detail:"maj_statut_echouee_apres_envoi"});
+    await liberer();return erreur("EMAIL_SENT_DB_UPDATE_FAILED","L'e-mail a été accepté par le prestataire. L'état du dossier doit être relu avant tout renvoi.",500,cors);
+  }
+  return reponseJson({ok:true,deja_envoye:!!(op.fournisseur_id && actuel.date_envoi && actuel.version_envoyee === op.version),statut:updated.statut,date_envoi:updated.date_envoi,version_envoyee:updated.version_envoyee,renvoi:op.renvoi,destinataire:op.destinataire,fournisseur_id:fournisseurId},200,cors);
+}
 
-  return reponseJson({
-    ok: true, statut: ligneMiseAJour.statut, date_envoi: ligneMiseAJour.date_envoi,
-    version_envoyee: ligneMiseAJour.version_envoyee, renvoi, fournisseur_id: idFournisseur,
-  }, 200, cors);
+export async function actionReprendreEnvoi(sb:any,req:Request,corps:any,cors:Record<string,string>,env:Record<string,string|undefined>,fetchFn:typeof fetch) {
+  const auth=await adminAuthentifie(sb,req,cors);if("refus" in auth)return auth.refus;
+  if(typeof corps?.devis_id!=="string")return erreur("BAD_REQUEST","Identifiant de devis requis.",400,cors);
+  const {data:op,error}=await sb.from("devis_envoi_operations").select("*").eq("devis_id",corps.devis_id)
+    .in("etat",["en_cours","a_reconcilier","acceptee"]).order("created_at",{ascending:false}).limit(1).maybeSingle();
+  if(error || !op)return erreur("NOT_FOUND","Aucun envoi à reprendre.",404,cors);
+  return await livrerOperation(sb,op,cors,env,fetchFn);
 }
 
 // ============================================================
-// ACTIONS 2-4 — GET / ACCEPT / REFUSE (côté client, preuve = le jeton)
+// ACTIONS 2-4 — identité Auth vérifiée ET propriété du dossier.
+// Le lien identifie le devis ; il ne confère jamais le rôle de son client.
 // ============================================================
-export async function actionGet(sb: any, corps: any, cors: Record<string, string>) {
+async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
+  const jwt = (req?.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!jwt) return { refus: erreur("UNAUTHORIZED", "Connectez-vous à votre espace client pour consulter ce devis.", 401, cors) };
+  const { data, error: authError } = await sb.auth.getUser(jwt);
+  if (authError || !data?.user?.id) return { refus: erreur("UNAUTHORIZED", "Votre session a expiré. Reconnectez-vous.", 401, cors) };
   const tokenBrut = corps?.token;
-  if (typeof tokenBrut !== "string" || tokenBrut.length < 20) {
-    return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
+  const devisId = corps?.devis_id;
+  const invalide = () => ({ refus: erreur("INVALID_OR_EXPIRED_LINK", "Devis inaccessible ou lien expiré.", 404, cors) });
+  let query = sb.from("devis").select("*");
+  let archive:any = null;
+  if (typeof tokenBrut === "string" && tokenBrut.length >= 20 && tokenBrut.length <= 256) {
+    const hash = await hasherToken(tokenBrut);
+    const {data:preparation,error:archiveError} = await sb.from("devis_preparations").select("*").eq("token_hash",hash).maybeSingle();
+    if(archiveError) return invalide();
+    archive=preparation;
+    if(archive && !archive.envoyee_le) return invalide();
+    query = archive ? query.eq("id",archive.devis_id) : query.eq("acceptation_token_hash", hash);
+  } else if (typeof devisId === "string" && /^[0-9a-f-]{36}$/i.test(devisId)) {
+    query = query.eq("id", devisId);
+  } else return invalide();
+  const { data: devisCourant, error } = await query.maybeSingle();
+  let devis = devisCourant;
+  if (error || !devis) return invalide();
+  const { data: dossier, error: dossierError } = await sb.from("clients").select("id")
+    .eq("id", devis.client_id).eq("auth_user_id", data.user.id).maybeSingle();
+  if (dossierError || !dossier) return invalide();
+  if (!archive && typeof devisId === "string") {
+    const {data:derniere,error:e}=await sb.from("devis_preparations").select("*").eq("devis_id",devis.id)
+      .gt("envoyee_le","1970-01-01T00:00:00Z").order("created_at",{ascending:false}).limit(1).maybeSingle();
+    if(e) return invalide();archive=derniere;
   }
-  const tokenHash = await hasherToken(tokenBrut);
-  const { data: devis, error } = await sb
-    .from("devis")
-    .select("id, reference, prix, statut, snapshot_devis, date_envoi, date_acceptation, date_refus, date_expiration_token, pdf_path, " +
-            "version, version_envoyee, version_acceptee, consulte_le, paiement_statut")
-    .eq("acceptation_token_hash", tokenHash)
-    .maybeSingle();
-  if (error || !devis) return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
-  if (devis.date_expiration_token && new Date(devis.date_expiration_token) < new Date()) {
-    return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
+  if(archive) devis={...devis, snapshot_devis:archive.snapshot_devis,pdf_path:archive.pdf_path,
+    version_envoyee:archive.version,date_envoi:archive.envoyee_le,date_expiration_token:archive.date_expiration};
+
+  if (!devis.date_expiration_token || !Number.isFinite(Date.parse(devis.date_expiration_token)) ||
+      Date.parse(devis.date_expiration_token) <= Date.now()) return invalide();
+  if (devis.annule_le || devis.expire_le || ["annule", "expire"].includes(devis.statut)) {
+    return { refus: erreur("ACTION_IMPOSSIBLE", "Ce devis est annulé ou expiré.", 409, cors) };
   }
+  return { devis, uid: data.user.id as string };
+}
+
+export async function actionGet(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
+  const autorisation = await devisDuClient(sb, corps, cors, req);
+  if ("refus" in autorisation) return autorisation.refus;
+  const { devis } = autorisation;
   // Un lien préparé mais jamais envoyé n'existe pas pour le client.
   if (devis.statut === "genere" && !devis.version_envoyee) {
     return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
@@ -728,7 +817,7 @@ export async function actionGet(sb: any, corps: any, cors: Record<string, string
   }
 
   let pdfUrl: string | null = null;
-  if (devis.pdf_path && !versionObsolete) {
+  if (devis.pdf_path) {
     const { data: urlSignee } = await sb.storage.from("devis").createSignedUrl(devis.pdf_path, 10 * 60);
     pdfUrl = urlSignee?.signedUrl ?? null;
   }
@@ -741,51 +830,41 @@ export async function actionGet(sb: any, corps: any, cors: Record<string, string
       reference: devis.reference, prix: prixEnvoye, statut: devis.statut,
       snapshot: devis.snapshot_devis, date_envoi: devis.date_envoi,
       date_acceptation: devis.date_acceptation, date_refus: devis.date_refus,
-      pdf_disponible: !!devis.pdf_path && !versionObsolete, pdf_url: pdfUrl,
+      pdf_disponible: !!pdfUrl, pdf_url: pdfUrl,
       version: version, version_envoyee: devis.version_envoyee, version_acceptee: devis.version_acceptee,
       version_obsolete: versionObsolete, paiement_statut: devis.paiement_statut || "aucun",
     },
   }, 200, cors);
 }
 
-export async function actionAccept(sb: any, corps: any, cors: Record<string, string>) {
-  return await traiterReponseDevis(sb, corps, "accepte", cors);
+export async function actionAccept(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
+  return await traiterReponseDevis(sb, corps, "accepte", cors, req);
 }
-export async function actionRefuse(sb: any, corps: any, cors: Record<string, string>) {
-  return await traiterReponseDevis(sb, corps, "refuse", cors);
+export async function actionRefuse(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
+  return await traiterReponseDevis(sb, corps, "refuse", cors, req);
 }
 
-async function traiterReponseDevis(sb: any, corps: any, cibleStatut: "accepte" | "refuse", cors: Record<string, string>) {
-  const tokenBrut = corps?.token;
-  if (typeof tokenBrut !== "string" || tokenBrut.length < 20) {
-    return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
-  }
-  const tokenHash = await hasherToken(tokenBrut);
+async function traiterReponseDevis(sb: any, corps: any, cibleStatut: "accepte" | "refuse", cors: Record<string, string>, req?: Request) {
+  const autorisation = await devisDuClient(sb, corps, cors, req);
+  if ("refus" in autorisation) return autorisation.refus;
+  const { devis: etat, uid } = autorisation;
   const maintenant = new Date().toISOString();
-
-  // L'état RÉEL d'abord : version courante, version envoyée, statut.
-  const { data: etat } = await sb.from("devis")
-    .select("id, statut, version, version_envoyee, date_expiration_token")
-    .eq("acceptation_token_hash", tokenHash).maybeSingle();
-  if (!etat) return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
-  if (etat.date_expiration_token && new Date(etat.date_expiration_token) < new Date()) {
-    return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
-  }
   const version = etat.version ?? 1;
   if (etat.version_envoyee != null && etat.version_envoyee !== version) {
     return erreur("VERSION_OBSOLETE", "Ce devis a été mis à jour depuis son envoi. Un nouveau devis vous sera envoyé : cette version ne peut plus être acceptée ni refusée.", 409, cors);
   }
 
-  // L'acceptation enregistre l'identité autorisée (le porteur du lien),
+  // L'acceptation enregistre l'identité Auth propriétaire du dossier,
   // la date, la version acceptée, et ouvre l'état « paiement en
   // attente » — SANS créer ni mission ni paiement (décision C02).
   const champsEcriture: Record<string, unknown> = cibleStatut === "accepte"
-    ? { statut: "accepte", date_acceptation: maintenant, date_refus: null, version_acceptee: version, paiement_statut: "en_attente" }
-    : { statut: "refuse", date_refus: maintenant, motif_refus: nettoyerMotifRefus(corps?.motif), paiement_statut: "aucun" };
+    ? { statut: "accepte", date_acceptation: maintenant, date_refus: null, accepte_par: uid, version_acceptee: version, paiement_statut: "en_attente" }
+    : { statut: "refuse", date_refus: maintenant, refuse_par: uid, motif_refus: nettoyerMotifRefus(corps?.motif), paiement_statut: "aucun" };
 
   const { data: ligneModifiee, error: erreurEcriture } = await sb
     .from("devis").update(champsEcriture)
-    .eq("acceptation_token_hash", tokenHash).eq("statut", "envoye").eq("version", version)
+    .eq("id", etat.id).eq("statut", "envoye").eq("version", version)
+    .is("annule_le", null).is("expire_le", null)
     .gt("date_expiration_token", maintenant)
     .select("id, statut, version_acceptee, paiement_statut").maybeSingle();
   if (erreurEcriture) return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
@@ -824,15 +903,16 @@ export async function traiterRequete(
   try { corps = await req.json(); } catch { return erreur("BAD_REQUEST", "Corps JSON invalide.", 400, cors); }
 
   const action = corps?.action;
-  if (!["prepare", "get", "accept", "refuse", "send_email"].includes(action)) {
+  if (!["prepare", "get", "accept", "refuse", "send_email", "resume_send"].includes(action)) {
     return erreur("BAD_REQUEST", "Action inconnue.", 400, cors);
   }
   try {
+    if (action === "resume_send") return await actionReprendreEnvoi(sb, req, corps, cors, env, fetchFn);
     if (action === "prepare") return await actionPrepare(sb, req, corps, cors);
-    if (action === "get") return await actionGet(sb, corps, cors);
-    if (action === "accept") return await actionAccept(sb, corps, cors);
+    if (action === "get") return await actionGet(sb, corps, cors, req);
+    if (action === "accept") return await actionAccept(sb, corps, cors, req);
     if (action === "send_email") return await actionSendEmail(sb, req, corps, cors, env, fetchFn);
-    return await actionRefuse(sb, corps, cors);
+    return await actionRefuse(sb, corps, cors, req);
   } catch (e) {
     console.error(`Erreur action=${action}:`, e instanceof Error ? e.message : String(e));
     return erreur("INTERNAL_ERROR", "Erreur serveur.", 500, cors);
@@ -854,6 +934,8 @@ if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
     const env = {
       RESEND_API_KEY: Deno.env.get("RESEND_API_KEY"),
       RESEND_FROM: Deno.env.get("RESEND_FROM"),
+      HELIXCAR_ENV: Deno.env.get("HELIXCAR_ENV"),
+      HELIXCAR_DESTINATAIRES_RECETTE: Deno.env.get("HELIXCAR_DESTINATAIRES_RECETTE"),
       HELIXCAR_URL_PUBLIQUE: Deno.env.get("HELIXCAR_URL_PUBLIQUE"),
     };
     return await traiterRequete(sb, req, env, fetch);

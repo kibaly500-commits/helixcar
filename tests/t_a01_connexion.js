@@ -590,7 +590,7 @@ const ATTEIGNABLE = `(() => {
       && (idx.match(/siret:\s+type_val === 'pro' \? \(siret_val \|\| null\) : null/g) || []).length === 3
       && !/societe:\s+societe_val \|\| null/.test(idx));
     check('H8 : la connexion depuis le site efface tout drapeau de récupération AVANT d\'ouvrir l\'espace',
-      /_hcEffacerDrapeauReinit\(\);\s*\n\s*window\.location\.href = 'dashboard\.html';/.test(idx));
+      /_hcEffacerDrapeauReinit\(\);\s*\n\s*window\.location\.href = _hcDestinationApresConnexion\(\);/.test(idx));
     check('H9 : sur le site aussi, un drapeau n\'est honoré qu\'à la reprise, jamais à une connexion normale',
       /evenement === 'INITIAL_SESSION' && aSession && _hcReinitEnCoursPour\(session\)/.test(idx)
       && /if \(evenement === 'SIGNED_IN'\) _hcEffacerDrapeauReinit\(\);/.test(idx));

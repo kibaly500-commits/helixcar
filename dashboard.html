@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   // Init EmailJS
@@ -2584,7 +2584,7 @@ function _etatDevisClient(dv) {
     return { texte: 'Devis accepté — paiement en attente', cls: 'badge-progress' };
   }
   if (dv.statut === 'envoye') {
-    return { texte: dv.consulte_le ? 'Devis consulté' : 'Devis envoyé — à consulter dans votre e-mail', cls: 'badge-pending' };
+    return { texte: dv.consulte_le ? 'Devis consulté' : 'Devis envoyé — à consulter', cls: 'badge-pending' };
   }
   return null;
 }
@@ -2618,12 +2618,14 @@ async function loadDemandesClient() {
     if (dv.client_id && !devisParDemande[dv.client_id]) devisParDemande[dv.client_id] = dv;
   });
   zone.innerHTML = demandes.map(function (d) {
-    const etat = _etatDevisClient(devisParDemande[d.id]);
+    const dv = devisParDemande[d.id];
+    const etat = _etatDevisClient(dv);
     return '<div class="detail-row" data-demande="' + escapeHtml(d.id) + '">'
       + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
       + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
       + ' · <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—') + '</span>'
       + (etat ? ' <span class="badge ' + etat.cls + '" data-etat-devis>' + escapeHtml(etat.texte) + '</span>' : '')
+      + (dv && ['envoye','accepte','refuse'].indexOf(dv.statut) !== -1 ? ' <a class="btn btn-sm btn-outline" href="devis.html?id=' + encodeURIComponent(dv.id) + '">Consulter mon devis</a>' : '')
       + '</span></div>';
   }).join('');
 }
@@ -6758,7 +6760,7 @@ function validerConvoyeur(id, name, email) {
           titre: '✅ Compte validé — Bienvenue chez HelixCar !',
           message: msg
         }).then(function() {
-          console.log('Email de validation envoyé à', email);
+          /* Acceptation prestataire, réception non prouvée. */
         }, function(err) {
           console.error('Erreur envoi email de validation:', err);
         });
@@ -12678,8 +12680,6 @@ async function prepareDevisSecure(devisId, base64Pdf, envoiCle) {
       body: JSON.stringify({
         action: 'prepare',
         devis_id: devisId,
-        pdf_base64: base64Pdf,
-        pdf_mime: 'application/pdf',
         envoi_cle: envoiCle || undefined
       })
     });
@@ -12720,7 +12720,7 @@ async function prepareDevisSecure(devisId, base64Pdf, envoiCle) {
 // Resend, exécuté entièrement côté serveur. Même patron d'authentification
 // que prepareDevisSecure (session admin réelle, jamais de secret côté
 // navigateur). Le token brut n'est transmis qu'une fois, jamais loggé.
-async function envoyerEmailDevisSecure(devisId, tokenBrut, envoiCle, renvoi) {
+async function envoyerEmailDevisSecure(devisId, tokenBrut, envoiCle, renvoi, reprendre) {
   if (!sbAuth) {
     return { ok: false, code: 'NO_AUTH_CLIENT', message: 'Client Supabase Auth indisponible.' };
   }
@@ -12745,7 +12745,7 @@ async function envoyerEmailDevisSecure(devisId, tokenBrut, envoiCle, renvoi) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        action: 'send_email',
+        action: reprendre ? 'resume_send' : 'send_email',
         devis_id: devisId,
         token: tokenBrut,
         // Clé d'idempotence de CETTE tentative : un double clic ou une
@@ -12858,7 +12858,7 @@ function envoyerDevis(clientId) {
     }
     var renvoi = d.statut === 'envoye';
     var question = renvoi
-      ? 'Renvoyer le devis ' + d.reference + ' à ' + c.email + ' ? Un nouvel e-mail partira, avec un nouveau lien ; l\'ancien lien ne fonctionnera plus.'
+      ? 'Renvoyer le devis ' + d.reference + ' à ' + c.email + ' ? Ce renvoi sera enregistré dans l\'historique.'
       : 'Envoyer le devis ' + d.reference + ' à ' + c.email + ' ?';
     if (!confirm(question)) {
       _envoiDevisEnCours = false;
@@ -12866,28 +12866,16 @@ function envoyerDevis(clientId) {
       return;
     }
 
-    // Une seule génération du PDF par tentative, réutilisée pour PREPARE.
-    var base64Pdf;
-    try {
-      var doc = _construirePdfDevis(c, d);
-      var dataUri = doc.output('datauristring');
-      var sep = dataUri.indexOf('base64,');
-      if (sep === -1) throw new Error('Format PDF inattendu');
-      base64Pdf = dataUri.substring(sep + 7);
-      if (!base64Pdf) throw new Error('PDF vide');
-    } catch (e) {
-      console.error('Erreur génération PDF:', e);
-      _envoiDevisEnCours = false;
-      _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
-      _devisErreurEnvoi('Impossible de générer le PDF. Le devis reste enregistré, aucun e-mail n\'a été envoyé.');
-      return;
-    }
+    // Le serveur relit les données et produit le PDF faisant foi.
+    // L'aperçu local reste disponible séparément dans le Dashboard.
+    var base64Pdf = null;
 
     var envoiCle = _hcCleTentative();
     _devisBoutonEnvoi('Préparation sécurisée…', false);
     _hcNote('devis-erreur-envoi', '');
 
     prepareDevisSecure(d.id, base64Pdf, envoiCle).then(function (resultatPrepare) {
+      if (resultatPrepare.code === 'ENVOI_A_REPRENDRE') resultatPrepare = {ok:true,reprendre:true};
       if (!resultatPrepare.ok) {
         _envoiDevisEnCours = false;
         _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
@@ -12895,7 +12883,7 @@ function envoyerDevis(clientId) {
         return;
       }
       var tokenBrut = resultatPrepare.token;
-      if (!tokenBrut || typeof tokenBrut !== 'string') {
+      if (!resultatPrepare.reprendre && (!tokenBrut || typeof tokenBrut !== 'string')) {
         _envoiDevisEnCours = false;
         _devisBoutonEnvoi(renvoi ? 'Renvoyer au client' : 'Envoyer au client', true);
         _devisErreurEnvoi('La préparation a réussi mais aucun lien sécurisé n\'a pu être généré. Aucun e-mail n\'a été envoyé.');
@@ -12903,21 +12891,21 @@ function envoyerDevis(clientId) {
       }
 
       _devisBoutonEnvoi('Envoi en cours…', false);
-      envoyerEmailDevisSecure(d.id, tokenBrut, envoiCle, renvoi).then(function (resultatEnvoi) {
+      envoyerEmailDevisSecure(d.id, tokenBrut, envoiCle, renvoi, resultatPrepare.reprendre).then(function (resultatEnvoi) {
         tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
         _envoiDevisEnCours = false;
 
         if (resultatEnvoi.ok) {
           // Le statut a été posé CÔTÉ SERVEUR, après acceptation réelle
           // par le prestataire. La page relit l'état renvoyé.
-          d.statut = resultatEnvoi.statut || 'envoye';
-          d.date_envoi = resultatEnvoi.date_envoi || d.date_envoi || new Date().toISOString();
+          d.statut = resultatEnvoi.statut;
+          d.date_envoi = resultatEnvoi.date_envoi;
           if (resultatEnvoi.version_envoyee) d.version_envoyee = resultatEnvoi.version_envoyee;
           _devisParClient[String(clientId)] = d;
           _rendreTableDemandesDevis(_demandesDevisListe);
           ouvrirFicheDemande(clientId);
           _devisSuccesEnvoi((resultatEnvoi.deja_envoye ? 'Cet envoi avait déjà été accepté par le prestataire : aucun second e-mail. ' : '') +
-            'Devis ' + d.reference + (renvoi ? ' renvoyé' : ' envoyé') + ' à ' + c.email +
+            'Devis ' + d.reference + (renvoi ? ' renvoyé' : ' envoyé') + ' à ' + (resultatEnvoi.destinataire || c.email) +
             ' avec le PDF en pièce jointe et le lien sécurisé. La réception en boîte n\'est pas prouvée par cet écran.');
           return;
         }

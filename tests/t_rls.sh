@@ -13,9 +13,17 @@
 # sont préfixés TEST-QA et utilisent des adresses en .test.
 set -u
 BIN=/usr/lib/postgresql/16/bin
+if [ ! -x "$BIN/psql" ] || ! id postgres >/dev/null 2>&1; then
+  echo "BLOQUÉ — PostgreSQL 16 et utilisateur de recette postgres indisponibles. Aucune commande SQL exécutée."
+  exit 2
+fi
 # Nom de la base JETABLE. Paramétrable pour que deux campagnes puissent
 # tourner en même temps sur la même machine (HC_RLS_DB=verif_lot1).
 DB="${HC_RLS_DB:-verif}"
+if [[ ! "$DB" =~ ^verif(_[a-z0-9_]+)?$ ]]; then
+  echo "BLOQUÉ — le nom de base de recette doit être verif ou verif_<suffixe>."
+  exit 2
+fi
 BASE="/var/lib/postgresql/$DB"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PASS=0; FAIL=0; ECHECS=()
@@ -44,9 +52,15 @@ $1
 commit;" | tail -n +2
 }
 
-appliquer() { # applique un fichier de migration
-  cp "$REPO/$1" "$BASE/mig.sql"; chown postgres:postgres "$BASE/mig.sql"
-  su postgres -c "psql -U postgres -d $DB -v ON_ERROR_STOP=1 -q -f $BASE/mig.sql" 2>&1 | grep -iE '^psql.*error' | head -2
+appliquer() {
+  if [ ! -f "$REPO/$1" ]; then echo "Migration introuvable : $1"; return 1; fi
+  cp "$REPO/$1" "$BASE/mig.sql" || return 1
+  chown postgres:postgres "$BASE/mig.sql" || return 1
+  local sortie
+  if ! sortie=$(su postgres -c "psql -U postgres -d $DB -v ON_ERROR_STOP=1 -q -f $BASE/mig.sql" 2>&1); then
+    printf '%s\n' "$sortie" | tail -5
+    return 1
+  fi
 }
 
 # ── Démarrage du cluster jetable ──
@@ -2658,7 +2672,7 @@ for f in "$REPO"/tests/rls/*.sh; do
   [ -f "$f" ] || continue
   # F01 (112) impose de nouvelles règles de saisie : les anciennes
   # fixtures des migrations antérieures doivent être créées avant.
-  [ "$(basename "$f")" = 'f01.sh' ] && continue
+  [[ "$(basename "$f")" = 'f01.sh' || "$(basename "$f")" = 'reprise_finalisation.sh' ]] && continue
   echo
   echo "── $(basename "$f") ──"
   # shellcheck disable=SC1090
@@ -2668,6 +2682,8 @@ done
 if [ -f "$REPO/tests/rls/f01.sh" ]; then
   . "$REPO/tests/rls/f01.sh"
 fi
+
+. "$REPO/tests/rls/reprise_finalisation.sh"
 
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="
