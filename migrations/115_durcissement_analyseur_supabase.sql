@@ -47,6 +47,7 @@ grant execute on function public.evaluer_mission(uuid,jsonb,text) to authenticat
 -- atomiques et le traitement serveur du paiement sont les seuls chemins.
 drop policy if exists insert_missions on public.missions;
 drop policy if exists "clients : depot public" on public.clients;
+alter table public.devis enable row level security;
 
 -- Certains environnements historiques n'ont pas toutes ces tables. Chaque bloc
 -- est donc autonome : une table absente n'annule jamais le durcissement global.
