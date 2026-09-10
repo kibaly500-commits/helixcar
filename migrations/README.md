@@ -75,6 +75,10 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 18 | **E** | `100_activites_partenaire.sql` → `104_identite_unique_roles_multiples.sql` | lots des Pull Requests nº 3 et nº 4 (déjà appliquées jusqu'à `102` ; `103` et `104` livrées par la PR nº 4) |
 | 19 | **E** | `105_video_envoi_en_deux_phases.sql` | **correctif P0 (lot V01)** : l'envoi de la vidéo de candidature en deux phases — colonnes d'envoi en cours, finalisation atomique réservée à `service_role`, garde-fou de `90` aligné sur `97` et renforcé. Sans elle, la fonction `candidature-video` livrée ne peut pas confirmer une vidéo |
 | 20 | **E** | `106_devis_versions_et_journal_envois.sql` | **correctif P0 (lot Q01)** : version de devis, états séparés (consulté, paiement en attente), journal `devis_envois` fermé par RLS. Sans elle, la fonction `devis-secure` livrée ne peut pas préparer ni envoyer |
+| 21 | **E** | `108_opportunites_missions.sql` | **lot O01** : opportunités privées, candidatures uniques, attribution atomique N sur N, clôture à N/N seulement (C03), journal d'intentions de notification (C11), vues partenaire / administrateur. Testée par `tests/rls/o01.sh` |
+| 22 | **E** | `109_fidelite_points.sql` | **lot L01** (C10) : registre `fidelite_mouvements`, paliers 2 000 → 10 000 puis Box mystère tous les 2 000 points, vue `v_ma_fidelite`, garde-fou de l'état de paiement, contrepassations. Testée par `tests/rls/l01.sh` |
+| 23 | **E** | `110_paiement_confirme_et_mission.sql` | **lot Q02** (C02) : journal `paiement_evenements`, `traiter_paiement_confirme` réservée à `service_role` (futur webhook), création de mission de nettoyage **seulement** si devis accepté ET payé ET informations complètes, déclencheur de complétion, `v_mes_devis`. Testée par `tests/rls/q02.sh` |
+| 24 | **E** | `111_evaluations_et_missions_client.sql` | **lot D01** : `evaluations` (une par mission, écriture par `evaluer_mission` seulement), `v_mes_missions`. Testée par `tests/rls/d01.sh` |
 
 ### Deux secrets, et pourquoi `92` retire une signature
 
@@ -498,7 +502,13 @@ select policyname from pg_policies where tablename = 'devis_envois';
 
 ## Stripe
 
-Aucun objet lié au paiement n'est créé : pas de colonne « payé », pas de
-webhook, pas de création automatique de mission. L'enchaînement
-paiement → complément → mission reste **dormant** et devra être activé
-dans un lot ultérieur, uniquement sur confirmation serveur fiable.
+Aucun objet Stripe n'existe dans le dépôt. Depuis la migration `110`, le
+serveur sait **recevoir** une confirmation de paiement :
+`traiter_paiement_confirme(devis_id, fournisseur, evenement_id, montant,
+devise, detail)` — exécutable uniquement avec la clé `service_role`
+(jamais depuis une session), idempotente par événement, et elle crée la
+mission de nettoyage si le dossier est complet (sinon la dernière
+information transmise la crée). Le futur webhook Stripe devra vérifier la
+signature de l'événement puis appeler cette fonction ; tant qu'il n'existe
+pas, aucun devis ne passe « payé » et aucune mission de nettoyage ne se
+crée (décision C02).

@@ -111,6 +111,9 @@ async function _rpcMissionNettoyage(params) {
     return String(d.client_id) === cid && d.statut === 'accepte';
   })[0];
   if (!dv) return { ok: false, code: 'DEVIS_NON_ACCEPTE' };
+  // Migration 110 (decision C02) : accepte ne suffit pas, le paiement
+  // doit avoir ete confirme par le serveur.
+  if (dv.paiement_statut !== 'paye') return { ok: false, code: 'PAIEMENT_NON_CONFIRME' };
 
   const dem = (window.__demandes || []).filter(function (c) { return String(c.id) === cid; })[0];
   const nd = (dem && dem.nettoyage_details) || {};
@@ -232,14 +235,16 @@ window.fetch = function(u, o){
   await page.evaluate(([d, ko]) => {
     _demandesDevisListe = [d, ko];
     window.__demandes = [d, ko];
+    // Decision C02 (migration 110) : les deux devis sont acceptes ET payes
+    // (paiement confirme par le serveur) — sans cela, aucune mission.
     _devisParClient = {
-      'qa-nett':    { reference: 'DEV-QA-N',  client_id: 'qa-nett',    prix: 480, statut: 'accepte' },
-      'qa-nett-ko': { reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte' }
+      'qa-nett':    { reference: 'DEV-QA-N',  client_id: 'qa-nett',    prix: 480, statut: 'accepte', paiement_statut: 'paye' },
+      'qa-nett-ko': { reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte', paiement_statut: 'paye' }
     };
     // Le SERVEUR ne lit pas _devisParClient : il lit la table.
     window.__db.devis = [
-      { id: 'dev-1', reference: 'DEV-QA-N', client_id: 'qa-nett', prix: 480, statut: 'accepte' },
-      { id: 'dev-2', reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte' }
+      { id: 'dev-1', reference: 'DEV-QA-N', client_id: 'qa-nett', prix: 480, statut: 'accepte', paiement_statut: 'paye' },
+      { id: 'dev-2', reference: 'DEV-QA-KO', client_id: 'qa-nett-ko', prix: 300, statut: 'accepte', paiement_statut: 'paye' }
     ];
     _missionsParDemande = {};
   }, [DEMANDE, INCOMPLETE]);

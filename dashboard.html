@@ -1067,7 +1067,6 @@ body.scroll-verrouille { overflow: hidden; }
         <div class="topbar-sub" id="topbar-sub">Bienvenue sur HelixCar</div>
       </div>
       <div class="topbar-actions">
-        <button class="notif-btn">🔔<span class="notif-dot"></span></button>
         <button class="btn btn-outline btn-sm" onclick="doLogout()">Déconnexion</button>
       </div>
     </div>
@@ -1272,65 +1271,24 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- ADMIN: Demandes recontact -->
+      <!-- ADMIN: Demandes recontact — LOT X01 : la table RÉELLE `recontacts`
+           (alimentée par le formulaire « Être recontacté » du site), plus
+           aucune ligne inventée. -->
       <div class="page" id="page-admin-recontact">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">📬 Demandes de recontact</div><div class="card-sub">Formulaires soumis depuis helixcar.com</div></div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select style="padding:6px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:.82rem;background:#fff">
-                <option>Tous les motifs</option>
-                <option>Demande de devis</option>
-                <option>Informations</option>
-                <option>Convoyeur</option>
-                <option>Entreprise</option>
-                <option>Réclamation</option>
-              </select>
-            </div>
+            <div><div class="card-title">📬 Demandes de recontact</div><div class="card-sub" id="recontacts-sub">Formulaires soumis depuis le site</div></div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Date</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Je suis</th><th>Motif</th><th>Statut</th><th>Action</th></tr></thead>
-              <tbody>
-                <tr style="background:rgba(181,68,75,.04)">
-                  <td>30/05 · 21h43</td>
-                  <td><strong>Jean Dupont</strong></td>
-                  <td>📞 06 11 22 33 44</td>
-                  <td>j.dupont@email.com</td>
-                  <td><span class="badge badge-active">👤 Client</span></td>
-                  <td>Demande de devis</td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.1);color:#A65E22">🔴 À traiter</span></td>
-                  <td>
-                    <a href="tel:0611223344" class="btn btn-sm btn-dark" style="text-decoration:none">📞 Rappeler</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td>30/05 · 19h12</td>
-                  <td><strong>Marie Lambert</strong></td>
-                  <td>📞 07 22 33 44 55</td>
-                  <td>m.lambert@email.com</td>
-                  <td><span class="badge badge-active">👤 Client</span></td>
-                  <td>Gestion de flotte</td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.1);color:#A65E22">🔴 À traiter</span></td>
-                  <td><a href="tel:0722334455" class="btn btn-sm btn-dark" style="text-decoration:none">📞 Rappeler</a></td>
-                </tr>
-                <tr style="opacity:.6">
-                  <td>29/05 · 14h05</td>
-                  <td><strong>Farid Alami</strong></td>
-                  <td>📞 06 33 44 55 66</td>
-                  <td>f.alami@email.com</td>
-                  <td><span class="badge badge-active">👤 Client</span></td>
-                  <td>Autre demande</td>
-                  <td><span class="badge badge-active">✅ Traité</span></td>
-                  <td><button class="btn btn-sm btn-outline">Archiver</button></td>
-                </tr>
+              <thead><tr><th>Date</th><th>Nom</th><th>Téléphone</th><th>E-mail</th><th>Profil</th><th>Motif</th><th>Message</th></tr></thead>
+              <tbody id="recontacts-table">
+                <tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
 <!-- ADMIN: Facturation -->
       <div class="page" id="page-admin-facturation">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
@@ -1370,239 +1328,31 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- ADMIN: Challenge mensuel -->
-      <div class="page" id="page-admin-challenge">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
-
-        <!-- Alerte récompenses à attribuer -->
-        <div class="alert" style="background:rgba(181,68,75,.12);border:2px solid rgba(181,68,75,.5);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px">
-          <span style="font-size:1.4rem">🏆</span>
-          <div>
-            <div style="font-weight:700;font-size:.92rem;color:#8C3238;margin-bottom:3px">3 convoyeurs à récompenser ce mois-ci</div>
-            <div style="font-size:.82rem;color:#8C3238;line-height:1.6">Le mois de mai est terminé. Attribuez les récompenses aux 3 premiers du classement. Les convoyeurs éligibles ont déjà reçu une notification.</div>
-            <button class="btn btn-sm" style="background:var(--yellow);color:var(--navy);border:none;margin-top:10px;font-weight:700" onclick="envoyerRecompenses()">🎁 Attribuer les récompenses et notifier</button>
-          </div>
-        </div>
-
-        <!-- Classement mensuel -->
+      <!-- LOT X01 — les pages « Challenge mensuel », « Pannes » et
+           « Notations » de l'administration étaient entièrement écrites en
+           dur (classements, incidents et notes inventés) : aucune table,
+           aucune fonction serveur ne les portait. Elles sont retirées avec
+           leurs entrées de menu, plutôt que laissées comme exemples. -->
+      <!-- ADMIN: Opportunités de missions — LOT O01 (migration 108).
+           Un brouillon est préparé automatiquement pour chaque nouvelle
+           mission ; l'administrateur relit, corrige, envoie ; puis étudie
+           les candidatures et sélectionne. Deux états publics seulement :
+           « À pourvoir » et « Pourvue / clôturée » (décision C03). -->
+      <div class="page" id="page-admin-opportunites">
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">🏁 Classement — Mai 2024</div><div class="card-sub">Convoyeurs actifs depuis au moins 2 mois · km parcourus ce mois</div></div>
-            <select style="padding:6px 12px;border:1.5px solid #ddd;border-radius:7px;font-size:.82rem;background:#fff">
-              <option>Mai 2024</option><option>Avril 2024</option><option>Mars 2024</option>
-            </select>
+            <div><div class="card-title">Opportunités de missions</div><div class="card-sub" id="opportunites-sub">Besoins publiés aux partenaires éligibles, sans coordonnées ni identité client</div></div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Rang</th><th>Convoyeur</th><th>Ancienneté</th><th>Km ce mois</th><th>Missions</th><th>Éligible</th><th>Récompense</th><th>Statut</th></tr></thead>
-              <tbody>
-                <tr style="background:rgba(181,68,75,.08)">
-                  <td><span style="font-size:1.2rem">🥇</span></td>
-                  <td><strong>Antoine Arcelin</strong><br><span style="font-size:.72rem;color:#888">CNV-0001</span></td>
-                  <td>4 mois ✅</td>
-                  <td><strong style="color:var(--green)">3 280 km</strong></td>
-                  <td>12</td>
-                  <td><span class="badge badge-active">✅ Éligible</span></td>
-                  <td><strong style="color:var(--yellow)">150 €</strong></td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
-                </tr>
-                <tr style="background:rgba(31,122,77,.04)">
-                  <td><span style="font-size:1.2rem">🥈</span></td>
-                  <td><strong>Jean Pellerin</strong><br><span style="font-size:.72rem;color:#888">CNV-0002</span></td>
-                  <td>3 mois ✅</td>
-                  <td><strong style="color:var(--green)">2 850 km</strong></td>
-                  <td>9</td>
-                  <td><span class="badge badge-active">✅ Éligible</span></td>
-                  <td><strong style="color:#888">100 €</strong></td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
-                </tr>
-                <tr>
-                  <td><span style="font-size:1.2rem">🥉</span></td>
-                  <td><strong>Sara Bouali</strong><br><span style="font-size:.72rem;color:#888">CNV-0003</span></td>
-                  <td>2 mois ✅</td>
-                  <td><strong style="color:var(--green)">1 910 km</strong></td>
-                  <td>7</td>
-                  <td><span class="badge badge-active">✅ Éligible</span></td>
-                  <td><strong style="color:#888">50 €</strong></td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#8C3238">⏳ À verser</span></td>
-                </tr>
-                <tr style="opacity:.5">
-                  <td>4</td>
-                  <td>Karim Benali</td>
-                  <td style="color:var(--red)">1 mois ❌</td>
-                  <td>1 240 km</td>
-                  <td>4</td>
-                  <td><span class="badge badge-pending">❌ Non éligible</span></td>
-                  <td>—</td>
-                  <td>—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div style="margin-top:12px;font-size:.78rem;color:var(--gray);line-height:1.7">
-            ⚠️ Seuls les convoyeurs ayant <strong>au moins 2 mois d'activité</strong> chez HelixCar sont éligibles au challenge mensuel.
-          </div>
-        </div>
-
-        <!-- Historique challenges -->
-        <div class="card">
-          <div class="card-header"><div class="card-title">📋 Historique des challenges</div></div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Mois</th><th>🥇 1er</th><th>🥈 2ème</th><th>🥉 3ème</th><th>Total versé</th><th>Statut</th></tr></thead>
-            <tbody>
-              <tr><td>Avril 2024</td><td>Antoine A. · 3 100 km</td><td>Jean P. · 2 640 km</td><td>Sara B. · 1 820 km</td><td><strong>300 €</strong></td><td><span class="badge badge-active">✅ Versé</span></td></tr>
-              <tr><td>Mars 2024</td><td>Antoine A. · 2 980 km</td><td>Jean P. · 2 310 km</td><td>—</td><td><strong>250 €</strong></td><td><span class="badge badge-active">✅ Versé</span></td></tr>
-            </tbody>
-          </table></div>
-        </div>
-      </div>
-
-      <!-- ADMIN: Pannes -->
-      <div class="page" id="page-admin-pannes">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
-        <div class="alert" style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.25);border-radius:10px;padding:12px 16px;color:#A65E22;margin-bottom:14px">
-          🔧 <strong>Exemple : 1 panne active.</strong> Aucun client n'est informé : le suivi des pannes n'est pas connecté.
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">🔧 Pannes & incidents signalés</div><div class="card-sub">Mis à jour en temps réel par les convoyeurs</div></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Mission</th><th>Convoyeur</th><th>Trajet</th><th>Type incident</th><th>Localisation</th><th>Heure signalement</th><th>Client informé</th><th>Statut</th></tr></thead>
-              <tbody>
-                <tr style="background:rgba(181,68,75,.04)">
-                  <td><strong>HC-2024-0531</strong></td>
-                  <td>Sara Bouali</td>
-                  <td>Marseille → Nice</td>
-                  <td>🚗 Panne moteur</td>
-                  <td>A8 · km 42</td>
-                  <td>14h32</td>
-                  <td><span class="badge badge-active">✅ SMS + Email</span></td>
-                  <td><span class="badge" style="background:rgba(181,68,75,.15);color:#A65E22">🔴 En cours</span></td>
-                </tr>
-                <tr>
-                  <td>HC-2024-0518</td>
-                  <td>Antoine Arcelin</td>
-                  <td>Paris → Lille</td>
-                  <td>🔧 Crevaison</td>
-                  <td>A1 · km 88</td>
-                  <td>Hier 09h15</td>
-                  <td><span class="badge badge-active">✅ Informé</span></td>
-                  <td><span class="badge badge-active">✅ Résolu</span></td>
-                </tr>
+              <thead><tr><th>Intitulé</th><th>Mission</th><th>Catégorie</th><th>Période</th><th>Zone</th><th>Besoin</th><th>Statut</th><th>Candidatures</th><th>Action</th></tr></thead>
+              <tbody id="opportunites-table">
+                <tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
-      <!-- ADMIN: Notations -->
-      <div class="page" id="page-admin-notations">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
-        <div class="alert alert-info"><span>ℹ️ Le blocage d'un partenaire est toujours une décision prise à la main, depuis sa fiche. Aucune note ne bloque personne automatiquement.</span></div>
-
-        <div class="card">
-          <div class="card-header">
-            <div><div class="card-title">Notation des convoyeurs</div><div class="card-sub">Moyenne générale calculée sur toutes les missions notées</div></div>
-          </div>
-
-          <!-- Antoine -->
-          <div class="convoyeur-note-row">
-            <div class="note-circle nc-excellent">17.2</div>
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <strong>Antoine Arcelin</strong>
-                <span class="note-badge note-excellent">Excellent</span>
-              </div>
-              <div style="font-size:0.78rem;color:var(--gray);margin-bottom:8px">24 missions · 11 280 km · 18 évaluations</div>
-              <div class="hn-row"><span class="hn-label">Ponctualité /4</span><div class="hn-bar"><div class="hn-fill" style="width:90%;background:var(--green)"></div></div><span class="hn-val">3.6</span></div>
-              <div class="hn-row"><span class="hn-label">Retard /4</span><div class="hn-bar"><div class="hn-fill" style="width:95%;background:var(--green)"></div></div><span class="hn-val">3.8</span></div>
-              <div class="hn-row"><span class="hn-label">État véhicule /4</span><div class="hn-bar"><div class="hn-fill" style="width:88%;background:var(--yellow)"></div></div><span class="hn-val">3.5</span></div>
-              <div class="hn-row"><span class="hn-label">Communication /3</span><div class="hn-bar"><div class="hn-fill" style="width:87%;background:var(--yellow)"></div></div><span class="hn-val">2.6</span></div>
-              <div class="hn-row"><span class="hn-label">Professionnalisme /3</span><div class="hn-bar"><div class="hn-fill" style="width:90%;background:var(--green)"></div></div><span class="hn-val">2.7</span></div>
-              <div class="hn-row"><span class="hn-label">Tenue /2</span><div class="hn-bar"><div class="hn-fill" style="width:100%;background:var(--green)"></div></div><span class="hn-val">2.0</span></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button class="btn btn-sm btn-outline" onclick="openNotationAdmin('Antoine Arcelin',17.2)">Historique</button>
-            </div>
-          </div>
-
-          <!-- Jean -->
-          <div class="convoyeur-note-row">
-            <div class="note-circle nc-bon">13.8</div>
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <strong>Jean Pellerin</strong>
-                <span class="note-badge note-bon">Bon</span>
-              </div>
-              <div style="font-size:0.78rem;color:var(--gray);margin-bottom:8px">18 missions · 8 430 km · 14 évaluations</div>
-              <div class="hn-row"><span class="hn-label">Ponctualité /4</span><div class="hn-bar"><div class="hn-fill" style="width:70%;background:var(--yellow)"></div></div><span class="hn-val">2.8</span></div>
-              <div class="hn-row"><span class="hn-label">Retard /4</span><div class="hn-bar"><div class="hn-fill" style="width:72%;background:var(--yellow)"></div></div><span class="hn-val">2.9</span></div>
-              <div class="hn-row"><span class="hn-label">État véhicule /4</span><div class="hn-bar"><div class="hn-fill" style="width:75%;background:var(--yellow)"></div></div><span class="hn-val">3.0</span></div>
-              <div class="hn-row"><span class="hn-label">Communication /3</span><div class="hn-bar"><div class="hn-fill" style="width:67%;background:var(--yellow)"></div></div><span class="hn-val">2.0</span></div>
-              <div class="hn-row"><span class="hn-label">Professionnalisme /3</span><div class="hn-bar"><div class="hn-fill" style="width:70%;background:var(--yellow)"></div></div><span class="hn-val">2.1</span></div>
-              <div class="hn-row"><span class="hn-label">Tenue /2</span><div class="hn-bar"><div class="hn-fill" style="width:50%;background:var(--orange)"></div></div><span class="hn-val">1.0</span></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button class="btn btn-sm btn-outline" onclick="openNotationAdmin('Jean Pellerin',13.8)">Historique</button>
-            </div>
-          </div>
-
-          <!-- Sara - danger -->
-          <div class="convoyeur-note-row" id="conv-sara-row">
-            <div class="note-circle nc-warning" id="sara-circle">11.4</div>
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <strong>Sara Bouali</strong>
-                <span class="note-badge note-warning" id="sara-badge">⚠️ Zone d'alerte</span>
-              </div>
-              <div style="font-size:0.78rem;color:var(--gray);margin-bottom:8px">9 missions · 3 910 km · 7 évaluations</div>
-              <div class="hn-row"><span class="hn-label">Ponctualité /4</span><div class="hn-bar"><div class="hn-fill" style="width:55%;background:var(--orange)"></div></div><span class="hn-val">2.2</span></div>
-              <div class="hn-row"><span class="hn-label">Retard /4</span><div class="hn-bar"><div class="hn-fill" style="width:50%;background:var(--orange)"></div></div><span class="hn-val">2.0</span></div>
-              <div class="hn-row"><span class="hn-label">État véhicule /4</span><div class="hn-bar"><div class="hn-fill" style="width:60%;background:var(--orange)"></div></div><span class="hn-val">2.4</span></div>
-              <div class="hn-row"><span class="hn-label">Communication /3</span><div class="hn-bar"><div class="hn-fill" style="width:57%;background:var(--orange)"></div></div><span class="hn-val">1.7</span></div>
-              <div class="hn-row"><span class="hn-label">Professionnalisme /3</span><div class="hn-bar"><div class="hn-fill" style="width:57%;background:var(--orange)"></div></div><span class="hn-val">1.7</span></div>
-              <div class="hn-row"><span class="hn-label">Tenue /2</span><div class="hn-bar"><div class="hn-fill" style="width:70%;background:var(--yellow)"></div></div><span class="hn-val">1.4</span></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button class="btn btn-sm btn-outline" onclick="openNotationAdmin('Sara Bouali',11.4)">Historique</button>
-            </div>
-          </div>
-
-          <!-- Nadia - bloquée -->
-          <div class="convoyeur-note-row blocked" id="conv-nadia-row">
-            <div class="note-circle nc-blocked">8.2</div>
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-                <strong>Nadia Ouali</strong>
-                <span class="note-badge note-blocked">🔒 BLOQUÉ DÉFINITIVEMENT</span>
-              </div>
-              <div style="font-size:0.78rem;color:var(--gray);margin-bottom:8px">5 missions · 1 840 km · 4 évaluations · Bloqué le 20/05/2024</div>
-              <div style="font-size:0.82rem;color:var(--red);background:rgba(181,68,75,0.06);padding:10px;border-radius:8px;line-height:1.6">
-                Note moyenne de 8.2/20 — sous le seuil de 10/20. Compte bloqué automatiquement. Email envoyé le 20/05/2024.
-              </div>
-            </div>
-            <div></div>
-          </div>
-
-        </div>
-
-        <!-- Historique des évaluations récentes -->
-        <div class="card">
-          <div class="card-header"><div class="card-title">Dernières évaluations reçues</div></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Convoyeur</th><th>Mission</th><th>Noté par</th><th>Note</th><th>Date</th><th>Commentaire</th></tr></thead>
-              <tbody>
-                <tr><td><strong>Antoine A.</strong></td><td>Paris → Lyon</td><td>Client</td><td><span class="note-badge note-excellent">18/20</span></td><td>29/05</td><td>"Parfait, très ponctuel"</td></tr>
-                <tr><td><strong>Jean P.</strong></td><td>Paris → Marseille</td><td>Admin</td><td><span class="note-badge note-bon">14/20</span></td><td>28/05</td><td>"Léger retard au départ"</td></tr>
-                <tr><td><strong>Sara B.</strong></td><td>Lyon → Bordeaux</td><td>Client</td><td><span class="note-badge note-warning">11/20</span></td><td>27/05</td><td>"Retard important, tenue incorrecte"</td></tr>
-                <tr><td><strong>Antoine A.</strong></td><td>Paris → Bordeaux</td><td>Client</td><td><span class="note-badge note-excellent">17/20</span></td><td>25/05</td><td>"Très pro, véhicule impeccable"</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- ADMIN: Archivage -->
       <div class="page" id="page-admin-archivage">
         <div class="alert alert-info"><span>ℹ️ Récupère sur ton ordinateur les photos d'état des lieux et lettres de voiture signées, pour libérer l'espace sur Supabase. Rien n'est modifié tant que tu n'as pas cliqué sur "Supprimer de Supabase".</span></div>
@@ -1675,157 +1425,36 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- CLIENT: Notation après mission -->
+      <!-- CLIENT: Évaluer — LOT D01 : évaluations RÉELLES. Les missions à
+           évaluer viennent de v_mes_missions (terminées, non évaluées), la
+           note est enregistrée par evaluer_mission (migration 111) et
+           l'historique relit la table evaluations sous RLS. Aucun écran de
+           succès n'apparaît sans réponse du serveur. -->
       <div class="page" id="page-client-notation">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
         <div class="card">
-          <div class="card-header">
-            <div><div class="card-title">Évaluer votre convoyeur</div><div class="card-sub">Mission : Paris → Lyon · Antoine Arcelin · 29/05/2024</div></div>
-          </div>
-          <p style="font-size:0.88rem;color:#555;margin-bottom:24px">Votre avis est important pour maintenir la qualité du service HelixCar. Notez chaque critère honnêtement.</p>
-
-          <div id="notation-form">
-            <div class="critere-row">
-              <span class="critere-label">🕐 Ponctualité</span>
-              <span class="critere-max">/4</span>
-              <div class="stars-input" id="stars-ponctualite">
-                <button class="star-btn" onclick="setNote('ponctualite',1,4)">1</button>
-                <button class="star-btn" onclick="setNote('ponctualite',2,4)">2</button>
-                <button class="star-btn" onclick="setNote('ponctualite',3,4)">3</button>
-                <button class="star-btn" onclick="setNote('ponctualite',4,4)">4</button>
-              </div>
-            </div>
-            <div class="critere-row">
-              <span class="critere-label">⏱️ Retard</span>
-              <span class="critere-max">/4</span>
-              <div class="stars-input" id="stars-retard">
-                <button class="star-btn" onclick="setNote('retard',1,4)">1</button>
-                <button class="star-btn" onclick="setNote('retard',2,4)">2</button>
-                <button class="star-btn" onclick="setNote('retard',3,4)">3</button>
-                <button class="star-btn" onclick="setNote('retard',4,4)">4</button>
-              </div>
-            </div>
-            <div class="critere-row">
-              <span class="critere-label">🚗 État du véhicule</span>
-              <span class="critere-max">/4</span>
-              <div class="stars-input" id="stars-etat">
-                <button class="star-btn" onclick="setNote('etat',1,4)">1</button>
-                <button class="star-btn" onclick="setNote('etat',2,4)">2</button>
-                <button class="star-btn" onclick="setNote('etat',3,4)">3</button>
-                <button class="star-btn" onclick="setNote('etat',4,4)">4</button>
-              </div>
-            </div>
-            <div class="critere-row">
-              <span class="critere-label">💬 Communication</span>
-              <span class="critere-max">/3</span>
-              <div class="stars-input" id="stars-communication">
-                <button class="star-btn" onclick="setNote('communication',1,3)">1</button>
-                <button class="star-btn" onclick="setNote('communication',2,3)">2</button>
-                <button class="star-btn" onclick="setNote('communication',3,3)">3</button>
-              </div>
-            </div>
-            <div class="critere-row">
-              <span class="critere-label">🏅 Professionnalisme</span>
-              <span class="critere-max">/3</span>
-              <div class="stars-input" id="stars-professionnalisme">
-                <button class="star-btn" onclick="setNote('professionnalisme',1,3)">1</button>
-                <button class="star-btn" onclick="setNote('professionnalisme',2,3)">2</button>
-                <button class="star-btn" onclick="setNote('professionnalisme',3,3)">3</button>
-              </div>
-            </div>
-            <div class="critere-row">
-              <span class="critere-label">👔 Tenue</span>
-              <span class="critere-max">/2</span>
-              <div class="stars-input" id="stars-tenue">
-                <button class="star-btn" onclick="setNote('tenue',1,2)">1</button>
-                <button class="star-btn" onclick="setNote('tenue',2,2)">2</button>
-              </div>
-            </div>
-
-            <div style="margin-top:24px;padding:16px;background:var(--gray-light);border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-              <div>
-                <div style="font-size:0.78rem;color:var(--gray);margin-bottom:4px">Note calculée</div>
-                <div class="note-global" id="note-preview">—<span style="font-size:1rem;color:var(--gray)">/20</span></div>
-              </div>
-              <div id="note-badge-preview"></div>
-            </div>
-
-            <div class="form-group" style="margin-top:16px">
-              <label>Commentaire (optionnel)</label>
-              <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical" placeholder="Décrivez votre expérience avec ce convoyeur..."></textarea>
-            </div>
-
-            <button class="btn btn-primary" style="margin-top:8px" onclick="soumettreNotation()">Soumettre mon évaluation →</button>
-          </div>
-
-          <div id="notation-success" style="display:none;text-align:center;padding:32px 0">
-            <div style="font-size:3rem;margin-bottom:12px">✅</div>
-            <h3 style="font-family:'Fraunces',Georgia,serif;font-weight:800;margin-bottom:8px">Évaluation envoyée !</h3>
-            <p style="color:#555;font-size:0.88rem">Merci pour votre retour. Il contribue à maintenir la qualité du service HelixCar.</p>
-            <button class="btn btn-primary" style="margin-top:20px" onclick="showPage('client-dashboard')">Retour au tableau de bord</button>
-          </div>
+          <div class="card-header"><div><div class="card-title">À évaluer</div><div class="card-sub">Vos missions terminées qui attendent votre avis</div></div></div>
+          <div id="client-evaluations-a-faire"><div class="fid-note">Chargement…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Historique des évaluations</div></div>
+          <div id="client-evaluations-historique"><div class="fid-note">Chargement…</div></div>
         </div>
       </div>
-
-      <!-- ADMIN: Paramètres -->
+      <!-- ADMIN: Paramètres — LOT X01 : les blocs RIB, notifications,
+           retenues et SMS affichaient des succès (« enregistré ✓ »,
+           « envoyée ✓ ») sans rien enregistrer ni envoyer. Ils sont retirés :
+           cette page ne montre que ce qui est réel. -->
       <div class="page" id="page-admin-parametres">
-        <div class="alert alert-info" style="margin-bottom:14px">ℹ️ Les informations bancaires ci-dessous sont enregistrées pour vous. Les blocs « retenues » et « SMS » plus bas ne sont pas encore connectés : ils n'enregistrent rien et n'envoient rien.</div>
         <div class="card">
-          <div class="card-header"><div class="card-title">🏦 Informations bancaires (RIB)</div><div class="card-sub">Visible uniquement par vous — jamais partagé</div></div>
-          <div class="alert alert-warning">🔒 Ces informations sont strictement confidentielles et stockées de manière sécurisée.</div>
-          <div class="profile-grid">
-            <div class="form-group"><label>Titulaire du compte</label><input type="text" placeholder="HelixCar SASU"></div>
-            <div class="form-group"><label>Banque</label><input type="text" placeholder="Nom de votre banque"></div>
-            <div class="form-group"><label>IBAN</label><input type="text" placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"></div>
-            <div class="form-group"><label>BIC / SWIFT</label><input type="text" placeholder="XXXXXXXX"></div>
-          </div>
-          <button class="btn btn-primary" style="margin-top:8px" onclick="alert('RIB enregistré de manière sécurisée ✓')">Enregistrer le RIB</button>
+          <div class="card-header"><div class="card-title">Compte administrateur</div></div>
+          <div class="detail-row"><span class="detail-label">Adresse e-mail</span><span class="detail-val" id="param-admin-email">—</span></div>
+          <div class="detail-row"><span class="detail-label">Site servi</span><span class="detail-val" id="param-admin-origine">—</span></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">🔔 Notifications push convoyeurs</div><div class="card-sub">Via OneSignal — gratuit jusqu'à 10 000 abonnés</div></div>
-          <div class="alert alert-info">📱 Les convoyeurs acceptent les notifications lors de leur première connexion. Vous pouvez ensuite leur envoyer des alertes instantanées sur leur téléphone.</div>
-          <div class="form-group"><label>Titre de la notification</label><input type="text" placeholder="🚗 Nouvelle mission disponible !"></div>
-          <div class="form-group"><label>Message</label><textarea style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:.88rem;min-height:70px;outline:none" placeholder="Paris → Lyon · 200 € · Départ 29/05 · Cliquez pour voir"></textarea></div>
-          <div class="form-group"><label>Envoyer à</label>
-            <select><option>Tous les convoyeurs actifs</option><option>Convoyeurs zone Paris</option><option>Convoyeurs zone Lyon</option><option>Convoyeurs zone Marseille</option></select>
-          </div>
-          <button class="btn btn-primary" onclick="alert('Notification envoyée à tous les convoyeurs actifs ✓')">🔔 Envoyer la notification</button>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">⚠️ Appliquer une retenue</div><div class="card-sub">Fonction non connectée : rien n'est encore enregistré ni envoyé</div></div>
-          <div class="form-group"><label>Convoyeur concerné</label>
-            <select><option>Fonction non connectée</option></select>
-          </div>
-          <div class="form-group"><label>Mission concernée</label><input type="text" placeholder="Ex : HC-2024-0529 · Paris → Lyon"></div>
-          <div class="form-group"><label>Motif de la retenue</label>
-            <select id="penalite-motif">
-              <option value="">Sélectionnez un motif…</option>
-              <option>Retard au rendez-vous</option>
-              <option>Tenue non conforme</option>
-              <option>Infraction routière — flash radar</option>
-              <option>Infraction routière — stationnement</option>
-              <option>Niveau de carburant non respecté</option>
-              <option>Manquement aux règles de mission</option>
-              <option>Dommage sur le véhicule</option>
-              <option>Absence injustifiée</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Précision (optionnel)</label><input type="text" placeholder="Ex : 45 min de retard, client informé…"></div>
-          <button class="btn btn-red" onclick="envoyerPenalite()">⚠️ Appliquer la retenue</button>
-        </div>
-        <div class="card">
-          <p style="font-size:0.88rem;color:#555;margin-bottom:16px;line-height:1.6">Aucun SMS n'est envoyé aujourd'hui : le service n'est pas connecté. Cette page prépare sa configuration.</p>
-          <div class="alert alert-info"><span>ℹ️ Service SMS via <strong>Twilio</strong> ou <strong>OVH SMS</strong>. Une fois votre clé API renseignée, les notifications partent automatiquement à chaque arrivée confirmée.</span></div>
-          <div class="form-group" style="margin-top:16px"><label>Clé API SMS</label><input type="text" placeholder="Votre clé API Twilio ou OVH SMS"></div>
-          <div class="form-group"><label>Numéro expéditeur</label><input type="text" placeholder="+33 X XX XX XX XX"></div>
-          <div class="form-group">
-            <label>Message automatique à l'arrivée</label>
-            <textarea style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:0.88rem;min-height:80px;outline:none;resize:vertical">Bonjour, votre convoyeur HelixCar vient d'arriver à destination avec votre véhicule. Merci de votre confiance ! — L'équipe HelixCar</textarea>
-          </div>
-          <button class="btn btn-primary" onclick="alert('Configuration SMS enregistrée ✓')">Enregistrer la configuration</button>
+          <div class="card-header"><div class="card-title">Fonctions non disponibles dans cette version</div></div>
+          <div class="fid-note">Informations bancaires, notifications aux partenaires, retenues et SMS ne sont pas connectés à un service : aucun réglage n'est enregistré ici, et aucun message ne part. Ces écrans reviendront lorsqu'un service réel les portera.</div>
         </div>
       </div>
-
       <!-- CONVOYEUR: Dashboard -->
       <div class="page" id="page-convoyeur-dashboard">
         <div class="stats-row">
@@ -1883,71 +1512,23 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- CONVOYEUR: Panne -->
-      <div class="page" id="page-convoyeur-panne">
-        <div class="alert" style="background:rgba(181,68,75,.08);border:1.5px solid rgba(181,68,75,.3);border-radius:10px;padding:12px 16px;color:#A65E22;margin-bottom:14px">
-          🔧 Signalez tout incident immédiatement. <strong>Le client sera prévenu automatiquement par SMS et email.</strong>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">🔧 Signaler un incident en cours de mission</div></div>
-          <div class="form-group"><label>Mission concernée</label>
-            <select><option>HC-2024-0531 · Marseille → Nice (en cours)</option></select>
-          </div>
-          <div class="form-group"><label>Type d'incident</label>
-            <select><option value="">Sélectionnez…</option><option>🚗 Panne moteur</option><option>💥 Accident</option><option>🔧 Crevaison</option><option>⛽ Panne de carburant</option><option>🚦 Retard important</option><option>🔑 Autre problème</option></select>
-          </div>
-          <div class="form-group"><label>Localisation</label><input type="text" placeholder="Ex : A6 direction Lyon, km 245"></div>
-          <div class="form-group"><label>Détails</label><textarea placeholder="Décrivez la situation…" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:.88rem;min-height:80px;outline:none;resize:vertical"></textarea></div>
-          <div class="form-group"><label>Retard estimé</label>
-            <select><option>Non estimé</option><option>+30 min</option><option>+1h</option><option>+2h</option><option>+3h ou plus</option><option>Mission compromise</option></select>
-          </div>
-          <button class="btn btn-red" onclick="alert('Le signalement d\'incident n\'est pas encore connecté : rien n\'a été enregistré, et aucun SMS ni e-mail n\'a été envoyé au client.')">🔧 Signaler un incident</button>
-        </div>
-      </div>
-
-      <!-- CONVOYEUR: Ma notation -->
-      <div class="page" id="page-convoyeur-notation">
+      <!-- LOT X01 — « Signaler une panne » promettait un SMS et un e-mail
+           au client qu'aucun service n'envoie, et « Ma notation » affichait
+           une note et des avis inventés à TOUT partenaire connecté. Les deux
+           pages sont retirées avec leurs entrées de menu. -->
+      <!-- CONVOYEUR: Opportunités de missions — LOT O01. La liste vient de
+           v_opportunites_partenaire : seules les opportunités « À pourvoir »
+           pour lesquelles au moins un métier requis est validé, plus celles
+           où le partenaire a déjà candidaté. Jamais le client, jamais
+           l'adresse exacte, jamais de rémunération dans cette version. -->
+      <div class="page" id="page-convoyeur-opportunites">
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title">Ma notation</div>
-              <div class="card-sub">Moyenne calculée sur toutes vos missions évaluées</div>
-            </div>
-            <div style="text-align:right">
-              <div class="note-global">17.2 <span style="font-size:1rem;color:var(--gray)">/20</span></div>
-              <span class="note-badge note-excellent" style="margin-top:6px;display:inline-block">Excellent</span>
-            </div>
+            <div><div class="card-title">Opportunités de missions</div><div class="card-sub" id="convoyeur-opportunites-sub">Missions indépendantes publiées par HelixCar pour vos métiers validés</div></div>
           </div>
-
-          <div style="margin-bottom:24px">
-            <div class="hn-row"><span class="hn-label">🕐 Ponctualité /4</span><div class="hn-bar"><div class="hn-fill" style="width:90%;background:var(--green)"></div></div><span class="hn-val">3.6</span></div>
-            <div class="hn-row"><span class="hn-label">⏱️ Retard /4</span><div class="hn-bar"><div class="hn-fill" style="width:95%;background:var(--green)"></div></div><span class="hn-val">3.8</span></div>
-            <div class="hn-row"><span class="hn-label">🚗 État véhicule /4</span><div class="hn-bar"><div class="hn-fill" style="width:88%;background:var(--yellow)"></div></div><span class="hn-val">3.5</span></div>
-            <div class="hn-row"><span class="hn-label">💬 Communication /3</span><div class="hn-bar"><div class="hn-fill" style="width:87%;background:var(--yellow)"></div></div><span class="hn-val">2.6</span></div>
-            <div class="hn-row"><span class="hn-label">🏅 Professionnalisme /3</span><div class="hn-bar"><div class="hn-fill" style="width:90%;background:var(--green)"></div></div><span class="hn-val">2.7</span></div>
-            <div class="hn-row"><span class="hn-label">👔 Tenue /2</span><div class="hn-bar"><div class="hn-fill" style="width:100%;background:var(--green)"></div></div><span class="hn-val">2.0</span></div>
-          </div>
-
-          <div style="background:rgba(31,122,77,0.06);border:1px solid rgba(31,122,77,0.2);border-radius:10px;padding:14px;font-size:0.85rem;color:#1F7A4D;line-height:1.6">
-            ✅ Votre note est au-dessus du seuil minimum de <strong>10/20</strong>. Continuez ainsi pour maintenir votre accès aux missions et vos récompenses du programme d'excellence.
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header"><div class="card-title">Derniers avis reçus</div></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Mission</th><th>Noté par</th><th>Note</th><th>Commentaire</th><th>Date</th></tr></thead>
-              <tbody>
-                <tr><td>Paris → Lyon</td><td>Client</td><td><span class="note-badge note-excellent">18/20</span></td><td>"Parfait, très ponctuel"</td><td>29/05</td></tr>
-                <tr><td>Paris → Bordeaux</td><td>Client</td><td><span class="note-badge note-excellent">17/20</span></td><td>"Très pro, véhicule impeccable"</td><td>25/05</td></tr>
-                <tr><td>Lyon → Marseille</td><td>Admin</td><td><span class="note-badge note-bon">16/20</span></td><td>"Bonne mission, légère remarque sur la tenue"</td><td>20/05</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div id="convoyeur-opportunites-liste"><div class="fid-note">Chargement…</div></div>
         </div>
       </div>
-
       <!-- CONVOYEUR: Historique -->
       <!-- Un seul champ de fichier, réutilisé pour les photos avant et
            après : le bouton cliqué dit lequel des deux. -->
@@ -1975,47 +1556,8 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- CONVOYEUR: Récompenses -->
-      <div class="page" id="page-convoyeur-recompenses">
-        <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">🏆 Challenge mensuel — Mai 2024</div></div>
-          <div class="alert alert-success"><span>✅ Vous êtes éligible au challenge (2+ mois d'activité). Vous êtes actuellement <strong>2ème</strong> avec 3 840 km ce mois.</span></div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <div style="flex:1;min-width:200px;background:var(--yellow);border-radius:12px;padding:24px;text-align:center">
-              <div style="font-size:2rem">🥇</div>
-              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem">150 €</div>
-              <div style="font-size:0.8rem;opacity:0.7">1ère place · 4 210 km</div>
-              <div style="font-size:0.75rem;margin-top:4px">Jean Pellerin</div>
-            </div>
-            <div style="flex:1;min-width:200px;background:var(--navy);color:white;border-radius:12px;padding:24px;text-align:center;border:3px solid var(--yellow)">
-              <div style="font-size:2rem">🥈</div>
-              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem;color:var(--yellow)">100 €</div>
-              <div style="font-size:0.8rem;opacity:0.7">2ème place · 3 840 km</div>
-              <div style="font-size:0.75rem;margin-top:4px;color:var(--yellow)">Vous ← </div>
-            </div>
-            <div style="flex:1;min-width:200px;background:var(--gray-light);border-radius:12px;padding:24px;text-align:center">
-              <div style="font-size:2rem">🥉</div>
-              <div style="font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:1.5rem">50 €</div>
-              <div style="font-size:0.8rem;opacity:0.7">3ème place · 3 120 km</div>
-              <div style="font-size:0.75rem;margin-top:4px">Sara Bouali</div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Programme fidélité convoyeur</div></div>
-          <div class="fidelite-bar-wrap">
-            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:6px">
-              <span>Vos km : <strong>11 280 km</strong></span>
-              <span>Prochain palier : <strong>20 000 km (Entreprises)</strong></span>
-            </div>
-            <div class="fidelite-bar-track"><div class="fidelite-bar-fill" style="width:56%"></div></div>
-            <div class="fidelite-labels"><span>10 000 km</span><span>20 000 km</span></div>
-          </div>
-          <div class="alert alert-info">🎁 Palier 4 atteint (10 000 km) — Réduction 25% active + Bon d'achat 50 € disponible.</div>
-        </div>
-      </div>
-
+      <!-- LOT X01 — « Récompenses » (podium, kilomètres et palier inventés)
+           est retirée : aucun challenge n'existe côté serveur. -->
       <!-- ══ CLIENT PAGES ═══════════════════════════════════ -->
 
       <!-- CLIENT: Dashboard -->
@@ -2039,26 +1581,15 @@ body.scroll-verrouille { overflow: hidden; }
           </div>
         </div>
 
-        <div class="stats-row">
-          <div class="stat-card yellow"><div class="stat-label">Missions effectuées</div><div class="stat-value">8</div></div>
-          <div class="stat-card orange"><div class="stat-label">Mission en cours</div><div class="stat-value">1</div><div class="stat-sub">En route</div></div>
-        </div>
-
+        <!-- LOT X01 / D01 — les compteurs (« 8 missions », « 1 en cours »)
+             et la carte « Mission en cours » (Paris → Lyon, BMW 320d) étaient
+             écrits en dur. Les missions réelles se lisent dans « Mes
+             missions » (v_mes_missions) ; un résumé réel est rendu ici. -->
         <div class="card">
-          <div class="card-header"><div class="card-title">Mission en cours</div></div>
-          <div class="alert alert-warning" style="margin-bottom:14px">⚠️ <strong>Page de démonstration.</strong> Les chiffres, noms et lignes ci-dessous sont des EXEMPLES : ils ne proviennent pas de vos données et aucune action de cette page n'enregistre quoi que ce soit.</div>
-          <div class="alert alert-success"><span>🚗 Exemple de suivi : véhicule en route, Paris → Lyon.</span></div>
-          <div class="detail-row"><span class="detail-label">Trajet</span><span class="detail-val">Paris → Lyon (463 km)</span></div>
-          <div class="detail-row"><span class="detail-label">Véhicule</span><span class="detail-val">BMW 320d · AB-123-CD</span></div>
-          <div class="detail-row"><span class="detail-label">Convoyeur</span><span class="detail-val">—</span></div>
-          <div class="detail-row"><span class="detail-label">Départ</span><span class="detail-val">29/05/2024 · 08h00</span></div>
-          <div class="detail-row"><span class="detail-label">Arrivée estimée</span><span class="detail-val">29/05/2024 · 14h30</span></div>
-          <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val"><span class="badge badge-progress">En route</span></span></div>
-          <div style="margin-top:16px;background:var(--gray-light);border-radius:10px;padding:16px;font-size:0.85rem;color:#555">
-            🗺️ Suivi en temps réel disponible via l'application mobile HelixCar.
-          </div>
+          <div class="card-header"><div><div class="card-title">Mes missions</div></div>
+            <button class="btn btn-sm btn-primary" onclick="showPage('client-missions')">Voir mes missions →</button></div>
+          <div id="client-missions-resume"><div class="fid-note">Chargement…</div></div>
         </div>
-
         <!-- LOT L01 — PROGRAMME DE FIDÉLITÉ : plus aucune valeur écrite en
              dur. Le contenu vient de la vue v_ma_fidelite (solde, prochain
              palier, points restants calculés par le serveur, migration 109)
@@ -2095,12 +1626,12 @@ body.scroll-verrouille { overflow: hidden; }
         <div class="card" style="margin-bottom:14px">
           <div class="card-header">
             <div>
-              <div class="card-title">Nouvelle demande</div>
-              <div style="font-size:.85rem;color:#555;margin-top:4px">
+              <div class="card-title" id="client-cadre-titre">Nouvelle demande</div>
+              <div style="font-size:.85rem;color:#555;margin-top:4px" id="client-cadre-sous-titre">
                 Vos informations de compte sont déjà connues : elles ne vous seront pas redemandées.
               </div>
             </div>
-            <button class="btn" onclick="fermerNouvelleDemande()">← Retour à mes demandes</button>
+            <button class="btn" id="client-cadre-retour" onclick="fermerNouvelleDemande()">← Retour à mes demandes</button>
           </div>
         </div>
         <div class="card" style="padding:0;overflow:hidden">
@@ -2113,24 +1644,20 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-client-missions">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div></div>
-          <button class="btn btn-primary" onclick="alert('Redirection vers le formulaire de devis HelixCar')">+ Nouvelle mission</button>
+          <button class="btn btn-primary" onclick="ouvrirNouvelleDemande()">+ Nouvelle demande</button>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Historique de vos missions</div></div>
+          <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="client-missions-sub"></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Trajet</th><th>Véhicule</th><th>Convoyeur</th><th>Date</th><th>Prix</th><th>Km</th><th>Statut</th></tr></thead>
-              <tbody>
-                <tr><td><strong>Paris → Lyon</strong></td><td>BMW 320d</td><td>Antoine A.</td><td>29/05</td><td>350 €</td><td>463 km</td><td><span class="badge badge-progress">En cours</span></td></tr>
-                <tr><td><strong>Paris → Bordeaux</strong></td><td>Tesla Model 3</td><td>Jean P.</td><td>15/05</td><td>660 €</td><td>600 km</td><td><span class="badge badge-done">Terminée</span></td></tr>
-                <tr><td><strong>Lyon → Marseille</strong></td><td>Mercedes GLC</td><td>Sara B.</td><td>02/05</td><td>424 €</td><td>313 km</td><td><span class="badge badge-done">Terminée</span></td></tr>
-                <tr><td><strong>Paris → Lille</strong></td><td>Peugeot 308</td><td>Jean P.</td><td>18/04</td><td>170 €</td><td>225 km</td><td><span class="badge badge-done">Terminée</span></td></tr>
+              <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Partenaire</th><th>Prix TTC</th><th>Statut</th><th>Évaluation</th></tr></thead>
+              <tbody id="client-missions-table">
+                <tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
       <!-- CLIENT: Informations à compléter -->
       <div class="page" id="page-client-infos">
         <div class="card">
@@ -2156,26 +1683,28 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
-      <!-- CLIENT: Profil -->
+      <!-- CLIENT: Profil — LOT X01 / D01 : les valeurs viennent du compte
+           connecté (v_mes_demandes), plus aucun « Marc Dupont » écrit en dur,
+           et plus de bouton « Sauvegarder » qui ne sauvegardait rien. -->
       <div class="page" id="page-client-profil">
         <div class="card">
           <div class="card-header"><div class="card-title">Mon profil</div></div>
           <div class="profile-grid">
-            <div class="form-group"><label>Prénom</label><input type="text" value="Marc"></div>
-            <div class="form-group"><label>Nom</label><input type="text" value="Dupont"></div>
-            <div class="form-group"><label>Email</label><input type="email" value="m.dupont@email.com"></div>
-            <div class="form-group"><label>Téléphone</label><input type="tel" value="06 12 34 56 78"></div>
-            <div class="form-group"><label>Type de compte</label><input type="text" value="Particulier" readonly></div>
+            <div class="form-group"><label>Prénom</label><input type="text" id="profil-client-prenom" value="" readonly></div>
+            <div class="form-group"><label>Nom</label><input type="text" id="profil-client-nom" value="" readonly></div>
+            <div class="form-group"><label>E-mail</label><input type="email" id="profil-client-email" value="" readonly></div>
+            <div class="form-group"><label>Téléphone</label><input type="tel" id="profil-client-telephone" value="" readonly></div>
+            <div class="form-group"><label>Type de compte</label><input type="text" id="profil-client-type" value="" readonly></div>
+            <div class="form-group"><label>Société</label><input type="text" id="profil-client-societe" value="" readonly></div>
           </div>
-          <button class="btn btn-primary" style="margin-top:8px">Sauvegarder les modifications</button>
+          <div class="fid-note" id="profil-client-note">Ces informations sont reprises de votre dernière demande. Pour les modifier, indiquez-le lors de votre prochaine demande ou contactez HelixCar.</div>
         </div>
       </div>
-
       <!-- CONVOYEUR: Profil -->
       <div class="page" id="page-convoyeur-profil">
         <div class="card">
           <div class="card-header"><div class="card-title">Mon profil convoyeur</div></div>
-          <div class="alert alert-success">✅ Compte validé par HelixCar — Certifié Convoyeur d'Excellence</div>
+          <div id="profil-statut-note" class="hc-note" role="status"></div>
           <div class="profile-grid">
             <div class="form-group"><label>Prénom</label><input type="text" id="profil-prenom" value=""></div>
             <div class="form-group"><label>Nom</label><input type="text" id="profil-nom" value=""></div>
@@ -2191,29 +1720,13 @@ body.scroll-verrouille { overflow: hidden; }
             <label>Mes métiers</label>
             <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
           </div>
-          <button class="btn btn-primary" style="margin-top:8px">Sauvegarder</button>
+          <div class="fid-note">Pour modifier vos coordonnées ou vos documents, contactez HelixCar : rien n'est modifiable directement depuis cet écran pour le moment.</div>
         </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">📄 Mes documents de mission</div><div class="card-sub">Disponibles pour chaque mission acceptée</div></div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--gray-light);border-radius:8px">
-              <div>
-                <div style="font-weight:700;font-size:.88rem">📄 Lettre de voiture — Mission HC-2024-0529</div>
-                <div style="font-size:.75rem;color:var(--gray);margin-top:2px">Paris → Lyon · À imprimer, signer et renvoyer</div>
-              </div>
-              <a href="helixcar-lettre-voiture.html" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">Ouvrir</a>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:#FFF8E1;border-radius:8px;border:1px solid rgba(181,68,75,.3)">
-              <div>
-                <div style="font-weight:700;font-size:.88rem">🔄 Lettre de voiture — Restitution HC-2024-0529-RESTIT</div>
-                <div style="font-size:.75rem;color:#8C3238;margin-top:2px">À utiliser pour l'état des lieux retour · Même procédure que l'aller</div>
-              </div>
-              <a href="helixcar-lettre-voiture-restit.html" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:var(--yellow);color:var(--navy);font-weight:700;padding:6px 12px;font-size:.78rem;border-radius:6px;text-decoration:none">Ouvrir</a>
-            </div>
-          </div>
-        </div>
+        <!-- LOT X01 — le bloc « Mes documents de mission » (lettre de voiture
+             HC-2024-0529, liens vers des pages absentes du dépôt) était
+             inventé : les vrais documents s'ouvrent depuis l'historique des
+             missions (lettre-voiture.html?mission=…). -->
       </div>
-
     </div><!-- /content -->
   </main>
 </div><!-- /app -->
@@ -2231,6 +1744,15 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
+<!-- Opportunité de mission (lot O01) -->
+<div class="modal-overlay" id="modal-opportunite">
+  <div class="modal" style="position:relative;max-width:920px;text-align:left">
+    <button class="modal-close" onclick="closeModal('opportunite')">✕</button>
+    <h3 id="opportunite-titre">Opportunité de mission</h3>
+    <div id="opportunite-message" class="hc-note" role="status"></div>
+    <div id="opportunite-corps"></div>
+  </div>
+</div>
 <!-- Dossier convoyeur -->
 <div class="modal-overlay" id="modal-dossier">
   <div class="modal" style="position:relative">
@@ -2288,32 +1810,11 @@ body.scroll-verrouille { overflow: hidden; }
 </div>
 
 <!-- Mission detail -->
-<div class="modal-overlay" id="modal-mission">
-  <div class="modal" style="position:relative">
-    <button class="modal-close" onclick="closeModal('mission')">✕</button>
-    <h3 id="modal-mission-title">Détail de la mission</h3>
-    <p>Consultez les informations et acceptez la mission.</p>
-    <div id="modal-mission-content"></div>
-    <div style="display:flex;gap:10px;margin-top:20px">
-      <button class="btn btn-primary btn-full" onclick="acceptMission()">✓ Accepter cette mission</button>
-    </div>
-  </div>
-</div>
-
-<!-- Mission acceptée - EDL access -->
-<div class="modal-overlay" id="modal-mission-accepted">
-  <div class="modal" style="position:relative">
-    <button class="modal-close" onclick="closeModal('mission-accepted')">✕</button>
-    <h3>✅ Mission acceptée</h3>
-    <p style="margin-bottom:16px">Un email de confirmation avec la fiche mission complète vous a été envoyé.</p>
-    <div id="modal-accepted-content"></div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
-      <a id="edl-link" href="helixcar-edl.html?phase=depart" class="btn btn-primary" style="text-decoration:none;text-align:center">📸 Démarrer l'état des lieux au départ →</a>
-      <button class="btn" style="background:var(--gray-light);color:var(--black)" onclick="closeModal('mission-accepted')">Plus tard</button>
-    </div>
-  </div>
-</div>
-
+<!-- LOT X01 — les modales « Détail de la mission » / « Mission acceptée »
+     (code HC-2024-0529 en dur, « un email de confirmation vous a été
+     envoyé » sans envoi, lien vers helixcar-edl.html absent) n'étaient
+     ouvertes par aucun flux réel : retirées avec leurs fonctions. Le flux
+     réel est accepterMission() puis allerVersEdl() → edl.html. -->
 <!-- MODALE « INFORMATIONS MISSION » SUPPRIMÉE : son contenu était
      entièrement écrit en dur (Paris → Lyon, BMW 320d, Marc Dupont,
      200 €) et aucun bouton de la page ne l'ouvrait. Le détail réel
@@ -2531,9 +2032,7 @@ const NAVS = {
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
     { id: 'admin-recontact',    icon: '📬', label: 'Demandes recontact' },
     { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
-    { id: 'admin-challenge',    icon: '🏁', label: 'Challenge mensuel' },
-    { id: 'admin-pannes',       icon: '🔧', label: 'Pannes' },
-    { id: 'admin-notations',    icon: '⭐', label: 'Notations' },
+    { id: 'admin-opportunites', icon: '📣', label: 'Opportunités de missions', badgeDynamique: true },
     { id: 'admin-archivage',    icon: '📦', label: 'Archivage' },
     { id: 'admin-parametres',   icon: '⚙️', label: 'Paramètres & RIB' },
   ],
@@ -2542,16 +2041,14 @@ const NAVS = {
     { id: 'convoyeur-missions',    icon: '🚗', label: 'Missions disponibles' },
     { id: 'convoyeur-historique',  icon: '📁', label: 'Historique' },
     { id: 'convoyeur-facturation', icon: '🧾', label: 'Mes factures' },
-    { id: 'convoyeur-panne',       icon: '🔧', label: 'Signaler une panne' },
-    { id: 'convoyeur-notation',    icon: '⭐', label: 'Ma notation' },
-    { id: 'convoyeur-recompenses', icon: '🏆', label: 'Récompenses' },
+    { id: 'convoyeur-opportunites', icon: '📣', label: 'Opportunités de missions', badgeDynamique: true },
     { id: 'convoyeur-profil',      icon: '👤', label: 'Mon profil' },
   ],
   client: [
     { id: 'client-dashboard', icon: '📊', label: 'Tableau de bord' },
     { id: 'client-missions',  icon: '🚗', label: 'Mes missions' },
     { id: 'client-infos',     icon: '📝', label: 'Informations à compléter' },
-    { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badge: 1 },
+    { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badgeDynamique: true },
     { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité' },
     { id: 'client-profil',    icon: '👤', label: 'Mon profil' },
   ],
@@ -2672,6 +2169,12 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
 }
 
 function remplirProfilConvoyeur(conv) {
+  // LOT X01 — l'ancien bandeau « Compte validé — Certifié Convoyeur
+  // d'Excellence » s'affichait à TOUT partenaire : le statut réel de la
+  // fiche décide désormais.
+  _hcNote('profil-statut-note',
+    conv.statut === 'actif' ? 'Compte partenaire actif, validé par HelixCar.' : 'Compte en attente de validation par HelixCar.',
+    conv.statut === 'actif' ? 'succes' : 'info');
   const champs = {
     'profil-prenom': conv.prenom || '',
     'profil-nom': conv.nom || '',
@@ -2970,14 +2473,21 @@ function ouvrirNouvelleDemande() {
   if (!cadre) { window.location.href = 'index.html?nouvelle-demande=1'; return; }
   // Rechargé à chaque ouverture : le brouillon et la reprise restent
   // ceux du formulaire lui-même, jamais un état gardé ici.
-  if (!cadre.getAttribute('src')) {
+  if (cadre.getAttribute('src') !== 'index.html?nouvelle-demande=1&integre=1') {
     cadre.setAttribute('src', 'index.html?nouvelle-demande=1&integre=1');
   }
+  window._hcCadreMode = 'demande';
+  const titre = document.getElementById('client-cadre-titre');
+  const sous = document.getElementById('client-cadre-sous-titre');
+  const retour = document.getElementById('client-cadre-retour');
+  if (titre) titre.textContent = 'Nouvelle demande';
+  if (sous) sous.textContent = 'Vos informations de compte sont déjà connues : elles ne vous seront pas redemandées.';
+  if (retour) retour.textContent = '← Retour à mes demandes';
   showPage('client-nouvelle-demande');
 }
 
 function fermerNouvelleDemande() {
-  showPage('client-dashboard');
+  showPage(window._hcCadreMode === 'completion' ? 'client-infos' : 'client-dashboard');
 }
 
 // Le formulaire intégré parle à son espace : hauteur réelle, et surtout
@@ -3006,12 +2516,36 @@ window.addEventListener('message', function (ev) {
       showPage('client-dashboard');
       const zone = document.getElementById('client-demandes-liste');
       if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+      return;
+    }
+    // LOT D01 — complétion dans le cadre : l'onglet « Informations à
+    // compléter » est relu depuis le serveur, jamais depuis le message.
+    if (m.type === 'hc-completion-enregistree') {
+      window._hcInfosARelire = true;
+      return;
+    }
+    if (m.type === 'hc-completion-fermee') {
+      showPage('client-infos');
     }
   } catch (e) { console.warn('Message du formulaire intégré ignoré :', e); }
 });
 
+// LOT D01 — la complétion des informations se fait DANS l'espace client,
+// dans le même cadre intégré que la nouvelle demande : même page, même
+// écran de complétion (index.html, #modal-completer), même session. Le
+// client ne quitte plus le Dashboard pour la vitrine.
 function ouvrirCompletionDemande(id) {
-  window.location.href = 'index.html?completer=' + encodeURIComponent(id);
+  const cadre = document.getElementById('client-demande-cadre');
+  if (!cadre) { window.location.href = 'index.html?completer=' + encodeURIComponent(id); return; }
+  cadre.setAttribute('src', 'index.html?integre=1&completer=' + encodeURIComponent(id));
+  window._hcCadreMode = 'completion';
+  const titre = document.getElementById('client-cadre-titre');
+  const sous = document.getElementById('client-cadre-sous-titre');
+  const retour = document.getElementById('client-cadre-retour');
+  if (titre) titre.textContent = 'Compléter mes informations';
+  if (sous) sous.textContent = 'Seules les informations encore manquantes ou à corriger vous sont demandées.';
+  if (retour) retour.textContent = '← Retour à mes informations';
+  showPage('client-nouvelle-demande');
 }
 
 function _libelleServiceClient(s) {
@@ -3030,12 +2564,43 @@ async function chargerDemandesClient() {
   return data || [];
 }
 
+// LOT Q02 — l'état du devis, tel que le serveur le connaît (v_mes_devis,
+// migration 110) : envoyé, consulté, accepté — paiement en attente, payé,
+// refusé. Jamais un état déduit d'un clic.
+async function chargerDevisClient() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth
+    .from('v_mes_devis')
+    .select('*')
+    .order('date_generation', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+function _etatDevisClient(dv) {
+  if (!dv) return null;
+  if (dv.statut === 'refuse') return { texte: 'Devis refusé', cls: 'badge-refused' };
+  if (dv.statut === 'accepte') {
+    if (dv.paiement_statut === 'paye') return { texte: 'Devis payé', cls: 'badge-done' };
+    return { texte: 'Devis accepté — paiement en attente', cls: 'badge-progress' };
+  }
+  if (dv.statut === 'envoye') {
+    return { texte: dv.consulte_le ? 'Devis consulté' : 'Devis envoyé — à consulter dans votre e-mail', cls: 'badge-pending' };
+  }
+  return null;
+}
+var LIB_STATUT_DEMANDE_CLIENT = {
+  nouveau: 'Reçue', compte_cree: 'Compte créé', en_cours: 'En cours', devis_envoye: 'Devis envoyé',
+  accepte: 'Acceptée', termine: 'Terminée', terminee: 'Terminée', annule: 'Annulée', annulee: 'Annulée'
+};
+
 async function loadDemandesClient() {
   const zone = document.getElementById('client-demandes-liste');
   if (!zone) return;
   let demandes = [];
+  let devis = [];
   try {
-    demandes = await chargerDemandesClient();
+    const r = await Promise.all([chargerDemandesClient(), chargerDevisClient().catch(function () { return []; })]);
+    demandes = r[0]; devis = r[1];
   } catch (e) {
     zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
       + 'Impossible de charger vos demandes pour le moment.</div>';
@@ -3047,13 +2612,714 @@ async function loadDemandesClient() {
       + 'Vous n\'avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</div>';
     return;
   }
+  // Le devis le plus récent de chaque demande (la vue est triée).
+  const devisParDemande = {};
+  devis.forEach(function (dv) {
+    if (dv.client_id && !devisParDemande[dv.client_id]) devisParDemande[dv.client_id] = dv;
+  });
   zone.innerHTML = demandes.map(function (d) {
-    return '<div class="detail-row">'
+    const etat = _etatDevisClient(devisParDemande[d.id]);
+    return '<div class="detail-row" data-demande="' + escapeHtml(d.id) + '">'
       + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
       + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
-      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></span>'
-      + '</div>';
+      + ' · <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—') + '</span>'
+      + (etat ? ' <span class="badge ' + etat.cls + '" data-etat-devis>' + escapeHtml(etat.texte) + '</span>' : '')
+      + '</span></div>';
   }).join('');
+}
+
+// ── LOT D01 — MES MISSIONS, MON PROFIL, MES ÉVALUATIONS ──────
+async function chargerMissionsClient() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth
+    .from('v_mes_missions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+function _missionLieuClient(m) {
+  if (m.type_mission === 'nettoyage') return m.ville_intervention || 'Lieu à préciser';
+  return (m.ville_depart || '—') + ' → ' + (m.ville_arrivee || '—');
+}
+function _missionDateClient(m) {
+  const v = m.type_mission === 'nettoyage' ? m.date_intervention : m.date_prise_en_charge;
+  return v ? _dvDate(v) : '—';
+}
+function _missionPrestationClient(m) {
+  if (m.type_mission === 'nettoyage') return m.prestation || 'Nettoyage';
+  return 'Convoyage';
+}
+function _missionStatutClient(m) {
+  return LIB_STATUT_MISSION[m.statut] || m.statut || '—';
+}
+
+async function loadMissionsClient() {
+  const tbody = document.getElementById('client-missions-table');
+  if (!tbody) return;
+  const sub = document.getElementById('client-missions-sub');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  let missions = [];
+  try { missions = await chargerMissionsClient(); }
+  catch (e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
+    return;
+  }
+  if (sub) sub.textContent = missions.length ? missions.length + ' mission(s)' : '';
+  if (!missions.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">'
+      + 'Aucune mission pour le moment. Vos missions apparaîtront ici une fois votre devis payé et vos informations complètes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = missions.map(function (m) {
+    let evaluation = '—';
+    if (m.evaluee) evaluation = '<span class="badge badge-done">' + escapeHtml(String(m.evaluation_note)) + '/20</span>';
+    else if (m.statut === 'terminee') evaluation = '<button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">À évaluer</button>';
+    return '<tr data-mission="' + escapeHtml(m.id) + '">'
+      + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(m.reference || '—') + '</td>'
+      + '<td>' + escapeHtml(_missionPrestationClient(m)) + '</td>'
+      + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
+      + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
+      + '<td>' + escapeHtml(m.convoyeur_prenom || '—') + '</td>'
+      + '<td>' + (m.prix_ttc != null ? escapeHtml(m.prix_ttc) + ' €' : '—') + '</td>'
+      + '<td><span class="badge badge-progress">' + escapeHtml(_missionStatutClient(m)) + '</span></td>'
+      + '<td>' + evaluation + '</td></tr>';
+  }).join('');
+}
+
+// Résumé réel sur le tableau de bord : compteurs calculés sur les lignes
+// serveur, jamais écrits en dur.
+async function loadMissionsResumeClient() {
+  const zone = document.getElementById('client-missions-resume');
+  if (!zone) return;
+  let missions = [];
+  try { missions = await chargerMissionsClient(); }
+  catch (e) { zone.innerHTML = '<div class="fid-note">Impossible de charger vos missions pour le moment.</div>'; return; }
+  if (!missions.length) {
+    zone.innerHTML = '<div class="fid-note" id="client-missions-resume-vide">Aucune mission pour le moment.</div>';
+    _majBadgeEvaluations(0);
+    return;
+  }
+  const enCours = missions.filter(function (m) { return m.statut !== 'terminee' && m.statut !== 'annulee'; }).length;
+  const terminees = missions.filter(function (m) { return m.statut === 'terminee'; }).length;
+  const aEvaluer = missions.filter(function (m) { return m.statut === 'terminee' && !m.evaluee; }).length;
+  zone.innerHTML = '<div class="detail-row"><span class="detail-label">En cours</span><span class="detail-val" id="client-resume-en-cours">' + enCours + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Terminées</span><span class="detail-val" id="client-resume-terminees">' + terminees + '</span></div>'
+    + (aEvaluer ? '<div class="detail-row"><span class="detail-label">À évaluer</span><span class="detail-val">'
+        + '<button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">' + aEvaluer + ' mission(s) à évaluer</button></span></div>' : '');
+  _majBadgeEvaluations(aEvaluer);
+}
+
+function loadProfilClient() {
+  const c = window._currentClient || {};
+  const d = (c.demandes || [])[0] || {};
+  const mettre = function (id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  mettre('profil-client-prenom', d.prenom);
+  mettre('profil-client-nom', d.nom);
+  mettre('profil-client-email', d.email || c.email);
+  mettre('profil-client-telephone', d.telephone);
+  mettre('profil-client-type', d.type_client === 'pro' ? 'Professionnel' : (d.type_client === 'particulier' ? 'Particulier' : ''));
+  mettre('profil-client-societe', d.societe);
+  const note = document.getElementById('profil-client-note');
+  if (note) {
+    note.textContent = (c.demandes || []).length
+      ? 'Ces informations sont reprises de votre dernière demande. Pour les modifier, indiquez-le lors de votre prochaine demande ou contactez HelixCar.'
+      : 'Aucune demande enregistrée pour ce compte : vos coordonnées seront reprises de votre première demande.';
+  }
+}
+
+// ── LOT D01 — ÉVALUATIONS RÉELLES (migration 111) ──────────
+// Le barème est celui déjà présenté : /4, /4, /4, /3, /3, /2 = /20. Le
+// total affiché n'est qu'un aperçu ; le serveur recalcule et décide.
+var EVALUATION_CRITERES = [
+  { cle: 'ponctualite',       libelle: 'Ponctualité',        max: 4 },
+  { cle: 'retard',            libelle: 'Retard',             max: 4 },
+  { cle: 'etat',              libelle: 'État du véhicule',   max: 4 },
+  { cle: 'communication',     libelle: 'Communication',      max: 3 },
+  { cle: 'professionnalisme', libelle: 'Professionnalisme',  max: 3 },
+  { cle: 'tenue',             libelle: 'Tenue',              max: 2 }
+];
+var _evalNotes = {};
+var _evalEnvoiEnCours = false;
+
+function _majBadgeEvaluations(n) {
+  const b = document.getElementById('badge-client-notation');
+  if (!b) return;
+  if (n > 0) { b.textContent = String(n); b.style.display = ''; }
+  else { b.textContent = ''; b.style.display = 'none'; }
+}
+
+function _evalHtmlFormulaire(m) {
+  const id = String(m.id);
+  const notes = _evalNotes[id] || {};
+  let html = '<div class="card" style="margin-bottom:14px" id="eval-' + escapeHtml(id) + '" data-mission="' + escapeHtml(id) + '">'
+    + '<div class="card-header"><div><div class="card-title">' + escapeHtml(m.reference || 'Mission') + '</div>'
+    + '<div class="card-sub">' + escapeHtml(_missionPrestationClient(m)) + ' · ' + escapeHtml(_missionLieuClient(m))
+    + (m.convoyeur_prenom ? ' · ' + escapeHtml(m.convoyeur_prenom) : '') + ' · ' + escapeHtml(_missionDateClient(m)) + '</div></div></div>';
+  EVALUATION_CRITERES.forEach(function (c) {
+    html += '<div class="critere-row" data-critere="' + c.cle + '"><span class="critere-label">' + escapeHtml(c.libelle) + '</span>'
+      + '<span class="critere-max">/' + c.max + '</span><div class="stars-input">';
+    for (let v = 1; v <= c.max; v++) {
+      html += '<button type="button" class="star-btn' + (notes[c.cle] >= v ? ' active' : '') + '" '
+        + actionHtml('choisirNoteEvaluation', [id, c.cle, v]) + '>' + v + '</button>';
+    }
+    html += '</div></div>';
+  });
+  html += '<div style="margin-top:16px;padding:12px 16px;background:var(--gray-light);border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+    + '<div><div style="font-size:0.78rem;color:var(--gray)">Note (aperçu)</div><div class="note-global" id="eval-total-' + escapeHtml(id) + '">'
+    + _evalTotalTexte(notes) + '</div></div></div>'
+    + '<div class="form-group" style="margin-top:16px"><label>Commentaire (optionnel)</label>'
+    + '<textarea id="eval-com-' + escapeHtml(id) + '" maxlength="1000" style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;font-size:0.88rem;min-height:80px"></textarea></div>'
+    + '<div id="eval-msg-' + escapeHtml(id) + '" class="hc-note" role="status"></div>'
+    + '<button class="btn btn-primary" style="margin-top:8px" id="eval-envoyer-' + escapeHtml(id) + '" '
+    + actionHtml('evaluerMissionClient', [id]) + '>Envoyer mon évaluation →</button>'
+    + '</div>';
+  return html;
+}
+function _evalTotalTexte(notes) {
+  const total = EVALUATION_CRITERES.reduce(function (a, c) { return a + (Number(notes[c.cle]) || 0); }, 0);
+  const complet = EVALUATION_CRITERES.every(function (c) { return notes[c.cle] != null; });
+  return (complet ? String(total) : '—') + '<span style="font-size:1rem;color:var(--gray)">/20</span>';
+}
+function choisirNoteEvaluation(missionId, critere, valeur) {
+  const id = String(missionId);
+  const v = Number(valeur);
+  const crit = EVALUATION_CRITERES.filter(function (c) { return c.cle === critere; })[0];
+  if (!crit || !(v >= 1 && v <= crit.max)) return;
+  _evalNotes[id] = _evalNotes[id] || {};
+  _evalNotes[id][critere] = v;
+  const ligne = document.querySelector('#eval-' + CSS.escape(id) + ' [data-critere="' + critere + '"]');
+  if (ligne) {
+    ligne.querySelectorAll('.star-btn').forEach(function (b, i) { b.classList.toggle('active', i < v); });
+  }
+  const total = document.getElementById('eval-total-' + id);
+  if (total) total.innerHTML = _evalTotalTexte(_evalNotes[id]);
+}
+
+async function evaluerMissionClient(missionId) {
+  const id = String(missionId);
+  const notes = _evalNotes[id] || {};
+  const msg = document.getElementById('eval-msg-' + id);
+  const manquant = EVALUATION_CRITERES.filter(function (c) { return notes[c.cle] == null; })[0];
+  if (manquant) { _hcNoteEl(msg, 'Notez « ' + manquant.libelle + ' » avant d\'envoyer.', 'erreur'); return; }
+  if (_evalEnvoiEnCours) return;
+  if (!_sbAuthPret()) { _hcNoteEl(msg, 'Votre session a expiré. Reconnectez-vous pour évaluer.', 'erreur'); return; }
+  _evalEnvoiEnCours = true;
+  const bouton = document.getElementById('eval-envoyer-' + id);
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Envoi…'; }
+  _hcNoteEl(msg, '');
+  try {
+    const com = (document.getElementById('eval-com-' + id) || {}).value || '';
+    const res = await sbAuth.rpc('evaluer_mission', { p_mission_id: id, p_notes: notes, p_commentaire: com.trim() || null });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    if (r.ok && r.code === 'ENREGISTREE') {
+      _hcNoteEl(msg, 'Merci, votre évaluation est enregistrée (' + r.note_totale + '/20).', 'succes');
+      delete _evalNotes[id];
+      setTimeout(loadEvaluationsClient, 900);
+    } else if (r.code === 'DEJA_EVALUEE') {
+      _hcNoteEl(msg, 'Cette mission a déjà été évaluée.', 'info');
+      setTimeout(loadEvaluationsClient, 900);
+    } else if (r.code === 'MISSION_NON_TERMINEE') {
+      _hcNoteEl(msg, 'Cette mission n\'est pas encore terminée : elle pourra être évaluée ensuite.', 'erreur');
+    } else if (r.code === 'NOTES_INVALIDES') {
+      _hcNoteEl(msg, 'Une note est hors barème : vérifiez chaque critère.', 'erreur');
+    } else if (r.code === 'COMMENTAIRE_TROP_LONG') {
+      _hcNoteEl(msg, 'Le commentaire dépasse 1 000 caractères.', 'erreur');
+    } else {
+      _hcNoteEl(msg, 'Votre évaluation n\'a pas pu être enregistrée.', 'erreur');
+    }
+  } catch (e) {
+    console.error('evaluer_mission :', e && e.message);
+    _hcNoteEl(msg, 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez : vos notes sont conservées.', 'erreur');
+  } finally {
+    _evalEnvoiEnCours = false;
+    if (bouton) { bouton.disabled = false; bouton.textContent = 'Envoyer mon évaluation →'; }
+  }
+}
+
+async function chargerEvaluationsClient() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth
+    .from('evaluations')
+    .select('id, mission_id, note_totale, commentaire, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function loadEvaluationsClient() {
+  const zoneA = document.getElementById('client-evaluations-a-faire');
+  const zoneH = document.getElementById('client-evaluations-historique');
+  if (!zoneA || !zoneH) return;
+  zoneA.innerHTML = '<div class="fid-note">Chargement…</div>';
+  zoneH.innerHTML = '<div class="fid-note">Chargement…</div>';
+  let missions = [], evaluations = [];
+  try {
+    const r = await Promise.all([chargerMissionsClient(), chargerEvaluationsClient()]);
+    missions = r[0]; evaluations = r[1];
+  } catch (e) {
+    zoneA.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger vos missions pour le moment.</div>';
+    zoneH.innerHTML = '';
+    return;
+  }
+  const aFaire = missions.filter(function (m) { return m.statut === 'terminee' && !m.evaluee; });
+  _majBadgeEvaluations(aFaire.length);
+  zoneA.innerHTML = aFaire.length
+    ? aFaire.map(_evalHtmlFormulaire).join('')
+    : '<div class="fid-note" id="client-evaluations-vide">Aucune évaluation en cours.</div>';
+  const parMission = {};
+  missions.forEach(function (m) { parMission[String(m.id)] = m; });
+  zoneH.innerHTML = evaluations.length
+    ? evaluations.map(function (e) {
+        const m = parMission[String(e.mission_id)] || {};
+        return '<div class="detail-row" data-evaluation="' + escapeHtml(e.id) + '">'
+          + '<span class="detail-label">' + escapeHtml(m.reference || 'Mission') + ' · ' + escapeHtml(_dvDate(e.created_at))
+          + (m.convoyeur_prenom ? ' · ' + escapeHtml(m.convoyeur_prenom) : '') + '</span>'
+          + '<span class="detail-val"><span class="badge badge-done">' + escapeHtml(String(e.note_totale)) + '/20</span>'
+          + (e.commentaire ? '<div style="font-size:.8rem;color:#555;margin-top:4px">' + escapeHtml(e.commentaire) + '</div>' : '')
+          + '</span></div>';
+      }).join('')
+    : '<div class="fid-note" id="client-evaluations-historique-vide">Aucune évaluation envoyée pour l\'instant.</div>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOT O01 — OPPORTUNITÉS DE MISSIONS (migration 108)
+// ══════════════════════════════════════════════════════════════
+// Tout ce qui décide vit sur le serveur : creer_brouillon_opportunite,
+// modifier_opportunite, publier_opportunite, postuler_opportunite,
+// decider_candidature. Le navigateur affiche ce que les vues renvoient
+// (v_opportunites_admin, v_opportunites_partenaire) et relit après
+// chaque action : aucun état n'est déduit d'un clic.
+var OPP_ACTIVITES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
+var LIB_STATUT_OPPORTUNITE = { brouillon: 'Brouillon', a_pourvoir: 'À pourvoir', pourvue: 'Pourvue / clôturée' };
+var LIB_ETAT_CANDIDATURE = { a_etudier: 'À étudier', preselectionne: 'Présélectionné', retenu: 'Retenu', non_retenu: 'Non retenu' };
+var _oppCourante = null;
+
+function _oppLibCategorie(c) { return LIB_ACTIVITE_DECISION[c] || c || '—'; }
+function _oppPeriode(o) {
+  if (o.date_debut && o.date_fin && o.date_debut !== o.date_fin) return _dvDate(o.date_debut) + ' → ' + _dvDate(o.date_fin);
+  if (o.date_debut) return _dvDate(o.date_debut);
+  return 'À préciser';
+}
+function _oppStatutBadge(o) {
+  if (o.statut === 'pourvue') return '<span class="badge badge-done">Pourvue / clôturée</span>';
+  if (o.statut === 'a_pourvoir') return '<span class="badge badge-progress">À pourvoir</span>';
+  return '<span class="badge badge-pending">Brouillon</span>';
+}
+// L'indicateur factuel : « 6 professionnels retenus sur 9 » — jamais un
+// troisième état « partiellement pourvue » (C03).
+function _oppCompteur(o) {
+  var n = Number(o.nb_retenus || 0), t = Number(o.nb_professionnels || 1);
+  return n + ' professionnel' + (n > 1 ? 's' : '') + ' retenu' + (n > 1 ? 's' : '') + ' sur ' + t;
+}
+
+// La carte telle que le partenaire la voit. Même rendu pour l'aperçu de
+// l'administrateur (« Ne pas publier lors de l'ouverture de l'aperçu »).
+function _oppCarteHtml(o, options) {
+  options = options || {};
+  var badges = (o.badges_requis || []).map(function (b) {
+    return '<span class="badge badge-service">' + escapeHtml(_oppLibCategorie(b)) + '</span>';
+  }).join(' ');
+  var tags = [
+    o.ponctuelle !== false ? 'Mission ponctuelle' : 'Mission récurrente',
+    o.statut_independant !== false ? 'Mission indépendante' : 'Mission encadrée'
+  ].map(function (t) { return '<span class="badge badge-pending" style="font-size:.72rem">' + escapeHtml(t) + '</span>'; }).join(' ');
+  var nb = Number(o.nb_professionnels || 1);
+  var html = '<div class="card opp-carte" data-opportunite="' + escapeHtml(o.id || '') + '" style="margin-bottom:14px">'
+    + '<div class="card-header"><div>'
+    + '<div class="card-title">' + escapeHtml(o.intitule || 'Opportunité de mission') + '</div>'
+    + '<div class="card-sub">' + escapeHtml(_oppLibCategorie(o.categorie)) + ' · ' + escapeHtml(_oppPeriode(o))
+    + (o.duree_texte ? ' · ' + escapeHtml(o.duree_texte) : '') + '</div></div>'
+    + (options.apercu ? '<span class="badge badge-pending">Aperçu partenaire</span>' : _oppStatutBadge(o)) + '</div>'
+    + '<div class="detail-row"><span class="detail-label">Zone générale</span><span class="detail-val">' + escapeHtml(o.zone_generale || 'À préciser') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Nombre de professionnels</span><span class="detail-val">' + nb + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Métiers requis</span><span class="detail-val">' + (badges || '—') + '</span></div>'
+    + '<div class="detail-row"><span class="detail-label">Cadre</span><span class="detail-val">' + tags + '</span></div>'
+    + '<div style="font-size:.85rem;color:#333;margin-top:10px;white-space:pre-line">' + escapeHtml(o.description_publique || '') + '</div>';
+  if (options.partenaire) {
+    html += '<div id="opp-msg-' + escapeHtml(o.id) + '" class="hc-note" role="status"></div>';
+    if (o.ma_candidature_etat) {
+      html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
+        + 'Votre candidature : ' + escapeHtml(LIB_ETAT_CANDIDATURE[o.ma_candidature_etat] || o.ma_candidature_etat) + '</span>'
+        + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
+        + '</div>';
+    } else if (o.statut === 'a_pourvoir') {
+      html += '<button class="btn btn-primary" style="margin-top:12px" id="opp-postuler-' + escapeHtml(o.id) + '" '
+        + actionHtml('postulerOpportunite', [o.id]) + '>Postuler</button>';
+    }
+  }
+  return html + '</div>';
+}
+
+// ── Administration ──
+async function chargerOpportunitesAdmin() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.from('v_opportunites_admin').select('*').order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+function _majBadgeOpportunitesAdmin(liste) {
+  const b = document.getElementById('badge-admin-opportunites');
+  if (!b) return;
+  const n = liste.reduce(function (a, o) { return a + Number(o.nb_a_etudier || 0); }, 0);
+  if (n > 0) { b.textContent = String(n); b.style.display = ''; } else { b.textContent = ''; b.style.display = 'none'; }
+}
+async function loadOpportunitesAdmin() {
+  const tbody = document.getElementById('opportunites-table');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  let liste = [];
+  try { liste = await chargerOpportunitesAdmin(); }
+  catch (e) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les opportunités pour le moment.</td></tr>';
+    return;
+  }
+  _majBadgeOpportunitesAdmin(liste);
+  const sub = document.getElementById('opportunites-sub');
+  if (sub) sub.textContent = liste.length ? liste.length + ' opportunité(s)' : 'Besoins publiés aux partenaires éligibles, sans coordonnées ni identité client';
+  if (!liste.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune opportunité pour le moment. Un brouillon est préparé automatiquement pour chaque nouvelle mission ; le bouton « Opportunité » d\'une mission l\'ouvre.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = liste.map(function (o) {
+    const cand = Number(o.nb_a_etudier || 0) + ' à étudier · ' + Number(o.nb_preselectionnes || 0) + ' présél. · '
+      + Number(o.nb_retenus || 0) + ' retenu(s) · ' + Number(o.nb_non_retenus || 0) + ' non retenu(s)';
+    return '<tr data-opportunite="' + escapeHtml(o.id) + '">'
+      + '<td><strong>' + escapeHtml(o.intitule || '—') + '</strong></td>'
+      + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(o.mission_reference || '—') + '</td>'
+      + '<td>' + escapeHtml(_oppLibCategorie(o.categorie)) + '</td>'
+      + '<td>' + escapeHtml(_oppPeriode(o)) + '</td>'
+      + '<td>' + escapeHtml(o.zone_generale || '—') + '</td>'
+      + '<td>' + escapeHtml(String(o.nb_professionnels || 1)) + '</td>'
+      + '<td>' + _oppStatutBadge(o) + (o.statut !== 'brouillon' ? '<div style="font-size:.72rem;color:#666;margin-top:4px" data-compteur>' + escapeHtml(_oppCompteur(o)) + '</div>' : '') + '</td>'
+      + '<td style="font-size:.78rem">' + escapeHtml(cand) + '</td>'
+      + '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirOpportuniteAdmin', [o.id]) + '>Ouvrir</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+// Depuis une mission : ouvre le brouillon (le serveur le crée s'il
+// n'existe pas encore, sans jamais le publier).
+async function ouvrirOpportuniteMission(missionId) {
+  if (!_sbAuthPret()) return;
+  try {
+    const res = await sbAuth.rpc('creer_brouillon_opportunite', { p_mission_id: missionId });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    if (!r.ok || !r.id) { alert('Impossible de préparer l\'opportunité de cette mission.'); return; }
+    showPage('admin-opportunites');
+    await ouvrirOpportuniteAdmin(r.id);
+  } catch (e) {
+    console.error('creer_brouillon_opportunite :', e && e.message);
+    alert('Impossible de préparer l\'opportunité de cette mission.');
+  }
+}
+
+async function _oppChargerDetail(id) {
+  const r = await Promise.all([
+    sbAuth.from('v_opportunites_admin').select('*').eq('id', id).limit(1),
+    sbAuth.from('opportunite_candidatures').select('id, convoyeur_id, etat, created_at, decidee_le').eq('opportunite_id', id).order('created_at', { ascending: true }),
+    sbFetchToutePage('convoyeurs?select=id,prenom,nom,activites,statut,bloque')
+  ]);
+  if (r[0].error) throw new Error(r[0].error.message);
+  if (r[1].error) throw new Error(r[1].error.message);
+  const o = (r[0].data || [])[0];
+  if (!o) throw new Error('INTROUVABLE');
+  const convoyeurs = {};
+  (r[2] || []).forEach(function (c) { convoyeurs[c.id] = c; });
+  return { o: o, candidatures: r[1].data || [], convoyeurs: convoyeurs };
+}
+
+function _oppFormulaireHtml(o) {
+  const badges = o.badges_requis || [];
+  return '<form id="opportunite-form" onsubmit="event.preventDefault();return false">'
+    + '<div class="profile-grid">'
+    + '<div class="form-group"><label>Intitulé</label><input type="text" id="opp-intitule" value="' + escapeHtml(o.intitule || '') + '"></div>'
+    + '<div class="form-group"><label>Catégorie</label><select id="opp-categorie">'
+    + OPP_ACTIVITES.map(function (a) { return '<option value="' + a + '"' + (o.categorie === a ? ' selected' : '') + '>' + escapeHtml(_oppLibCategorie(a)) + '</option>'; }).join('')
+    + '</select></div>'
+    + '<div class="form-group"><label>Début</label><input type="date" id="opp-date-debut" value="' + escapeHtml(o.date_debut || '') + '"></div>'
+    + '<div class="form-group"><label>Fin</label><input type="date" id="opp-date-fin" value="' + escapeHtml(o.date_fin || '') + '"></div>'
+    + '<div class="form-group"><label>Durée (texte)</label><input type="text" id="opp-duree" value="' + escapeHtml(o.duree_texte || '') + '" placeholder="Ex : 2 jours · sur place 9h–17h"></div>'
+    + '<div class="form-group"><label>Zone générale (ville ou département, jamais l\'adresse)</label><input type="text" id="opp-zone" value="' + escapeHtml(o.zone_generale || '') + '"></div>'
+    + '<div class="form-group"><label>Nombre de professionnels</label><input type="number" min="1" id="opp-nb" value="' + escapeHtml(String(o.nb_professionnels || 1)) + '"></div>'
+    + '<div class="form-group"><label>Cadre</label>'
+    + '<label style="font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" id="opp-ponctuelle"' + (o.ponctuelle !== false ? ' checked' : '') + '> Mission ponctuelle</label>'
+    + '<label style="font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" id="opp-independant"' + (o.statut_independant !== false ? ' checked' : '') + '> Mission indépendante</label></div>'
+    + '</div>'
+    + '<div class="form-group"><label>Métiers requis (au moins un doit être validé chez le partenaire)</label><div style="display:flex;gap:14px;flex-wrap:wrap">'
+    + OPP_ACTIVITES.map(function (a) { return '<label style="font-weight:400;text-transform:none;letter-spacing:0"><input type="checkbox" class="opp-badge" value="' + a + '"' + (badges.indexOf(a) !== -1 ? ' checked' : '') + '> ' + escapeHtml(_oppLibCategorie(a)) + '</label>'; }).join('')
+    + '</div></div>'
+    + '<div class="form-group"><label>Description publique (sans nom, e-mail, téléphone ni adresse : le serveur les retire)</label>'
+    + '<textarea id="opp-description" style="width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit;font-size:.88rem;min-height:110px">' + escapeHtml(o.description_publique || '') + '</textarea></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + '<button type="button" class="btn btn-outline" ' + actionHtml('enregistrerOpportunite', [o.id]) + '>Enregistrer le brouillon</button>'
+    + '<button type="button" class="btn btn-primary" ' + actionHtml('publierOpportunite', [o.id]) + '>Envoyer l\'opportunité aux partenaires</button>'
+    + '</div></form>';
+}
+
+function _oppCandidaturesHtml(detail) {
+  const o = detail.o;
+  const etats = ['a_etudier', 'preselectionne', 'retenu', 'non_retenu'];
+  const cloturee = o.statut === 'pourvue';
+  let html = '<div style="margin-top:18px"><div style="font-weight:700;font-size:.9rem;margin-bottom:8px">Candidatures — '
+    + escapeHtml(_oppCompteur(o)) + (cloturee ? ' · <span class="badge badge-done">Pourvue / clôturée</span>' : ' · <span class="badge badge-progress">À pourvoir</span>') + '</div>';
+  if (!detail.candidatures.length) {
+    return html + '<div class="fid-note" id="opp-candidatures-vide">Aucune candidature pour le moment.</div></div>';
+  }
+  etats.forEach(function (etat) {
+    const liste = detail.candidatures.filter(function (c) { return c.etat === etat; });
+    html += '<div class="detail-row" data-pipeline="' + etat + '"><span class="detail-label">' + escapeHtml(LIB_ETAT_CANDIDATURE[etat]) + ' (' + liste.length + ')</span><span class="detail-val">';
+    if (!liste.length) html += '—';
+    liste.forEach(function (c) {
+      const cv = detail.convoyeurs[c.convoyeur_id] || {};
+      const nom = [cv.prenom, cv.nom].filter(Boolean).join(' ') || 'Partenaire';
+      let boutons = '';
+      const bt = function (etatCible, libelle, cls) {
+        return '<button type="button" class="btn btn-sm ' + (cls || 'btn-outline') + '" style="margin-left:6px" '
+          + actionHtml('deciderCandidature', [c.id, etatCible]) + '>' + libelle + '</button>';
+      };
+      if (etat === 'a_etudier') boutons = bt('preselectionne', 'Présélectionner') + bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Non retenu');
+      else if (etat === 'preselectionne') boutons = bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Non retenu');
+      else if (etat === 'retenu') boutons = bt('non_retenu', 'Annuler la sélection');
+      else boutons = bt('a_etudier', 'Réétudier');
+      html += '<div data-candidature="' + escapeHtml(c.id) + '" style="margin-bottom:6px">'
+        + '<strong>' + escapeHtml(nom) + '</strong>'
+        + ' <span style="font-size:.75rem;color:#888">' + escapeHtml((normaliserActivites(cv.activites) || []).map(_oppLibCategorie).join(', ')) + '</span>'
+        + ' <button type="button" class="btn btn-sm btn-outline" style="margin-left:6px" ' + actionHtml('voirConvoyeurSb', [c.convoyeur_id]) + '>Profil</button>'
+        + boutons + '</div>';
+    });
+    html += '</span></div>';
+  });
+  return html + '</div>';
+}
+
+async function ouvrirOpportuniteAdmin(id) {
+  const corps = document.getElementById('opportunite-corps');
+  const titre = document.getElementById('opportunite-titre');
+  if (!corps) return;
+  _hcNote('opportunite-message', '');
+  corps.innerHTML = '<div class="fid-note">Chargement…</div>';
+  openModal('opportunite');
+  let detail;
+  try { detail = await _oppChargerDetail(id); }
+  catch (e) {
+    corps.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger cette opportunité.</div>';
+    return;
+  }
+  _oppCourante = detail;
+  const o = detail.o;
+  if (titre) titre.textContent = (LIB_STATUT_OPPORTUNITE[o.statut] || o.statut) + ' — ' + (o.intitule || 'Opportunité de mission') + (o.mission_reference ? ' (' + o.mission_reference + ')' : '');
+  if (o.statut === 'brouillon') {
+    corps.innerHTML = '<div class="fid-note" style="margin-bottom:12px">Brouillon préparé à partir de la mission : relisez et corrigez avant d\'envoyer. L\'aperçu ci-dessous est exactement ce que verront les partenaires. Rien n\'est publié tant que vous n\'avez pas cliqué sur « Envoyer ».</div>'
+      + _oppFormulaireHtml(o)
+      + '<div style="font-weight:700;font-size:.9rem;margin:18px 0 8px">Aperçu partenaire</div>'
+      + '<div id="opp-apercu">' + _oppCarteHtml(o, { apercu: true }) + '</div>';
+    _oppBrancherApercu();
+  } else {
+    corps.innerHTML = '<div id="opp-apercu">' + _oppCarteHtml(o, { apercu: true }) + '</div>'
+      + '<div class="detail-row"><span class="detail-label">Publiée le</span><span class="detail-val">' + escapeHtml(o.publiee_le ? _dvDateHeure(o.publiee_le) : '—') + '</span></div>'
+      + (o.cloturee_le ? '<div class="detail-row"><span class="detail-label">Clôturée le</span><span class="detail-val">' + escapeHtml(_dvDateHeure(o.cloturee_le)) + '</span></div>' : '')
+      + '<div class="detail-row"><span class="detail-label">Notifications à envoyer</span><span class="detail-val">' + escapeHtml(String(o.nb_notifications_a_envoyer || 0)) + ' (aucun e-mail n\'existe encore pour les opportunités : intentions journalisées)</span></div>'
+      + _oppCandidaturesHtml(detail);
+  }
+}
+
+// L'aperçu suit la saisie, sans rien envoyer.
+function _oppLireFormulaire() {
+  const v = function (id) { const el = document.getElementById(id); return el ? el.value : ''; };
+  const badges = Array.prototype.map.call(document.querySelectorAll('.opp-badge:checked'), function (c) { return c.value; });
+  return {
+    intitule: v('opp-intitule').trim(), categorie: v('opp-categorie'),
+    date_debut: v('opp-date-debut') || null, date_fin: v('opp-date-fin') || null,
+    duree_texte: v('opp-duree').trim(), zone_generale: v('opp-zone').trim(),
+    nb_professionnels: Math.max(1, parseInt(v('opp-nb'), 10) || 1),
+    ponctuelle: !!(document.getElementById('opp-ponctuelle') || {}).checked,
+    statut_independant: !!(document.getElementById('opp-independant') || {}).checked,
+    badges_requis: badges, description_publique: v('opp-description').trim()
+  };
+}
+function _oppBrancherApercu() {
+  const form = document.getElementById('opportunite-form');
+  if (!form) return;
+  form.addEventListener('input', function () {
+    const ap = document.getElementById('opp-apercu');
+    if (ap && _oppCourante) ap.innerHTML = _oppCarteHtml(Object.assign({}, _oppCourante.o, _oppLireFormulaire()), { apercu: true });
+  });
+}
+
+async function enregistrerOpportunite(id) {
+  if (!_sbAuthPret()) return null;
+  const champs = _oppLireFormulaire();
+  _hcNote('opportunite-message', '');
+  try {
+    const res = await sbAuth.rpc('modifier_opportunite', { p_id: id, p_champs: champs });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    if (r.ok) { _hcNote('opportunite-message', 'Brouillon enregistré.', 'succes'); return r; }
+    const msgs = { DEJA_PUBLIEE: 'Cette opportunité est déjà publiée : elle ne se modifie plus.', BADGES_INVALIDES: 'Métiers requis invalides.',
+                   CATEGORIE_INVALIDE: 'Catégorie invalide.', NB_PROFESSIONNELS_INVALIDE: 'Le nombre de professionnels doit être au moins 1.',
+                   NON_AUTORISE: 'Seul un administrateur peut modifier une opportunité.', INTROUVABLE: 'Opportunité introuvable.' };
+    _hcNote('opportunite-message', msgs[r.code] || 'Le brouillon n\'a pas pu être enregistré.', 'erreur');
+    return r;
+  } catch (e) {
+    console.error('modifier_opportunite :', e && e.message);
+    _hcNote('opportunite-message', 'Le brouillon n\'a pas pu être enregistré. Vérifiez votre connexion.', 'erreur');
+    return null;
+  }
+}
+
+async function publierOpportunite(id) {
+  if (!_sbAuthPret()) return;
+  // Le brouillon est enregistré tel qu'affiché, puis publié : ce que
+  // l'administrateur voit dans l'aperçu est ce qui part.
+  const r0 = await enregistrerOpportunite(id);
+  if (!r0 || !r0.ok) return;
+  if (!confirm('Envoyer cette opportunité aux partenaires éligibles ? Elle deviendra visible dans leur espace.')) return;
+  try {
+    const res = await sbAuth.rpc('publier_opportunite', { p_id: id });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    if (r.ok && r.code === 'PUBLIEE') {
+      _hcNote('opportunite-message', 'Opportunité envoyée : visible par les partenaires éligibles (' + (r.notifications_a_envoyer || 0) + ' notification(s) à envoyer, aucun e-mail n\'existe encore).', 'succes');
+    } else if (r.code === 'DEJA_PUBLIEE') {
+      _hcNote('opportunite-message', 'Cette opportunité était déjà publiée.', 'info');
+    } else {
+      const msgs = { DESCRIPTION_VIDE: 'La description publique est vide.', INTITULE_VIDE: 'L\'intitulé est vide.',
+                     BADGES_REQUIS_VIDES: 'Choisissez au moins un métier requis.', CLOTUREE: 'Cette opportunité est clôturée.',
+                     NB_PROFESSIONNELS_INVALIDE: 'Le nombre de professionnels doit être au moins 1.', NON_AUTORISE: 'Seul un administrateur peut publier.' };
+      _hcNote('opportunite-message', msgs[r.code] || 'L\'opportunité n\'a pas pu être envoyée.', 'erreur');
+      return;
+    }
+    await ouvrirOpportuniteAdmin(id);
+    loadOpportunitesAdmin();
+  } catch (e) {
+    console.error('publier_opportunite :', e && e.message);
+    _hcNote('opportunite-message', 'L\'envoi n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
+  }
+}
+
+async function deciderCandidature(candidatureId, etat) {
+  if (!_sbAuthPret() || !_oppCourante) return;
+  if (etat === 'retenu' && !confirm('Retenir définitivement ce partenaire ? La place lui est attribuée immédiatement.')) return;
+  try {
+    const res = await sbAuth.rpc('decider_candidature', { p_candidature_id: candidatureId, p_etat: etat });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    const msgs = {
+      POURVUE: 'Besoin entièrement pourvu : ' + (r.retenus || 0) + ' sur ' + (r.requis || 0) + '. L\'opportunité passe en « Pourvue / clôturée » ; le client est à informer (e-mail manquant, intention journalisée).',
+      DECIDEE: 'Décision enregistrée' + (r.etat === 'retenu' ? ' : ' + (r.retenus || 0) + ' retenu(s) sur ' + (r.requis || 0) + '.' : '.'),
+      ROUVERTE: 'Sélection annulée : l\'opportunité repasse « À pourvoir » (' + (r.retenus || 0) + ' sur ' + (r.requis || 0) + ').',
+      INCHANGEE: 'Cet état était déjà celui de la candidature.',
+      PLACES_EPUISEES: 'Toutes les places sont attribuées (' + (r.retenus || 0) + ' sur ' + (r.requis || 0) + ') : impossible de retenir un partenaire de plus.',
+      CLOTUREE: 'Cette opportunité est pourvue : seule l\'annulation d\'un partenaire retenu est encore possible.',
+      DEJA_RETENU: 'Ce partenaire est déjà retenu.', NON_PUBLIEE: 'L\'opportunité n\'est pas publiée.',
+      ETAT_INVALIDE: 'État inconnu.', INTROUVABLE: 'Candidature introuvable.', NON_AUTORISE: 'Seul un administrateur peut décider.'
+    };
+    _hcNote('opportunite-message', msgs[r.code] || 'La décision n\'a pas pu être enregistrée.', r.ok ? 'succes' : 'erreur');
+    await ouvrirOpportuniteAdmin(_oppCourante.o.id);
+    loadOpportunitesAdmin();
+  } catch (e) {
+    console.error('decider_candidature :', e && e.message);
+    _hcNote('opportunite-message', 'La décision n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
+  }
+}
+
+// ── Partenaire ──
+async function chargerOpportunitesPartenaire() {
+  if (!_sbAuthPret()) return [];
+  const { data, error } = await sbAuth.from('v_opportunites_partenaire').select('*').order('publiee_le', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+async function loadOpportunitesPartenaire() {
+  const zone = document.getElementById('convoyeur-opportunites-liste');
+  if (!zone) return;
+  zone.innerHTML = '<div class="fid-note">Chargement…</div>';
+  let liste = [];
+  try { liste = await chargerOpportunitesPartenaire(); }
+  catch (e) {
+    zone.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger les opportunités pour le moment.</div>';
+    return;
+  }
+  const b = document.getElementById('badge-convoyeur-opportunites');
+  const nouvelles = liste.filter(function (o) { return o.statut === 'a_pourvoir' && !o.ma_candidature_etat; }).length;
+  if (b) { if (nouvelles > 0) { b.textContent = String(nouvelles); b.style.display = ''; } else { b.textContent = ''; b.style.display = 'none'; } }
+  const sub = document.getElementById('convoyeur-opportunites-sub');
+  if (sub) sub.textContent = liste.length ? liste.length + ' opportunité(s)' : 'Missions indépendantes publiées par HelixCar pour vos métiers validés';
+  if (!liste.length) {
+    zone.innerHTML = '<div class="fid-note" id="convoyeur-opportunites-vide">Aucune opportunité disponible pour le moment.</div>';
+    return;
+  }
+  zone.innerHTML = liste.map(function (o) { return _oppCarteHtml(o, { partenaire: true }); }).join('');
+}
+
+async function postulerOpportunite(id) {
+  if (!_sbAuthPret()) return;
+  const msg = document.getElementById('opp-msg-' + id);
+  const bouton = document.getElementById('opp-postuler-' + id);
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Envoi…'; }
+  try {
+    const res = await sbAuth.rpc('postuler_opportunite', { p_opportunite_id: id });
+    if (res && res.error) throw new Error(res.error.message);
+    const r = (res && res.data) || {};
+    if (r.ok && r.code === 'CANDIDATURE_ENREGISTREE') {
+      _hcNoteEl(msg, 'Votre candidature est enregistrée. HelixCar l\'étudie et vous informera.', 'succes');
+    } else {
+      const msgs = { DEJA_CANDIDAT: 'Vous avez déjà candidaté à cette opportunité.',
+                     CLOTUREE: 'Cette opportunité vient d\'être pourvue : elle n\'accepte plus de candidature.',
+                     NON_ELIGIBLE: 'Cette opportunité demande un métier qui n\'est pas validé sur votre compte.',
+                     NON_VALIDE: 'Votre compte n\'a pas encore de métier validé par HelixCar : aucune candidature possible.',
+                     NON_AUTORISE: 'Votre compte partenaire n\'est pas actif.', INTROUVABLE: 'Cette opportunité n\'existe plus.' };
+      _hcNoteEl(msg, msgs[r.code] || 'Votre candidature n\'a pas pu être enregistrée.', r.code === 'DEJA_CANDIDAT' ? 'info' : 'erreur');
+    }
+    // L'état affiché est relu depuis le serveur, jamais déduit ici.
+    setTimeout(loadOpportunitesPartenaire, 700);
+  } catch (e) {
+    console.error('postuler_opportunite :', e && e.message);
+    _hcNoteEl(msg, 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
+    if (bouton) { bouton.disabled = false; bouton.textContent = 'Postuler'; }
+  }
+}
+
+// ── LOT X01 — DEMANDES DE RECONTACT (table réelle) ET PARAMÈTRES ──
+function loadRecontacts() {
+  const tbody = document.getElementById('recontacts-table');
+  if (!tbody) return;
+  const sub = document.getElementById('recontacts-sub');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  sbFetchToutePage('recontacts?order=created_at.desc').then(function (rows) {
+    rows = rows || [];
+    if (sub) sub.textContent = rows.length ? rows.length + ' demande(s) reçue(s)' : 'Formulaires soumis depuis le site';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune demande de recontact pour le moment.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function (r) {
+      const tel = String(r.telephone || '').trim();
+      const telUtile = tel && tel !== 'non renseigné';
+      return '<tr>'
+        + '<td>' + escapeHtml(r.created_at ? _dvDateHeure(r.created_at) : '—') + '</td>'
+        + '<td><strong>' + escapeHtml([r.prenom, r.nom].filter(Boolean).join(' ') || '—') + '</strong></td>'
+        + '<td>' + (telUtile ? '<a href="tel:' + escapeHtml(tel.replace(/\s+/g, '')) + '">' + escapeHtml(tel) + '</a>' : '—') + '</td>'
+        + '<td>' + (r.email ? '<a href="mailto:' + escapeHtml(r.email) + '">' + escapeHtml(r.email) + '</a>' : '—') + '</td>'
+        + '<td>' + escapeHtml(r.profil || '—') + '</td>'
+        + '<td>' + escapeHtml(r.motif || '—') + '</td>'
+        + '<td style="max-width:320px;white-space:pre-line">' + escapeHtml(r.message || '—') + '</td>'
+        + '</tr>';
+    }).join('');
+  }).catch(function () {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les demandes de recontact pour le moment.</td></tr>';
+  });
+}
+
+function loadParametresAdmin() {
+  const email = document.getElementById('param-admin-email');
+  const origine = document.getElementById('param-admin-origine');
+  const a = window._currentAdmin || {};
+  if (email) email.textContent = a.email || '—';
+  if (origine) origine.textContent = _hcOrigineOfficielle();
 }
 
 // ============================================================
@@ -3316,9 +3582,39 @@ async function chargerInformationsDemande(demandeId) {
   return data || [];
 }
 
+// LOT D01 — regroupement par véhicule (« Véhicule 2 — immatriculation
+// manquante », jamais « immatriculation manquante » sans contexte), état
+// « Complet » par véhicule et par demande, chargement en parallèle et
+// erreurs dites plutôt que tues.
+function _infosGrouper(lignes) {
+  const groupes = {};
+  const ordre = [];
+  lignes.forEach(function (l) {
+    const m = /^vehicule_(\d+)_/.exec(l.cle || '');
+    const cle = m ? 'vehicule_' + m[1] : 'general';
+    if (!groupes[cle]) {
+      groupes[cle] = { cle: cle, rang: m ? Number(m[1]) : 0, titre: m ? 'Véhicule ' + m[1] : 'Informations générales', lignes: [], identite: '' };
+      ordre.push(cle);
+    }
+    groupes[cle].lignes.push(l);
+    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && !groupes[cle].identite) {
+      groupes[cle].identite = l.valeur;
+    }
+  });
+  return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
+}
+function _infoLibelleEtat(l) {
+  const base = String(l.libelle || l.cle || '');
+  if (l.statut === 'a_corriger') return base + ' — à corriger';
+  if (l.statut === 'attendue') return base + ' manquante';
+  return base;
+}
+function _estRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+
 async function loadInfosClient() {
   const zone = document.getElementById('client-infos-liste');
   if (!zone) return;
+  window._hcInfosARelire = false;
   zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>';
 
   let demandes = [];
@@ -3330,70 +3626,71 @@ async function loadInfosClient() {
     return;
   }
 
+  // Un appel par demande, tous en parallèle ; une panne sur l'un ne
+  // fait pas taire les autres et n'est jamais présentée comme « rien à
+  // compléter ».
+  const resultats = await Promise.all(demandes.map(function (d) {
+    return chargerInformationsDemande(d.id)
+      .then(function (lignes) { return { d: d, lignes: lignes }; })
+      .catch(function () { return { d: d, erreur: true }; });
+  }));
+
   const blocs = [];
-  for (const d of demandes) {
-    let lignes = [];
-    try {
-      lignes = await chargerInformationsDemande(d.id);
-    } catch (e) { continue; }
-    if (!lignes.length) continue;
-
-    const total = lignes.length;
-    const fournies = lignes.filter(function (l) {
-      return l.statut === 'fournie' || l.statut === 'validee' || l.statut === 'transmise';
-    }).length;
-    const restantes = lignes.filter(function (l) {
-      return l.statut === 'attendue' || l.statut === 'a_corriger';
-    });
-
-    // N'afficher QUE les demandes qui nécessitent réellement quelque chose.
-    if (!restantes.length) continue;
-
-    const recues = lignes.filter(function (l) {
-      return l.statut !== 'attendue' && l.statut !== 'a_corriger';
-    });
-
-    blocs.push(
-      '<div class="card" style="margin-bottom:16px">'
-      + '<div class="card-header"><div>'
-      + '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
-      + '<div style="font-size:.85rem;color:#555;margin-top:4px">'
-      + escapeHtml(_libelleServiceClient(d.type_service))
-      + ' · <span class="badge badge-progress">' + escapeHtml(d.statut || '—') + '</span></div>'
-      + '</div>'
-      + '<button class="btn btn-sm btn-primary"'
-      + actionHtml('ouvrirCompletionDemande', [d.id])
-      + '>Compléter mes informations →</button>'
-      + '</div>'
-      + '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
-      + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '')
-      + ' sur ' + total + '</strong> déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.'
-      + '</div>'
-      + (recues.length
-          ? '<div class="detail-row"><span class="detail-label">Déjà reçues</span>'
-            + '<span class="detail-val">'
-            + recues.map(function (l) {
-                return escapeHtml(l.libelle) + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')';
+  let restantesTotal = 0;
+  let erreurs = 0;
+  resultats.forEach(function (r) {
+    const d = r.d;
+    const entete = '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
+      + '<div style="font-size:.85rem;color:#555;margin-top:4px">' + escapeHtml(_libelleServiceClient(d.type_service)) + '</div>';
+    if (r.erreur) {
+      erreurs++;
+      blocs.push('<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '"><div class="card-header"><div>' + entete + '</div></div>'
+        + '<div class="hc-note visible">Impossible de vérifier les informations de cette demande pour le moment. Réessayez dans quelques instants.</div></div>');
+      return;
+    }
+    const lignes = r.lignes || [];
+    if (!lignes.length) return;   // aucune information n'est requise pour cette demande
+    const restantes = lignes.filter(_estRestante);
+    const fournies = lignes.length - restantes.length;
+    const transmises = lignes.filter(function (l) { return l.statut === 'transmise'; }).length;
+    restantesTotal += restantes.length;
+    const complet = restantes.length === 0;
+    const groupes = _infosGrouper(lignes);
+    let corps = '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
+      + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '') + ' sur ' + lignes.length + '</strong> déjà '
+      + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
+    groupes.forEach(function (g) {
+      const gRestantes = g.lignes.filter(_estRestante);
+      const gComplet = gRestantes.length === 0;
+      corps += '<div class="detail-row" data-groupe="' + escapeHtml(g.cle) + '"><span class="detail-label">'
+        + escapeHtml(g.titre) + (g.identite ? ' · ' + escapeHtml(g.identite) : '')
+        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? 'Complet' : gRestantes.length + ' à compléter') + '</span></span>'
+        + '<span class="detail-val">'
+        + (gRestantes.length
+            ? gRestantes.map(function (l) {
+                const motif = (l.statut === 'a_corriger' && l.commentaire) ? ' — <em>' + escapeHtml(l.commentaire) + '</em>' : '';
+                return '<span class="info-ligne" data-cle="' + escapeHtml(l.cle) + '">' + escapeHtml(_infoLibelleEtat(l)) + '</span>' + motif;
               }).join('<br>')
-            + '</span></div>'
-          : '')
-      + '<div class="detail-row"><span class="detail-label">Encore attendues</span>'
-      + '<span class="detail-val">'
-      + restantes.map(function (l) {
-          const motif = (l.statut === 'a_corriger' && l.commentaire)
-            ? ' — <em>' + escapeHtml(l.commentaire) + '</em>' : '';
-          return escapeHtml(l.libelle)
-            + ' (' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + ')' + motif;
-        }).join('<br>')
-      + '</span></div>'
-      + '</div>'
-    );
-  }
+            : 'Toutes les informations sont renseignées.')
+        + '</span></div>';
+    });
+    blocs.push(
+      '<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '" data-complet="' + (complet ? '1' : '0') + '">'
+      + '<div class="card-header"><div>' + entete + '</div>'
+      + (complet
+          ? '<span class="badge badge-done">Complet' + (transmises ? ' — en cours de validation par HelixCar' : '') + '</span>'
+          : '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>')
+      + '</div>' + corps + '</div>');
+  });
 
-  zone.innerHTML = blocs.length
-    ? blocs.join('')
-    : '<div style="font-size:.85rem;color:#666">'
+  if (!blocs.length) {
+    zone.innerHTML = '<div style="font-size:.85rem;color:#666" id="client-infos-vide">'
       + 'Aucune information ne manque actuellement. Merci !</div>';
+    return;
+  }
+  zone.innerHTML = (restantesTotal === 0 && !erreurs
+      ? '<div class="hc-note hc-note--succes visible" style="margin-bottom:12px">Toutes vos demandes sont complètes.</div>' : '')
+    + blocs.join('');
 }
 
 // Vérifie qu'une session Supabase Auth valide correspond bien à un
@@ -3672,25 +3969,22 @@ const PAGE_TITLES = {
   'admin-acquisition':   ['Acquisition', 'D\'où viennent vos demandes de convoyage'],
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
   'admin-facturation':   ['Facturation', 'Validation et paiement des convoyeurs'],
-  'admin-challenge':     ['Challenge mensuel', 'Classement et attribution des récompenses'],
-  'admin-pannes':        ['Pannes en cours', 'Incidents signalés par les convoyeurs'],
-  'admin-parametres':    ['Paramètres & RIB', 'Configuration et informations bancaires'],
+  'admin-opportunites':  ['Opportunités de missions', 'Besoins publiés aux partenaires, candidatures et attribution'],
+  'admin-parametres':    ['Paramètres', 'Votre compte administrateur'],
   'admin-archivage':     ['Archivage', 'Libère l\'espace de stockage Supabase en rapatriant les fichiers de mission sur ton ordinateur'],
   'convoyeur-facturation': ['Mes factures', 'Générez vos factures et suivez vos paiements'],
-  'convoyeur-panne':     ['Signaler une panne', 'Prévenez le client automatiquement'],
-  'convoyeur-dashboard':  ['Tableau de bord', 'Bienvenue Antoine'],
+  'convoyeur-opportunites': ['Opportunités de missions', 'Les besoins publiés par HelixCar pour lesquels vous pouvez postuler'],
+  'convoyeur-dashboard':  ['Tableau de bord', 'Bienvenue'],
   'convoyeur-missions':   ['Missions disponibles', 'Acceptez vos prochaines missions'],
   'convoyeur-historique': ['Historique', 'Vos missions passées'],
-  'convoyeur-notation':   ['Ma notation', 'Votre score qualité HelixCar'],
-  'convoyeur-recompenses':['Récompenses', 'Challenge mensuel & fidélité'],
-  'convoyeur-profil':     ['Mon profil', 'Gérez vos informations'],
-  'client-dashboard':    ['Tableau de bord', 'Bienvenue Marc'],
+  'convoyeur-profil':     ['Mon profil', 'Vos informations'],
+  'client-dashboard':    ['Tableau de bord', 'Bienvenue'],
   'client-nouvelle-demande': ['Nouvelle demande', 'Convoyage, stockage, nettoyage ou recherche d\'un professionnel'],
   'client-missions':     ['Mes missions', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
-  'client-notation':     ['Évaluer mon convoyeur', '1 mission en attente d\'évaluation'],
+  'client-notation':     ['Évaluer mes missions', 'Vos missions terminées à évaluer, et vos évaluations envoyées'],
   'client-fidelite':     ['Programme de fidélité', 'Vos points HelixCar'],
-  'client-profil':       ['Mon profil', 'Gérez vos informations'],
+  'client-profil':       ['Mon profil', 'Vos informations de compte'],
 };
 
 function showPage(id) {
@@ -3719,9 +4013,16 @@ function showPage(id) {
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
   if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
-  if (id === 'client-dashboard') { loadDemandesClient(); loadFideliteCarte(); }
+  if (id === 'client-dashboard') { loadDemandesClient(); loadFideliteCarte(); loadMissionsResumeClient(); }
   if (id === 'client-fidelite') { loadFideliteClient(); }
   if (id === 'client-infos') { loadInfosClient(); }
+  if (id === 'client-missions') { loadMissionsClient(); }
+  if (id === 'client-notation') { loadEvaluationsClient(); }
+  if (id === 'client-profil') { loadProfilClient(); }
+  if (id === 'admin-recontact') { loadRecontacts(); }
+  if (id === 'admin-parametres') { loadParametresAdmin(); }
+  if (id === 'admin-opportunites') { loadOpportunitesAdmin(); }
+  if (id === 'convoyeur-opportunites') { loadOpportunitesPartenaire(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
   if (id === 'admin-acquisition') { loadAcquisition(); }
@@ -6383,7 +6684,7 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
     <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Missions effectuées</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
-    <div style="color:#888;font-size:.78rem;margin-top:10px">📋 Pénalités & récompenses : pas encore connectées à de vraies données (pages Pannes/Notations/Challenge toujours fictives).</div>
+    <div style="color:#888;font-size:.78rem;margin-top:10px">📋 Retenues et récompenses : aucun mécanisme n'existe encore côté serveur ; les évaluations reçues se lisent dans la table des évaluations (lot D01).</div>
   `;
   // CORRECTION : l'état de blocage était codé en dur à false, si bien que
   // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la
@@ -6977,6 +7278,12 @@ function loadMissions() {
         actions = '<span class="badge badge-active" style="font-size:.72rem">✅ Validée</span>';
       } else {
         actions = '—';
+      }
+      // LOT O01 — chaque mission non annulée peut être proposée aux
+      // partenaires : le bouton ouvre (ou crée) le brouillon d'opportunité.
+      if (m.statut !== 'annulee') {
+        actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
+          + actionHtml('ouvrirOpportuniteMission', [m.id]) + '>📣 Opportunité</button>' + (actions === '—' ? '' : actions);
       }
       // Une prestation de nettoyage se valide sur pièces : le bouton
       // Photos est donc offert à TOUS les états, y compris une fois la
@@ -7984,38 +8291,6 @@ function marquerFacturePayee(factureId) {
 }
 
 // ── MISSION DETAIL ─────────────────────────────────────────
-function openMissionDetail(from, to, km, type, date, price) {
-  document.getElementById('modal-mission-title').textContent = from + ' → ' + to;
-  document.getElementById('modal-mission-content').innerHTML = `
-    <div class="detail-row"><span class="detail-label">Trajet</span><span class="detail-val"><strong>${from} → ${to}</strong></span></div>
-    <div class="detail-row"><span class="detail-label">Distance</span><span class="detail-val">${km} km</span></div>
-    <div class="detail-row"><span class="detail-label">Type de véhicule</span><span class="detail-val">${type}</span></div>
-    <div class="detail-row"><span class="detail-label">Date souhaitée</span><span class="detail-val">${date}</span></div>
-    <div class="detail-row"><span class="detail-label">Rémunération</span><span class="detail-val"><strong style="font-size:1.1rem;color:var(--green)">${price} €</strong></span></div>
-  `;
-  openModal('mission');
-}
-
-function acceptMission() {
-  const title = document.getElementById('modal-mission-title').textContent;
-  const code = 'HC-2024-0529';
-  const restitCode = code + '-RESTIT';
-  document.getElementById('modal-accepted-content').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:6px;font-size:.84rem">
-      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee"><span style="color:#888">Mission</span><span style="font-weight:700;font-family:monospace">${code}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee"><span style="color:#888">Trajet</span><span style="font-weight:600">${title}</span></div>
-      <div style="padding:10px;background:rgba(181,68,75,.1);border:1.5px solid rgba(181,68,75,.4);border-radius:8px;margin-top:4px">
-        <div style="font-weight:700;color:#8C3238;font-size:.83rem;margin-bottom:4px">🔄 Code de restitution</div>
-        <div style="font-family:monospace;font-size:1rem;font-weight:900;letter-spacing:.1em;color:#1a1a1a">${restitCode}</div>
-        <div style="font-size:.75rem;color:#8C3238;margin-top:4px">Conservez ce code. Il vous sera renvoyé par email dès la livraison.</div>
-      </div>
-    </div>
-  `;
-  document.getElementById('edl-link').href = 'helixcar-edl.html?code=' + code + '&phase=depart';
-  closeModal('mission');
-  openModal('mission-accepted');
-}
-
 // openInfoMission() SUPPRIMÉE avec la modale qu'elle ouvrait.
 function openFraisModal() { openModal('frais'); }
 function handleDashVideo(input) {
@@ -8034,13 +8309,6 @@ function handleDashVideo(input) {
 }
 
 
-
-function envoyerRecompenses() {
-  // La version précédente annonçait trois lauréats nommés et un e-mail
-  // envoyé à chacun : rien n'était enregistré, aucun e-mail ne partait.
-  alert('Le challenge mensuel n\'est pas encore connecté : aucune '
-    + 'récompense n\'a été attribuée et aucun message n\'a été envoyé.');
-}
 
 function calcSimulateur() {
   const km = parseInt(document.getElementById('sim-km').value) || 0;
@@ -8149,18 +8417,6 @@ function showSplit(km) {
 // d'une candidature passe par refuserConvoyeur(), qui écrit dans
 // Supabase.
 
-function envoyerPenalite() {
-  const motif = document.getElementById('penalite-motif').value;
-  if (!motif) { alert('Veuillez sélectionner un motif.'); return; }
-  // La version précédente annonçait « Retenue appliquée » et un e-mail
-  // envoyé au convoyeur : rien n'était enregistré, et aucun e-mail ne
-  // partait. Tant que les retenues ne sont pas connectées, le
-  // Dashboard le dit plutôt que de laisser croire le contraire.
-  alert('Les retenues ne sont pas encore connectées : rien n\'a été '
-    + 'enregistré et aucun message n\'a été envoyé au convoyeur.\n\n'
-    + 'Motif saisi : ' + motif);
-}
-
 // ── MOBILE BOTTOM NAV ─────────────────────────────────────
 function mbnGo(type, btn) {
   document.querySelectorAll('.mbn-item').forEach(b => b.classList.remove('active'));
@@ -8251,69 +8507,9 @@ function showDashboard(role) {
 }
 
 // ── NOTATION ───────────────────────────────────────────────
-const CRITERES = {
-  ponctualite:      { max: 4 },
-  retard:           { max: 4 },
-  etat:             { max: 4 },
-  communication:    { max: 3 },
-  professionnalisme:{ max: 3 },
-  tenue:            { max: 2 },
-};
-const notes = {};
-
-function setNote(critere, val, max) {
-  notes[critere] = val;
-  const container = document.getElementById('stars-' + critere);
-  container.querySelectorAll('.star-btn').forEach((btn, i) => {
-    btn.classList.toggle('active', i < val);
-  });
-  updateNotePreview();
-}
-
-function updateNotePreview() {
-  const total = Object.values(notes).reduce((a, b) => a + b, 0);
-  const maxTotal = 20;
-  const el = document.getElementById('note-preview');
-  const badge = document.getElementById('note-badge-preview');
-  if (!el) return;
-  el.innerHTML = `<strong>${total}</strong><span style="font-size:1rem;color:var(--gray)">/20</span>`;
-
-  let label = '', cls = '';
-  if (total >= 16)      { label = '⭐ Excellent';     cls = 'note-excellent'; }
-  else if (total >= 12) { label = '👍 Bon';           cls = 'note-bon'; }
-  else if (total >= 10) { label = '⚠️ Passable';      cls = 'note-warning'; }
-  else                  { label = '🔴 Insuffisant';   cls = 'note-danger'; }
-
-  badge.innerHTML = `<span class="note-badge ${cls}">${label}</span>`;
-  if (total < 10 && Object.keys(notes).length === 6) {
-    badge.innerHTML += `<div style="font-size:0.75rem;color:var(--red);margin-top:6px">⚠️ Note très basse — elle sera examinée par HelixCar</div>`;
-  }
-}
-
-function soumettreNotation() {
-  const total = Object.values(notes).reduce((a, b) => a + b, 0);
-  if (Object.keys(notes).length < 6) {
-    alert('Veuillez noter tous les critères avant de soumettre.');
-    return;
-  }
-  document.getElementById('notation-form').style.display = 'none';
-  document.getElementById('notation-success').style.display = 'block';
-  // Les deux alertes précédentes annonçaient un blocage automatique et
-  // des e-mails d'avertissement. Ni l'un ni les autres n'existent : le
-  // blocage d'un partenaire est une décision prise à la main par un
-  // administrateur, tracée dans convoyeurs.bloque, et aucun e-mail
-  // n'est envoyé sur une note.
-  // Remove badge on nav
-  const navBadge = document.querySelector('#nav-client-notation .nav-badge');
-  if (navBadge) navBadge.remove();
-}
-
-function openNotationAdmin(name, note) {
-  // Aucune évaluation n'est encore enregistrée : on le dit clairement
-  // plutôt que de promettre un historique qui n'existe pas.
-  alert('Les évaluations détaillées ne sont pas encore connectées : '
-    + 'aucun historique réel n\'est disponible pour ' + name + '.');
-}
+// LOT D01 — l'ancienne notation (CRITERES, setNote, soumettreNotation :
+// « Évaluation envoyée ! » sans aucune écriture) est remplacée par les
+// évaluations réelles, plus haut (loadEvaluationsClient / evaluerMissionClient).
 
 // ── BLOCAGE DEPUIS LA LISTE ─────────────────────────────────
 // ANCIENNES VERSIONS SUPPRIMÉES. Elles n'écrivaient RIEN : elles
@@ -9116,26 +9312,31 @@ function _blocMissionNettoyageHtml(c) {
     var nd = _nettDetails(c) || {};
     var dvNett = _devisParClient[String(c.id)];
     var devisAccepte = !!(dvNett && dvNett.statut === 'accepte');
-    // Le serveur reste seul juge de ce qui manque : ce test n'est qu'un
-    // repere d'affichage, jamais une autorisation.
+    // LOT Q02 / décision C02 — « accepté » ne suffit pas : le paiement
+    // doit être confirmé par le serveur (traiter_paiement_confirme,
+    // migration 110). Le serveur reste seul juge de ce qui manque : ces
+    // tests ne sont que des repères d'affichage, jamais une autorisation.
+    var devisPaye = !!(devisAccepte && dvNett.paiement_statut === 'paye');
     var prete = !!(nd.date_souhaitee && nd.date_fin
                    && (nd.adresse_rue || nd.lieu === 'helixcar')
                    && _contactSurPlaceTexte(nd.contact_sur_place));
     if (!devisAccepte) {
-      html += '<div style="font-size:.82rem;color:#555">La mission sera créée '
-        + '<b>automatiquement</b> dès que le client aura accepté son devis et que '
-        + 'toutes les informations nécessaires seront réunies. Un devis refusé ne '
-        + 'crée aucune mission.</div>';
+      html += '<div style="font-size:.82rem;color:#555">Aucune mission tant que le devis '
+        + 'n\'est pas accepté puis <b>payé</b>. Un devis refusé ne crée aucune mission.</div>';
+    } else if (!devisPaye) {
+      html += '<div style="font-size:.82rem;color:#8a6d3b"><b>Accepté — paiement en attente.</b> '
+        + 'La mission ne peut être créée qu\'après confirmation du paiement par le serveur '
+        + '(règle C02) : aucune action possible ici.</div>';
     } else if (!prete) {
-      html += '<div style="font-size:.82rem;color:#8a6d3b">Le devis est accepté. '
-        + 'Il manque encore des informations d\'intervention (période, adresse ou '
-        + 'contact sur place) : elles sont listées ci-dessus, dans « Informations '
-        + 'nécessaires à la mission ». La mission se créera <b>toute seule</b> dès '
-        + 'que le client les aura fournies.</div>';
+      html += '<div style="font-size:.82rem;color:#8a6d3b"><b>Payé — informations à compléter.</b> '
+        + 'Il manque des informations d\'intervention (période, adresse ou contact sur '
+        + 'place), listées ci-dessus dans « Informations nécessaires à la mission ». La '
+        + 'mission se créera <b>toute seule</b> à la dernière information transmise.</div>';
     } else {
       html += '<div style="font-size:.82rem;color:#555;margin-bottom:10px">'
-        + 'La mission reprendra l\'adresse, le contact, la date, l\'horaire, la prestation et '
-        + 'les consignes de cette demande. Elle sera visible par les partenaires nettoyage.</div>';
+        + '<b>Payé, dossier complet.</b> La mission reprendra l\'adresse, le contact, la date, '
+        + 'l\'horaire, la prestation et les consignes de cette demande. Elle sera visible par '
+        + 'les partenaires nettoyage.</div>';
       html += '<button class="btn btn-primary" ' + actionHtml('creerMissionNettoyage', [c.id]) + '>'
         + 'Créer la mission de nettoyage</button>';
     }
@@ -9175,6 +9376,8 @@ function creerMissionNettoyage(clientId) {
     }
     if (r && r.code === 'DEVIS_NON_ACCEPTE') {
       alert('La mission ne peut pas etre creee : le devis n\'a pas encore ete accepte par le client.');
+    } else if (r && r.code === 'PAIEMENT_NON_CONFIRME') {
+      alert('La mission ne peut pas etre creee : le paiement du devis n\'a pas encore ete confirme par le serveur (regle C02).');
     } else if (r && r.code === 'INFORMATIONS_MANQUANTES') {
       alert('La mission ne peut pas encore etre creee : il manque '
         + (r.manquantes || 'des') + ' information(s). Elles sont listees dans '
@@ -13135,6 +13338,9 @@ function declencherChampFichier(id) {
 
 [
   'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
+  'choisirNoteEvaluation', 'evaluerMissionClient',
+  'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
+  'deciderCandidature', 'postulerOpportunite',
   'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite',
   'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',

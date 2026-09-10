@@ -260,23 +260,17 @@ window.fetch = function(u, o){
     JSON.stringify(entetesClients));
 
   // ── D. PLUS AUCUNE PROMESSE D'E-MAIL OU DE SMS NON TENUE ──
-  await page.evaluate(() => { window.__alertes = []; });
-  await page.evaluate(() => {
-    const sel = document.getElementById('penalite-motif');
-    if (sel) sel.value = 'Retard au rendez-vous';
-    envoyerPenalite();
-  });
-  await page.waitForTimeout(150);
-  let alertes = await page.evaluate(() => window.__alertes.slice());
-  check('D1 : une retenue ne prétend plus être appliquée ni envoyée',
-    alertes.length === 1 && /ne sont pas encore connect/i.test(alertes[0])
-    && !/email a été envoyé/i.test(alertes[0]), JSON.stringify(alertes));
-
-  await page.evaluate(() => { window.__alertes = []; openNotationAdmin('TEST-QA Untel', 12); });
-  await page.waitForTimeout(100);
-  alertes = await page.evaluate(() => window.__alertes.slice());
-  check('D2 : l\'historique des évaluations ne promet plus rien',
-    alertes.length === 1 && /pas encore connect/i.test(alertes[0]), JSON.stringify(alertes));
+  // LOT X01 — les blocs « retenue », « notification », « RIB » et « SMS »
+  // (succès affichés sans rien faire) et l'historique de notation fictif
+  // ont été retirés : ils n'existent plus, ni dans le code, ni à l'écran.
+  check('D1 : les faux succès de la page Paramètres ont disparu (RIB, notification, SMS, retenue)',
+    src.indexOf('RIB enregistré de manière sécurisée') === -1
+    && src.indexOf('Notification envoyée à tous les convoyeurs') === -1
+    && src.indexOf('Configuration SMS enregistrée') === -1
+    && src.indexOf('function envoyerPenalite') === -1);
+  check('D2 : l\'historique de notation fictif n\'existe plus',
+    src.indexOf('function openNotationAdmin') === -1
+    && (await page.evaluate(() => typeof window.openNotationAdmin === 'undefined' && typeof window.envoyerPenalite === 'undefined')));
 
   check('D3 : plus aucun e-mail n\'a réellement été tenté',
     (await page.evaluate(() => window.__emails.length)) === 0);
@@ -293,17 +287,23 @@ window.fetch = function(u, o){
   check('D8 : la page SMS ne prétend plus en envoyer aujourd\'hui',
     src.indexOf('Un SMS est envoyé automatiquement au client lorsque le convoyeur arrive') === -1);
 
-  // ── E. LES PAGES ENCORE FICTIVES LE DISENT ──
+  // ── E. LES PAGES FICTIVES N'EXISTENT PLUS (LOT X01) ──
   for (const [id, nom] of [['admin-challenge', 'Challenge mensuel'],
                            ['admin-pannes', 'Pannes'],
                            ['admin-notations', 'Notations'],
-                           ['admin-recontact', 'Demandes recontact']]) {
-    const banniere = await page.evaluate(i => {
-      const p = document.getElementById('page-' + i);
-      return p ? (p.textContent || '').indexOf('Page de démonstration') !== -1 : false;
-    }, id);
-    check('E/' + nom + ' : la page annonce clairement qu\'elle est un exemple', banniere);
+                           ['convoyeur-panne', 'Signaler une panne'],
+                           ['convoyeur-notation', 'Ma notation'],
+                           ['convoyeur-recompenses', 'Récompenses']]) {
+    const etat = await page.evaluate(i => ({
+      page: !!document.getElementById('page-' + i),
+      menu: Object.keys(NAVS).some(r => NAVS[r].some(x => x.id === i)),
+      titre: !!PAGE_TITLES[i]
+    }), id);
+    check('E/' + nom + ' : la page fictive, son entrée de menu et son titre ont disparu',
+      etat.page === false && etat.menu === false && etat.titre === false, JSON.stringify(etat));
   }
+  check('E/bandeaux : plus aucune bannière « Page de démonstration » dans le Dashboard',
+    src.indexOf('Page de démonstration') === -1);
 
   check('Z1 : aucune erreur JavaScript (accueil)', errs.length === 0, errs.slice(0, 3).join(' | '));
   check('Z2 : aucune erreur JavaScript (tentative de contournement)',
