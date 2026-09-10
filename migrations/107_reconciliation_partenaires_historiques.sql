@@ -19,22 +19,40 @@ create table if not exists public.convoyeurs_rattachement_canonique_sauvegarde (
 revoke all on public.convoyeurs_rattachement_canonique_sauvegarde
   from public, anon, authenticated;
 
+create temporary table hc_partenaire_historique on commit drop as
+select c.id as convoyeur_id,
+       (select count(*) from public.missions m where m.convoyeur_id = c.id)::bigint as missions,
+       0::bigint as factures
+from public.convoyeurs c;
+
+do $$
+begin
+  if to_regclass('public.factures_convoyeur') is not null then
+    execute $q$
+      update hc_partenaire_historique h
+         set factures=(select count(*) from public.factures_convoyeur f
+                       where f.convoyeur_id=h.convoyeur_id)
+    $q$;
+  end if;
+end $$;
+
 with candidats as (
   select
     c.id as convoyeur_id,
     u.id as auth_user_id,
-    (select count(*) from public.missions m where m.convoyeur_id = c.id) as missions,
-    (select count(*) from public.factures_convoyeur f where f.convoyeur_id = c.id) as factures,
+    h.missions,
+    h.factures,
     row_number() over (
       partition by u.id
       order by
-        (select count(*) from public.missions m where m.convoyeur_id = c.id) desc,
-        (select count(*) from public.factures_convoyeur f where f.convoyeur_id = c.id) desc,
+        h.missions desc,
+        h.factures desc,
         c.created_at asc,
         c.id asc
     ) as rang,
     count(*) over (partition by u.id) as nb_fiches
   from public.convoyeurs c
+  join hc_partenaire_historique h on h.convoyeur_id=c.id
   join auth.users u on lower(trim(u.email)) = lower(trim(c.email))
   where c.auth_user_id is null
 ), selection as (
