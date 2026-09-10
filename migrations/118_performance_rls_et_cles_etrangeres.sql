@@ -1,27 +1,26 @@
 -- HelixCar — 118 : index des clés étrangères et init-plan RLS
 -- Additive et idempotente. Aucune permission ni règle métier modifiée.
 
-do $$ begin
-  if to_regclass('public.convoyeur_decisions') is not null then execute 'create index if not exists convoyeur_decisions_decide_par_fkey_idx on public.convoyeur_decisions(decide_par)'; end if;
-  if to_regclass('public.convoyeur_decisions_historique') is not null then execute 'create index if not exists convoyeur_decisions_historique_modifie_par_fkey_idx on public.convoyeur_decisions_historique(modifie_par)'; end if;
-  if to_regclass('public.convoyeurs') is not null then execute 'create index if not exists convoyeurs_bloque_par_fkey_idx on public.convoyeurs(bloque_par)'; end if;
-  if to_regclass('public.convoyeurs_rattachement_canonique_sauvegarde') is not null then execute 'create index if not exists convoyeurs_rattachement_canonique_auth_apres_idx on public.convoyeurs_rattachement_canonique_sauvegarde(auth_user_id_apres)'; end if;
-  if to_regclass('public.demande_informations_manquantes') is not null then execute 'create index if not exists demande_infos_validee_par_fkey_idx on public.demande_informations_manquantes(validee_par)'; end if;
-  if to_regclass('public.devis') is not null then execute 'create index if not exists devis_accepte_par_fkey_idx on public.devis(accepte_par)'; execute 'create index if not exists devis_refuse_par_fkey_idx on public.devis(refuse_par)'; end if;
-  if to_regclass('public.devis_envoi_operations') is not null then execute 'create index if not exists devis_envoi_operations_auteur_fkey_idx on public.devis_envoi_operations(auteur)'; end if;
-  if to_regclass('public.devis_envois') is not null then execute 'create index if not exists devis_envois_auteur_fkey_idx on public.devis_envois(auteur)'; end if;
-  if to_regclass('public.documents') is not null then execute 'create index if not exists documents_mission_id_fkey_idx on public.documents(mission_id)'; end if;
-  if to_regclass('public.etats_des_lieux') is not null then execute 'create index if not exists etats_des_lieux_mission_id_fkey_idx on public.etats_des_lieux(mission_id)'; end if;
-  if to_regclass('public.evaluations') is not null then execute 'create index if not exists evaluations_client_id_fkey_idx on public.evaluations(client_id)'; end if;
-  if to_regclass('public.factures_convoyeur') is not null then execute 'create index if not exists factures_convoyeur_convoyeur_id_fkey_idx on public.factures_convoyeur(convoyeur_id)'; end if;
-  if to_regclass('public.fidelite_mouvements') is not null then execute 'create index if not exists fidelite_mouvements_client_id_fkey_idx on public.fidelite_mouvements(client_id)'; execute 'create index if not exists fidelite_mouvements_cree_par_fkey_idx on public.fidelite_mouvements(cree_par)'; end if;
-  if to_regclass('public.mission_photos') is not null then execute 'create index if not exists mission_photos_ajoutee_par_fkey_idx on public.mission_photos(ajoutee_par)'; end if;
-  if to_regclass('public.missions') is not null then execute 'create index if not exists missions_convoyeur_id_fkey_idx on public.missions(convoyeur_id)'; execute 'create index if not exists missions_prestation_validee_par_fkey_idx on public.missions(prestation_validee_par)'; end if;
-  if to_regclass('public.opportunite_candidatures') is not null then execute 'create index if not exists opportunite_candidatures_decidee_par_fkey_idx on public.opportunite_candidatures(decidee_par)'; end if;
-  if to_regclass('public.opportunite_notifications') is not null then execute 'create index if not exists opportunite_notifications_convoyeur_id_fkey_idx on public.opportunite_notifications(convoyeur_id)'; end if;
-  if to_regclass('public.opportunites') is not null then execute 'create index if not exists opportunites_created_by_fkey_idx on public.opportunites(created_by)'; end if;
-  if to_regclass('public.parrainages') is not null then execute 'create index if not exists parrainages_parrain_id_fkey_idx on public.parrainages(parrain_id)'; end if;
-  if to_regclass('public.video_verifications') is not null then execute 'create index if not exists video_verifications_convoyeur_id_fkey_idx on public.video_verifications(convoyeur_id)'; end if;
+do $$
+declare r record;
+begin
+  for r in
+    select c.conname, n.nspname, t.relname,
+           (select string_agg(format('%I',a.attname),', ' order by u.ord)
+              from unnest(c.conkey) with ordinality u(attnum,ord)
+              join pg_attribute a on a.attrelid=t.oid and a.attnum=u.attnum) as colonnes
+      from pg_constraint c
+      join pg_class t on t.oid=c.conrelid
+      join pg_namespace n on n.oid=t.relnamespace
+     where c.contype='f' and n.nspname='public'
+       and not exists (
+         select 1 from pg_index i
+          where i.indrelid=t.oid and i.indisvalid
+            and (i.indkey::smallint[])[0:cardinality(c.conkey)-1] @> c.conkey)
+  loop
+    execute format('create index if not exists %I on %I.%I (%s)',
+      left(r.conname || '_idx',63),r.nspname,r.relname,r.colonnes);
+  end loop;
 end $$;
 
 -- auth.uid() et les helpers stables sont évalués une fois par requête.
@@ -55,4 +54,3 @@ alter policy "missions : lecture partenaire actif" on public.missions
 alter policy "missions : mise a jour partenaire actif" on public.missions
   using ((select public.partenaire_actif()) and (convoyeur_id is null or exists(select 1 from public.convoyeurs c where c.id=missions.convoyeur_id and c.auth_user_id=(select auth.uid()))))
   with check ((select public.partenaire_actif()));
-
