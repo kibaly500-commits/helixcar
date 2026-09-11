@@ -323,10 +323,19 @@ window.emailjs = { init: function () {},
   // demande ni une table.
   const destinationsMdp = (idx.match(/password:\s*[A-Za-z_$][\w$]*/g) || []);
   const appelsAuth = (idx.match(/auth\.(signUp|signInWithPassword|updateUser)\(/g) || []).length;
+  // Retirer uniquement les objets passés aux trois méthodes Auth qui
+  // acceptent légitimement un mot de passe. L'ancienne fenêtre de 120
+  // caractères s'arrêtait au milieu d'un appel signUp mis en forme sur
+  // plusieurs lignes (avec emailRedirectTo) et prenait ensuite son
+  // champ `password` pour une écriture applicative interdite.
+  const horsAppelsAuth = idx.replace(
+    /auth\.(signUp|signInWithPassword|updateUser)\(\s*\{[\s\S]{0,800}?\}\s*\)/g,
+    ''
+  );
   check('E2 : le mot de passe ne va QUE vers Supabase Auth, jamais dans un payload',
     destinationsMdp.length > 0 && destinationsMdp.length <= appelsAuth
     && !/payload\.[a-z_]*(password|mot_de_passe)/i.test(idx)
-    && !/(mot_de_passe|password)\s*:\s*(mdp|password|motDePasse)/i.test(idx.replace(/auth\.[\s\S]{0,120}?\)/g, '')),
+    && !/(mot_de_passe|password)\s*:\s*(mdp|password|motDePasse)/i.test(horsAppelsAuth),
     JSON.stringify(destinationsMdp) + ' / appels auth=' + appelsAuth);
   check('E3 : aucun mot de passe écrit dans les journaux',
     !/console\.(log|error|warn)\([^)]*\b(mdp|password)\b/i.test(idx.replace(/autocomplete="new-password"/g, ''))

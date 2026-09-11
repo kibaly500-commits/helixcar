@@ -48,7 +48,11 @@ window.supabase = { createClient: function () { return {
     onAuthStateChange() { return { data: { subscription: { unsubscribe(){} } } }; },
     async getSession() { return { data: { session: window.__session } }; },
     async signUp(ident) {
-      window.__journal.push({ op: 'signUp', email: ident && ident.email });
+      window.__journal.push({
+        op: 'signUp',
+        email: ident && ident.email,
+        retour: ident && ident.options && ident.options.emailRedirectTo
+      });
       if (window.__avecSession) {
         window.__session = { access_token: 'jwt-client', user: UTILISATEUR };
         return { data: { user: UTILISATEUR, session: window.__session }, error: null };
@@ -134,6 +138,7 @@ async function deposerCompteSeul(browser, avecSession) {
       && j.nom === 'creer_demande_avec_vehicules');
     return {
       journal: window.__journal.map(j => j.op),
+      appelInscription: window.__journal.find(j => j.op === 'signUp') || null,
       appels: appels,
       succesTexte: zone ? zone.textContent : '',
       emails: window.__journal.filter(j => j.op === 'email').length,
@@ -183,6 +188,9 @@ async function deposerCompteSeul(browser, avecSession) {
   const c = await deposerCompteSeul(browser, false);
   check('C1 : un compte est créé', c.etat.journal.indexOf('signUp') !== -1,
     JSON.stringify(c.etat.journal));
+  check('C1 bis : avec confirmation requise, le retour vise aussi le Dashboard',
+    c.etat.appelInscription && /\/dashboard\.html$/.test(c.etat.appelInscription.retour || ''),
+    JSON.stringify(c.etat.appelInscription));
   check('C2 : une session est RÉELLEMENT tentée avant d\'écrire',
     c.etat.journal.indexOf('signIn') !== -1
       && c.etat.journal.indexOf('signIn') < c.etat.journal.lastIndexOf('rpc'),
@@ -551,6 +559,8 @@ async function deposerCompteSeul(browser, avecSession) {
     /_hcReclamerDemandesEnAttente\(sbAuth\)/.test(dash));
   check('D12 : et le site public aussi, au retour de confirmation',
     /_hcReclamerDemandesEnAttente\(_sb\)/.test(idx));
+  check('D12 bis : le retour de confirmation est construit depuis l\'origine réellement servie',
+    /var HELIXCAR_URL_DASHBOARD = \(function \(\) \{[\s\S]*window\.location\.origin[\s\S]*return o \+ '\/dashboard\.html'/.test(idx));
 
   // ── D bis. LES DEUX SECRETS, VUS DEPUIS LES FICHIERS ──
   const mig92 = fs.readFileSync(fichier('migrations/92_creation_demande_atomique.sql'), 'utf8');
@@ -584,6 +594,22 @@ async function deposerCompteSeul(browser, avecSession) {
     check('D22 (' + nom + ') : et l\'adresse est normalisée des deux côtés',
       /function _hcNormaliserAdresse\(x\)/.test(src) && /toLowerCase\(\)/.test(src));
   });
+
+  // ── D quater. LE SYMPTÔME RAPPORTÉ NE PEUT PAS REVENIR ──
+  // Après confirmation sur téléphone, une ancienne page affichait le
+  // profil et les statistiques de démonstration « Marc Dupont ». Même
+  // si la session ne possède encore aucune demande, l'interface doit
+  // rester vide et se remplir uniquement avec les réponses serveur.
+  check('D23 : aucun prénom ou nom Marc Dupont n\'est prérempli dans le profil client',
+    !/id="profil-client-prenom"[^>]*value="Marc"/.test(dash)
+    && !/id="profil-client-nom"[^>]*value="Dupont"/.test(dash));
+  check('D24 : le titre client ne souhaite jamais la bienvenue à Marc par défaut',
+    !/'client-dashboard'\s*:\s*\[\s*'Tableau de bord'\s*,\s*'Bienvenue Marc'\s*\]/.test(dash));
+  check('D25 : missions et fidélité attendent leurs données serveur, sans statistiques de démonstration',
+    /id="client-missions-resume"[^>]*>[\s\S]{0,120}Chargement/.test(dash)
+    && /id="client-fidelite-carte"[^>]*>[\s\S]{0,120}Chargement/.test(dash)
+    && /loadMissionsResumeClient\(\)/.test(dash)
+    && /loadFideliteCarte\(\)/.test(dash));
 
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

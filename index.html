@@ -16334,7 +16334,20 @@ async function _submitClientFormInterne() {
     if (mdpSaisi) {
       _compteEtat = 'echec';
       try {
-        var rCompte = await _sb.auth.signUp({ email: email_val, password: mdpSaisi });
+        // Sans destination explicite, Supabase revient sur la « Site URL »
+        // globale du projet. Une inscription faite sur une Preview pouvait
+        // donc être confirmée sur téléphone puis ouvrir une ancienne version
+        // du Dashboard (avec les anciennes données de démonstration) au lieu
+        // de la version réellement utilisée sur le PC. La destination vient
+        // exclusivement de notre origine courante et vise un chemin fixe :
+        // aucun paramètre utilisateur, aucun referrer, aucune redirection
+        // ouverte. Cette origine doit être autorisée dans les Redirect URLs
+        // Supabase, comme pour le parcours partenaire.
+        var rCompte = await _sb.auth.signUp({
+          email: email_val,
+          password: mdpSaisi,
+          options: { emailRedirectTo: HELIXCAR_URL_DASHBOARD }
+        });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
         var msgErr = String((rCompte && rCompte.error && rCompte.error.message) || '');
         // Supabase signale une adresse déjà inscrite de deux façons
