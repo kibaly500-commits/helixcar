@@ -30,11 +30,20 @@ function check(l, c, e) {
   else { console.log('FAIL - ' + l + (e ? '  [' + String(e).slice(0, 260) + ']' : '')); fail++; echecs.push(l); }
 }
 
-const SOURCE_VITRINE = fichier('index.html');
-const SOURCE_DASHBOARD = fichier('dashboard.html');
+const SOURCE_VITRINE = fs.readFileSync(fichier('index.html'), 'utf8');
+const SOURCE_DASHBOARD = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+const SOURCE_MIGRATION = fs.readFileSync(fichier('migrations/109_fidelite_points.sql'), 'utf8');
 check('C10 : aucune règle d\'expiration des points n\'est inventée dans l\'interface',
   !/points n['’]expirent pas/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD)
   && !/expiration des points/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD));
+check('C10 : la règle validée TTC/euro entier est identique dans les deux interfaces',
+  SOURCE_VITRINE.includes("1 point par euro TTC entier, arrondi à l'inférieur")
+  && SOURCE_DASHBOARD.includes('1 € TTC entier payé = 1 point')
+  && SOURCE_DASHBOARD.includes('1 € TTC entier payé sur une prestation terminée = 1 point'));
+check('C10 : le serveur crédite floor(prix TTC), sans règle provisoire résiduelle',
+  SOURCE_MIGRATION.includes('v_points := floor(d.prix)::integer')
+  && SOURCE_MIGRATION.includes('123,99 € TTC → 123 points')
+  && !/règle provisoire/i.test(SOURCE_MIGRATION));
 
 // Sorties de fidelite_prochain_palier() pour chaque solde, telles que
 // tests/rls/l01.sh les mesure sur PostgreSQL 16 (L01-016). Le double ne

@@ -36,14 +36,14 @@
 --     sont pas exposées au navigateur (aucun EXECUTE accordé).
 --
 -- ------------------------------------------------------------
--- CE QUI N'EST PAS DÉFINI — documenté, rien n'est inventé
+-- RÈGLE DE CALCUL COMPLÉMENTAIRE VALIDÉE LE 11 SEPTEMBRE 2026
 -- ------------------------------------------------------------
---   * HT / TTC : le point est calculé sur `devis.prix` tel qu'il est
---     enregistré (le prix du devis payé). Savoir si ce prix est hors
---     taxes ou toutes taxes comprises n'est pas tranché : le jour où il
---     le sera, seule la fonction crediter_points_prestation() changera.
---   * Centimes : floor(prix). 1 234,56 € → 1 234 points. Règle provisoire,
---     à confirmer ; documentée dans la fonction.
+--   * Base : montant TTC du devis payé, enregistré dans `devis.prix`.
+--   * Centimes : un point par euro TTC entier, arrondi à l'inférieur :
+--     floor(prix). Exemple validé : 123,99 € TTC → 123 points.
+--
+-- CE QUI N'EST TOUJOURS PAS DÉFINI — rien n'est inventé
+-- ------------------------------------------------------------
 --   * Expiration des points : règle non décidée. Cette migration ne
 --     crée aucun mécanisme d'expiration et l'interface ne promet donc
 --     ni expiration ni absence d'expiration.
@@ -262,8 +262,8 @@ comment on view public.v_ma_fidelite is
 -- le premier événement ne fait rien, le second crédite. Rejouer l'un ou
 -- l'autre ne crée jamais de doublon (clé de dédoublonnage unique).
 --
--- Montant : floor(devis.prix). HT/TTC et centimes NON définis — voir
--- l'en-tête. Aucun avantage n'est distribué : des points, c'est tout.
+-- Montant : floor(devis.prix TTC), soit un point par euro TTC entier.
+-- Aucun avantage n'est distribué : des points, c'est tout.
 create or replace function public.crediter_points_prestation(p_devis_id uuid)
 returns jsonb
 language plpgsql
@@ -312,7 +312,7 @@ begin
     return jsonb_build_object('ok', false, 'code', 'COMPTE_INCONNU');
   end if;
 
-  -- Le montant. floor() : règle des centimes PROVISOIRE, documentée.
+  -- Règle validée : un point par euro TTC entier, arrondi à l'inférieur.
   if d.prix is null or d.prix < 1 then
     return jsonb_build_object('ok', false, 'code', 'PRIX_ABSENT');
   end if;
