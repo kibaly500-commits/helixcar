@@ -873,19 +873,20 @@
   .renfort-profile {
     min-width: 0; padding: 9px 7px; text-align: center; border-radius: 10px;
     border: 1px solid rgba(245,242,234,.1); background: rgba(245,242,234,.035);
-    animation: renfortProfil 7.2s ease-in-out infinite;
   }
-  .renfort-profile:nth-child(2) { animation-delay: .35s; }
-  .renfort-profile:nth-child(3) { animation-delay: .7s; }
+  .renfort-profile:nth-child(1) { animation: renfortCritere1 8s linear infinite; }
+  .renfort-profile:nth-child(2) { animation: renfortCritere2 8s linear infinite; }
+  .renfort-profile:nth-child(3) { animation: renfortCritere3 8s linear infinite; }
   .renfort-avatar { width: 27px; height: 27px; margin: 0 auto 6px; border-radius: 50%; display: grid; place-items: center; background: rgba(245,242,234,.09); color: var(--paper); font-size: .7rem; font-weight: 750; }
+  .renfort-profile:nth-child(1) .renfort-avatar { animation: renfortCheck1 8s linear infinite; }
+  .renfort-profile:nth-child(2) .renfort-avatar { animation: renfortCheck2 8s linear infinite; }
+  .renfort-profile:nth-child(3) .renfort-avatar { animation: renfortCheck3 8s linear infinite; }
   .renfort-profile strong { display: block; color: rgba(245,242,234,.8); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .renfort-profile span { display: block; color: rgba(245,242,234,.42); font-size: .62rem; margin-top: 3px; }
-  .renfort-profile.is-match { border-color: rgba(229,72,77,.58); background: rgba(229,72,77,.08); }
-  .renfort-profile.is-match .renfort-avatar { background: var(--accent); }
   .renfort-confirm {
     position: relative; z-index: 1; margin-top: 9px; padding: 10px 13px; display: flex; align-items: center; gap: 10px;
     border-radius: 10px; background: var(--paper); color: var(--ink);
-    animation: renfortConfirmation 7.2s ease-in-out -3.8s infinite;
+    animation: renfortConfirmation 8s linear infinite;
   }
   .renfort-confirm-icon { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: .78rem; font-weight: 800; }
   .renfort-confirm strong { display: block; font-size: .79rem; }
@@ -893,12 +894,19 @@
 
   @keyframes renfortPulse { 70% { box-shadow: 0 0 0 8px rgba(229,72,77,0); } 100% { box-shadow: 0 0 0 0 rgba(229,72,77,0); } }
   @keyframes renfortScan { 0% { transform: translateX(-110%); } 55%,100% { transform: translateX(280%); } }
-  @keyframes renfortProfil { 0%,10% { opacity:.28; transform:translateY(7px); } 24%,88% { opacity:1; transform:none; } 100% { opacity:.28; transform:translateY(7px); } }
-  @keyframes renfortConfirmation { 0%,42% { opacity:0; transform:translateY(8px); } 56%,88% { opacity:1; transform:none; } 100% { opacity:0; transform:translateY(8px); } }
+  @keyframes renfortCritere1 { 0%,7%,94%,100% { opacity:.38; border-color:rgba(245,242,234,.1); background:rgba(245,242,234,.035); transform:translateY(4px); } 12%,86% { opacity:1; border-color:rgba(229,72,77,.62); background:rgba(229,72,77,.09); transform:none; } }
+  @keyframes renfortCritere2 { 0%,25%,94%,100% { opacity:.38; border-color:rgba(245,242,234,.1); background:rgba(245,242,234,.035); transform:translateY(4px); } 30%,86% { opacity:1; border-color:rgba(229,72,77,.62); background:rgba(229,72,77,.09); transform:none; } }
+  @keyframes renfortCritere3 { 0%,43%,94%,100% { opacity:.38; border-color:rgba(245,242,234,.1); background:rgba(245,242,234,.035); transform:translateY(4px); } 48%,86% { opacity:1; border-color:rgba(229,72,77,.62); background:rgba(229,72,77,.09); transform:none; } }
+  @keyframes renfortCheck1 { 0%,7%,94%,100% { background:rgba(245,242,234,.09); box-shadow:none; } 12%,86% { background:var(--accent); box-shadow:0 0 0 5px rgba(229,72,77,.1); } }
+  @keyframes renfortCheck2 { 0%,25%,94%,100% { background:rgba(245,242,234,.09); box-shadow:none; } 30%,86% { background:var(--accent); box-shadow:0 0 0 5px rgba(229,72,77,.1); } }
+  @keyframes renfortCheck3 { 0%,43%,94%,100% { background:rgba(245,242,234,.09); box-shadow:none; } 48%,86% { background:var(--accent); box-shadow:0 0 0 5px rgba(229,72,77,.1); } }
+  @keyframes renfortConfirmation { 0%,57% { opacity:0; transform:translateY(8px); } 64%,84% { opacity:1; transform:none; } 92%,100% { opacity:0; transform:translateY(8px); } }
 
   @media (prefers-reduced-motion: reduce) {
     .renfort-card { transition: none; opacity: 1; transform: none; }
-    .renfort-live, .renfort-scan-line::after, .renfort-profile, .renfort-confirm { animation: none; opacity: 1; transform: none; }
+    .renfort-live, .renfort-scan-line::after, .renfort-profile, .renfort-avatar, .renfort-confirm { animation: none; opacity: 1; transform: none; }
+    .renfort-profile { border-color: rgba(229,72,77,.62); background: rgba(229,72,77,.09); }
+    .renfort-avatar { background: var(--accent); }
   }
 
   @media (max-width: 900px) {
@@ -924,14 +932,14 @@
 
   .stockage-block { background: var(--neutral-light); position: relative; z-index: 1; }
   @media (min-width: 901px) {
-    .stockage-block { padding-left: 48px; padding-right: 48px; } /* V66 — réduit le padding générique de section (80px) pour cette section afin d'utiliser réellement plus de largeur, sans grossir le contenu */
+    .stockage-block { padding-left: 80px; padding-right: 80px; }
   }
   .stockage-inner {
     display: block;
-    max-width: 1400px; margin: 0 auto;
+    width: 100%; max-width: none; margin: 0;
   }
-  .stockage-intro { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(420px,.9fr); gap: clamp(48px,7vw,110px); align-items: end; }
-  .stockage-copy .section-sub { max-width: 720px; }
+  .stockage-intro { display: grid; grid-template-columns: minmax(0,1fr) minmax(500px,1.15fr); gap: clamp(56px,7vw,128px); align-items: end; }
+  .stockage-copy .section-sub { max-width: 760px; }
   .stockage-benefits { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .stockage-benefits li { font-size: .88rem; color: #37414a; padding: 15px 16px 15px 38px; position: relative; background: #fff; border: 1px solid rgba(16,24,32,.08); border-radius: 8px; }
   .stockage-benefits li::before { content: '✓'; position: absolute; left: 15px; top: 14px; color: var(--accent); font-weight: 800; }
@@ -1325,7 +1333,7 @@
 
     filter: drop-shadow(0 0 7px rgba(229,72,77,.8));
 
-    animation: loyaltyRun 8s cubic-bezier(.45,0,.2,1) infinite;
+    animation: loyaltyRun 10s linear infinite;
 
   }
 
@@ -1379,28 +1387,28 @@
 
     transition: all var(--transition);
 
-    animation: loyaltyMilestone 8s ease-in-out infinite;
+    animation: loyaltyMilestone1 10s linear infinite;
 
   }
 
-  .track-node:nth-child(1) .node-circle { animation-delay: .2s; }
-  .track-node:nth-child(2) .node-circle { animation-delay: 1.65s; }
-  .track-node:nth-child(3) .node-circle { animation-delay: 3.1s; }
-  .track-node:nth-child(4) .node-circle { animation-delay: 4.55s; }
-  .track-node:nth-child(5) .node-circle { animation-delay: 6s; }
+  .track-node:nth-child(1) .node-circle { animation-name: loyaltyMilestone1; }
+  .track-node:nth-child(2) .node-circle { animation-name: loyaltyMilestone2; }
+  .track-node:nth-child(3) .node-circle { animation-name: loyaltyMilestone3; }
+  .track-node:nth-child(4) .node-circle { animation-name: loyaltyMilestone4; }
+  .track-node:nth-child(5) .node-circle { animation-name: loyaltyMilestone5; }
 
   @keyframes loyaltyRun {
-    0% { transform: translateX(-110%); opacity: 0; }
-    8% { opacity: 1; }
-    82% { transform: translateX(510%); opacity: 1; }
-    90%,100% { transform: translateX(510%); opacity: 0; }
+    0% { transform: translateX(-50%); opacity: 0; }
+    5% { transform: translateX(-50%); opacity: 1; }
+    95% { transform: translateX(450%); opacity: 1; }
+    100% { transform: translateX(450%); opacity: 0; }
   }
 
-  @keyframes loyaltyMilestone {
-    0%,7%,100% { border-color: rgba(255,255,255,.15); color: inherit; box-shadow: none; transform: scale(1); }
-    11%,18% { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 7px rgba(229,72,77,.1), 0 0 20px rgba(229,72,77,.28); transform: scale(1.1); }
-    24% { border-color: rgba(255,255,255,.15); color: inherit; box-shadow: none; transform: scale(1); }
-  }
+  @keyframes loyaltyMilestone1 { 0%,2%,14%,100% { border-color:rgba(255,255,255,.15);color:inherit;box-shadow:none;transform:scale(1); } 5%,11% { border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 7px rgba(229,72,77,.1),0 0 20px rgba(229,72,77,.28);transform:scale(1.1); } }
+  @keyframes loyaltyMilestone2 { 0%,22%,34%,100% { border-color:rgba(255,255,255,.15);color:inherit;box-shadow:none;transform:scale(1); } 25%,31% { border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 7px rgba(229,72,77,.1),0 0 20px rgba(229,72,77,.28);transform:scale(1.1); } }
+  @keyframes loyaltyMilestone3 { 0%,45%,56%,100% { border-color:rgba(255,255,255,.15);color:inherit;box-shadow:none;transform:scale(1); } 48%,53% { border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 7px rgba(229,72,77,.1),0 0 20px rgba(229,72,77,.28);transform:scale(1.1); } }
+  @keyframes loyaltyMilestone4 { 0%,68%,79%,100% { border-color:rgba(255,255,255,.15);color:inherit;box-shadow:none;transform:scale(1); } 71%,76% { border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 7px rgba(229,72,77,.1),0 0 20px rgba(229,72,77,.28);transform:scale(1.1); } }
+  @keyframes loyaltyMilestone5 { 0%,89%,100% { border-color:rgba(255,255,255,.15);color:inherit;box-shadow:none;transform:scale(1); } 92%,98% { border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 7px rgba(229,72,77,.1),0 0 20px rgba(229,72,77,.28);transform:scale(1.1); } }
 
   @media (prefers-reduced-motion: reduce) {
     .track-line::after, .node-circle { animation: none; }
@@ -3686,7 +3694,8 @@
   .hero2-route-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
   .hero2-route-dot.is-muted { background: var(--silver); opacity: .5; }
   .hero2-route-label { font-family: var(--font-body); font-size: .64rem; letter-spacing: .06em; text-transform: uppercase; color: var(--silver); white-space: normal; text-align: center; line-height: 1.35; }
-  .hero2-route-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--accent), rgba(167,173,180,.35)); margin: 0 12px 4px; min-width: 24px; }
+  .hero2-route-line { flex: 1; height: 1px; background: rgba(167,173,180,.28); margin: 0 12px 4px; min-width: 24px; position: relative; overflow: hidden; }
+  .hero2-route-line::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,transparent,var(--accent),rgba(255,255,255,.85),var(--accent),transparent); transform: translateX(-105%); animation: hero2-route-flow 4.8s linear infinite; }
   .hero2-panel { border: 1px solid rgba(245,242,234,0.14); padding: 36px 32px; font-family: var(--font-body); }
   .hero2-panel-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26px; gap: 12px; }
   .hero2-panel-eyebrow { font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--silver); }
@@ -3712,8 +3721,8 @@
   .hero2-panel-progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin-bottom: 22px; }
   .hero2-panel-progress-city { font-family: var(--font-display); font-size: 1.25rem; color: var(--paper); }
   .hero2-panel-progress-track { position: relative; height: 1px; background: rgba(245,242,234,.16); }
-  .hero2-panel-progress-fill { position: absolute; left: 0; top: 0; height: 100%; width: 58%; background: var(--accent); animation: hero2-draw 1.8s cubic-bezier(.25,.46,.45,.94) .2s both; }
-  .hero2-panel-progress-marker { position: absolute; left: 58%; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); transform: translate(-50%,-50%); box-shadow: 0 0 0 4px rgba(229,72,77,.18); }
+  .hero2-panel-progress-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; background: var(--accent); animation: hero2-draw 5.2s linear infinite; }
+  .hero2-panel-progress-marker { position: absolute; left: 0; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); transform: translate(-50%,-50%); box-shadow: 0 0 0 4px rgba(229,72,77,.18); animation: hero2-marker 5.2s linear infinite; }
 
   .hero2-panel-km { font-family: var(--font-display); font-size: 2.5rem; color: var(--paper); line-height: 1; margin-bottom: 6px; }
   .hero2-panel-km span { font-family: var(--font-body); font-size: .85rem; color: var(--silver); font-weight: 400; margin-left: 4px; }
@@ -3724,10 +3733,14 @@
   .hero2-panel-stat-label { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--silver); margin-top: 4px; }
 
   @keyframes hero2-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
-  @keyframes hero2-draw { from { width: 0; } to { width: 58%; } }
+  @keyframes hero2-draw { 0% { width:0;opacity:.65; } 88% { width:100%;opacity:1; } 96%,100% { width:100%;opacity:0; } }
+  @keyframes hero2-marker { 0% { left:0;opacity:.65; } 88% { left:100%;opacity:1; } 96%,100% { left:100%;opacity:0; } }
+  @keyframes hero2-route-flow { 0% { transform:translateX(-105%);opacity:0; } 12% { opacity:1; } 72% { transform:translateX(105%);opacity:1; } 84%,100% { transform:translateX(105%);opacity:0; } }
   @media (prefers-reduced-motion: reduce) {
     .hero2-panel-status-dot { animation: none; }
-    .hero2-panel-progress-fill { animation: none; width: 58%; }
+    .hero2-panel-progress-fill { animation: none; width: 58%; opacity:1; }
+    .hero2-panel-progress-marker { animation: none; left:58%; opacity:1; }
+    .hero2-route-line::after { animation:none; transform:none; background:var(--accent); opacity:.7; }
   }
 
   @media (max-width: 900px) {
@@ -5295,7 +5308,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <div>
           <div class="hero2-panel-eyebrow">Mission type</div>
           <div class="hero2-switcher">
-            <button type="button" class="hero2-switcher-arrow" onclick="hero2ChangeScenario(-1)" aria-label="Service précédent">‹</button>
             <span class="hero2-switcher-label" id="hero2-switcher-label">Convoyage</span>
             <button type="button" class="hero2-switcher-arrow" onclick="hero2ChangeScenario(1)" aria-label="Service suivant">›</button>
           </div>
@@ -5644,8 +5656,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="renfort-cards">
         <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20v-9l8-6 8 6v9"/><path d="M8 20v-5h8v5"/><path d="M9 10h6"/></svg></span>Accueil en concession</div>
-        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 13l1.5-4h11l1.5 4"/><rect x="3.5" y="12.5" width="17" height="5.5" rx="1.5"/><path d="M7 18v2M17 18v2"/></svg></span>Préparation automobile</div>
-        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 17h6M17 14v6"/></svg></span>Opérations de parc</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 13l1.5-4h11l1.5 4"/><rect x="3.5" y="12.5" width="17" height="5.5" rx="1.5"/><path d="M7 18v2M17 18v2"/></svg></span>Préparateur automobile</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 17h6M17 14v6"/></svg></span>Opérateur de parc</div>
         <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span>Soutien administratif</div>
       </div>
 
@@ -5659,7 +5671,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <div class="renfort-scan"><span>Recherche du profil adapté</span><span class="renfort-scan-line"></span></div>
         <div class="renfort-profiles" aria-hidden="true">
           <div class="renfort-profile"><div class="renfort-avatar">✓</div><strong>Disponible demain</strong><span>8 h 30</span></div>
-          <div class="renfort-profile is-match"><div class="renfort-avatar">✓</div><strong>Compétence vérifiée</strong><span>Préparation auto</span></div>
+          <div class="renfort-profile"><div class="renfort-avatar">✓</div><strong>Compétence vérifiée</strong><span>Préparation auto</span></div>
           <div class="renfort-profile"><div class="renfort-avatar">✓</div><strong>Sur votre site</strong><span>Intervention sur place</span></div>
         </div>
         <div class="renfort-confirm"><span class="renfort-confirm-icon">✓</span><span><strong>Professionnel sélectionné</strong><span>Disponible demain à 8 h 30</span></span></div>
@@ -5671,10 +5683,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <details class="renfort-metiers">
         <summary>Voir tous les métiers</summary>
         <div class="renfort-metiers-list">
-          <span>Jockey automobile</span><span>Accueil en concession</span>
-          <span>Préparation automobile</span><span>Opérations de parc</span>
-          <span>Soutien administratif</span><span>Mécanique</span>
-          <span>Carrosserie</span><span>Diagnostic automobile</span>
+          <span>Jockey automobile</span><span>Préparateur automobile</span>
+          <span>Soutien administratif</span><span>Carrossier</span>
+          <span>Accueil en concession</span><span>Opérateur de parc</span>
+          <span>Mécanicien</span><span>Diagnostiqueur automobile</span>
         </div>
       </details>
       <button type="button" class="renfort-cta" onclick="ouvrirRenfortProfessionnel()">Organiser un renfort</button>
@@ -22286,6 +22298,25 @@ console.log('HelixCar ' + window.HC_VERSION);
   var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}},20);});
   function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
   document.addEventListener('DOMContentLoaded',startConv);if(document.readyState!=='loading')setTimeout(startConv,0);
+})();
+</script>
+
+<script id="hc-vitrine-section-order">
+/* Ordre éditorial de la vitrine : les quatre blocs principaux suivent
+   immédiatement les Services. Le renfort détaillé reste disponible ensuite. */
+(function () {
+  var services = document.getElementById('services');
+  var fidelite = document.getElementById('fidelite');
+  var stockage = document.getElementById('stockage-automobile');
+  var tarifs = document.getElementById('devis');
+  var equipe = document.getElementById('convoyeurs');
+  var renfort = document.getElementById('renfort-ponctuel');
+  if (!services || !fidelite || !stockage || !tarifs || !equipe) return;
+  services.insertAdjacentElement('afterend', fidelite);
+  fidelite.insertAdjacentElement('afterend', stockage);
+  stockage.insertAdjacentElement('afterend', tarifs);
+  tarifs.insertAdjacentElement('afterend', equipe);
+  if (renfort) equipe.insertAdjacentElement('afterend', renfort);
 })();
 </script>
 

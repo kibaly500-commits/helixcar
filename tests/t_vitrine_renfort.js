@@ -34,7 +34,8 @@ function check(libelle, condition, detail) {
       scene: !!sec.querySelector('.renfort-match'),
       hauteur: sec.getBoundingClientRect().height,
       profils: Array.from(sec.querySelectorAll('.renfort-profile strong')).map(el => el.textContent.trim()),
-      confirmation: sec.querySelector('.renfort-confirm').innerText
+      confirmation: sec.querySelector('.renfort-confirm').innerText,
+      metiersLibelles: Array.from(sec.querySelectorAll('.renfort-metiers-list span')).map(el => el.textContent.trim())
     };
   });
   check('R4 : le nouveau titre orienté bénéfice est affiché', /Le bon professionnel/.test(avant.titre), avant.titre);
@@ -45,6 +46,9 @@ function check(libelle, condition, detail) {
   check('R8 : le bloc est compact et la confirmation donne une disponibilité concrète',
     avant.hauteur < 600 && /Disponible demain à 8 h 30/.test(avant.confirmation),
     JSON.stringify({ hauteur: avant.hauteur, confirmation: avant.confirmation }));
+  check('R9 : les huit intitulés métiers utilisent les bons noms professionnels',
+    avant.metiersLibelles.join('|') === 'Jockey automobile|Préparateur automobile|Soutien administratif|Carrossier|Accueil en concession|Opérateur de parc|Mécanicien|Diagnostiqueur automobile',
+    avant.metiersLibelles.join(' | '));
 
   await page.locator('.renfort-metiers summary').click();
   const liste = await page.locator('.renfort-metiers').evaluate(el => {
@@ -52,7 +56,7 @@ function check(libelle, condition, detail) {
     const panneau = el.querySelector('.renfort-metiers-list');
     return { ouvert: el.open, debordement: getComputedStyle(sec).overflowY, zIndex: getComputedStyle(panneau).zIndex };
   });
-  check('R9 : « Voir tous les métiers » déplie une liste qui peut dépasser la section sans être coupée',
+  check('R10 : « Voir tous les métiers » déplie une liste qui peut dépasser la section sans être coupée',
     liste.ouvert && liste.debordement === 'visible' && Number(liste.zIndex) >= 20, JSON.stringify(liste));
 
   await page.locator('.renfort-cta').click();
@@ -60,7 +64,7 @@ function check(libelle, condition, detail) {
     ouvert: document.getElementById('modal-client').classList.contains('open'),
     choisi: document.querySelector('input[name="type-service"][value="professionnel"]').checked
   }));
-  check('R10 : le bouton ouvre le parcours « Trouver un professionnel » déjà sélectionné',
+  check('R11 : le bouton ouvre le parcours « Trouver un professionnel » déjà sélectionné',
     parcours.ouvert && parcours.choisi, JSON.stringify(parcours));
 
   await page.evaluate(() => { document.getElementById('modal-client').classList.remove('open'); document.body.style.overflow = ''; });
@@ -68,29 +72,80 @@ function check(libelle, condition, detail) {
     const stockage = document.querySelector('.stockage-inner').getBoundingClientRect();
     const etapes = document.querySelector('.stockage-steps').getBoundingClientRect();
     const ligne = getComputedStyle(document.querySelector('.track-line'), '::after');
-    const animations = Array.from(document.querySelectorAll('.node-circle')).map(el => getComputedStyle(el).animationName);
+    const animations = Array.from(document.querySelectorAll('.node-circle')).map(el => ({
+      nom: getComputedStyle(el).animationName,
+      duree: getComputedStyle(el).animationDuration,
+      rythme: getComputedStyle(el).animationTimingFunction
+    }));
+    const stockageTag = document.querySelector('#stockage-automobile .section-tag').getBoundingClientRect();
+    const fideliteTag = document.querySelector('#fidelite > .section-tag').getBoundingClientRect();
+    const ordre = Array.from(document.querySelectorAll('section[id]')).map(el => el.id);
+    const idsAttendus = ['services', 'fidelite', 'stockage-automobile', 'devis', 'convoyeurs'];
+    const positions = idsAttendus.map(id => ordre.indexOf(id));
+    const heroFill = getComputedStyle(document.querySelector('.hero2-panel-progress-fill'));
+    const heroMarker = getComputedStyle(document.querySelector('.hero2-panel-progress-marker'));
     return {
       largeurStockage: stockage.width,
       largeurEtapes: etapes.width,
       viewport: innerWidth,
       animationLigne: ligne.animationName,
+      dureeLigne: ligne.animationDuration,
+      rythmeLigne: ligne.animationTimingFunction,
       animations,
-      fausseProgression: !!document.querySelector('.track-progress')
+      fausseProgression: !!document.querySelector('.track-progress'),
+      alignementGauche: Math.abs(stockageTag.left - fideliteTag.left),
+      positions,
+      flechesHero: document.querySelectorAll('.hero2-switcher-arrow').length,
+      precedenteHero: !!document.querySelector('[aria-label="Service précédent"]'),
+      heroFill: { nom: heroFill.animationName, duree: heroFill.animationDuration },
+      heroMarker: { nom: heroMarker.animationName, duree: heroMarker.animationDuration },
+      routeAnimee: getComputedStyle(document.querySelector('.hero2-route-line'), '::after').animationName
     };
   });
-  check('R11 : le bloc Stockage et sa frise utilisent presque toute la largeur disponible',
-    miseEnPage.largeurStockage >= miseEnPage.viewport * .88
-    && miseEnPage.largeurEtapes >= miseEnPage.largeurStockage * .98, JSON.stringify(miseEnPage));
-  check('R12 : la frise Fidélité anime la ligne et les cinq paliers sans fausse barre de progression',
+  check('R12 : le bloc Stockage est large et aligné à gauche sur le Programme de fidélité',
+    miseEnPage.largeurStockage >= miseEnPage.viewport * .87
+    && miseEnPage.largeurEtapes >= miseEnPage.largeurStockage * .98
+    && miseEnPage.alignementGauche <= 1, JSON.stringify(miseEnPage));
+  check('R13 : la frise Fidélité synchronise la ligne et les cinq paliers sur dix secondes',
     miseEnPage.animationLigne === 'loyaltyRun'
+    && miseEnPage.dureeLigne === '10s'
+    && miseEnPage.rythmeLigne === 'linear'
     && miseEnPage.animations.length === 5
-    && miseEnPage.animations.every(n => n === 'loyaltyMilestone')
+    && miseEnPage.animations.map(a => a.nom).join('|') === 'loyaltyMilestone1|loyaltyMilestone2|loyaltyMilestone3|loyaltyMilestone4|loyaltyMilestone5'
+    && miseEnPage.animations.every(a => a.duree === '10s' && a.rythme === 'linear')
     && miseEnPage.fausseProgression === false, JSON.stringify(miseEnPage));
+  check('R14 : l’ordre éditorial demandé suit immédiatement les Services',
+    miseEnPage.positions.every((position, i) => position >= 0 && (!i || position === miseEnPage.positions[i - 1] + 1)),
+    JSON.stringify(miseEnPage.positions));
+  check('R15 : Mission type défile uniquement vers la droite avec ligne et marqueur synchronisés',
+    miseEnPage.flechesHero === 1 && !miseEnPage.precedenteHero
+    && miseEnPage.heroFill.nom === 'hero2-draw'
+    && miseEnPage.heroMarker.nom === 'hero2-marker'
+    && miseEnPage.heroFill.duree === miseEnPage.heroMarker.duree
+    && miseEnPage.routeAnimee === 'hero2-route-flow', JSON.stringify(miseEnPage));
+
+  await page.evaluate(() => {
+    document.getAnimations().forEach(animation => {
+      if (/^renfort(?:Critere|Check|Confirmation)/.test(animation.animationName || '')) {
+        animation.currentTime = 5200;
+        animation.pause();
+      }
+    });
+  });
+  await page.waitForTimeout(50);
+  const renfortFinal = await page.evaluate(() => ({
+    checks: Array.from(document.querySelectorAll('.renfort-avatar')).map(el => getComputedStyle(el).backgroundColor),
+    confirmation: Number(getComputedStyle(document.querySelector('.renfort-confirm')).opacity)
+  }));
+  check('R16 : les trois critères sont rouges avant l’apparition de la confirmation blanche',
+    renfortFinal.checks.length === 3
+    && renfortFinal.checks.every(c => /181, 68, 75|229, 72, 77/.test(c))
+    && renfortFinal.confirmation > .9, JSON.stringify(renfortFinal));
 
   await page.setViewportSize({ width: 390, height: 844 });
   const largeur = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
-  check('R13 : aucun débordement horizontal à 390 px', largeur.scroll <= largeur.client, JSON.stringify(largeur));
-  check('R14 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));
+  check('R17 : aucun débordement horizontal à 390 px', largeur.scroll <= largeur.client, JSON.stringify(largeur));
+  check('R18 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));
 
   await browser.close();
   console.log(`=== ${pass} PASS / ${fail} FAIL ===`);
