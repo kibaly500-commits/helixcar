@@ -44,8 +44,9 @@
 --     le sera, seule la fonction crediter_points_prestation() changera.
 --   * Centimes : floor(prix). 1 234,56 € → 1 234 points. Règle provisoire,
 --     à confirmer ; documentée dans la fonction.
---   * Expiration des points : aucune (rien n'expire tant que ce n'est
---     pas décidé).
+--   * Expiration des points : règle non décidée. Cette migration ne
+--     crée aucun mécanisme d'expiration et l'interface ne promet donc
+--     ni expiration ni absence d'expiration.
 --   * Remboursement d'un AVANTAGE : non défini → AUCUNE distribution
 --     d'avantage n'est faite ici. Seuls les points et les seuils
 --     existent. Les récompenses des paliers ne vivent pas en base.

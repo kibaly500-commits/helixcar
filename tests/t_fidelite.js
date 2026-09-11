@@ -30,6 +30,12 @@ function check(l, c, e) {
   else { console.log('FAIL - ' + l + (e ? '  [' + String(e).slice(0, 260) + ']' : '')); fail++; echecs.push(l); }
 }
 
+const SOURCE_VITRINE = fichier('index.html');
+const SOURCE_DASHBOARD = fichier('dashboard.html');
+check('C10 : aucune règle d\'expiration des points n\'est inventée dans l\'interface',
+  !/points n['’]expirent pas/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD)
+  && !/expiration des points/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD));
+
 // Sorties de fidelite_prochain_palier() pour chaque solde, telles que
 // tests/rls/l01.sh les mesure sur PostgreSQL 16 (L01-016). Le double ne
 // « calcule » rien : il rend ces lignes, comme la vue le ferait.
