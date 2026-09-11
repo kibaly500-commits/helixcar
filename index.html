@@ -783,22 +783,25 @@
   .renfort-block {
     background: linear-gradient(160deg, #141d26 0%, #101820 55%, #0a0e13 100%);
     color: var(--paper);
+    position: relative; z-index: 2; overflow: visible;
+    padding-top: 42px; padding-bottom: 40px;
   }
   .renfort-inner {
     max-width: 1280px; margin: 0 auto;
-    display: flex; flex-direction: column; gap: 28px; /* V68 — 48px -> 28px : remonte le bloc cartes/parcours, moins d'espace vide sous le texte d'intro */
+    display: grid; grid-template-columns: minmax(0,1fr) minmax(360px,.92fr);
+    gap: 18px 52px; align-items: start;
   }
-  .renfort-intro { max-width: 640px; }
+  .renfort-intro { max-width: 640px; grid-column: 1; grid-row: 1; }
   .renfort-tag { font-family: var(--font-body); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 16px; }
-  .renfort-title { font-family: var(--font-display); font-weight: 500; font-size: clamp(2rem,3.2vw,3rem); line-height: 1.08; margin-bottom: 18px; }
-  .renfort-text { font-size: .98rem; line-height: 1.75; color: rgba(245,242,234,.72); max-width: 600px; }
+  .renfort-title { font-family: var(--font-display); font-weight: 500; font-size: clamp(2rem,3.2vw,3rem); line-height: 1.08; margin-bottom: 12px; }
+  .renfort-text { font-size: .98rem; line-height: 1.6; color: rgba(245,242,234,.72); max-width: 600px; }
 
-  .renfort-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px,.92fr); gap: 52px; align-items: center; }
+  .renfort-body { display: contents; }
 
-  .renfort-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .renfort-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; grid-column: 1; grid-row: 2; }
   .renfort-card {
     border: 1px solid rgba(245,242,234,.16); border-top: 2px solid var(--accent);
-    border-radius: 8px; padding: 19px 18px; min-height: 78px;
+    border-radius: 8px; padding: 14px 16px; min-height: 66px;
     display: flex; align-items: center; gap: 13px;
     font-family: var(--font-body); font-size: .96rem; font-weight: 600; letter-spacing: .01em;
     color: var(--paper); background: rgba(245,242,234,.03);
@@ -818,7 +821,7 @@
   .renfort-block.in-view .renfort-card:nth-child(3) { transition-delay: .31s; }
   .renfort-block.in-view .renfort-card:nth-child(4) { transition-delay: .44s; }
 
-  .renfort-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+  .renfort-actions { display: flex; align-items: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; grid-column: 1; grid-row: 3; }
   .renfort-metiers { position: relative; }
   .renfort-metiers summary {
     list-style: none; cursor: pointer; color: var(--paper); font-size: .86rem; font-weight: 650;
@@ -828,7 +831,7 @@
   .renfort-metiers summary::after { content: '+'; color: var(--accent); font-size: 1.15rem; line-height: 1; }
   .renfort-metiers[open] summary::after { content: '−'; }
   .renfort-metiers-list {
-    position: absolute; left: 0; top: calc(100% + 8px); z-index: 8; width: min(520px,80vw);
+    position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; width: min(620px,82vw);
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
     padding: 18px; border: 1px solid rgba(245,242,234,.15); border-radius: 10px;
     background: #17232d; box-shadow: 0 18px 40px rgba(0,0,0,.28);
@@ -844,7 +847,8 @@
 
   /* Mise en relation racontée comme une scène, plutôt que comme une liste d'étapes. */
   .renfort-match {
-    position: relative; overflow: hidden; min-height: 365px; padding: 22px;
+    position: relative; overflow: hidden; min-height: 292px; padding: 18px;
+    grid-column: 2; grid-row: 1 / span 2; align-self: stretch;
     border: 1px solid rgba(245,242,234,.14); border-radius: 16px;
     background: linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.018));
     box-shadow: 0 24px 60px rgba(0,0,0,.24);
@@ -856,30 +860,30 @@
   .renfort-match-head { display: flex; align-items: center; gap: 9px; position: relative; z-index: 1; color: rgba(245,242,234,.66); font-size: .73rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
   .renfort-live { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(229,72,77,.5); animation: renfortPulse 2s ease-out infinite; }
   .renfort-brief {
-    position: relative; z-index: 1; margin-top: 20px; padding: 17px 18px; border-radius: 11px;
+    position: relative; z-index: 1; margin-top: 14px; padding: 13px 16px; border-radius: 11px;
     background: rgba(9,14,19,.58); border: 1px solid rgba(245,242,234,.12);
   }
   .renfort-brief small { display: block; color: rgba(245,242,234,.5); font-size: .72rem; margin-bottom: 6px; }
-  .renfort-brief strong { display: block; color: var(--paper); font-size: 1rem; margin-bottom: 6px; }
+  .renfort-brief strong { display: block; color: var(--paper); font-size: 1rem; margin-bottom: 3px; }
   .renfort-brief span { color: rgba(245,242,234,.62); font-size: .78rem; }
-  .renfort-scan { height: 32px; margin: 8px 0 2px; display: flex; align-items: center; gap: 10px; color: rgba(245,242,234,.55); font-size: .74rem; }
+  .renfort-scan { height: 27px; margin: 5px 0 1px; display: flex; align-items: center; gap: 10px; color: rgba(245,242,234,.55); font-size: .74rem; }
   .renfort-scan-line { flex: 1; height: 1px; overflow: hidden; background: rgba(245,242,234,.1); position: relative; }
   .renfort-scan-line::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 40%; background: var(--accent); animation: renfortScan 2.4s ease-in-out infinite; }
   .renfort-profiles { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
   .renfort-profile {
-    min-width: 0; padding: 12px 8px; text-align: center; border-radius: 10px;
+    min-width: 0; padding: 9px 7px; text-align: center; border-radius: 10px;
     border: 1px solid rgba(245,242,234,.1); background: rgba(245,242,234,.035);
     animation: renfortProfil 7.2s ease-in-out infinite;
   }
   .renfort-profile:nth-child(2) { animation-delay: .35s; }
   .renfort-profile:nth-child(3) { animation-delay: .7s; }
-  .renfort-avatar { width: 30px; height: 30px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; background: rgba(245,242,234,.09); color: var(--paper); font-size: .7rem; font-weight: 750; }
+  .renfort-avatar { width: 27px; height: 27px; margin: 0 auto 6px; border-radius: 50%; display: grid; place-items: center; background: rgba(245,242,234,.09); color: var(--paper); font-size: .7rem; font-weight: 750; }
   .renfort-profile strong { display: block; color: rgba(245,242,234,.8); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .renfort-profile span { display: block; color: rgba(245,242,234,.42); font-size: .62rem; margin-top: 3px; }
   .renfort-profile.is-match { border-color: rgba(229,72,77,.58); background: rgba(229,72,77,.08); }
   .renfort-profile.is-match .renfort-avatar { background: var(--accent); }
   .renfort-confirm {
-    position: relative; z-index: 1; margin-top: 12px; padding: 13px 15px; display: flex; align-items: center; gap: 11px;
+    position: relative; z-index: 1; margin-top: 9px; padding: 10px 13px; display: flex; align-items: center; gap: 10px;
     border-radius: 10px; background: var(--paper); color: var(--ink);
     animation: renfortConfirmation 7.2s ease-in-out -3.8s infinite;
   }
@@ -898,16 +902,19 @@
   }
 
   @media (max-width: 900px) {
+    .renfort-inner { display: flex; flex-direction: column; gap: 18px; }
     .renfort-body { grid-template-columns: 1fr; gap: 40px; }
+    .renfort-body { display: grid; }
+    .renfort-cards, .renfort-match, .renfort-actions { grid-column: auto; grid-row: auto; }
     .renfort-title { font-size: 2rem; }
-    .renfort-match { min-height: 350px; }
+    .renfort-match { min-height: 292px; }
   }
   @media (max-width: 560px) {
     .renfort-cards { grid-template-columns: 1fr; gap: 12px; }
     .renfort-metiers-list { position: static; width: 100%; grid-template-columns: 1fr; margin-top: 6px; }
     .renfort-actions { align-items: stretch; flex-direction: column; }
     .renfort-cta { width: 100%; }
-    .renfort-match { padding: 17px; min-height: 350px; }
+    .renfort-match { padding: 15px; min-height: 292px; }
     .renfort-profile { padding-left: 5px; padding-right: 5px; }
   }
 
@@ -915,20 +922,22 @@
 
   /* ─── V63 — BLOC STOCKAGE AUTOMOBILE (vitrine) ─── */
 
-  .stockage-block { background: var(--neutral-light); }
+  .stockage-block { background: var(--neutral-light); position: relative; z-index: 1; }
   @media (min-width: 901px) {
     .stockage-block { padding-left: 48px; padding-right: 48px; } /* V66 — réduit le padding générique de section (80px) pour cette section afin d'utiliser réellement plus de largeur, sans grossir le contenu */
   }
   .stockage-inner {
-    display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 72px; align-items: center;
-    max-width: 1400px; margin: 0 auto; /* V66 — 1320 -> 1400px, composition mieux répartie sur la largeur */
+    display: block;
+    max-width: 1400px; margin: 0 auto;
   }
-  .stockage-benefits { list-style: none; margin-top: 22px; display: flex; flex-direction: column; gap: 10px; }
-  .stockage-benefits li { font-size: .88rem; color: #444; padding-left: 20px; position: relative; }
-  .stockage-benefits li::before { content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .stockage-intro { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(420px,.9fr); gap: clamp(48px,7vw,110px); align-items: end; }
+  .stockage-copy .section-sub { max-width: 720px; }
+  .stockage-benefits { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stockage-benefits li { font-size: .88rem; color: #37414a; padding: 15px 16px 15px 38px; position: relative; background: #fff; border: 1px solid rgba(16,24,32,.08); border-radius: 8px; }
+  .stockage-benefits li::before { content: '✓'; position: absolute; left: 15px; top: 14px; color: var(--accent); font-weight: 800; }
 
   /* V65 — frise stockage agrandie : dot 48->58px, ligne recentrée (top/left 24 -> 29px), libellés agrandis */
-  .stockage-steps { position: relative; padding-top: 8px; }
+  .stockage-steps { position: relative; padding-top: 8px; margin-top: 52px; width: 100%; }
   .stockage-steps-track { position: relative; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0; }
   .stockage-steps-line { position: absolute; left: 29px; right: 29px; top: 29px; height: 1px; background: rgba(16,24,32,.12); }
   .stockage-steps-line-fill { position: absolute; left: 29px; top: 29px; height: 1px; width: 0; background: var(--accent); transition: width 1.6s cubic-bezier(.25,.46,.45,.94) .1s; }
@@ -954,9 +963,13 @@
   }
 
   @media (max-width: 900px) {
-    .stockage-inner { grid-template-columns: 1fr; gap: 40px; }
+    .stockage-intro { grid-template-columns: 1fr; gap: 28px; }
+    .stockage-steps { margin-top: 38px; }
     .stockage-steps-track { flex-wrap: nowrap; }
     .stockage-step-label { font-size: .72rem; max-width: 88px; }
+  }
+  @media (max-width: 560px) {
+    .stockage-benefits { grid-template-columns: 1fr; }
   }
 
 
@@ -1300,7 +1313,19 @@
 
     height: 4px; background: rgba(255,255,255,0.1);
 
-    border-radius: 2px;
+    border-radius: 2px; overflow: hidden;
+
+  }
+
+  .track-line::after {
+
+    content: ''; position: absolute; inset: 0 auto 0 0; width: 20%;
+
+    background: linear-gradient(90deg, transparent, var(--accent), rgba(255,255,255,.9), var(--accent), transparent);
+
+    filter: drop-shadow(0 0 7px rgba(229,72,77,.8));
+
+    animation: loyaltyRun 8s cubic-bezier(.45,0,.2,1) infinite;
 
   }
 
@@ -1354,6 +1379,31 @@
 
     transition: all var(--transition);
 
+    animation: loyaltyMilestone 8s ease-in-out infinite;
+
+  }
+
+  .track-node:nth-child(1) .node-circle { animation-delay: .2s; }
+  .track-node:nth-child(2) .node-circle { animation-delay: 1.65s; }
+  .track-node:nth-child(3) .node-circle { animation-delay: 3.1s; }
+  .track-node:nth-child(4) .node-circle { animation-delay: 4.55s; }
+  .track-node:nth-child(5) .node-circle { animation-delay: 6s; }
+
+  @keyframes loyaltyRun {
+    0% { transform: translateX(-110%); opacity: 0; }
+    8% { opacity: 1; }
+    82% { transform: translateX(510%); opacity: 1; }
+    90%,100% { transform: translateX(510%); opacity: 0; }
+  }
+
+  @keyframes loyaltyMilestone {
+    0%,7%,100% { border-color: rgba(255,255,255,.15); color: inherit; box-shadow: none; transform: scale(1); }
+    11%,18% { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 7px rgba(229,72,77,.1), 0 0 20px rgba(229,72,77,.28); transform: scale(1.1); }
+    24% { border-color: rgba(255,255,255,.15); color: inherit; box-shadow: none; transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .track-line::after, .node-circle { animation: none; }
   }
 
 
@@ -5608,11 +5658,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
         <div class="renfort-scan"><span>Recherche du profil adapté</span><span class="renfort-scan-line"></span></div>
         <div class="renfort-profiles" aria-hidden="true">
-          <div class="renfort-profile"><div class="renfort-avatar">PA</div><strong>Profil vérifié</strong><span>Automobile</span></div>
-          <div class="renfort-profile is-match"><div class="renfort-avatar">✓</div><strong>Profil adapté</strong><span>Disponible</span></div>
-          <div class="renfort-profile"><div class="renfort-avatar">PA</div><strong>Profil vérifié</strong><span>Automobile</span></div>
+          <div class="renfort-profile"><div class="renfort-avatar">✓</div><strong>Disponible demain</strong><span>8 h 30</span></div>
+          <div class="renfort-profile is-match"><div class="renfort-avatar">✓</div><strong>Compétence vérifiée</strong><span>Préparation auto</span></div>
+          <div class="renfort-profile"><div class="renfort-avatar">✓</div><strong>Sur votre site</strong><span>Intervention sur place</span></div>
         </div>
-        <div class="renfort-confirm"><span class="renfort-confirm-icon">✓</span><span><strong>Renfort confirmé</strong><span>Le professionnel adapté est prêt pour la mission.</span></span></div>
+        <div class="renfort-confirm"><span class="renfort-confirm-icon">✓</span><span><strong>Professionnel sélectionné</strong><span>Disponible demain à 8 h 30</span></span></div>
       </div>
 
     </div>
@@ -5642,13 +5692,17 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
   <div class="stockage-inner">
 
-    <div>
+    <div class="stockage-intro">
+
+      <div class="stockage-copy">
 
       <div class="section-tag">Stockage automobile</div>
 
       <h2 class="section-h2" style="color:var(--ink);font-size:clamp(1.6rem,2.4vw,2.2rem)">Stockage automobile</h2>
 
       <p class="section-sub">Confiez-nous votre véhicule pour quelques jours ou plusieurs semaines. HelixCar organise sa prise en charge, son stockage, puis sa restitution ou sa livraison selon vos besoins.</p>
+
+      </div>
 
       <ul class="stockage-benefits">
         <li>Durée adaptée au besoin</li>
