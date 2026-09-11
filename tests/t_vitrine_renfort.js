@@ -122,8 +122,12 @@ function check(libelle, condition, detail) {
       tarif: {
         fond: tarifFond,
         carte: tarifCarte.backgroundColor,
+        carteDegrade: tarifCarte.backgroundImage,
+        carteBordure: tarifCarte.borderTopColor,
         texte: tarifCarte.color,
         noteFond: tarifNote.backgroundColor,
+        noteDegrade: tarifNote.backgroundImage,
+        noteBordure: tarifNote.borderTopColor,
         note: getComputedStyle(document.querySelector('.pricing-note-inner > div')).color,
         stockageFond,
         titre: document.querySelector('.quote-section > .section-h2').textContent.trim(),
@@ -148,10 +152,12 @@ function check(libelle, condition, detail) {
   check('R14 : le bloc Renfort partage l’alignement et la largeur généreuse du Stockage',
     miseEnPage.renfort.largeur >= miseEnPage.largeurStockage * .99
     && miseEnPage.renfort.alignementGauche <= 1, JSON.stringify(miseEnPage.renfort));
-  check('R15 : Tarifs convoyage garde son fond noir avec cartes et note gris clair',
+  check('R15 : Tarifs convoyage garde son fond noir avec cartes et note en graphite bordé de rouge',
     /rgb\((?:10|11|13|16), (?:14|15|18|24), (?:19|20|24|32)\)/.test(miseEnPage.tarif.fond)
-    && miseEnPage.tarif.carte === miseEnPage.tarif.stockageFond
-    && miseEnPage.tarif.noteFond === miseEnPage.tarif.stockageFond
+    && /linear-gradient/.test(miseEnPage.tarif.carteDegrade)
+    && /linear-gradient/.test(miseEnPage.tarif.noteDegrade)
+    && /229, 72, 77/.test(miseEnPage.tarif.carteBordure)
+    && /229, 72, 77/.test(miseEnPage.tarif.noteBordure)
     && /rgb\((?:16|17), (?:24|25), (?:32|33)\)/.test(miseEnPage.tarif.texte)
     && /rgba?\((?:16|17), (?:24|25), (?:32|33)/.test(miseEnPage.tarif.note)
     && miseEnPage.tarif.titre === 'Un tarif clair, adapté à votre trajet.'
@@ -210,7 +216,7 @@ function check(libelle, condition, detail) {
   await page.evaluate(() => {
     document.getAnimations().forEach(animation => {
       if (/^renfort(?:Critere|Check|Confirmation)/.test(animation.animationName || '')) {
-        animation.currentTime = 5200;
+        animation.currentTime = 8000;
         animation.pause();
       }
     });
@@ -218,12 +224,20 @@ function check(libelle, condition, detail) {
   await page.waitForTimeout(50);
   const renfortFinal = await page.evaluate(() => ({
     checks: Array.from(document.querySelectorAll('.renfort-avatar')).map(el => getComputedStyle(el).backgroundColor),
-    confirmation: Number(getComputedStyle(document.querySelector('.renfort-confirm')).opacity)
+    confirmation: Number(getComputedStyle(document.querySelector('.renfort-confirm')).opacity),
+    fond: getComputedStyle(document.querySelector('.renfort-confirm')).backgroundImage,
+    bordure: getComputedStyle(document.querySelector('.renfort-confirm')).borderTopColor,
+    uneLigne: getComputedStyle(document.querySelector('.renfort-confirm > span:last-child')).whiteSpace,
+    rechercheDuree: getComputedStyle(document.querySelector('.renfort-scan-line'), '::after').animationDuration
   }));
-  check('R19 : les trois critères sont rouges avant l’apparition de la confirmation blanche',
+  check('R19 : les trois critères sont rouges avant la confirmation sombre, compacte et ralentie',
     renfortFinal.checks.length === 3
     && renfortFinal.checks.every(c => /181, 68, 75|229, 72, 77/.test(c))
-    && renfortFinal.confirmation > .9, JSON.stringify(renfortFinal));
+    && renfortFinal.confirmation > .9
+    && /linear-gradient/.test(renfortFinal.fond)
+    && /229, 72, 77/.test(renfortFinal.bordure)
+    && renfortFinal.uneLigne === 'nowrap'
+    && renfortFinal.rechercheDuree === '6.8s', JSON.stringify(renfortFinal));
 
   await page.setViewportSize({ width: 390, height: 844 });
   const largeur = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
