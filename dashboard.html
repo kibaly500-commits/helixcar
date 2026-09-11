@@ -1457,6 +1457,10 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
       <!-- CONVOYEUR: Dashboard -->
       <div class="page" id="page-convoyeur-dashboard">
+        <div id="conv-rib-rappel" class="alert alert-info" style="display:none;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
+          <span><strong>Finalisez vos informations de paiement</strong><br>Pour recevoir vos paiements HelixCar, ajoutez votre RIB depuis votre espace sécurisé.</span>
+          <button type="button" class="btn btn-dark btn-sm" onclick="showPage('convoyeur-profil');setTimeout(function(){var e=document.getElementById('conv-rib-carte');if(e)e.scrollIntoView({behavior:'smooth',block:'center'});},0)">Ajouter mon RIB</button>
+        </div>
         <div class="stats-row">
           <div class="stat-card yellow"><div class="stat-label">Missions disponibles</div><div class="stat-value" id="conv-stat-dispo">—</div><div class="stat-sub" id="conv-stat-dispo-sub"></div></div>
           <div class="stat-card green"><div class="stat-label">Missions ce mois</div><div class="stat-value" id="conv-stat-mois">—</div></div>
@@ -1720,7 +1724,21 @@ body.scroll-verrouille { overflow: hidden; }
             <label>Mes métiers</label>
             <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
           </div>
-          <div class="fid-note">Pour modifier vos coordonnées ou vos documents, contactez HelixCar : rien n'est modifiable directement depuis cet écran pour le moment.</div>
+          <div class="fid-note">Pour modifier vos coordonnées ou les documents de candidature, contactez HelixCar. Votre RIB de paiement se gère ci-dessous.</div>
+        </div>
+        <div class="card" id="conv-rib-carte">
+          <div class="card-header"><div><div class="card-title">Informations de paiement</div><div class="card-sub">Dépôt privé, accessible uniquement par vous et HelixCar</div></div></div>
+          <div id="conv-rib-manquant">
+            <p style="font-size:.86rem;color:#555;line-height:1.55;margin-bottom:14px">Pour finaliser votre dossier de paiement et recevoir vos règlements, nous avons besoin de votre RIB.</p>
+            <input type="file" id="conv-rib-input" accept="application/pdf,image/jpeg,image/png" style="display:none" onchange="envoyerRibPartenaire(this)">
+            <button type="button" class="btn btn-primary" id="conv-rib-btn" onclick="document.getElementById('conv-rib-input').click()">Ajouter mon RIB</button>
+            <div style="font-size:.75rem;color:#777;margin-top:8px">PDF, JPG ou PNG — 10 Mo maximum.</div>
+          </div>
+          <div id="conv-rib-fourni" style="display:none">
+            <div class="hc-note hc-note--succes visible" role="status">Votre RIB a bien été transmis à HelixCar pour vos paiements.</div>
+            <button type="button" class="btn btn-outline btn-sm" style="margin-top:12px" onclick="document.getElementById('conv-rib-input').click()">Remplacer mon RIB</button>
+          </div>
+          <div id="conv-rib-message" class="hc-note" role="status"></div>
         </div>
         <!-- LOT X01 — le bloc « Mes documents de mission » (lettre de voiture
              HC-2024-0529, liens vers des pages absentes du dépôt) était
@@ -2199,6 +2217,73 @@ function remplirProfilConvoyeur(conv) {
             + escapeHtml(CONV_LIB_METIER[m]) + '</span>';
         }).join('')
       : '<span style="font-size:.82rem;color:#888">Aucun métier déclaré. Contactez HelixCar pour les préciser.</span>';
+  }
+  _mettreAJourAffichageRib(conv);
+}
+
+function _ribEstCheminPrive(valeur) {
+  return typeof valeur === 'string' && /^[0-9a-f-]{36}\/rib\/[0-9a-f-]{16,}\.(pdf|jpe?g|png)$/i.test(valeur);
+}
+
+function _mettreAJourAffichageRib(conv) {
+  conv = conv || window._currentConvoyeur;
+  var fourni = !!(conv && conv.rib_iban);
+  var rappel = document.getElementById('conv-rib-rappel');
+  var manquant = document.getElementById('conv-rib-manquant');
+  var ok = document.getElementById('conv-rib-fourni');
+  if (rappel) rappel.style.display = fourni ? 'none' : 'flex';
+  if (manquant) manquant.style.display = fourni ? 'none' : 'block';
+  if (ok) ok.style.display = fourni ? 'block' : 'none';
+}
+
+async function envoyerRibPartenaire(input) {
+  var conv = window._currentConvoyeur;
+  var fichier = input && input.files && input.files[0];
+  var btn = document.getElementById('conv-rib-btn');
+  if (!conv || !fichier || !sbAuth) return;
+  var types = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
+  var extension = types[fichier.type];
+  if (!extension) {
+    _hcNote('conv-rib-message', 'Format refusé. Choisissez un PDF, un JPG ou un PNG.');
+    input.value = '';
+    return;
+  }
+  if (fichier.size > 10 * 1024 * 1024) {
+    _hcNote('conv-rib-message', 'Ce fichier dépasse 10 Mo. Choisissez un document plus léger.');
+    input.value = '';
+    return;
+  }
+  var identifiant;
+  try { identifiant = crypto.randomUUID(); }
+  catch (e) { identifiant = Date.now() + '-' + Math.random().toString(16).slice(2); }
+  var chemin = conv.id + '/rib/' + identifiant + '.' + extension;
+  var ancien = conv.rib_iban;
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi du RIB…'; }
+  _hcNote('conv-rib-message', 'Envoi sécurisé en cours…', 'info');
+  try {
+    var depot = await sbAuth.storage.from('convoyeurs-documents').upload(chemin, fichier, {
+      contentType: fichier.type,
+      cacheControl: '3600',
+      upsert: false
+    });
+    if (depot.error) throw depot.error;
+    var maj = await sbAuth.from('convoyeurs').update({ rib_iban: chemin }).eq('id', conv.id).select('rib_iban').single();
+    if (maj.error || !maj.data) {
+      await sbAuth.storage.from('convoyeurs-documents').remove([chemin]);
+      throw maj.error || new Error('Mise à jour non confirmée');
+    }
+    conv.rib_iban = maj.data.rib_iban;
+    _mettreAJourAffichageRib(conv);
+    _hcNote('conv-rib-message', 'RIB transmis avec succès.', 'succes');
+    if (_ribEstCheminPrive(ancien)) {
+      sbAuth.storage.from('convoyeurs-documents').remove([ancien]).catch(function () {});
+    }
+  } catch (e) {
+    console.error('Erreur envoi RIB:', e);
+    _hcNote('conv-rib-message', "L'envoi du RIB a échoué. Vérifiez votre connexion puis réessayez.");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ajouter mon RIB'; }
+    input.value = '';
   }
 }
 
@@ -5248,7 +5333,7 @@ async function lancerSynchronisation() {
       descripteurs.push({ cle: c.id_url, chemin: base + 'Documents/piece-identite.' + extraireExtension(c.id_url), valeur: c.id_url, estUrl: true });
       descripteurs.push({ cle: c.permis_url, chemin: base + 'Documents/permis-de-conduire.' + extraireExtension(c.permis_url), valeur: c.permis_url, estUrl: true });
       descripteurs.push({ cle: c.rc_pro_url, chemin: base + 'Documents/rc-pro.' + extraireExtension(c.rc_pro_url), valeur: c.rc_pro_url, estUrl: true });
-      descripteurs.push({ cle: c.rib_iban, chemin: base + 'Documents/rib.' + extraireExtension(c.rib_iban), valeur: c.rib_iban, estUrl: true });
+      descripteurs.push({ cle: c.rib_iban, chemin: base + 'Documents/rib.' + extraireExtension(c.rib_iban), valeur: c.rib_iban, estUrl: true, estRibPrive: _ribEstCheminPrive(c.rib_iban) });
 
       const missionsConvoyeur = (missions || []).filter(function(m) { return m.convoyeur_id === c.id; });
       missionsConvoyeur.forEach(function(m) {
@@ -5375,9 +5460,15 @@ async function lancerSynchronisation() {
           if (d.estUrl) {
             if (!d.valeur) return;
             try {
-              const resp = await fetch(d.valeur);
-              if (!resp.ok) { erreurs++; return; }
-              donnee = await resp.blob();
+              if (d.estRibPrive) {
+                const prive = await sbAuth.storage.from('convoyeurs-documents').download(d.valeur);
+                if (prive.error || !prive.data) { erreurs++; return; }
+                donnee = prive.data;
+              } else {
+                const resp = await fetch(d.valeur);
+                if (!resp.ok) { erreurs++; return; }
+                donnee = await resp.blob();
+              }
             } catch (e) { erreurs++; return; }
           }
           zipMorceau.file(d.chemin, donnee);
@@ -5481,9 +5572,16 @@ async function executerParLots(taches, tailleLot, onProgress) {
 async function ajouterFichierAuZip(zip, url, cheminZipSansExt, logId) {
   if (!url) return false;
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) { ecrireLogArchive(logId, '⚠️ Échec de téléchargement (ignoré) : ' + url); return false; }
-    const blob = await resp.blob();
+    let blob;
+    if (_ribEstCheminPrive(url)) {
+      const prive = await sbAuth.storage.from('convoyeurs-documents').download(url);
+      if (prive.error || !prive.data) { ecrireLogArchive(logId, '⚠️ RIB privé indisponible (ignoré).'); return false; }
+      blob = prive.data;
+    } else {
+      const resp = await fetch(url);
+      if (!resp.ok) { ecrireLogArchive(logId, '⚠️ Échec de téléchargement (ignoré) : ' + url); return false; }
+      blob = await resp.blob();
+    }
     zip.file(cheminZipSansExt + '.' + extraireExtension(url), blob);
     return true;
   } catch (e) {
@@ -6145,7 +6243,6 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
-    <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
   `;
   // Décisions par activité + état de blocage RÉELLEMENT enregistré.
@@ -6673,6 +6770,37 @@ function supprimerConvoyeur(id) {
 let currentCandId = null;
 let currentCandName = null;
 
+async function ouvrirRibPartenaire(id) {
+  const c = (window._convoyeursActifsData || {})[id];
+  if (!c || !c.rib_iban) return;
+  if (!_ribEstCheminPrive(c.rib_iban)) {
+    const legacy = urlSure(c.rib_iban);
+    if (legacy) window.open(legacy, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  const onglet = window.open('', '_blank');
+  try {
+    const r = await sbAuth.storage.from('convoyeurs-documents').createSignedUrl(c.rib_iban, 300);
+    if (r.error || !r.data || !r.data.signedUrl) throw r.error || new Error('URL signée absente');
+    if (onglet) { onglet.opener = null; onglet.location = r.data.signedUrl; }
+    else window.open(r.data.signedUrl, '_blank', 'noopener,noreferrer');
+  } catch (e) {
+    if (onglet) onglet.close();
+    alert("Impossible d'ouvrir ce RIB pour le moment. Réessayez.");
+  }
+}
+
+function _lienRibAdmin(c) {
+  if (!c || !c.rib_iban) return '<span class="badge badge-pending">⏳ Manquant</span>';
+  if (_ribEstCheminPrive(c.rib_iban)) {
+    return '<button type="button" class="badge badge-active" style="border:0;cursor:pointer" '
+      + actionHtml('ouvrirRibPartenaire', [c.id]) + '>✅ Voir le RIB</button>';
+  }
+  var u = urlSure(c.rib_iban);
+  return u ? '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="text-decoration:none">✅ Voir le RIB</a>'
+    : '<span class="badge badge-pending">⏳ Manquant</span>';
+}
+
 function voirConvoyeurSb(id) {
   const c = (window._convoyeursActifsData || {})[id];
   if (!c) return;
@@ -6702,7 +6830,7 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
-    <div class="detail-row"><span class="detail-label">🏦 RIB</span><span class="detail-val">${docLink(c.rib_iban, 'le RIB')}</span></div>
+    <div class="detail-row"><span class="detail-label">🏦 RIB de paiement</span><span class="detail-val">${_lienRibAdmin(c)}</span></div>
     <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Missions effectuées</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
     <div style="color:#888;font-size:.78rem;margin-top:10px">📋 Retenues et récompenses : aucun mécanisme n'existe encore côté serveur ; les évaluations reçues se lisent dans la table des évaluations (lot D01).</div>
   `;
@@ -13364,7 +13492,7 @@ function declencherChampFichier(id) {
   'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',
   'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',
   'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
-  'ouvrirPhotosMission', 'ouvrirVideoCandidature', 'previsualiserDevis',
+  'ouvrirPhotosMission', 'ouvrirRibPartenaire', 'ouvrirVideoCandidature', 'previsualiserDevis',
   'refuserConvoyeur', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',
   'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',

@@ -84,6 +84,8 @@ async function definirResultatSignature(page, litteral) {
 
   // ── A. Fiche unique et états ──
   await page.evaluate(() => openDossierSb('cand-1'));
+  const dossierCandidat = await page.evaluate(() => document.getElementById('dossier-content').textContent);
+  check('A0 : le RIB n\'est pas demandé dans le dossier de candidature', !/RIB/i.test(dossierCandidat), dossierCandidat);
   await page.waitForTimeout(120);
   let fiche = await page.evaluate(() => ({
     html: document.getElementById('dossier-content').innerHTML,
