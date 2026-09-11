@@ -18,6 +18,10 @@ const migration = fs.readFileSync(path.join(racine, 'migrations/120_rib_partenai
 check('V1 : progression vidéo visible sur l\'étape finale', /id="conv-soumission-video"/.test(index));
 check('V2 : le pourcentage est alimenté par convMajProgressionVideo',
   /function convMajProgressionVideo[\s\S]*conv-soumission-video-pourcent/.test(index));
+check('V2b : le libellé décrit l\'envoi complet de la candidature',
+  /Envoi de votre candidature/.test(index));
+check('V2c : le pourcentage affiché avance par paliers réels de 5 %',
+  /function _convPourcentageAffiche[\s\S]{0,350}Math\.floor\(reel \/ 5\) \* 5/.test(index));
 check('V3 : transfert et vérification serveur sont deux états distincts',
   /_convAfficherEtapeSoumissionVideo\('verification'\)/.test(index)
   && /Vidéo envoyée — vérification de sécurité en cours/.test(index));

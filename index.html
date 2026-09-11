@@ -14807,20 +14807,29 @@ function _convMajBoutonsEnvoi() {
   if (reessayer) reessayer.style.display = (_convVideoEtat === 'erreur') ? 'inline-flex' : 'none';
 }
 
+// La barre suit chaque octet réellement transmis. Le nombre affiché est
+// volontairement plus stable : il avance par paliers de 5 % sans jamais
+// annoncer davantage que ce que le serveur a déjà reçu.
+function _convPourcentageAffiche(pct) {
+  var reel = Math.max(0, Math.min(100, Math.round(pct || 0)));
+  return reel === 100 ? 100 : Math.floor(reel / 5) * 5;
+}
+
 function convMajProgressionVideo(pct) {
   var valeur = Math.max(0, Math.min(100, Math.round(pct)));
+  var valeurAffichee = _convPourcentageAffiche(valeur);
   var barre = document.getElementById('conv-video-barre');
   if (barre) barre.style.width = valeur + '%';
   var txt = document.getElementById('conv-video-pourcent');
-  if (txt) txt.textContent = valeur + ' %';
+  if (txt) txt.textContent = valeurAffichee + ' %';
   var barreRecap = document.getElementById('conv-soumission-video-barre');
   if (barreRecap) barreRecap.style.width = valeur + '%';
   var txtRecap = document.getElementById('conv-soumission-video-pourcent');
-  if (txtRecap) txtRecap.textContent = valeur + ' %';
+  if (txtRecap) txtRecap.textContent = valeurAffichee + ' %';
   var titreRecap = document.getElementById('conv-soumission-video-titre');
   var pisteRecap = document.getElementById('conv-soumission-video-piste');
   if (titreRecap && pisteRecap && pisteRecap.style.display !== 'none') {
-    titreRecap.textContent = 'Envoi de la vidéo : ' + valeur + ' %';
+    titreRecap.textContent = 'Envoi de votre candidature : ' + valeurAffichee + ' %';
   }
   _convMajBoutonsEnvoi();
 }
@@ -14835,7 +14844,7 @@ function _convAfficherEtapeSoumissionVideo(etat, pct) {
   if (!etat) return;
   if (etat === 'envoi') {
     var valeur = Math.max(0, Math.min(100, Math.round(pct || 0)));
-    if (titre) titre.textContent = 'Envoi de la vidéo : ' + valeur + ' %';
+    if (titre) titre.textContent = 'Envoi de votre candidature : ' + _convPourcentageAffiche(valeur) + ' %';
     if (detail) detail.textContent = 'Ne fermez pas cette page pendant le transfert.';
     if (piste) piste.style.display = 'block';
     convMajProgressionVideo(valeur);
