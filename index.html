@@ -10565,9 +10565,16 @@ function _trajetCommun() {
   return false;
 }
 
-// Fiches individuelles requises ? (non en flotte à détailler, non à 1 véhicule)
+// Fiches individuelles requises ? Toute demande détaillée utilise la même
+// source de vérité, y compris lorsqu'elle ne contient qu'un véhicule.
+// Le rendu V51 a supprimé le formulaire mono historique : exclure encore
+// `n === 1` ici faisait afficher et valider la fiche, puis l'omettre du
+// payload final. Le seul cas sans lignes véhicule reste la flotte que le
+// client demande explicitement à compléter plus tard.
 function _fichesVehiculesRequises() {
-  return _nbVehicules() >= 2 && !_flotteADetailler();
+  return (_avecConvoyage() || _avecStockage())
+    && _nbVehicules() >= 1
+    && !_flotteADetailler();
 }
 
 // ── Rendu des fiches véhicules ────────────────────────────
@@ -16177,9 +16184,10 @@ async function _submitClientFormInterne() {
     heure_livraison:        heure_liv || null,
     type_service:              (type_service_val === 'compte' ? null : type_service_val),
     nb_vehicules:              (type_service_val === 'compte') ? null : nb_vehicules_val,
-    trajet_commun:             (_avecConvoyage() && nb_vehicules_val >= 2)
-                                 ? (trajet_commun_el ? trajet_commun_el.value === 'oui' : null)
-                                 : (_avecConvoyage() ? true : null),
+    // V51 : les opérations vivent dans chaque fiche véhicule, même en mono.
+    // `trajet_commun=true` ferait relire au PDF les anciens champs dossier,
+    // désormais masqués, et réintroduirait des tirets à la place des valeurs.
+    trajet_commun:             _avecConvoyage() ? false : null,
     flotte_a_detailler:        (flotte_el && flotte_el.checked) ? true : null,
     stockage_code_postal:      aDuStockage && stock_cp_val ? stock_cp_val : null,
     stockage_ville:            aDuStockage && stock_ville_val ? stock_ville_val : null,
