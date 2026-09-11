@@ -46,7 +46,8 @@
 // Variables d'environnement des Edge Functions :
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
 //   HELIXCAR_URL_PUBLIQUE (facultative), HELIXCAR_ORIGINES_SUPPLEMENTAIRES
-//   (facultative), RESEND_FROM (facultative, une fois le domaine vérifié)
+//   (facultative), RESEND_FROM (facultative, une fois le domaine vérifié),
+//   RESEND_REPLY_TO (facultative, défaut : contact@helixcar.fr)
 
 import { construirePdfServeur } from "../_shared/devis-pdf.mjs";
 
@@ -486,6 +487,7 @@ export async function actionPrepare(sb: any, req: Request, corps: any, cors: Rec
 // Expéditeur par défaut tant que le domaine HelixCar n'est pas vérifié
 // chez Resend ; remplaçable par RESEND_FROM sans toucher au code.
 const RESEND_FROM_TEMPORAIRE = "HelixCar <onboarding@resend.dev>";
+const HELIXCAR_EMAIL_CONTACT = "contact@helixcar.fr";
 const VERROU_ENVOI_MINUTES = 2;
 
 export async function actionSendEmail(
@@ -649,6 +651,7 @@ export async function actionSendEmail(
 
   const payload = {
     from: env.RESEND_FROM || RESEND_FROM_TEMPORAIRE, to: [destinataire], subject: sujet,
+    reply_to: env.RESEND_REPLY_TO || HELIXCAR_EMAIL_CONTACT,
     html: htmlEmail, text: texteEmail,
     attachments: [{ filename: nomPieceJointe, content: pdfBase64Standard }],
   };
@@ -936,6 +939,7 @@ if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
     const env = {
       RESEND_API_KEY: Deno.env.get("RESEND_API_KEY"),
       RESEND_FROM: Deno.env.get("RESEND_FROM"),
+      RESEND_REPLY_TO: Deno.env.get("RESEND_REPLY_TO"),
       HELIXCAR_ENV: Deno.env.get("HELIXCAR_ENV"),
       HELIXCAR_DESTINATAIRES_RECETTE: Deno.env.get("HELIXCAR_DESTINATAIRES_RECETTE"),
       HELIXCAR_URL_PUBLIQUE: Deno.env.get("HELIXCAR_URL_PUBLIQUE"),

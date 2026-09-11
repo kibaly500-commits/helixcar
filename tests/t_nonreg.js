@@ -131,6 +131,7 @@ const futur = dansNJours;
   const diff = execSync('git diff origin/main -- index.html dashboard.html', { cwd: RACINE, maxBuffer: 60 * 1024 * 1024 }).toString();
   const lignesAjoutees = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
   const ajouts = lignesAjoutees.join('\n');
+  const indexHtml = fs.readFileSync(fichier('index.html'), 'utf8');
   // Les garde-fous ci-dessous cherchent du CODE, pas des mots. Les
   // commentaires qui attestent l'absence de Stripe contiennent
   // forcément « Stripe » : les inclure ferait échouer le test sur sa
@@ -143,10 +144,14 @@ const futur = dansNJours;
 
   L.check('E1 : aucun nouvel envoi EmailJS introduit',
     !/emailjs\.(send|sendForm)/i.test(ajouts), (ajouts.match(/emailjs\.[a-z]+/gi) || []).join(','));
-  L.check('E2 : aucun code Stripe introduit',
+
+  L.check('E2 : l’adresse publique HelixCar est la boîte officielle du domaine',
+    /mailto:contact@helixcar\.fr/.test(indexHtml)
+      && /HELIXCAR_EMAIL_ADMIN\s*=\s*['"]contact@helixcar\.fr['"]/.test(indexHtml));
+  L.check('E3 : aucun code Stripe introduit',
     !/stripe|checkout\.session|payment_intent/i.test(ajoutsCode),
     (ajoutsCode.match(/.*stripe.*/i) || []).slice(0, 2).join(' | '));
-  L.check('E3 : aucun statut « payé » introduit',
+  L.check('E4 : aucun statut « payé » introduit',
     !/statut\s*[:=]\s*['"]pay/i.test(ajoutsCode) && !/\bpaye\b\s*[:=]\s*true/i.test(ajoutsCode));
   // Le mot apparaît dans des commentaires qui attestent que la clé
   // reste côté serveur. Ce qui doit être vérifié, c'est l'absence de
@@ -161,7 +166,7 @@ const futur = dansNJours;
         } catch (e) { return false; }
       });
   }
-  L.check('E4 : aucune clé privilégiée réelle introduite dans le navigateur',
+  L.check('E5 : aucune clé privilégiée réelle introduite dans le navigateur',
     jwtsPrivilegies(ajouts).length === 0
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('index.html'), 'utf8'))
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('dashboard.html'), 'utf8')));
@@ -273,6 +278,11 @@ const futur = dansNJours;
     // Lot Q01 : la page publique du devis suit le contrat versionné de
     // la fonction serveur (version obsolète, paiement en attente).
     'devis.html',
+    // Identité officielle : la fiche imprimable indique désormais la
+    // même adresse de contact que la vitrine.
+    'fiche-mission.html',
+    // Même identité sur la lettre de voiture contractuelle.
+    'lettre-voiture.html',
     // Lot Q01 : la fonction devis-secure vivait à la racine, hors de
     // l'arborescence que la CLI Supabase déploie. Elle est DÉPLACÉE
     // (git mv) vers supabase/functions/devis-secure/index.ts : l'ancien
@@ -302,13 +312,12 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 22,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 24,
     PERIMETRE.length + ' entrées');
-  // devis.html et index.ts sont entrés dans le périmètre avec le lot
-  // Q01 (voir PERIMETRE) ; les pages annexes, elles, restent interdites.
-  L.check('E6b : aucun fichier hors périmètre (edl.html, fiche-mission.html…)',
-    !fichiers.some(f => ['edl.html', 'fiche-mission.html',
-                         'lettre-voiture.html'].indexOf(f) !== -1),
+  // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
+  // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
+  L.check('E6b : aucun fichier annexe hors périmètre (edl.html…)',
+    !fichiers.some(f => ['edl.html'].indexOf(f) !== -1),
     fichiers.join(', '));
   L.check('E6d : la fonction devis-secure n\'est plus à la racine du dépôt',
     !fs.existsSync(fichier('index.ts')) && fs.existsSync(fichier('supabase/functions/devis-secure/index.ts')));

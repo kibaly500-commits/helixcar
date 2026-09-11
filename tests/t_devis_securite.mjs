@@ -142,7 +142,7 @@ function creerDouble(etat) {
     if (!String(url).startsWith('https://api.resend.com/')) throw new Error('réseau coupé : ' + url);
     const corps = JSON.parse(options.body);
     journal.resend.push({
-      to: corps.to, subject: corps.subject, from: corps.from,
+      to: corps.to, subject: corps.subject, from: corps.from, replyTo: corps.reply_to,
       piece: corps.attachments && corps.attachments[0] && corps.attachments[0].filename,
       pieceOctets: corps.attachments && corps.attachments[0] ? Buffer.from(corps.attachments[0].content, 'base64').length : 0,
       lien: (corps.html.match(/href="([^"]+)"/) || [])[1],
@@ -284,6 +284,8 @@ async function executerSuite() {
       d.journal.resend[0].lien);
     check('4.9 La clé Resend n\'apparaît que dans l\'en-tête d\'autorisation, jamais dans le corps',
       d.journal.resend[0].auth === 'Bearer k-secret' && !d.journal.resend[0].html.includes('k-secret'));
+    check('4.9b Les réponses au devis reviennent sur la boîte officielle HelixCar',
+      d.journal.resend[0].replyTo === 'contact@helixcar.fr', d.journal.resend[0].replyTo);
     check('4.10 Journal : preparation, tentative, acceptee_prestataire — dans cet ordre',
       etapes(d.journal).join(',') === 'preparation,tentative,acceptee_prestataire', etapes(d.journal).join(','));
     const acc = d.journal.insertsJournal.find(x => x.etape === 'acceptee_prestataire');
