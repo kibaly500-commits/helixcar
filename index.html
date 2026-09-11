@@ -790,51 +790,125 @@
   }
   .renfort-intro { max-width: 640px; }
   .renfort-tag { font-family: var(--font-body); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 16px; }
-  .renfort-title { font-family: var(--font-display); font-weight: 500; font-size: 1.9rem; line-height: 1.28; margin-bottom: 18px; }
+  .renfort-title { font-family: var(--font-display); font-weight: 500; font-size: clamp(2rem,3.2vw,3rem); line-height: 1.08; margin-bottom: 18px; }
   .renfort-text { font-size: .98rem; line-height: 1.75; color: rgba(245,242,234,.72); max-width: 600px; }
 
-  .renfort-body { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 64px; align-items: center; } /* V65 — rééquilibrage 58/42 (proche de la fourchette 55-60 / 40-45 demandée) */
+  .renfort-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px,.92fr); gap: 52px; align-items: center; }
 
   .renfort-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .renfort-card {
     border: 1px solid rgba(245,242,234,.16); border-top: 2px solid var(--accent);
-    border-radius: 2px; padding: 22px 20px; min-height: 84px; /* V65 — cartes moins massives (padding 30/26 -> 22/20, min-height 108 -> 84) */
-    display: flex; align-items: center;
+    border-radius: 8px; padding: 19px 18px; min-height: 78px;
+    display: flex; align-items: center; gap: 13px;
     font-family: var(--font-body); font-size: .96rem; font-weight: 600; letter-spacing: .01em;
     color: var(--paper); background: rgba(245,242,234,.03);
     opacity: 0; transform: translateY(10px);
-    transition: opacity .5s ease, transform .5s ease;
+    transition: opacity .5s ease, transform .5s ease, border-color .2s ease, background .2s ease;
   }
+  .renfort-card:hover { border-color: rgba(229,72,77,.65); background: rgba(245,242,234,.065); }
+  .renfort-card-icon {
+    width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--accent);
+    background: rgba(229,72,77,.11); border: 1px solid rgba(229,72,77,.26);
+  }
+  .renfort-card-icon svg { width: 17px; height: 17px; }
   .renfort-block.in-view .renfort-card { opacity: 1; transform: translateY(0); }
   .renfort-block.in-view .renfort-card:nth-child(1) { transition-delay: .05s; }
   .renfort-block.in-view .renfort-card:nth-child(2) { transition-delay: .18s; }
   .renfort-block.in-view .renfort-card:nth-child(3) { transition-delay: .31s; }
   .renfort-block.in-view .renfort-card:nth-child(4) { transition-delay: .44s; }
 
-  /* V65 — parcours agrandi verticalement : dot 23->30px, gap/padding augmentés, ligne recentrée sur le nouveau diamètre (left 19 -> 23px), libellé agrandi */
-  .renfort-flow { display: flex; flex-direction: column; justify-content: center; align-self: center; position: relative; padding-left: 8px; min-height: 260px; } /* V68 — 340px -> 260px : réduit la hauteur de ligne de la grille, remonte les cartes de gauche (centrage grid moins d'écart) */
-  .renfort-flow-line { position: absolute; left: 23px; top: 15px; bottom: 15px; width: 1px; background: rgba(245,242,234,.22); } /* V71 — ligne un peu plus visible (.14 -> .22), progression plus lisible avant l'animation */
-  .renfort-flow-line-fill { position: absolute; left: 23px; top: 15px; width: 1px; height: 0; background: var(--accent); transition: height 1.6s cubic-bezier(.25,.46,.45,.94) .1s; }
-  .renfort-block.in-view .renfort-flow-line-fill { height: calc(100% - 30px); }
-  .renfort-flow-item { display: flex; align-items: center; gap: 22px; padding: 18px 0; position: relative; z-index: 1; } /* V68 — 24px -> 18px : bande de droite plus resserrée/remontée */
-  .renfort-flow-dot {
-    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-    border: 1.5px solid rgba(245,242,234,.38); background: #12191F; /* V71 — bordure plus visible (.25 -> .38) */
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-body); font-size: .78rem; font-weight: 700; color: rgba(245,242,234,.78); /* V71 — numéros/icône plus lisibles (.55 -> .78) */
+  .renfort-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+  .renfort-metiers { position: relative; }
+  .renfort-metiers summary {
+    list-style: none; cursor: pointer; color: var(--paper); font-size: .86rem; font-weight: 650;
+    padding: 11px 0; display: inline-flex; align-items: center; gap: 8px;
   }
-  .renfort-flow-label { font-family: var(--font-body); font-size: 1.02rem; letter-spacing: .02em; color: var(--paper); font-weight: 600; }
-  .renfort-flow-item.is-last .renfort-flow-dot { border-color: var(--accent); color: var(--accent); }
+  .renfort-metiers summary::-webkit-details-marker { display: none; }
+  .renfort-metiers summary::after { content: '+'; color: var(--accent); font-size: 1.15rem; line-height: 1; }
+  .renfort-metiers[open] summary::after { content: '−'; }
+  .renfort-metiers-list {
+    position: absolute; left: 0; top: calc(100% + 8px); z-index: 8; width: min(520px,80vw);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
+    padding: 18px; border: 1px solid rgba(245,242,234,.15); border-radius: 10px;
+    background: #17232d; box-shadow: 0 18px 40px rgba(0,0,0,.28);
+  }
+  .renfort-metiers-list span { color: rgba(245,242,234,.76); font-size: .82rem; line-height: 1.45; }
+  .renfort-metiers-list span::before { content: '•'; color: var(--accent); margin-right: 8px; }
+  .renfort-cta {
+    appearance: none; border: 1px solid var(--accent); border-radius: 3px; cursor: pointer;
+    padding: 12px 18px; background: var(--accent); color: #fff; font: 700 .84rem var(--font-body);
+    transition: transform .2s ease, background .2s ease;
+  }
+  .renfort-cta:hover { transform: translateY(-2px); background: #cf3e43; }
+
+  /* Mise en relation racontée comme une scène, plutôt que comme une liste d'étapes. */
+  .renfort-match {
+    position: relative; overflow: hidden; min-height: 365px; padding: 22px;
+    border: 1px solid rgba(245,242,234,.14); border-radius: 16px;
+    background: linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.018));
+    box-shadow: 0 24px 60px rgba(0,0,0,.24);
+  }
+  .renfort-match::before {
+    content: ''; position: absolute; width: 230px; height: 230px; border-radius: 50%;
+    right: -105px; top: -100px; background: rgba(229,72,77,.16); filter: blur(5px);
+  }
+  .renfort-match-head { display: flex; align-items: center; gap: 9px; position: relative; z-index: 1; color: rgba(245,242,234,.66); font-size: .73rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
+  .renfort-live { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(229,72,77,.5); animation: renfortPulse 2s ease-out infinite; }
+  .renfort-brief {
+    position: relative; z-index: 1; margin-top: 20px; padding: 17px 18px; border-radius: 11px;
+    background: rgba(9,14,19,.58); border: 1px solid rgba(245,242,234,.12);
+  }
+  .renfort-brief small { display: block; color: rgba(245,242,234,.5); font-size: .72rem; margin-bottom: 6px; }
+  .renfort-brief strong { display: block; color: var(--paper); font-size: 1rem; margin-bottom: 6px; }
+  .renfort-brief span { color: rgba(245,242,234,.62); font-size: .78rem; }
+  .renfort-scan { height: 32px; margin: 8px 0 2px; display: flex; align-items: center; gap: 10px; color: rgba(245,242,234,.55); font-size: .74rem; }
+  .renfort-scan-line { flex: 1; height: 1px; overflow: hidden; background: rgba(245,242,234,.1); position: relative; }
+  .renfort-scan-line::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 40%; background: var(--accent); animation: renfortScan 2.4s ease-in-out infinite; }
+  .renfort-profiles { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .renfort-profile {
+    min-width: 0; padding: 12px 8px; text-align: center; border-radius: 10px;
+    border: 1px solid rgba(245,242,234,.1); background: rgba(245,242,234,.035);
+    animation: renfortProfil 7.2s ease-in-out infinite;
+  }
+  .renfort-profile:nth-child(2) { animation-delay: .35s; }
+  .renfort-profile:nth-child(3) { animation-delay: .7s; }
+  .renfort-avatar { width: 30px; height: 30px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; background: rgba(245,242,234,.09); color: var(--paper); font-size: .7rem; font-weight: 750; }
+  .renfort-profile strong { display: block; color: rgba(245,242,234,.8); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .renfort-profile span { display: block; color: rgba(245,242,234,.42); font-size: .62rem; margin-top: 3px; }
+  .renfort-profile.is-match { border-color: rgba(229,72,77,.58); background: rgba(229,72,77,.08); }
+  .renfort-profile.is-match .renfort-avatar { background: var(--accent); }
+  .renfort-confirm {
+    position: relative; z-index: 1; margin-top: 12px; padding: 13px 15px; display: flex; align-items: center; gap: 11px;
+    border-radius: 10px; background: var(--paper); color: var(--ink);
+    animation: renfortConfirmation 7.2s ease-in-out -3.8s infinite;
+  }
+  .renfort-confirm-icon { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: .78rem; font-weight: 800; }
+  .renfort-confirm strong { display: block; font-size: .79rem; }
+  .renfort-confirm span { display: block; color: #68717a; font-size: .68rem; margin-top: 2px; }
+
+  @keyframes renfortPulse { 70% { box-shadow: 0 0 0 8px rgba(229,72,77,0); } 100% { box-shadow: 0 0 0 0 rgba(229,72,77,0); } }
+  @keyframes renfortScan { 0% { transform: translateX(-110%); } 55%,100% { transform: translateX(280%); } }
+  @keyframes renfortProfil { 0%,10% { opacity:.28; transform:translateY(7px); } 24%,88% { opacity:1; transform:none; } 100% { opacity:.28; transform:translateY(7px); } }
+  @keyframes renfortConfirmation { 0%,42% { opacity:0; transform:translateY(8px); } 56%,88% { opacity:1; transform:none; } 100% { opacity:0; transform:translateY(8px); } }
 
   @media (prefers-reduced-motion: reduce) {
     .renfort-card { transition: none; opacity: 1; transform: none; }
-    .renfort-flow-line-fill { transition: none; height: calc(100% - 30px); }
+    .renfort-live, .renfort-scan-line::after, .renfort-profile, .renfort-confirm { animation: none; opacity: 1; transform: none; }
   }
 
   @media (max-width: 900px) {
     .renfort-body { grid-template-columns: 1fr; gap: 40px; }
-    .renfort-cards { grid-template-columns: 1fr; gap: 16px; }
-    .renfort-title { font-size: 1.5rem; }
+    .renfort-title { font-size: 2rem; }
+    .renfort-match { min-height: 350px; }
+  }
+  @media (max-width: 560px) {
+    .renfort-cards { grid-template-columns: 1fr; gap: 12px; }
+    .renfort-metiers-list { position: static; width: 100%; grid-template-columns: 1fr; margin-top: 6px; }
+    .renfort-actions { align-items: stretch; flex-direction: column; }
+    .renfort-cta { width: 100%; }
+    .renfort-match { padding: 17px; min-height: 350px; }
+    .renfort-profile { padding-left: 5px; padding-right: 5px; }
   }
 
 
@@ -5510,48 +5584,50 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="renfort-tag">Renfort professionnel ponctuel</div>
 
-      <h2 class="renfort-title">Un besoin ponctuel sur votre site ?</h2>
+      <h2 class="renfort-title">Le bon professionnel,<br>au bon moment.</h2>
 
-      <p class="renfort-text">HelixCar mobilise son réseau de partenaires indépendants pour vous aider à trouver un professionnel adapté à votre mission.</p>
+      <p class="renfort-text">Décrivez votre besoin. HelixCar sélectionne le professionnel adapté et organise son intervention directement sur votre site.</p>
 
     </div>
 
     <div class="renfort-body">
 
       <div class="renfort-cards">
-        <div class="renfort-card">Accueil en concession</div>
-        <div class="renfort-card">Préparation automobile</div>
-        <div class="renfort-card">Opérations de parc</div>
-        <div class="renfort-card">Soutien administratif</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20v-9l8-6 8 6v9"/><path d="M8 20v-5h8v5"/><path d="M9 10h6"/></svg></span>Accueil en concession</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 13l1.5-4h11l1.5 4"/><rect x="3.5" y="12.5" width="17" height="5.5" rx="1.5"/><path d="M7 18v2M17 18v2"/></svg></span>Préparation automobile</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 17h6M17 14v6"/></svg></span>Opérations de parc</div>
+        <div class="renfort-card"><span class="renfort-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></span>Soutien administratif</div>
       </div>
 
-      <div class="renfort-flow">
-
-        <div class="renfort-flow-line"></div>
-        <div class="renfort-flow-line-fill"></div>
-
-        <div class="renfort-flow-item">
-          <div class="renfort-flow-dot">1</div>
-          <div class="renfort-flow-label">Besoin client</div>
+      <div class="renfort-match" aria-label="Exemple animé de mise en relation avec un professionnel">
+        <div class="renfort-match-head"><span class="renfort-live"></span>Mise en relation HelixCar</div>
+        <div class="renfort-brief">
+          <small>Votre besoin</small>
+          <strong>Préparateur automobile</strong>
+          <span>Demain · 8 h 30 · Intervention sur votre site</span>
         </div>
-
-        <div class="renfort-flow-item">
-          <div class="renfort-flow-dot"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><rect x="3.5" y="11" width="17" height="5.5" rx="1.5"/><circle cx="7.5" cy="16.5" r="1.4"/><circle cx="16.5" cy="16.5" r="1.4"/></svg></div>
-          <div class="renfort-flow-label">HelixCar</div>
+        <div class="renfort-scan"><span>Recherche du profil adapté</span><span class="renfort-scan-line"></span></div>
+        <div class="renfort-profiles" aria-hidden="true">
+          <div class="renfort-profile"><div class="renfort-avatar">PA</div><strong>Profil vérifié</strong><span>Automobile</span></div>
+          <div class="renfort-profile is-match"><div class="renfort-avatar">✓</div><strong>Profil adapté</strong><span>Disponible</span></div>
+          <div class="renfort-profile"><div class="renfort-avatar">PA</div><strong>Profil vérifié</strong><span>Automobile</span></div>
         </div>
-
-        <div class="renfort-flow-item">
-          <div class="renfort-flow-dot">3</div>
-          <div class="renfort-flow-label">Partenaire indépendant</div>
-        </div>
-
-        <div class="renfort-flow-item is-last">
-          <div class="renfort-flow-dot">✓</div>
-          <div class="renfort-flow-label">Mission pourvue</div>
-        </div>
-
+        <div class="renfort-confirm"><span class="renfort-confirm-icon">✓</span><span><strong>Renfort confirmé</strong><span>Le professionnel adapté est prêt pour la mission.</span></span></div>
       </div>
 
+    </div>
+
+    <div class="renfort-actions">
+      <details class="renfort-metiers">
+        <summary>Voir tous les métiers</summary>
+        <div class="renfort-metiers-list">
+          <span>Jockey automobile</span><span>Accueil en concession</span>
+          <span>Préparation automobile</span><span>Opérations de parc</span>
+          <span>Soutien administratif</span><span>Mécanique</span>
+          <span>Carrosserie</span><span>Diagnostic automobile</span>
+        </div>
+      </details>
+      <button type="button" class="renfort-cta" onclick="ouvrirRenfortProfessionnel()">Organiser un renfort</button>
     </div>
 
   </div>
@@ -5621,9 +5697,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
   <div class="section-tag reveal">Programme de fidélité</div>
 
-  <h2 class="section-h2 reveal">Chaque prestation payée<br>vous rapproche du prochain palier</h2>
+  <h2 class="section-h2 reveal">Chaque prestation<br>vous rapproche du prochain palier</h2>
 
-  <p class="section-sub reveal">1&nbsp;€ payé sur une prestation terminée = 1 point, tous services confondus. Cinq paliers, puis une Box mystère tous les 2&nbsp;000 points.</p>
+  <p class="section-sub reveal">Avancez à votre rythme : HelixCar vous accompagne, palier après palier, vers de nouveaux avantages.</p>
 
   <!-- LOT L01 / L02 — cinq paliers en POINTS (décision C10), icônes sobres
        (cadeau, étoile, insigne, couronne, trophée), aucune progression
@@ -5666,20 +5742,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
   </div>
 
-  <div class="loyalty-suite reveal">
-    <p><strong>Palier 1 — 2&nbsp;000 points</strong> : réduction de 10&nbsp;% sur une box surprise automobile.
-       Les récompenses des paliers suivants sont dévoilées à chaque palier atteint.</p>
-    <p>Au-delà de 10&nbsp;000 points, le programme continue sans remise à zéro : 12&nbsp;000, 14&nbsp;000, 16&nbsp;000 points…
-       Chaque nouveau seuil ouvre une <strong>Box mystère</strong>.</p>
-  </div>
-
   <div class="loyalty-bottom">
 
     <div class="loyalty-card reveal">
 
       <h3>Programme Clients</h3>
 
-      <p>Vos points sont calculés par HelixCar sur vos prestations terminées et payées : 1 point par euro TTC entier, arrondi à l'inférieur. Suivez vos points cumulés et le prochain palier depuis votre espace client.</p>
+      <p>Une fois votre prestation terminée, vos points sont automatiquement ajoutés à votre compte. Suivez vos points cumulés et votre prochain palier depuis votre espace client.</p>
 
 <p style="color:rgba(255,255,255,.5);font-size:.82rem;margin-top:8px;font-style:italic">Les récompenses sont révélées à chaque nouveau palier atteint.</p>
 
@@ -5715,7 +5784,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <p style="color:#444;line-height:1.8;margin-bottom:20px">
 
-        Rejoignez notre programme de fidélité : chaque euro payé sur une prestation terminée vous rapporte un point, quel que soit le service. Cinq paliers jalonnent le parcours (2&nbsp;000, 4&nbsp;000, 6&nbsp;000, 8&nbsp;000 et 10&nbsp;000 points), puis une Box mystère s'ouvre tous les 2&nbsp;000 points, sans remise à zéro. Suivez vos points cumulés et le prochain palier depuis votre espace client.
+        Rejoignez notre programme de fidélité : une fois votre prestation terminée, vos points sont automatiquement ajoutés à votre compte. Cinq paliers jalonnent le parcours et les récompenses sont révélées à chaque nouveau palier atteint. Suivez vos points cumulés et votre prochain palier depuis votre espace client.
 
       </p>
 
@@ -16907,6 +16976,17 @@ function openModal(type) {
   // professionnel » reflète le type de client (particulier par défaut).
   if (type === 'client' && typeof nettSyncOptionService === 'function') nettSyncOptionService();
 
+}
+
+// Le bouton de la vitrine ouvre le parcours client avec le service
+// « Trouver un professionnel » déjà choisi. Le demandeur conserve
+// néanmoins toutes les étapes normales d'identification et de contrôle.
+function ouvrirRenfortProfessionnel() {
+  openModal('client');
+  var option = document.querySelector('input[name="type-service"][value="professionnel"]');
+  if (!option) return;
+  option.checked = true;
+  if (typeof onChoixService === 'function') onChoixService();
 }
 
 

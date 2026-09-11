@@ -36,8 +36,10 @@ const SOURCE_MIGRATION = fs.readFileSync(fichier('migrations/109_fidelite_points
 check('C10 : aucune règle d\'expiration des points n\'est inventée dans l\'interface',
   !/points n['’]expirent pas/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD)
   && !/expiration des points/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD));
-check('C10 : la règle validée TTC/euro entier est identique dans les deux interfaces',
-  SOURCE_VITRINE.includes("1 point par euro TTC entier, arrondi à l'inférieur")
+check('C10 : la règle de calcul reste explicite dans l’espace privé, sans discours marchand sur l’argent dans la vitrine',
+  !SOURCE_VITRINE.includes("1 point par euro TTC entier, arrondi à l'inférieur")
+  && !/1\s*€\s*payé/i.test(SOURCE_VITRINE)
+  && SOURCE_VITRINE.includes('Une fois votre prestation terminée, vos points sont automatiquement ajoutés à votre compte')
   && SOURCE_DASHBOARD.includes('1 € TTC entier payé = 1 point')
   && SOURCE_DASHBOARD.includes('1 € TTC entier payé sur une prestation terminée = 1 point'));
 check('C10 : le serveur crédite floor(prix TTC), sans règle provisoire résiduelle',
@@ -404,12 +406,13 @@ async function ouvrirFidelite(page, cas, mouvements) {
   check('H6 : aucune progression fictive (ni palier « atteint », ni barre remplie), aucun kilomètre, aucun « Palier Entreprises »',
     vitrine.barre === false && vitrine.noeuds.every(n => !/done|active/.test(n.classes))
     && motsInterdits(vitrine.texte).length === 0, motsInterdits(vitrine.texte).join(', '));
-  check('H7 : la continuité au-delà de 10 000 points et la Box mystère sont annoncées, sans contenu ni valeur',
-    /12\s?000/.test(vitrine.texte.replace(/\u00a0/g, ' ')) && /Box mystère/.test(vitrine.texte)
-    && !/€\s*de valeur|d'une valeur|vaut/i.test(vitrine.texte));
-  check('H8 : la récompense vérifiée du palier 1 est reprise, les autres sont dévoilées à chaque palier',
-    /10\s?% sur une box surprise automobile/.test(vitrine.texte.replace(/\u00a0/g, ' '))
-    && /dévoilées à chaque palier/.test(vitrine.texte));
+  check('H7 : la vitrine reste centrée sur les cinq paliers, sans détail après 10 000 points',
+    !/12\s?000/.test(vitrine.texte.replace(/\u00a0/g, ' '))
+    && !/Au-delà de 10\s?000/i.test(vitrine.texte)
+    && !/class="loyalty-suite"/.test(idx));
+  check('H8 : aucun avantage n’est dévoilé en avance ; les récompenses sont révélées au palier atteint',
+    !/10\s?% sur une box surprise automobile/.test(vitrine.texte.replace(/\u00a0/g, ' '))
+    && /récompenses sont révélées à chaque nouveau palier atteint/i.test(vitrine.texte));
   // Le challenge des convoyeurs ne change pas : son paragraphe est
   // textuellement celui d'origin/main.
   let ancienIdx = '';
