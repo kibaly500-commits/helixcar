@@ -79,11 +79,17 @@ function check(libelle, condition, detail) {
     }));
     const stockageTag = document.querySelector('#stockage-automobile .section-tag').getBoundingClientRect();
     const fideliteTag = document.querySelector('#fidelite > .section-tag').getBoundingClientRect();
+    const renfort = document.querySelector('.renfort-inner').getBoundingClientRect();
+    const renfortTag = document.querySelector('#renfort-ponctuel .renfort-tag').getBoundingClientRect();
     const ordre = Array.from(document.querySelectorAll('section[id]')).map(el => el.id);
     const idsAttendus = ['services', 'fidelite', 'stockage-automobile', 'devis', 'convoyeurs'];
     const positions = idsAttendus.map(id => ordre.indexOf(id));
     const heroFill = getComputedStyle(document.querySelector('.hero2-panel-progress-fill'));
     const heroMarker = getComputedStyle(document.querySelector('.hero2-panel-progress-marker'));
+    const heroStage = getComputedStyle(document.querySelector('.hero2-panel-progress-stage'));
+    const heroTrack = document.querySelector('.hero2-panel-progress-track').getBoundingClientRect();
+    const tarifFond = getComputedStyle(document.querySelector('.quote-section')).backgroundColor;
+    const tarifCarte = getComputedStyle(document.querySelector('.pricing-card'));
     return {
       largeurStockage: stockage.width,
       largeurEtapes: etapes.width,
@@ -94,12 +100,22 @@ function check(libelle, condition, detail) {
       animations,
       fausseProgression: !!document.querySelector('.track-progress'),
       alignementGauche: Math.abs(stockageTag.left - fideliteTag.left),
+      renfort: { largeur: renfort.width, alignementGauche: Math.abs(renfortTag.left - fideliteTag.left) },
       positions,
       flechesHero: document.querySelectorAll('.hero2-switcher-arrow').length,
       precedenteHero: !!document.querySelector('[aria-label="Service précédent"]'),
       heroFill: { nom: heroFill.animationName, duree: heroFill.animationDuration },
       heroMarker: { nom: heroMarker.animationName, duree: heroMarker.animationDuration },
-      routeAnimee: getComputedStyle(document.querySelector('.hero2-route-line'), '::after').animationName
+      heroStage: { nom: heroStage.animationName, duree: heroStage.animationDuration },
+      heroTrackLargeur: heroTrack.width,
+      brillanceHero: heroFill.backgroundImage,
+      routeAnimee: getComputedStyle(document.querySelector('.hero2-route-line'), '::after').animationName,
+      tarif: {
+        fond: tarifFond,
+        carte: tarifCarte.backgroundColor,
+        texte: tarifCarte.color,
+        note: getComputedStyle(document.querySelector('.pricing-note-inner > div')).color
+      }
     };
   });
   check('R12 : le bloc Stockage est large et aligné à gauche sur le Programme de fidélité',
@@ -114,15 +130,48 @@ function check(libelle, condition, detail) {
     && miseEnPage.animations.map(a => a.nom).join('|') === 'loyaltyMilestone1|loyaltyMilestone2|loyaltyMilestone3|loyaltyMilestone4|loyaltyMilestone5'
     && miseEnPage.animations.every(a => a.duree === '10s' && a.rythme === 'linear')
     && miseEnPage.fausseProgression === false, JSON.stringify(miseEnPage));
-  check('R14 : l’ordre éditorial demandé suit immédiatement les Services',
+  check('R14 : le bloc Renfort partage l’alignement et la largeur généreuse du Stockage',
+    miseEnPage.renfort.largeur >= miseEnPage.largeurStockage * .99
+    && miseEnPage.renfort.alignementGauche <= 1, JSON.stringify(miseEnPage.renfort));
+  check('R15 : Tarifs convoyage inverse bien le contraste — fond noir, cartes blanches, texte noir',
+    /rgb\((?:10|11|13|16), (?:14|15|18|24), (?:19|20|24|32)\)/.test(miseEnPage.tarif.fond)
+    && miseEnPage.tarif.carte === 'rgb(255, 255, 255)'
+    && /rgb\((?:16|17), (?:24|25), (?:32|33)\)/.test(miseEnPage.tarif.texte)
+    && /rgba?\((?:16|17), (?:24|25), (?:32|33)/.test(miseEnPage.tarif.note), JSON.stringify(miseEnPage.tarif));
+  check('R16 : l’ordre éditorial demandé suit immédiatement les Services',
     miseEnPage.positions.every((position, i) => position >= 0 && (!i || position === miseEnPage.positions[i - 1] + 1)),
     JSON.stringify(miseEnPage.positions));
-  check('R15 : Mission type défile uniquement vers la droite avec ligne et marqueur synchronisés',
+  check('R17 : Mission type défile lentement vers la droite avec étape centrale et brillance blanche',
     miseEnPage.flechesHero === 1 && !miseEnPage.precedenteHero
     && miseEnPage.heroFill.nom === 'hero2-draw'
     && miseEnPage.heroMarker.nom === 'hero2-marker'
+    && miseEnPage.heroStage.nom === 'hero2-stage'
+    && miseEnPage.heroFill.duree === '8.5s'
     && miseEnPage.heroFill.duree === miseEnPage.heroMarker.duree
+    && miseEnPage.heroFill.duree === miseEnPage.heroStage.duree
+    && miseEnPage.heroTrackLargeur <= 251
+    && /255, 255, 255/.test(miseEnPage.brillanceHero)
     && miseEnPage.routeAnimee === 'hero2-route-flow', JSON.stringify(miseEnPage));
+
+  const fideliteCumulee = await page.evaluate(async () => {
+    const animations = document.getAnimations().filter(animation => /^loyaltyMilestone/.test(animation.animationName || ''));
+    const couleurs = () => Array.from(document.querySelectorAll('.node-circle')).map(el => getComputedStyle(el).borderTopColor);
+    animations.forEach(animation => { animation.currentTime = 6000; animation.pause(); });
+    await new Promise(requestAnimationFrame);
+    const milieu = couleurs();
+    animations.forEach(animation => { animation.currentTime = 9500; });
+    await new Promise(requestAnimationFrame);
+    const fin = couleurs();
+    animations.forEach(animation => { animation.currentTime = 10000; });
+    await new Promise(requestAnimationFrame);
+    return { milieu, fin, reprise: couleurs() };
+  });
+  const rouge = couleur => /181, 68, 75|229, 72, 77/.test(couleur);
+  check('R18 : les paliers déjà traversés restent rouges puis tous reviennent à zéro ensemble',
+    fideliteCumulee.milieu.slice(0, 3).every(rouge)
+    && fideliteCumulee.milieu.slice(3).every(c => !rouge(c))
+    && fideliteCumulee.fin.every(rouge)
+    && fideliteCumulee.reprise.every(c => !rouge(c)), JSON.stringify(fideliteCumulee));
 
   await page.evaluate(() => {
     document.getAnimations().forEach(animation => {
@@ -137,15 +186,15 @@ function check(libelle, condition, detail) {
     checks: Array.from(document.querySelectorAll('.renfort-avatar')).map(el => getComputedStyle(el).backgroundColor),
     confirmation: Number(getComputedStyle(document.querySelector('.renfort-confirm')).opacity)
   }));
-  check('R16 : les trois critères sont rouges avant l’apparition de la confirmation blanche',
+  check('R19 : les trois critères sont rouges avant l’apparition de la confirmation blanche',
     renfortFinal.checks.length === 3
     && renfortFinal.checks.every(c => /181, 68, 75|229, 72, 77/.test(c))
     && renfortFinal.confirmation > .9, JSON.stringify(renfortFinal));
 
   await page.setViewportSize({ width: 390, height: 844 });
   const largeur = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
-  check('R17 : aucun débordement horizontal à 390 px', largeur.scroll <= largeur.client, JSON.stringify(largeur));
-  check('R18 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));
+  check('R20 : aucun débordement horizontal à 390 px', largeur.scroll <= largeur.client, JSON.stringify(largeur));
+  check('R21 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));
 
   await browser.close();
   console.log(`=== ${pass} PASS / ${fail} FAIL ===`);
