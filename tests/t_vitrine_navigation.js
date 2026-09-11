@@ -12,10 +12,10 @@ function check(libelle, condition, detail) {
 (async () => {
   const source = fs.readFileSync(fichier('index.html'), 'utf8');
   check('N1 : l’inspiration n’introduit aucune marque ou ressource Gucci dans le site', !/gucci/i.test(source));
-  check('N2 : les quatre actions demandées et le panneau latéral sont versionnés',
-    /nav-quote-action/.test(source) && /nav-partner-action/.test(source)
+  check('N2 : les deux actions conservées et et le panneau latéral sont versionnés',
+    /nav-quote-action/.test(source) && !/nav-partner-action/.test(source)
       && /nav-account-action/.test(source) && /nav-menu-lines/.test(source)
-      && /site-menu-panel/.test(source));
+      && /site-menu-panel/.test(source) && !/site-menu-quick/.test(source));
   check('N3 : le nouveau texte commercial exact remplace le doublon',
     source.includes('Prix transparent, du devis à la livraison.')
       && !source.includes('Prix transparent, sans surprise'));
@@ -29,6 +29,8 @@ function check(libelle, condition, detail) {
   const bureau = await page.evaluate(() => {
     const nav = document.querySelector('nav').getBoundingClientRect();
     const logo = document.querySelector('nav .logo').getBoundingClientRect();
+    const contact = document.querySelector('.nav-contact').getBoundingClientRect();
+    const navActions = document.querySelector('.nav-actions').getBoundingClientRect();
     const services = document.getElementById('services');
     const bande = services.previousElementSibling;
     const cartes = Array.from(document.querySelectorAll('.services-grid .service-card'));
@@ -39,6 +41,8 @@ function check(libelle, condition, detail) {
       traits: document.querySelectorAll('.nav-menu-lines span').length,
       ancienMenu: document.querySelectorAll('nav .nav-links').length,
       recontact: document.querySelector('.nav-contact-link').getAttribute('href'),
+      margeContact: Math.round(contact.left - nav.left),
+      margeActions: Math.round(nav.right - navActions.right),
       espaceServices: services.getBoundingClientRect().top - bande.getBoundingClientRect().bottom,
       cartes: cartes.length,
       largeurs: cartes.map(el => Math.round(el.getBoundingClientRect().width)),
@@ -48,8 +52,9 @@ function check(libelle, condition, detail) {
   });
   check('N4 : le vrai logo HelixCar est centré indépendamment des actions',
     Math.abs(bureau.centreLogo - bureau.centreNav) <= 1, JSON.stringify(bureau));
-  check('N5 : la barre montre trois icônes, trois traits dessinés et aucun ancien menu horizontal',
-    bureau.actions === 3 && bureau.traits === 3 && bureau.ancienMenu === 0 && bureau.recontact === '#recontact', JSON.stringify(bureau));
+  check('N5 : la barre recentrée montre deux icônes, trois traits et aucun ancien menu horizontal',
+    bureau.actions === 2 && bureau.traits === 3 && bureau.ancienMenu === 0 && bureau.recontact === '#recontact'
+      && bureau.margeContact >= 70 && bureau.margeActions >= 70, JSON.stringify(bureau));
   check('N6 : Nos services remonte sous la barre défilante',
     bureau.espaceServices >= 0 && bureau.espaceServices <= 55, String(bureau.espaceServices));
   check('N7 : les huit services sont conservés dans une composition de tailles hiérarchisées',
@@ -68,13 +73,14 @@ function check(libelle, condition, detail) {
     menu.ouvert && menu.cache === 'false' && menu.etendu === 'true'
       && menu.liens.join('|') === 'Services|Fidélité|Stockage|Tarifs|Renfort professionnel|Partenaires|FAQ|Contact',
     JSON.stringify(menu));
+  check('N8b : aucun bouton devis ou connexion ne subsiste en bas du menu',
+    (await page.locator('.site-menu-quick').count()) === 0);
   await page.locator('.site-menu-close').click();
   check('N9 : la grande croix referme proprement le panneau',
     !(await page.locator('#site-menu-panel').evaluate(el => el.classList.contains('open'))));
 
   for (const [selecteur, modal] of [
     ['.nav-quote-action', 'modal-client'],
-    ['.nav-partner-action', 'modal-convoyeur'],
     ['.nav-account-action', 'modal-connexion']
   ]) {
     await page.locator(selecteur).click();
@@ -93,6 +99,10 @@ function check(libelle, condition, detail) {
     const note = getComputedStyle(document.querySelector('.pricing-note-inner'));
     const confirmation = getComputedStyle(document.querySelector('.renfort-confirm'));
     const recherche = getComputedStyle(document.querySelector('.renfort-scan-line'), '::after');
+    const vedette = document.querySelector('.pricing-card--featured');
+    const badge = document.querySelector('.pricing-badge');
+    const vedetteBox = vedette.getBoundingClientRect();
+    const badgeBox = badge.getBoundingClientRect();
     return {
       tarifFond: getComputedStyle(document.querySelector('.quote-section')).backgroundColor,
       carteDegrade: carte.backgroundImage,
@@ -105,13 +115,16 @@ function check(libelle, condition, detail) {
       confirmationBordure: confirmation.borderTopColor,
       confirmationLigne: getComputedStyle(document.querySelector('.renfort-confirm > span:last-child')).whiteSpace,
       rechercheDuree: recherche.animationDuration
+      ,rayonCarte: parseFloat(carte.borderTopLeftRadius)
+      ,badgeVisible: badgeBox.top >= vedetteBox.top && badgeBox.bottom <= vedetteBox.bottom && badgeBox.width > 0
     };
   });
   check('N11 : les tarifs gardent le fond noir avec graphite, bordure rouge et reflet lent',
     /rgb\((?:10|11|13|16), (?:14|15|18|24), (?:19|20|24|32)\)/.test(premium.tarifFond)
       && /linear-gradient/.test(premium.carteDegrade) && /linear-gradient/.test(premium.noteDegrade)
       && /229, 72, 77/.test(premium.carteBordure) && /229, 72, 77/.test(premium.noteBordure)
-      && premium.reflet === 'pricingSheen' && premium.refletDuree === '10s', JSON.stringify(premium));
+      && premium.reflet === 'pricingSheen' && premium.refletDuree === '10s'
+      && premium.rayonCarte >= 12 && premium.badgeVisible, JSON.stringify(premium));
   check('N12 : la recherche est ralentie et la confirmation est sombre, rouge et sur une ligne',
     premium.rechercheDuree === '6.8s' && /linear-gradient/.test(premium.confirmationFond)
       && /229, 72, 77/.test(premium.confirmationBordure) && premium.confirmationLigne === 'nowrap',
@@ -127,21 +140,28 @@ function check(libelle, condition, detail) {
     reduit.reflet === 'none' && reduit.renfort === 'none' && reduit.fidelite === 'none', JSON.stringify(reduit));
 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const bandeau = await page.evaluate(() => ({
+    cycles: document.querySelectorAll('.slogan-cycle').length,
+    groupes: document.querySelectorAll('.slogan-group').length,
+    labels: Array.from(document.querySelectorAll('.slogan-cycle:first-child .slogan-group-label')).map(el => el.textContent.trim())
+  }));
+  check('N13b : le bandeau distingue marques, expertises et engagements',
+    bandeau.cycles === 2 && bandeau.groupes === 6
+      && bandeau.labels.join('|') === 'Ils nous font confiance|Nos expertises|Nos engagements', JSON.stringify(bandeau));
   await page.setViewportSize({ width: 390, height: 844 });
   const mobile = await page.evaluate(() => {
     const nav = document.querySelector('nav').getBoundingClientRect();
     const logo = document.querySelector('nav .logo').getBoundingClientRect();
-    const partenaire = getComputedStyle(document.querySelector('.nav-partner-action'));
     return {
       centreLogo: logo.left + logo.width / 2,
       centreNav: nav.left + nav.width / 2,
-      partenaire: partenaire.display,
+      actions: document.querySelectorAll('.nav-icon-action').length,
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth
     };
   });
   check('N14 : sur mobile le logo reste centré, la barre est allégée et ne déborde pas',
-    Math.abs(mobile.centreLogo - mobile.centreNav) <= 1 && mobile.partenaire === 'none' && mobile.scroll <= mobile.client,
+    Math.abs(mobile.centreLogo - mobile.centreNav) <= 1 && mobile.actions === 2 && mobile.scroll <= mobile.client,
     JSON.stringify(mobile));
 
   check('N15 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));

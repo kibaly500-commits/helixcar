@@ -93,7 +93,7 @@
 
     display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 24px;
 
-    min-height: 64px; padding: 7px 48px;
+    min-height: 64px; padding: 7px clamp(72px,8vw,128px);
 
     background: rgba(255,255,255,0.95); /* V60 — blanc de référence des formulaires */
 
@@ -125,22 +125,22 @@
 
   .nav-contact { grid-column: 1; justify-self: start; min-width: 0; }
   .nav-contact-link {
-    display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none;
-    font: 500 .78rem/1 'Instrument Sans',sans-serif; letter-spacing: .105em; text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 14px; color: #050505; text-decoration: none;
+    font: 600 .76rem/1 'Instrument Sans',sans-serif; letter-spacing: .115em; text-transform: uppercase;
     white-space: nowrap; transition: color .25s ease;
   }
   .nav-contact-plus { color: var(--accent); font-size: 1.28rem; font-weight: 350; line-height: 1; }
   .nav-contact-link:hover { color: var(--accent); }
 
-  .nav-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 6px; }
+  .nav-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 8px; }
   .nav-icon-action,
   .nav-menu-trigger {
-    position: relative; appearance: none; border: 0; background: transparent; color: var(--ink);
+    position: relative; appearance: none; border: 0; background: transparent; color: #050505;
     display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px;
     padding: 7px; text-decoration: none; cursor: pointer; border-radius: 50%;
     transition: color .22s ease, background .22s ease, transform .22s ease;
   }
-  .nav-icon-action svg { width: 21px; height: 21px; }
+  .nav-icon-action svg { width: 21px; height: 21px; stroke-width: 1.35; }
   .nav-icon-action:hover,
   .nav-menu-trigger:hover { color: var(--accent); background: rgba(16,24,32,.045); transform: translateY(-1px); }
   .nav-icon-action::after {
@@ -154,7 +154,7 @@
   .nav-menu-trigger { gap: 9px; width: auto; border-radius: 2px; padding-right: 0; }
   .nav-menu-lines { width: 21px; display: inline-flex; flex-direction: column; gap: 4px; }
   .nav-menu-lines span { display: block; width: 21px; height: 1.5px; background: currentColor; }
-  .nav-menu-label { font: 500 .7rem/1 'Instrument Sans',sans-serif; letter-spacing: .12em; }
+  .nav-menu-label { color:#050505; font: 600 .7rem/1 'Instrument Sans',sans-serif; letter-spacing: .13em; }
 
   .site-menu-backdrop {
     position: fixed; inset: 0; z-index: 790; background: rgba(5,9,13,.42); opacity: 0; pointer-events: none;
@@ -185,12 +185,6 @@
   .site-menu-links a::after { content: '↗'; color: var(--accent); font-size: .9rem; opacity: 0; transform: translateX(-8px); transition: opacity .2s ease, transform .2s ease; }
   .site-menu-links a:hover { color: var(--accent); padding-left: 8px; }
   .site-menu-links a:hover::after { opacity: 1; transform: translateX(0); }
-  .site-menu-quick { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .site-menu-quick button {
-    appearance: none; border: 1px solid rgba(16,24,32,.16); background: transparent; color: var(--ink); cursor: pointer;
-    min-height: 44px; padding: 11px 12px; font: 600 .73rem/1.2 'Instrument Sans',sans-serif; letter-spacing: .04em;
-  }
-  .site-menu-quick button:first-child { background: var(--accent); border-color: var(--accent); color: #fff; }
   body.hc-menu-open { overflow: hidden; }
 
 
@@ -576,77 +570,72 @@
   /* ─── SLOGAN BAND ─────────────────────────────────────── */
 
   .slogan-band {
-
-    background: var(--ink);
-
-    padding: 10px 0;
-
+    background: linear-gradient(90deg,#0b1117 0%,#151c23 48%,#0b1117 100%);
+    padding: 0;
     overflow: hidden;
-
-    border-top: 1px solid rgba(229,72,77,.45);
-
-    border-bottom: 2px solid var(--accent);
-
+    border-top: 1px solid rgba(255,255,255,.1);
+    border-bottom: 1px solid rgba(229,72,77,.5);
     position: relative;
-
     z-index: 10;
-
   }
+
+  .slogan-band::before,
+  .slogan-band::after {
+    content:''; position:absolute; z-index:2; top:0; bottom:0; width:72px; pointer-events:none;
+  }
+  .slogan-band::before { left:0; background:linear-gradient(90deg,#0b1117,transparent); }
+  .slogan-band::after { right:0; background:linear-gradient(-90deg,#0b1117,transparent); }
 
   .slogan-scroll {
-
     display: flex;
-
-    gap: 60px;
-
+    gap: 0;
     white-space: nowrap;
-
-    animation: scrollLoop 38s linear infinite; /* V66 — scrollStart (ease-in-out + pause intégrée) supprimée : c'était la cause du défilement irrégulier (vite/lent). Une seule animation linéaire, vitesse constante dès le chargement, sans délai ni saut de boucle */
-
+    animation: scrollLoop 52s linear infinite;
     width: max-content;
-
   }
+
+  .slogan-cycle { display:flex; align-items:stretch; padding-right:34px; }
+  .slogan-group {
+    display:flex; align-items:center; gap:24px; min-height:54px; padding:0 30px;
+    border-right:1px solid rgba(255,255,255,.16);
+  }
+  .slogan-group-label {
+    display:inline-flex; align-items:center; gap:9px; color:var(--accent);
+    font:650 .61rem/1 'Instrument Sans',sans-serif; letter-spacing:.17em; text-transform:uppercase;
+  }
+  .slogan-group-label::before { content:''; width:17px; height:1px; background:currentColor; }
+  .slogan-group-list { display:flex; align-items:center; gap:20px; }
+  .slogan-group--brands .slogan-item {
+    font-family:'Fraunces',serif; font-size:.84rem; font-weight:500; letter-spacing:.12em;
+  }
+  .slogan-group--services .slogan-item { color:rgba(255,255,255,.88); }
+  .slogan-group--commitments .slogan-item { color:rgba(255,255,255,.72); }
+  .slogan-separator { width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,.34); flex:0 0 auto; }
 
   @media (prefers-reduced-motion: reduce) {
     .slogan-scroll { animation: none; }
   }
 
   .slogan-item {
-
     display: inline-flex;
-
     align-items: center;
-
-    gap: 14px;
-
-    font-size: .72rem;
-
-    font-weight: 600;
-
-    letter-spacing: .09em;
-
+    gap: 8px;
+    font-size: .68rem;
+    font-weight: 550;
+    letter-spacing: .08em;
     text-transform: uppercase;
-
     color: #fff;
-
     flex-shrink: 0;
-
   }
 
   .slogan-dot {
-
-    width: 6px;
-
-    height: 6px;
-
-    background: var(--accent);
-
+    width: 5px;
+    height: 5px;
+    background: transparent;
+    border: 1px solid var(--accent);
     border-radius: 50%;
-
     flex-shrink: 0;
-
     display: inline-block;
-
   }
 
 
@@ -1048,7 +1037,7 @@
 
   .pricing-card {
     background: linear-gradient(145deg,#e7e8e7 0%,#d6d9da 55%,#ececea 100%);
-    border-radius: 2px;
+    border-radius: 14px;
     padding: 32px 24px;
     color: var(--ink);
     position: relative;
@@ -1076,11 +1065,12 @@
   .pricing-card--featured {
     border-color: var(--accent);
     transform: translateY(-8px);
+    padding-top: 48px;
   }
 
   .pricing-badge {
     position: absolute;
-    top: -14px;
+    top: 0;
     left: 50%;
     transform: translateX(-50%);
     background: var(--accent);
@@ -1090,8 +1080,9 @@
     text-transform: uppercase;
     letter-spacing: .08em;
     padding: 5px 16px;
-    border-radius: 2px;
+    border-radius: 0 0 8px 8px;
     white-space: nowrap;
+    z-index: 2;
   }
 
   .pricing-distance {
@@ -1182,6 +1173,8 @@
     .pricing-card--featured {
       transform: none;
     }
+    .slogan-group { min-height:50px; padding:0 22px; gap:18px; }
+    .slogan-scroll { animation-duration:58s; }
   }
 
   @media (max-width: 560px) {
@@ -3602,13 +3595,13 @@
     .nav-contact-label { display: none; }
     .nav-contact-link { width: 34px; height: 34px; justify-content: center; }
     .nav-contact-plus { font-size: 1.45rem; }
-    .nav-partner-action { display: none; }
     .logo img { height: 29px; max-width: 128px; object-fit: contain; }
     .site-menu-panel { padding: 24px 22px 30px; }
     .site-menu-head { padding-bottom: 24px; }
     .site-menu-links { margin-top: 18px; }
     .site-menu-links a { padding: 14px 0; font-size: 1.2rem; }
-    .site-menu-quick { grid-template-columns: 1fr; }
+    .slogan-group { padding:0 18px; gap:14px; }
+    .slogan-group-label { font-size:.56rem; }
 
     .hero-h1 { font-size: 2rem; line-height: 1.15; }
 
@@ -5360,13 +5353,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
   <div class="nav-actions">
     <a href="#" class="nav-icon-action nav-quote-action" data-label="Demander un devis" aria-label="Demander un devis" onclick="event.preventDefault();openModal('client')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4M9 12h6M9 16h4"/><path d="M3 8.5v-3h3"/></svg>
-    </a>
-    <a href="#" class="nav-icon-action nav-partner-action" data-label="Devenir partenaire" aria-label="Devenir partenaire HelixCar" onclick="event.preventDefault();openModal('convoyeur')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M3.8 10h16.4M12 10V6.2M7.4 17.8l3.2-4.1M16.6 17.8l-3.2-4.1"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h7.7l3.3 3.3v13.7h-11z"/><path d="M14 3.7v3.5h3.3M9.5 12h5M9.5 15.5h5"/></svg>
     </a>
     <a href="#" class="nav-icon-action nav-account-action" data-label="Connexion" aria-label="Connexion" onclick="event.preventDefault();openModal('connexion')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c.8-4 3.1-6 6.5-6s5.7 2 6.5 6"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3"/><path d="M6.2 20c.35-4.15 2.3-6.2 5.8-6.2s5.45 2.05 5.8 6.2"/></svg>
     </a>
     <button type="button" class="nav-menu-trigger" id="nav-menu-btn" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="site-menu-panel" onclick="ouvrirMenuPrincipal()">
       <span class="nav-menu-lines" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -5392,10 +5382,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <li><a href="#faq" onclick="fermerMenuPrincipal()">FAQ</a></li>
     <li><a href="#recontact" onclick="fermerMenuPrincipal()">Contact</a></li>
   </ul>
-  <div class="site-menu-quick">
-    <button type="button" onclick="fermerMenuPrincipal();openModal('client')">Demander un devis</button>
-    <button type="button" onclick="fermerMenuPrincipal();openModal('connexion')">Connexion</button>
-  </div>
 </aside>
 
 
@@ -5601,91 +5587,66 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
 
 <div class="slogan-band">
-
   <div class="slogan-scroll">
-
-    <div class="slogan-item" style="color:var(--accent);font-weight:700;font-size:.8rem;letter-spacing:.1em;padding:0 10px">✦ ILS NOUS FONT CONFIANCE ✦</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">BMW</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">AUDI</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">MERCEDES</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-        <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">PORSCHE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">CONVOYAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">STOCKAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">NETTOYAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">RENFORT PROFESSIONNEL PONCTUEL</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> 7 jours sur 7</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Partout en France et en Europe</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Suivi en temps réel</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Programme fidélité</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-weight:700;font-size:.8rem;letter-spacing:.1em;padding:0 10px">✦ ILS NOUS FONT CONFIANCE ✦</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">BMW</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">AUDI</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">MERCEDES</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-        <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">PORSCHE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">CONVOYAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">STOCKAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">NETTOYAGE AUTOMOBILE</div>
-
-    <div class="slogan-item" style="color:var(--accent);font-size:.7rem;opacity:.6">—</div>
-
-    <div class="slogan-item" style="color:#fff;font-weight:700;font-size:.72rem;letter-spacing:.08em">RENFORT PROFESSIONNEL PONCTUEL</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> 7 jours sur 7</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Partout en France et en Europe</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Suivi en temps réel</div>
-
-    <div class="slogan-item"><span class="slogan-dot"></span> Programme fidélité</div>
-
+    <div class="slogan-cycle">
+      <div class="slogan-group slogan-group--brands">
+        <span class="slogan-group-label">Ils nous font confiance</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item">BMW</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Audi</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Mercedes</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Porsche</span>
+        </div>
+      </div>
+      <div class="slogan-group slogan-group--services">
+        <span class="slogan-group-label">Nos expertises</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item">Convoyage</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Stockage automobile</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Nettoyage</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Renfort professionnel</span>
+        </div>
+      </div>
+      <div class="slogan-group slogan-group--commitments">
+        <span class="slogan-group-label">Nos engagements</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item"><span class="slogan-dot"></span>7 jours sur 7</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>France &amp; Europe</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>Suivi en temps réel</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>Programme fidélité</span>
+        </div>
+      </div>
+    </div>
+    <div class="slogan-cycle" aria-hidden="true">
+      <div class="slogan-group slogan-group--brands">
+        <span class="slogan-group-label">Ils nous font confiance</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item">BMW</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Audi</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Mercedes</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Porsche</span>
+        </div>
+      </div>
+      <div class="slogan-group slogan-group--services">
+        <span class="slogan-group-label">Nos expertises</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item">Convoyage</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Stockage automobile</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Nettoyage</span><span class="slogan-separator"></span>
+          <span class="slogan-item">Renfort professionnel</span>
+        </div>
+      </div>
+      <div class="slogan-group slogan-group--commitments">
+        <span class="slogan-group-label">Nos engagements</span>
+        <div class="slogan-group-list">
+          <span class="slogan-item"><span class="slogan-dot"></span>7 jours sur 7</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>France &amp; Europe</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>Suivi en temps réel</span>
+          <span class="slogan-item"><span class="slogan-dot"></span>Programme fidélité</span>
+        </div>
+      </div>
+    </div>
   </div>
-
 </div>
 
 
