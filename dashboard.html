@@ -8802,8 +8802,12 @@ function _operationDossier(c, prefixe) {
   // que l'organisation est réellement individuelle par véhicule. On exige
   // désormais une confirmation EXPLICITE (`=== true`) pour traiter une
   // demande multi comme un trajet dossier commun.
-  var nb = c.nb_vehicules || (c._vehicules ? c._vehicules.length : 0) || 1;
-  if (nb >= 2 && c.trajet_commun !== true) return false;
+  var lignesVehicules = c._vehicules && c._vehicules.length;
+  var nb = c.nb_vehicules || lignesVehicules || 1;
+  // Depuis V51, une vraie ligne véhicule est la source opérationnelle même
+  // en mono. Le bloc dossier ne reste actif que pour les anciens dossiers
+  // sans ligne véhicule, ou pour un ancien trajet explicitement commun.
+  if ((nb >= 2 || lignesVehicules) && c.trajet_commun !== true) return false;
   return true;
 }
 
@@ -10830,7 +10834,8 @@ function _construirePdfDevis(c, d) {
   // rien d'autre) : les cartes véhicules individuelles restent déjà la
   // source exacte pour ce cas.
   var _nbVehiculesTrajet = c.nb_vehicules || (c._vehicules ? c._vehicules.length : 0) || 1;
-  var _estMultiIndividuelTrajet = (_nbVehiculesTrajet >= 2 && c.trajet_commun !== true);
+  var _estMultiIndividuelTrajet = ((_nbVehiculesTrajet >= 2
+    || (c._vehicules && c._vehicules.length)) && c.trajet_commun !== true);
 
   // ══ SERVICES SUR SITE — Nettoyage / Trouver un professionnel ══
   // Ces deux services n'ont ni trajet, ni prise en charge, ni livraison,
@@ -11411,7 +11416,10 @@ function _construirePdfDevis(c, d) {
   // formulaire, cf. V50.3B). On calcule donc la bonne source UNE FOIS,
   // par dossier, puis on l'utilise systématiquement dans la boucle.
   var _nbVehPdf = _nbVehiculesDossier(c);
-  var _monoPdf = _nbVehPdf < 2;
+  // « mono historique » signifie désormais : un véhicule ET aucune vraie
+  // ligne dans `vehicules`. Dès qu'une ligne existe, ses adresses, dates et
+  // horaires sont la source exacte, même si le compteur vaut 1.
+  var _monoPdf = _nbVehPdf < 2 && !(c._vehicules && c._vehicules.length);
   var _livDossierApplicablePdf = _monoPdf && _operationDossier(c, 'liv') ? (c.date_livraison || null) : null;
 
   if (c.flotte_a_detailler) {
