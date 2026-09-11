@@ -28,6 +28,7 @@ function check(libelle, condition, detail) {
     const sec = document.getElementById('renfort-ponctuel');
     return {
       titre: sec.querySelector('.renfort-title').innerText,
+      tiret: getComputedStyle(sec.querySelector('.renfort-tag'), '::before').content,
       cartes: sec.querySelectorAll('.renfort-cards .renfort-card').length,
       metiers: sec.querySelectorAll('.renfort-metiers-list span').length,
       ancien: !!sec.querySelector('.renfort-flow'),
@@ -39,6 +40,7 @@ function check(libelle, condition, detail) {
     };
   });
   check('R4 : le nouveau titre orienté bénéfice est affiché', /Le bon professionnel/.test(avant.titre), avant.titre);
+  check('R4b : le libellé Renfort commence par le même repère visuel que les autres blocs', avant.tiret !== 'none' && avant.tiret !== 'normal', avant.tiret);
   check('R5 : exactement quatre métiers sont visibles en premier', avant.cartes === 4, String(avant.cartes));
   check('R6 : la liste complète reste accessible', avant.metiers === 8, String(avant.metiers));
   check('R7 : les trois critères de sélection sont utiles et non répétitifs',
@@ -72,6 +74,7 @@ function check(libelle, condition, detail) {
     const stockage = document.querySelector('.stockage-inner').getBoundingClientRect();
     const etapes = document.querySelector('.stockage-steps').getBoundingClientRect();
     const ligne = getComputedStyle(document.querySelector('.track-line'), '::after');
+    const ligneCumulee = getComputedStyle(document.querySelector('.track-line'), '::before');
     const animations = Array.from(document.querySelectorAll('.node-circle')).map(el => ({
       nom: getComputedStyle(el).animationName,
       duree: getComputedStyle(el).animationDuration,
@@ -90,6 +93,9 @@ function check(libelle, condition, detail) {
     const heroTrack = document.querySelector('.hero2-panel-progress-track').getBoundingClientRect();
     const tarifFond = getComputedStyle(document.querySelector('.quote-section')).backgroundColor;
     const tarifCarte = getComputedStyle(document.querySelector('.pricing-card'));
+    const tarifNote = getComputedStyle(document.querySelector('.pricing-note-inner'));
+    const stockageFond = getComputedStyle(document.querySelector('.stockage-block')).backgroundColor;
+    const route = getComputedStyle(document.querySelector('.hero2-route-line'), '::after');
     return {
       largeurStockage: stockage.width,
       largeurEtapes: etapes.width,
@@ -97,6 +103,8 @@ function check(libelle, condition, detail) {
       animationLigne: ligne.animationName,
       dureeLigne: ligne.animationDuration,
       rythmeLigne: ligne.animationTimingFunction,
+      animationLigneCumulee: ligneCumulee.animationName,
+      dureeLigneCumulee: ligneCumulee.animationDuration,
       animations,
       fausseProgression: !!document.querySelector('.track-progress'),
       alignementGauche: Math.abs(stockageTag.left - fideliteTag.left),
@@ -109,12 +117,17 @@ function check(libelle, condition, detail) {
       heroStage: { nom: heroStage.animationName, duree: heroStage.animationDuration },
       heroTrackLargeur: heroTrack.width,
       brillanceHero: heroFill.backgroundImage,
-      routeAnimee: getComputedStyle(document.querySelector('.hero2-route-line'), '::after').animationName,
+      routeAnimee: route.animationName,
+      routeDuree: route.animationDuration,
       tarif: {
         fond: tarifFond,
         carte: tarifCarte.backgroundColor,
         texte: tarifCarte.color,
-        note: getComputedStyle(document.querySelector('.pricing-note-inner > div')).color
+        noteFond: tarifNote.backgroundColor,
+        note: getComputedStyle(document.querySelector('.pricing-note-inner > div')).color,
+        stockageFond,
+        titre: document.querySelector('.quote-section > .section-h2').textContent.trim(),
+        mention: document.querySelector('.pricing-note-inner > div').textContent.replace(/\s+/g, ' ').trim()
       }
     };
   });
@@ -124,7 +137,9 @@ function check(libelle, condition, detail) {
     && miseEnPage.alignementGauche <= 1, JSON.stringify(miseEnPage));
   check('R13 : la frise Fidélité synchronise la ligne et les cinq paliers sur dix secondes',
     miseEnPage.animationLigne === 'loyaltyRun'
+    && miseEnPage.animationLigneCumulee === 'loyaltyFill'
     && miseEnPage.dureeLigne === '10s'
+    && miseEnPage.dureeLigneCumulee === '10s'
     && miseEnPage.rythmeLigne === 'linear'
     && miseEnPage.animations.length === 5
     && miseEnPage.animations.map(a => a.nom).join('|') === 'loyaltyMilestone1|loyaltyMilestone2|loyaltyMilestone3|loyaltyMilestone4|loyaltyMilestone5'
@@ -133,11 +148,14 @@ function check(libelle, condition, detail) {
   check('R14 : le bloc Renfort partage l’alignement et la largeur généreuse du Stockage',
     miseEnPage.renfort.largeur >= miseEnPage.largeurStockage * .99
     && miseEnPage.renfort.alignementGauche <= 1, JSON.stringify(miseEnPage.renfort));
-  check('R15 : Tarifs convoyage inverse bien le contraste — fond noir, cartes blanches, texte noir',
+  check('R15 : Tarifs convoyage garde son fond noir avec cartes et note gris clair',
     /rgb\((?:10|11|13|16), (?:14|15|18|24), (?:19|20|24|32)\)/.test(miseEnPage.tarif.fond)
-    && miseEnPage.tarif.carte === 'rgb(255, 255, 255)'
+    && miseEnPage.tarif.carte === miseEnPage.tarif.stockageFond
+    && miseEnPage.tarif.noteFond === miseEnPage.tarif.stockageFond
     && /rgb\((?:16|17), (?:24|25), (?:32|33)\)/.test(miseEnPage.tarif.texte)
-    && /rgba?\((?:16|17), (?:24|25), (?:32|33)/.test(miseEnPage.tarif.note), JSON.stringify(miseEnPage.tarif));
+    && /rgba?\((?:16|17), (?:24|25), (?:32|33)/.test(miseEnPage.tarif.note)
+    && miseEnPage.tarif.titre === 'Un tarif clair, adapté à votre trajet.'
+    && miseEnPage.tarif.mention === 'Tarifs indicatifs TTC. Le prix final dépend de la distance exacte, du type de véhicule et des services choisis.', JSON.stringify(miseEnPage.tarif));
   check('R16 : l’ordre éditorial demandé suit immédiatement les Services',
     miseEnPage.positions.every((position, i) => position >= 0 && (!i || position === miseEnPage.positions[i - 1] + 1)),
     JSON.stringify(miseEnPage.positions));
@@ -149,29 +167,45 @@ function check(libelle, condition, detail) {
     && miseEnPage.heroFill.duree === '8.5s'
     && miseEnPage.heroFill.duree === miseEnPage.heroMarker.duree
     && miseEnPage.heroFill.duree === miseEnPage.heroStage.duree
-    && miseEnPage.heroTrackLargeur <= 251
+    && miseEnPage.heroTrackLargeur >= 260
+    && miseEnPage.heroTrackLargeur <= 321
     && /255, 255, 255/.test(miseEnPage.brillanceHero)
-    && miseEnPage.routeAnimee === 'hero2-route-flow', JSON.stringify(miseEnPage));
+    && miseEnPage.routeAnimee === 'hero2-route-flow'
+    && miseEnPage.routeDuree === miseEnPage.heroFill.duree, JSON.stringify(miseEnPage));
 
   const fideliteCumulee = await page.evaluate(async () => {
-    const animations = document.getAnimations().filter(animation => /^loyaltyMilestone/.test(animation.animationName || ''));
+    const toutes = document.getAnimations();
+    const animations = toutes.filter(animation => /^loyaltyMilestone/.test(animation.animationName || ''));
+    const remplissage = toutes.find(animation => animation.animationName === 'loyaltyFill');
+    const largeur = () => parseFloat(getComputedStyle(document.querySelector('.track-line'), '::before').width);
+    const largeurTotale = document.querySelector('.track-line').getBoundingClientRect().width;
     const couleurs = () => Array.from(document.querySelectorAll('.node-circle')).map(el => getComputedStyle(el).borderTopColor);
+    remplissage.currentTime = 6000;
+    remplissage.pause();
     animations.forEach(animation => { animation.currentTime = 6000; animation.pause(); });
     await new Promise(requestAnimationFrame);
     const milieu = couleurs();
+    const ligneMilieu = largeur();
+    remplissage.currentTime = 9500;
     animations.forEach(animation => { animation.currentTime = 9500; });
     await new Promise(requestAnimationFrame);
     const fin = couleurs();
+    const ligneFin = largeur();
+    remplissage.currentTime = 10000;
     animations.forEach(animation => { animation.currentTime = 10000; });
     await new Promise(requestAnimationFrame);
-    return { milieu, fin, reprise: couleurs() };
+    return { milieu, fin, reprise: couleurs(), ligneMilieu, ligneFin, ligneReprise: largeur(), largeurTotale };
   });
   const rouge = couleur => /181, 68, 75|229, 72, 77/.test(couleur);
   check('R18 : les paliers déjà traversés restent rouges puis tous reviennent à zéro ensemble',
     fideliteCumulee.milieu.slice(0, 3).every(rouge)
     && fideliteCumulee.milieu.slice(3).every(c => !rouge(c))
     && fideliteCumulee.fin.every(rouge)
-    && fideliteCumulee.reprise.every(c => !rouge(c)), JSON.stringify(fideliteCumulee));
+    && fideliteCumulee.reprise.every(c => !rouge(c))
+    && fideliteCumulee.ligneMilieu > fideliteCumulee.largeurTotale * .5
+    && fideliteCumulee.ligneMilieu < fideliteCumulee.largeurTotale * .75
+    && fideliteCumulee.ligneFin >= fideliteCumulee.largeurTotale * .99
+    && fideliteCumulee.ligneReprise === 0, JSON.stringify(fideliteCumulee));
 
   await page.evaluate(() => {
     document.getAnimations().forEach(animation => {
