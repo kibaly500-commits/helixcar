@@ -20,7 +20,7 @@ function check(libelle, condition, detail) {
     source.includes('Prix transparent, du devis à la livraison.')
       && !source.includes('Prix transparent, sans surprise'));
   check('N3b : le bloc services contient son accroche et le visuel Mercedes',
-    source.includes('Chaque besoin automobile mérite son expertise.')
+    source.includes('L’automobile, dans toutes ses exigences.')
       && source.includes('Des prestations pensées comme un ensemble cohérent')
       && source.includes('assets/helixcar-services-mercedes.webp'));
 
