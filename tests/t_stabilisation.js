@@ -602,7 +602,7 @@ async function modesParVehicule(page, n) {
     && /_hcEffacerBandeauErreur\(\);\s*\n\s*document\.getElementById\('modal-' \+ type\)\.classList\.add\('open'\)/.test(idx));
   check('F5 : un échec de candidature retire les documents devenus orphelins',
     /_supprimerFichierTeleverse/.test(idx)
-    && /\[id_url, permis_url, rc_pro_url\]\.map\(_supprimerFichierTeleverse\)/.test(idx));
+    && /\[id_url, permis_url, kbis_url, rc_pro_url\]\.filter\(Boolean\)\.map\(_supprimerFichierTeleverse\)/.test(idx));
 
   // Une erreur laissée par la candidature ne doit plus accueillir le
   // client dans SA fenêtre.
@@ -1430,8 +1430,8 @@ window.jspdf = { jsPDF: function () {
       nonExpliques.length === 0, nonExpliques.join(' | '));
     check('O3 : et aucune « raison » ne couvre un libellé toujours présent',
       excusesSansObjet.length === 0, excusesSansObjet.join(' | '));
-    check('O4 : les onze disparitions sont exactement celles qui étaient demandées',
-      disparus.length === 11, disparus.length + ' : ' + disparus.join(' | '));
+    check('O4 : les douze disparitions sont exactement celles qui étaient demandées',
+      disparus.length === 12, disparus.length + ' : ' + disparus.join(' | '));
 
     // Les nouveautés ne sont pas écrasées : l'index actuel en propose
     // strictement PLUS que l'ancien, et les libellés propres au main

@@ -1132,9 +1132,9 @@ body.scroll-verrouille { overflow: hidden; }
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Expérience</th><th>RC Pro</th><th>Date</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Expérience</th><th>Immatriculation</th><th>RC Pro</th><th>Date</th><th>Actions</th></tr></thead>
               <tbody id="candidatures-table">
-                <tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1715,6 +1715,7 @@ body.scroll-verrouille { overflow: hidden; }
             <div class="form-group"><label>Email</label><input type="email" id="profil-email" value="" readonly></div>
             <div class="form-group"><label>Téléphone</label><input type="tel" id="profil-telephone" value=""></div>
             <div class="form-group"><label>Expérience</label><input type="text" id="profil-experience" value="" readonly></div>
+            <div class="form-group"><label>Justificatif d'immatriculation</label><input type="text" id="profil-kbis" value="" readonly></div>
             <div class="form-group"><label>RC Pro</label><input type="text" id="profil-rcpro" value="" readonly></div>
           </div>
           <!-- Les métiers déclarés à la candidature, tels qu'HelixCar
@@ -2199,6 +2200,7 @@ function remplirProfilConvoyeur(conv) {
     'profil-email': conv.email || '',
     'profil-telephone': conv.telephone || '',
     'profil-experience': conv.experience || 'Non renseignée',
+    'profil-kbis': conv.kbis_url ? '✅ Fourni' : '⏳ Non fourni',
     'profil-rcpro': conv.rc_pro_url ? '✅ Fournie' : '⏳ Non fournie'
   };
   for (const id in champs) {
@@ -5332,6 +5334,7 @@ async function lancerSynchronisation() {
 
       descripteurs.push({ cle: c.id_url, chemin: base + 'Documents/piece-identite.' + extraireExtension(c.id_url), valeur: c.id_url, estUrl: true });
       descripteurs.push({ cle: c.permis_url, chemin: base + 'Documents/permis-de-conduire.' + extraireExtension(c.permis_url), valeur: c.permis_url, estUrl: true });
+      descripteurs.push({ cle: c.kbis_url, chemin: base + 'Documents/justificatif-immatriculation.' + extraireExtension(c.kbis_url), valeur: c.kbis_url, estUrl: true });
       descripteurs.push({ cle: c.rc_pro_url, chemin: base + 'Documents/rc-pro.' + extraireExtension(c.rc_pro_url), valeur: c.rc_pro_url, estUrl: true });
       descripteurs.push({ cle: c.rib_iban, chemin: base + 'Documents/rib.' + extraireExtension(c.rib_iban), valeur: c.rib_iban, estUrl: true, estRibPrive: _ribEstCheminPrive(c.rib_iban) });
 
@@ -5647,6 +5650,7 @@ async function lancerArchivageConvoyeurs() {
         const docs = [
           { url: c.id_url, nom: 'piece-identite' },
           { url: c.permis_url, nom: 'permis-de-conduire' },
+          { url: c.kbis_url, nom: 'justificatif-immatriculation' },
           { url: c.rc_pro_url, nom: 'rc-pro' },
           { url: c.rib_iban, nom: 'rib' }
         ];
@@ -6165,7 +6169,7 @@ async function lancerArchivageFactures() {
 function loadCandidatures() {
   const tbody = document.getElementById('candidatures-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
   sbFetchToutePage('convoyeurs?statut=eq.en_attente&order=created_at.desc')
     .then(function(rows) {
       // (helper défini plus haut : badgesActivites)
@@ -6173,7 +6177,7 @@ function loadCandidatures() {
       const cardSub = document.querySelector('#page-admin-candidatures .card-sub');
       const statPending = document.getElementById('stat-pending');
       if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune candidature en attente</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Aucune candidature en attente</td></tr>';
         if (badge) badge.remove();
         if (cardSub) cardSub.textContent = '0 en attente de validation';
         if (statPending) statPending.textContent = '0';
@@ -6192,12 +6196,18 @@ function loadCandidatures() {
         const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—';
         const rcBadge = c.rc_pro_url
           ? '<span class="badge badge-active">✅ Fournie</span>'
-          : '<span class="badge badge-pending">⏳ Manquante</span>';
+          : (normaliserActivites(c.activites).indexOf('convoyage') !== -1
+              ? '<span class="badge badge-pending">⏳ Manquante</span>'
+              : '<span class="badge">Facultative</span>');
+        const kbisBadge = c.kbis_url
+          ? '<span class="badge badge-active">✅ Fourni</span>'
+          : '<span class="badge badge-pending">⏳ Manquant</span>';
         return '<tr id="cand-' + c.id + '">'
           + '<td><strong>' + nom + '</strong>' + badgesActivites(c.activites) + '</td>'
           + '<td>' + escapeHtml(c.email) + '</td>'
           + '<td>' + escapeHtml(c.telephone) + '</td>'
           + '<td>' + escapeHtml(c.experience) + '</td>'
+          + '<td>' + kbisBadge + '</td>'
           + '<td>' + rcBadge + '</td>'
           + '<td>' + dateStr + '</td>'
           + '<td style="display:flex;gap:6px;flex-wrap:wrap">'
@@ -6211,7 +6221,7 @@ function loadCandidatures() {
       rows.forEach(function(c) { window._candidaturesData[c.id] = c; });
     })
     .catch(function(e) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
     });
 }
 
@@ -6240,7 +6250,8 @@ function openDossierSb(id) {
     ${normaliserActivites(c.activites).indexOf('convoyage') !== -1
       ? `<div class="detail-row"><span class="detail-label">Expérience</span><span class="detail-val">${escapeHtml(c.experience) || '—'}</span></div>`
       : ''}
-    <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
+    <div class="detail-row"><span class="detail-label">Justificatif d'immatriculation</span><span class="detail-val">${docLink(c.kbis_url, "le justificatif d'immatriculation")}</span></div>
+    <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${c.rc_pro_url ? docLink(c.rc_pro_url, 'la RC Pro') : (normaliserActivites(c.activites).indexOf('convoyage') === -1 ? '<span class="badge">Facultative — non fournie</span>' : docLink(null, 'la RC Pro'))}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
@@ -6827,6 +6838,7 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val" id="dossier-statut-partenaire">${_badgeEtatPartenaire(c)}</span></div>
     ${_partenaireEstBloque(c) ? `<div class="detail-row"><span class="detail-label">Motif du blocage</span><span class="detail-val">${escapeHtml(c.bloque_motif || 'Non précisé')}</span></div>
     <div class="detail-row"><span class="detail-label">Bloqué le</span><span class="detail-val">${escapeHtml((typeof _dateHeureFr === 'function' ? _dateHeureFr(c.bloque_le) : c.bloque_le) || '—')}</span></div>` : ''}
+    <div class="detail-row"><span class="detail-label">Justificatif d'immatriculation</span><span class="detail-val">${docLink(c.kbis_url, "le justificatif d'immatriculation")}</span></div>
     <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>

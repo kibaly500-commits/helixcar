@@ -75,6 +75,7 @@ create table if not exists public.convoyeurs (
   activites    text[],
   id_url       text,
   permis_url   text,
+  kbis_url     text,
   rc_pro_url   text,
   rib_iban     text,
   statut       text not null default 'en_attente',

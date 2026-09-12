@@ -145,8 +145,30 @@ async function etat(page) {
   L.check('D3 : avec un message qui parle de métier',
     /au moins un métier/i.test(v.erreur), v.erreur);
 
-  // ── E. LA VIDÉO SUIT LE MÉTIER RÉELLEMENT DÉCLARÉ ──
+  // ── D bis. DOCUMENTS : KBIS/RNE TOUJOURS, RC PRO SI CONVOYAGE ──
   await ajouter(page, 'nettoyage');
+  let docs = await page.evaluate(() => ({
+    manquants: _docsPartenaireManquants().map(d => d.input),
+    aide: (document.getElementById('conv-documents-aide') || {}).textContent || '',
+    rcStatut: (document.getElementById('conv-rcpro-statut') || {}).textContent || '',
+  }));
+  L.check('D4 : le justificatif Kbis/RNE est requis pour tout partenaire',
+    docs.manquants.indexOf('conv-doc-kbis') !== -1, JSON.stringify(docs));
+  L.check('D5 : sans convoyage, la RC Pro est bien facultative',
+    docs.manquants.indexOf('conv-doc-rcpro') === -1
+      && /facultative/i.test(docs.aide + ' ' + docs.rcStatut), JSON.stringify(docs));
+  await ajouter(page, 'convoyage');
+  docs = await page.evaluate(() => ({
+    manquants: _docsPartenaireManquants().map(d => d.input),
+    aide: (document.getElementById('conv-documents-aide') || {}).textContent || '',
+    rcStatut: (document.getElementById('conv-rcpro-statut') || {}).textContent || '',
+  }));
+  L.check('D6 : avec convoyage, la RC Pro devient obligatoire',
+    docs.manquants.indexOf('conv-doc-rcpro') !== -1
+      && /obligatoire/i.test(docs.aide + ' ' + docs.rcStatut), JSON.stringify(docs));
+  await retirer(page, 'convoyage');
+
+  // ── E. LA VIDÉO SUIT LE MÉTIER RÉELLEMENT DÉCLARÉ ──
   e = await etat(page);
   L.check('E1 : un nettoyeur seul n\'a aucune vidéo à fournir',
     e.videoRequise === false && e.dureeMax === 0, JSON.stringify(e));

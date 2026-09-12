@@ -6001,7 +6001,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="section-tag">Récompenses</div>
 
-      <h2 class="section-h2">Fidélité & Challenge mensuel</h2>
+      <h2 class="section-h2">Fidélité &amp; Challenge trimestriel</h2>
 
       <p style="color:#444;line-height:1.8;margin-bottom:20px">
 
@@ -6011,7 +6011,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <p style="color:#444;line-height:1.8">
 
-        Pour nos convoyeurs, un challenge excitant vous attend : chaque mois, ceux qui auront parcouru le plus de kilomètres se verront attribuer des récompenses allant jusqu'à 150 euros. Parce que chez HelixCar, nous aimons relever des défis et aller toujours plus loin !
+        Pour les membres de notre réseau, un challenge vous attend : chaque trimestre, celles et ceux qui auront réalisé le plus de missions recevront des récompenses allant jusqu'à 150 euros.
 
       </p>
 
@@ -6106,11 +6106,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <div class="section-tag">Rejoindre l'équipe</div>
 
-      <h2 class="section-h2" style="color:var(--navy)">Devenez convoyeur <span style="color:var(--yellow)">HelixCar</span></h2>
+      <h2 class="section-h2" style="color:var(--navy)">Devenez partenaire <span style="color:var(--yellow)">HelixCar</span></h2>
 
       <p style="color:#555;line-height:1.7;margin-bottom:32px">
 
-        Rejoindre HelixCar en tant que convoyeur, c'est bien plus qu'un simple travail. Avec une rémunération attractive et des missions variées, chaque kilomètre compte.
+        Rejoindre HelixCar en tant que partenaire, c'est bien plus qu'un simple travail. Avec une rémunération attractive et des missions variées, chaque mission est une nouvelle occasion de valoriser votre savoir-faire.
 
       </p>
 
@@ -6134,7 +6134,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
             <div class="step-title">Soumettez votre dossier</div>
 
-            <div class="step-desc">Téléchargez pièce d'identité, permis de conduire, <strong>RC Pro en cours de validité</strong> et votre vidéo de présentation.</div>
+            <div class="step-desc">Téléchargez votre pièce d'identité, votre permis de conduire, votre <strong>justificatif d'immatriculation (Kbis ou attestation RNE)</strong>, votre RC Pro si vous candidatez au convoyage, ainsi que votre vidéo de présentation lorsqu'elle est demandée.</div>
 
           </div>
 
@@ -6158,7 +6158,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
             <div class="step-title">Commencez à gagner de l'argent</div>
 
-            <div class="step-desc">Acceptez des missions rémunératrices, suivez vos performances en temps réel et débloquez vos récompenses à chaque kilomètre parcouru.</div>
+            <div class="step-desc">Acceptez des missions rémunératrices, suivez vos performances en temps réel et débloquez vos récompenses au fil des missions réalisées.</div>
 
           </div>
 
@@ -6176,7 +6176,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
       <h3>Challenge Trimestriel</h3>
 
-      <p>Chaque trimestre, les convoyeurs ayant parcouru le plus de kilomètres sont récompensés. Un classement simple et transparent, remis à zéro au début de chaque nouveau trimestre.</p>
+      <p>Chaque trimestre, les membres du réseau ayant réalisé le plus de missions sont récompensés. Un classement simple et transparent, remis à zéro au début de chaque nouveau trimestre.</p>
 
       <div class="podium">
 
@@ -7745,8 +7745,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div class="modal-form-group">
           <label>Documents requis</label>
-          <div style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
-            Merci de fournir chaque document demandé : pièce d'identité, permis de conduire et RC Pro.
+          <div id="conv-documents-aide" style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
+            Pièce d'identité, permis de conduire et justificatif d'immatriculation sont requis. La RC Pro est facultative tant que le convoyage automobile n'est pas sélectionné.
           </div>
           <div class="hc-doc-zone" id="conv-zone-identite" data-doc-id="conv-doc-identite" style="margin-bottom:14px">
             <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Pièce d'identité <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
@@ -7756,8 +7756,12 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Permis de conduire <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-permis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
+          <div class="hc-doc-zone" id="conv-zone-kbis" data-doc-id="conv-doc-kbis" style="margin-bottom:14px">
+            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Justificatif d'immatriculation (Kbis ou attestation RNE) <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
+            <input type="file" id="conv-doc-kbis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+          </div>
           <div class="hc-doc-zone" id="conv-zone-rcpro" data-doc-id="conv-doc-rcpro" style="margin-bottom:4px">
-            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">RC Pro en cours de validité <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
+            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">RC Pro en cours de validité <span id="conv-rcpro-statut" class="field-optional-hint">— Facultative sans convoyage · PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-rcpro" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
         </div>
@@ -12208,7 +12212,8 @@ function construireRecapConvoyeur() {
     : '';
   var docs = _recapLigne('Pièce d\'identité', _recapNomFichier('conv-doc-identite') || 'Non ajouté') +
              _recapLigne('Permis de conduire', _recapNomFichier('conv-doc-permis') || 'Non ajouté') +
-             _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || 'Non ajouté');
+             _recapLigne('Justificatif d\'immatriculation', _recapNomFichier('conv-doc-kbis') || 'Non ajouté') +
+             _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || (_partenaireAvecConvoyage() ? 'Non ajouté' : 'Facultative — non ajoutée'));
   // La ligne vidéo n'apparaît que si une activité la rend nécessaire :
   // un candidat « nettoyage seul » ne doit jamais la voir.
   if (typeof _convVideoRequise === 'function' && _convVideoRequise()) {
@@ -14567,22 +14572,25 @@ function resetClientForm() {
   _renderFormStep('client');
 }
 
-// Lot 1 (V69) — documents obligatoires du partenaire. Liste unique,
+// Documents du partenaire. Liste unique,
 // réutilisée par la validation d'étape ET par le garde-fou de
 // soumission : une seule source de vérité, aucune divergence possible.
-// Ces 3 documents sont exigés pour TOUTES les activités (convoyage,
-// nettoyage, renfort et toutes leurs combinaisons).
+// La RC Pro est obligatoire uniquement lorsque le convoyage fait partie
+// des activités choisies ; elle reste facultative pour les autres métiers.
 var DOCS_PARTENAIRE = [
   { input: 'conv-doc-identite', zone: 'conv-zone-identite', libelle: "la pièce d'identité", prefixe: 'identite' },
   { input: 'conv-doc-permis',   zone: 'conv-zone-permis',   libelle: 'le permis de conduire', prefixe: 'permis' },
-  { input: 'conv-doc-rcpro',    zone: 'conv-zone-rcpro',    libelle: 'la RC professionnelle', prefixe: 'rcpro' }
+  { input: 'conv-doc-kbis',     zone: 'conv-zone-kbis',     libelle: "le justificatif d'immatriculation", prefixe: 'kbis' },
+  { input: 'conv-doc-rcpro',    zone: 'conv-zone-rcpro',    libelle: 'la RC professionnelle', prefixe: 'rcpro', requis: function () { return _partenaireAvecConvoyage(); } }
 ];
 function _fichierPresent(inputId) {
   var el = document.getElementById(inputId);
   return !!(el && el.files && el.files.length > 0);
 }
 function _docsPartenaireManquants() {
-  return DOCS_PARTENAIRE.filter(function (d) { return !_fichierPresent(d.input); });
+  return DOCS_PARTENAIRE.filter(function (d) {
+    return (!d.requis || d.requis()) && !_fichierPresent(d.input);
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -15768,16 +15776,25 @@ function _partenaireAvecConvoyage() {
   return _activitesPartenaire().indexOf('convoyage') !== -1;
 }
 
-// Affiche/masque le SEUL champ conditionnel de l'étape 3 : l'expérience
-// de conduite. Pièce d'identité, permis et RC Pro restent demandés pour
-// TOUTES les activités — jamais masqués ici.
+// L'expérience et l'exigence de RC Pro suivent le convoyage. La zone RC
+// Pro reste visible afin qu'un candidat à un autre métier puisse tout de
+// même la joindre volontairement.
 function onChoixActivitesPartenaire() {
   var conv = _partenaireAvecConvoyage();
   var grp = document.getElementById('conv-experience-group');
   if (grp) grp.style.display = conv ? 'block' : 'none';
+  var aide = document.getElementById('conv-documents-aide');
+  if (aide) aide.textContent = conv
+    ? "Pièce d'identité, permis de conduire, justificatif d'immatriculation et RC Pro en cours de validité sont requis pour le convoyage automobile."
+    : "Pièce d'identité, permis de conduire et justificatif d'immatriculation sont requis. La RC Pro est facultative tant que le convoyage automobile n'est pas sélectionné.";
+  var statutRc = document.getElementById('conv-rcpro-statut');
+  if (statutRc) statutRc.textContent = conv
+    ? '— Obligatoire pour le convoyage · PDF, JPG ou PNG'
+    : '— Facultative sans convoyage · PDF, JPG ou PNG';
   // Sans convoyage, aucune erreur résiduelle ne doit rester affichée ni
   // bloquer la progression (pas de validation invisible).
   if (!conv && typeof _clearFieldError === 'function') _clearFieldError('conv-experience');
+  if (!conv && typeof _clearGroupError === 'function') _clearGroupError('conv-zone-rcpro');
   if (typeof _clearGroupError === 'function') _clearGroupError('conv-activites-group');
   // L'exigence de vidéo ET sa durée maximale dépendent des activités :
   // elles sont donc réévaluées à CHAQUE changement. Retirer le renfort
@@ -15820,11 +15837,11 @@ function _validateConvStep(n) {
     }
   }
   if (n === 3) {
-    // Les 3 documents sont obligatoires dans TOUS les cas, quelle que
-    // soit l'activité. Erreur affichée sur la zone hc-doc-zone concernée
-    // (système visuel existant réutilisé, enhanceDocZone non touchée).
+    // Les documents communs sont toujours obligatoires. La RC Pro ne
+    // rejoint cette liste que lorsque le convoyage est sélectionné.
     DOCS_PARTENAIRE.forEach(function (d) {
-      if (!_fichierPresent(d.input)) {
+      var requis = !d.requis || d.requis();
+      if (requis && !_fichierPresent(d.input)) {
         ok = false;
         if (typeof _showGroupError === 'function') {
           _showGroupError(d.zone, 'Document obligatoire : ajoutez ' + d.libelle + '.');
@@ -18984,7 +19001,7 @@ function _convEffacerEchecCandidature() {
 
 // SUPPRESSION D'UN FICHIER DEVENU ORPHELIN.
 //
-// Les trois documents partent AVANT l'ecriture de la candidature. Si
+// Les documents partent AVANT l'ecriture de la candidature. Si
 // cette ecriture echoue — c'est exactement ce qui arrivait avec la
 // contrainte des activites — les fichiers restent dans le bucket sans
 // qu'aucune ligne ne les reference : personne ne saura jamais qu'ils
@@ -19092,19 +19109,22 @@ async function submitConvoyeurForm() {
   if (btn) { btn.textContent = 'Envoi en cours...'; btn.disabled = true; }
 
   // Upload des fichiers vers Supabase Storage.
-  // Lot 1 (V69) — la présence des 3 fichiers est déjà garantie par le
-  // garde-fou ci-dessus. Donc si uploadFichier renvoie null ICI, ce
+  // La présence des documents requis est déjà garantie par le garde-fou
+  // ci-dessus. Donc si uploadFichier renvoie null ICI pour l'un d'eux, ce
   // n'est PAS une absence de fichier mais un ÉCHEC D'UPLOAD réel
   // (réseau, storage, permissions) : on interrompt sans jamais insérer
   // une candidature portant une URL null.
   var id_url     = await uploadFichier('conv-doc-identite', 'identite');
   var permis_url = await uploadFichier('conv-doc-permis', 'permis');
-  var rc_pro_url = await uploadFichier('conv-doc-rcpro', 'rcpro');
+  var kbis_url   = await uploadFichier('conv-doc-kbis', 'kbis');
+  var rcProFournie = _fichierPresent('conv-doc-rcpro');
+  var rc_pro_url = rcProFournie ? await uploadFichier('conv-doc-rcpro', 'rcpro') : null;
 
   var echecs = [];
   if (!id_url)     echecs.push("la pièce d'identité");
   if (!permis_url) echecs.push('le permis de conduire');
-  if (!rc_pro_url) echecs.push('la RC professionnelle');
+  if (!kbis_url)   echecs.push("le justificatif d'immatriculation");
+  if (rcProFournie && !rc_pro_url) echecs.push('la RC professionnelle');
   if (echecs.length) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
     _convAfficherEchecCandidature(
@@ -19132,6 +19152,7 @@ async function submitConvoyeurForm() {
     metiers: metiers.length ? metiers : null,
     id_url: id_url,
     permis_url: permis_url,
+    kbis_url: kbis_url,
     rc_pro_url: rc_pro_url,
     rib_iban: rib_iban,
     statut: 'en_attente'
@@ -19164,9 +19185,9 @@ async function submitConvoyeurForm() {
   var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
   if (!rInsert || rInsert.error) {
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
-    // Les trois documents sont deja partis : sans candidature pour les
+    // Les documents sont deja partis : sans candidature pour les
     // referencer, ce sont des orphelins. On les retire.
-    await Promise.all([id_url, permis_url, rc_pro_url].map(_supprimerFichierTeleverse));
+    await Promise.all([id_url, permis_url, kbis_url, rc_pro_url].filter(Boolean).map(_supprimerFichierTeleverse));
     // Le detail technique est deja dans la console (supabaseInsert).
     // Le candidat, lui, lit une phrase qu'il peut comprendre et suivre —
     // jamais un code SQL ni un nom de table.
@@ -22472,8 +22493,8 @@ console.log('HelixCar ' + window.HC_VERSION);
   document.addEventListener('DOMContentLoaded',start);if(document.readyState!=='loading')setTimeout(start,0);
 
   // Point 4 (V57) — équivalent convoyeur, séparé et indépendant.
-  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}},20);});
-  function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
+  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}},20);});
+  function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
   document.addEventListener('DOMContentLoaded',startConv);if(document.readyState!=='loading')setTimeout(startConv,0);
 })();
 </script>

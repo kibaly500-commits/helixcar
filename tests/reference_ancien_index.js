@@ -158,7 +158,7 @@ const LIBELLES_ANCIEN_INDEX = [
   "À"
 ];
 
-// Les onze libellés de l'ancien index qui n'existent plus dans l'index
+// Les douze libellés de l'ancien index qui n'existent plus dans l'index
 // actuel. Chacun a une raison NOMMÉE et vérifiable. Aucun n'est une
 // perte de fonctionnalité historique : ce sont soit des retraits
 // explicitement demandés, soit des remplacements par un dispositif
@@ -190,7 +190,10 @@ const DISPARUS_EXPLIQUES = [
   ['Renfort automobile',
     'ancienne case d\'activité partenaire — devenue les métiers « Renfort », '
     + '« Accueil en concession », « Préparation automobile », « Opérations de parc » '
-    + 'et « Soutien administratif »']
+    + 'et « Soutien administratif »'],
+  ['RC Pro en cours de validité — PDF, JPG ou PNG',
+    'libellé remplacé par un statut dynamique : obligatoire pour le convoyage, '
+    + 'facultative pour les autres métiers']
 ];
 
 module.exports = { LIBELLES_ANCIEN_INDEX, DISPARUS_EXPLIQUES };

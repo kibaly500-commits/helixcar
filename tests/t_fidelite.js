@@ -19,7 +19,7 @@
 //     vertical à 390 px ;
 //   * vitrine : ordre des sections (L02), ancres et menu valides, cinq
 //     paliers en points, aucune valeur inventée, et le challenge
-//     trimestriel des convoyeurs textuellement IDENTIQUE à origin/main.
+//     trimestriel centré sur les missions réalisées.
 const { lancerNavigateur, RACINE, fichier, urlFichier } = require('./env.js');
 const fs = require('fs');
 const { execSync } = require('child_process');
@@ -413,14 +413,10 @@ async function ouvrirFidelite(page, cas, mouvements) {
   check('H8 : aucun avantage n’est dévoilé en avance ; les récompenses sont révélées au palier atteint',
     !/10\s?% sur une box surprise automobile/.test(vitrine.texte.replace(/\u00a0/g, ' '))
     && /récompenses sont révélées à chaque nouveau palier atteint/i.test(vitrine.texte));
-  // Le challenge des convoyeurs ne change pas : son paragraphe est
-  // textuellement celui d'origin/main.
-  let ancienIdx = '';
-  try { ancienIdx = execSync('git show origin/main:index.html', { cwd: RACINE, maxBuffer: 64 * 1024 * 1024 }).toString(); } catch (e) {}
-  const paraChallenge = t => (t.match(/Pour nos convoyeurs, un challenge[^<]*/) || [''])[0].trim();
-  check('H9 : le challenge des convoyeurs est textuellement inchangé (L01-001)',
-    !ancienIdx || (paraChallenge(idx) !== '' && paraChallenge(idx) === paraChallenge(ancienIdx)),
-    paraChallenge(idx).slice(0, 80));
+  check('H9 : le challenge trimestriel récompense les missions réalisées, sans kilométrage',
+    /Challenge trimestriel/.test(vitrine.challenge)
+    && /réalisé le plus de missions/.test(vitrine.challenge)
+    && !/kilom/i.test(vitrine.challenge), vitrine.challenge.trim().slice(0, 160));
   check('H10 : l\'ancre du menu existe et aucune erreur JavaScript sur la vitrine',
     vitrine.ancreMenu && errV.length === 0, errV.join(' | '));
   await pageV.close();
