@@ -7693,9 +7693,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <div class="modal-form-group">
           <label for="conv-civilite">Civilité <span class="field-required">*</span></label>
           <select id="conv-civilite">
-            <option value="">— Sélectionnez —</option>
-            <option value="madame">Madame</option>
+            <option value="" disabled selected>— Sélectionnez —</option>
             <option value="monsieur">Monsieur</option>
+            <option value="madame">Madame</option>
             <option value="non_precise">Je préfère ne pas préciser</option>
           </select>
         </div>
@@ -16753,6 +16753,26 @@ async function _submitClientFormInterne() {
   // réellement été créé à l'instant ».
   var _compteCree = (_compteEtat === 'cree');
 
+  // Une adresse Auth deja connue ne doit jamais conduire a creer un
+  // second compte ni une demande anonyme impossible a retrouver. Si le
+  // mot de passe saisi a permis d'ouvrir la session, le client est bien
+  // authentifie et peut naturellement deposer une nouvelle demande.
+  // Sinon, on le ramene a son adresse e-mail et on l'invite a passer par
+  // la connexion. Aucun dossier n'a encore ete ecrit a cet instant.
+  if (_compteEtat === 'existe_deja' && !_compteSession) {
+    _formStepState.client = 1;
+    _etapeMax = Math.max(_etapeMax, 1);
+    _renderFormStep('client');
+    _showFieldError('client-email',
+      'Cette adresse e-mail est déjà utilisée. Connectez-vous pour faire une nouvelle demande.');
+    var _champEmailExistant = document.getElementById('client-email');
+    if (_champEmailExistant) {
+      try { _champEmailExistant.focus({ preventScroll: true }); } catch (e3) { _champEmailExistant.focus(); }
+      try { _champEmailExistant.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e4) {}
+    }
+    return;
+  }
+
   // ── ÉCRITURE ATOMIQUE : LA DEMANDE ET SES VÉHICULES ENSEMBLE ──
   // L'ancienne version écrivait la demande, PUIS les véhicules, en deux
   // requêtes. Quand la seconde échouait — ce qui est arrivé en
@@ -19182,6 +19202,8 @@ async function submitConvoyeurForm() {
 
   var rInsert = await supabaseInsert('convoyeurs', payloadCandidature);
   if (!rInsert || rInsert.error) {
+    var erreurEmailDejaUtilise = !!(rInsert && typeof rInsert.error === 'string'
+      && /EMAIL_DEJA_UTILISE|convoyeurs_email_normalise_unique/i.test(rInsert.error));
     if (btn) { btn.textContent = btnTxt; btn.disabled = false; }
     // Les documents sont deja partis : sans candidature pour les
     // referencer, ce sont des orphelins. On les retire.
@@ -19189,6 +19211,17 @@ async function submitConvoyeurForm() {
     // Le detail technique est deja dans la console (supabaseInsert).
     // Le candidat, lui, lit une phrase qu'il peut comprendre et suivre —
     // jamais un code SQL ni un nom de table.
+    if (erreurEmailDejaUtilise) {
+      _formStepState.convoyeur = 1;
+      _renderFormStep('convoyeur');
+      _showFieldError('conv-email', 'Cette adresse e-mail est déjà utilisée.');
+      var champEmailConvoyeur = document.getElementById('conv-email');
+      if (champEmailConvoyeur) {
+        try { champEmailConvoyeur.focus({ preventScroll: true }); } catch (e) { champEmailConvoyeur.focus(); }
+        try { champEmailConvoyeur.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
+      }
+      return;
+    }
     _convAfficherEchecCandidature(
       "Votre candidature n'a pas pu etre enregistree.\n\n"
       + "Rien n'a ete valide et vos informations sont conservees : "
@@ -21296,8 +21329,9 @@ document.addEventListener('click', function (e) {
   function scan(root){(root||document).querySelectorAll && (root||document).querySelectorAll('#modal-client select').forEach(enhanceSelect);}
   document.addEventListener('click',function(e){document.querySelectorAll('#modal-client .hc-select-wrap.open').forEach(function(w){if(!w.contains(e.target))w.classList.remove('open')});});
 
-  // Point 2 (V58) — composant dédié, UNIQUEMENT pour #conv-experience
-  // (pas un traitement générique de tous les selects du convoyeur).
+  // Point 2 (V58) + civilité — composant dédié aux deux listes du
+  // partenaire qui doivent conserver l'habillage HelixCar, sans le bleu
+  // natif Windows/Chrome. Les autres selects convoyeur restent inchangés.
   // Réutilise le même habillage visuel que celui déjà en place pour
   // client (classes hc-select-*, CSS déjà étendu à #modal-convoyeur).
   // Le <select> original reste la seule source de vérité : valeurs,
@@ -21305,7 +21339,8 @@ document.addEventListener('click', function (e) {
   // pas — il est seulement masqué visuellement et piloté par ce
   // composant, qui déclenche 'change' comme un select natif.
   function enhanceSelectExperienceConvoyeur(){
-    var sel=document.getElementById('conv-experience');
+    ['conv-experience','conv-civilite'].forEach(function(selectId){
+    var sel=document.getElementById(selectId);
     if(!sel || sel.dataset.hcSelect==='1') return;
     sel.dataset.hcSelect='1';
     var wrap=document.createElement('div'); wrap.className='hc-select-wrap';
@@ -21323,7 +21358,7 @@ document.addEventListener('click', function (e) {
       if(actif) actif.focus();
     }
     function render(){
-      var opt=sel.options[sel.selectedIndex]; btn.textContent=opt?opt.textContent:'Sélectionnez votre expérience';
+      var opt=sel.options[sel.selectedIndex]; btn.textContent=opt?opt.textContent:(selectId==='conv-civilite'?'— Sélectionnez —':'Sélectionnez votre expérience');
       menu.innerHTML=''; options=[];
       Array.prototype.forEach.call(sel.options,function(o,idx){
         if(o.disabled){
@@ -21353,6 +21388,7 @@ document.addEventListener('click', function (e) {
     document.addEventListener('click',function(e){ if(!wrap.contains(e.target)) fermer(); });
     sel.addEventListener('change',render);
     render();
+    });
   }
   window.enhanceSelectExperienceConvoyeur = enhanceSelectExperienceConvoyeur;
 
