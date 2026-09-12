@@ -94,7 +94,7 @@ function check(libelle, condition, detail) {
   check('N7c : le challenge trimestriel et ses paliers ont des angles arrondis',
     bureau.challengeRadius >= 12 && bureau.podiumRadius >= 8, JSON.stringify(bureau));
   check('N7d : les exemples de tous les formulaires clairs restent pâles face au texte saisi',
-    bureau.couleursExemples.every(c => c === 'rgb(242, 243, 244)')
+    bureau.couleursExemples.every(c => c === 'rgb(248, 248, 248)')
       && bureau.couleurTexteClient === 'rgb(58, 63, 69)', JSON.stringify(bureau));
 
   await page.locator('#nav-menu-btn').click();
