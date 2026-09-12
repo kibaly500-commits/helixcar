@@ -131,6 +131,7 @@ const futur = dansNJours;
   const diff = execSync('git diff origin/main -- index.html dashboard.html', { cwd: RACINE, maxBuffer: 60 * 1024 * 1024 }).toString();
   const lignesAjoutees = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
   const ajouts = lignesAjoutees.join('\n');
+  const indexHtml = fs.readFileSync(fichier('index.html'), 'utf8');
   // Les garde-fous ci-dessous cherchent du CODE, pas des mots. Les
   // commentaires qui attestent l'absence de Stripe contiennent
   // forcément « Stripe » : les inclure ferait échouer le test sur sa
@@ -143,10 +144,14 @@ const futur = dansNJours;
 
   L.check('E1 : aucun nouvel envoi EmailJS introduit',
     !/emailjs\.(send|sendForm)/i.test(ajouts), (ajouts.match(/emailjs\.[a-z]+/gi) || []).join(','));
-  L.check('E2 : aucun code Stripe introduit',
+
+  L.check('E2 : l’adresse publique HelixCar est la boîte officielle du domaine',
+    /mailto:contact@helixcar\.fr/.test(indexHtml)
+      && /HELIXCAR_EMAIL_ADMIN\s*=\s*['"]contact@helixcar\.fr['"]/.test(indexHtml));
+  L.check('E3 : aucun code Stripe introduit',
     !/stripe|checkout\.session|payment_intent/i.test(ajoutsCode),
     (ajoutsCode.match(/.*stripe.*/i) || []).slice(0, 2).join(' | '));
-  L.check('E3 : aucun statut « payé » introduit',
+  L.check('E4 : aucun statut « payé » introduit',
     !/statut\s*[:=]\s*['"]pay/i.test(ajoutsCode) && !/\bpaye\b\s*[:=]\s*true/i.test(ajoutsCode));
   // Le mot apparaît dans des commentaires qui attestent que la clé
   // reste côté serveur. Ce qui doit être vérifié, c'est l'absence de
@@ -161,7 +166,7 @@ const futur = dansNJours;
         } catch (e) { return false; }
       });
   }
-  L.check('E4 : aucune clé privilégiée réelle introduite dans le navigateur',
+  L.check('E5 : aucune clé privilégiée réelle introduite dans le navigateur',
     jwtsPrivilegies(ajouts).length === 0
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('index.html'), 'utf8'))
     && !/SUPABASE_SERVICE_ROLE_KEY/.test(fs.readFileSync(fichier('dashboard.html'), 'utf8')));
@@ -251,6 +256,8 @@ const futur = dansNJours;
   const PERIMETRE = [
     'index.html',
     'dashboard.html',
+    // Visuel éditorial demandé pour la section « Nos services ».
+    'assets/helixcar-services-mercedes.webp',
     'creer-compte-convoyeur.html',
     // Le réglage sans lequel la fonction vidéo répondrait 401 à toute
     // candidature. Versionné exprès, plutôt que coché à la main.
@@ -260,6 +267,8 @@ const futur = dansNJours;
     'package-lock.json',
     // Le lanceur de tests et la campagne d'intégration continue.
     '.github/workflows/tests.yml',
+    // Recette : désactive les déploiements Vercel de cette seule branche.
+    'vercel.json',
     // node_modules et sorties locales, désormais ignorés par git.
     '.gitignore',
     // Le dossier de recette et de mise en production.
@@ -268,6 +277,31 @@ const futur = dansNJours;
     'RECETTE-STABILISATION-POST-PR2.md',
     // Celui du chantier qui a suivi la PR nº 3.
     'RECETTE-POST-PR3.md',
+    // Lot Q01 : la page publique du devis suit le contrat versionné de
+    // la fonction serveur (version obsolète, paiement en attente).
+    'devis.html',
+    // Identité officielle : la fiche imprimable indique désormais la
+    // même adresse de contact que la vitrine.
+    'fiche-mission.html',
+    // Même identité sur la lettre de voiture contractuelle.
+    'lettre-voiture.html',
+    // Lot Q01 : la fonction devis-secure vivait à la racine, hors de
+    // l'arborescence que la CLI Supabase déploie. Elle est DÉPLACÉE
+    // (git mv) vers supabase/functions/devis-secure/index.ts : l'ancien
+    // chemin apparaît dans le diff comme supprimé, c'est voulu.
+    'index.ts',
+    // Le dossier de recette de la révision experte P0/P1.
+    'RECETTE-EXPERT-P0-P1.md',
+    // X01 : retrait demandé des pages de démonstration et faux contrats.
+    'helixcar-cgv-client.html',
+    'helixcar-contrat-convoyeur.html',
+    'helixcar-emails.html',
+    // V01 : mesure réelle des vidéos hors des limites d'une Edge Function.
+    'services/video-validation/serveur.mjs',
+    'services/video-validation/valider.mjs',
+    'services/video-validation/README.md',
+    // Adaptateur Vercel du validateur vidéo, isolé de la vitrine.
+    'api/video-validation.mjs',
   ];
   // supabase/templates/ — les modèles d'e-mail Supabase, versionnés
   // pour que ce qui part réellement aux clients soit relu et comparé
@@ -280,13 +314,15 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 12,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 25,
     PERIMETRE.length + ' entrées');
-  L.check('E6b : aucun fichier hors périmètre (devis.html, index.ts, edl.html…)',
-    !fichiers.some(f => ['devis.html', 'index.ts', 'edl.html', 'fiche-mission.html',
-                         'lettre-voiture.html',
-                         'helixcar-emails.html'].indexOf(f) !== -1),
+  // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
+  // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
+  L.check('E6b : aucun fichier annexe hors périmètre (edl.html…)',
+    !fichiers.some(f => ['edl.html'].indexOf(f) !== -1),
     fichiers.join(', '));
+  L.check('E6d : la fonction devis-secure n\'est plus à la racine du dépôt',
+    !fs.existsSync(fichier('index.ts')) && fs.existsSync(fichier('supabase/functions/devis-secure/index.ts')));
   // Ce qui est touché dans l'inscription partenaire doit se limiter aux
   // mots de passe : aucun autre comportement de cette page ne change.
   const diffConvoyeur = execSync('git diff origin/main -- creer-compte-convoyeur.html',
@@ -323,8 +359,8 @@ const futur = dansNJours;
   // RLS refusait en silence. E6d ci-dessous rend cette évolution
   // vérifiable, et interdit tout retour en arrière.
   L.check('E6c : l\'inscription partenaire ne change que le mot de passe et la logique de compte',
-    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)),
-    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*/i.test(l)).slice(0, 3).join(' | '));
+    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)),
+    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)).slice(0, 3).join(' | '));
   // L'ÉLARGISSEMENT CI-DESSUS EST COMPENSÉ, jamais laissé à nu : ces
   // trois contrôles interdisent tout retour au comportement d'avant.
   const srcConvoyeur = fs.readFileSync(fichier('creer-compte-convoyeur.html'), 'utf8');

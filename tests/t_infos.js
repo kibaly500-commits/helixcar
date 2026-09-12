@@ -152,10 +152,11 @@ window.emailjs = { init: function () {},
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   page.on('dialog', d => d.accept());
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'clientA@helixcar.test';
-    document.getElementById('login-pw').value = 'x';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     showPage('client-infos');
   });
   await page.waitForTimeout(600);
@@ -171,8 +172,8 @@ window.emailjs = { init: function () {},
     /4 informations sur 6/.test(onglet), (onglet.match(/\d+ informations? sur \d+/g) || []).join(' | '));
   check('A5 : une autre progression pour un autre service',
     /2 informations sur 3/.test(onglet), (onglet.match(/\d+ informations? sur \d+/g) || []).join(' | '));
-  check('A6 : les informations déjà reçues sont listées',
-    /Déjà reçues/.test(onglet) && /Adresse de livraison/.test(onglet));
+  check('A6 : les informations déjà reçues ne sont plus détaillées',
+    !/Déjà reçues/.test(onglet) && !/Adresse de livraison/.test(onglet));
   check('A7 : les informations encore attendues sont listées',
     /Encore attendues/.test(onglet) && /Nom du contact sur place au départ/.test(onglet));
   check('A8 : le motif de correction est visible pour le client',
@@ -278,13 +279,14 @@ window.emailjs = { init: function () {},
   check('C2 : le client concerné est indiqué', /TEST-QA ClientA/.test(bloc));
   check('C3 : la référence de la demande est indiquée', /TEST-QA-C1/.test(bloc));
   check('C4 : le devis associé est indiqué', /DEV-TEST-QA-1/.test(bloc));
-  check('C5 : les informations déjà reçues sont listées', /Déjà reçues/.test(bloc));
-  check('C6 : les informations manquantes sont listées', /Encore manquantes/.test(bloc));
+  check('C5 : les informations déjà reçues ne sont plus listées',
+    !/Déjà reçues/.test(bloc) && !/Adresse de livraison/.test(bloc));
+  check('C6 : les informations restant à traiter sont listées', /Encore manquantes ou à traiter/.test(bloc));
   // À ce stade le client a répondu (section B) : les deux rubriques
   // concernées sont « Transmise », l'adresse reste « Validée » et les
   // données du dépôt initial « Reçue ».
-  check('C7 : le statut de chaque information est affiché',
-    /Validée/.test(bloc) && /Transmise/.test(bloc) && /Reçue/.test(bloc), bloc.slice(0, 260));
+  check('C7 : seuls les statuts nécessitant encore une action sont affichés',
+    /Transmise/.test(bloc) && !/Validée/.test(bloc) && !/Reçue/.test(bloc), bloc.slice(0, 260));
 
   // Valider
   const validation = await page.evaluate(async () => {

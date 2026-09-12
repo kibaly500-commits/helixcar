@@ -1,0 +1,62 @@
+From 01eef82a0b8ae0462c57c98d5d746e7627ba79fd Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 10 Sep 2026 12:09:14 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?F01=20(2/8)=20:=20la=20question=20=C2=AB=20?=
+ =?UTF-8?q?disponibilit=C3=A9=20=C2=BB=20ne=20revient=20plus=20par=20les?=
+ =?UTF-8?q?=20anciens=20dossiers?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Le formulaire Nettoyage, son payload, son récapitulatif et le PDF ne
+portaient déjà plus « Quelle est votre disponibilité ? » (Heure précise /
+Créneau horaire / Flexible) ; les horaires de début et de fin sur place
+y sont obligatoires, sans valeur par défaut, avec cohérence date+heure.
+Le Dashboard, lui, restituait encore le choix « Flexible » des demandes
+antérieures : il affiche désormais « Non renseigné » quand aucun horaire
+réel n'existe, conserve une heure précise réellement saisie, et ne
+réécrit jamais l'ancien dossier. La colonne clients.disponibilite
+(planifie / pas-maintenant) est un autre drapeau, historique : elle est
+conservée telle quelle, aucune migration n'est nécessaire.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019pgrVMCXfVuhyMDc7dctBj
+---
+ dashboard.html | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/dashboard.html b/dashboard.html
+index 84d3e01..a7eef35 100644
+--- a/dashboard.html
++++ b/dashboard.html
+@@ -8422,9 +8422,10 @@ function _nettHoraireTexte(nd) {
+   if (!nd) return '';
+   var plage = [nd.creneau_debut, nd.creneau_fin].filter(Boolean).join(' – ');
+   if (plage) return plage;
+-  // Demandes antérieures uniquement.
+-  if (nd.dispo_type === 'precise') return nd.heure_precise || '';
+-  if (nd.dispo_type === 'flexible') return 'Flexible';
++  // Demandes antérieures uniquement : une heure réellement saisie par le
++  // client reste lisible. LOT F01 (F01-004) — le choix « Flexible » de la
++  // question retirée n'est plus restitué : sans horaire réel, la demande
++  // est affichée « Non renseigné » par l'appelant, jamais réécrite.
+   return nd.heure_precise || '';
+ }
+ 
+@@ -9414,8 +9415,12 @@ function ouvrirFicheDemande(clientId) {
+     if (nd.acces_electricite) org += L('Prise électrique (demande antérieure)', NETT_LIB_OUINON[nd.acces_electricite] || nd.acces_electricite);
+     org += L(nd.date_fin && nd.date_fin !== nd.date_souhaitee ? 'Période' : 'Date souhaitée',
+              _nettPeriodeTexte(nd, _dvDate));
++    // LOT F01 (F01-004/006) — l'horaire de début et de fin sur place est
++    // obligatoire pour toute nouvelle demande ; un ancien dossier qui n'en
++    // porte aucun reste lisible et affiche « Non renseigné », sans jamais
++    // être réécrit ni inventé.
+     var _horaireNett = _nettHoraireTexte(nd);
+-    if (_horaireNett) org += L('Horaire sur place', _horaireNett);
++    org += L('Horaire sur place', _horaireNett || 'Non renseigné');
+     org += L('Délai', NETT_LIB_DELAI[nd.delai] || nd.delai);
+     // V77 — la cle instructions n'est plus ecrite ; conservee en lecture
+     // pour les demandes anterieures.
+-- 
+2.43.0
+

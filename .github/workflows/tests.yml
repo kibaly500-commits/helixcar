@@ -39,9 +39,13 @@ jobs:
       - name: Rendre origin/main disponible
         run: git fetch --no-tags origin main:refs/remotes/origin/main || true
 
+      - name: Installer le décodeur de recette vidéo
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Lancer toutes les suites
         env:
           CI_NO_SANDBOX: '1'
+          HC_VIDEO_GRANDE: '1'
         run: node tests/lancer.js --sans-sql
 
   sql:

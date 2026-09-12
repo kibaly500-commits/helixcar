@@ -190,6 +190,31 @@ const DEVIS = { reference: 'DEV-2026-TESTQA', prix: 1250, statut: 'genere', date
     !/Trouver un professionnel|Mission sur site|Véhicules à nettoyer/i.test(t));
   check('NON-RÉGRESSION : bande tarif toujours présente', /TARIF PROPOSÉ/.test(t));
 
+  // ── STOCKAGE AUTOMATIQUE SUR UN CONVOYAGE LONG ──
+  const DEM_CONV_2J = Object.assign({}, DEM_CONV, {
+    date_prise_en_charge: '2026-09-12', date_livraison: '2026-09-14'
+  });
+  r = await genere(DEM_CONV_2J);
+  t = (r.textes || []).join(' | ');
+  check('Convoyage de 2 jours : aucun stockage ajouté',
+    r.ok && !/Stockage automobile/i.test(t), t.slice(0, 700));
+
+  const DEM_CONV_LONG = Object.assign({}, DEM_CONV, {
+    nb_vehicules: 2,
+    _vehicules: [
+      { position: 1, type_vehicule: 'berline', marque_modele: 'Peugeot 308', immatriculation: 'AA-111-AA', date_prise_en_charge: '2026-09-13', date_livraison: '2026-09-15' },
+      { position: 2, type_vehicule: 'citadine', marque_modele: 'Renault Clio', immatriculation: 'BB-222-BB', date_prise_en_charge: '2026-09-12', date_livraison: '2026-09-18' }
+    ]
+  });
+  r = await genere(DEM_CONV_LONG);
+  t = (r.textes || []).join(' | ');
+  check('Convoyage long : bloc Stockage automobile ajouté',
+    r.ok && /Stockage automobile/i.test(t), t.slice(0, 900));
+  check('Convoyage long : première prise en charge et dernière livraison affichées',
+    /12\/09\/2026/.test(t) && /18\/09\/2026/.test(t), t.slice(0, 900));
+  check('Convoyage long : durée globale de 6 jours affichée', /6 jours/.test(t), t.slice(0, 900));
+  check('Convoyage long : les 2 véhicules sont comptés', /Nombre de véhicules/i.test(t) && /\| 2 \|/.test(' | ' + t + ' | '), t.slice(0, 900));
+
   check('Aucune erreur JS de page', errs.length === 0, errs.join(' | '));
 
   await browser.close();

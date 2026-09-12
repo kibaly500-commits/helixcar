@@ -32,3 +32,20 @@ project_id = "helixcar"
 # Autrement dit : le gateway ne peut pas autoriser ce parcours, et la
 # fonction l'autorise mieux que lui.
 verify_jwt = false
+
+[functions.devis-secure]
+# La page publique devis.html (lien reçu par le client) appelle cette
+# fonction SANS session : la seule preuve est le jeton à usage lié au
+# devis, vérifié par la fonction elle-même (empreinte SHA-256 en base,
+# expiration). Les actions administrateur (prepare, send_email)
+# vérifient de leur côté le JWT de la session et l'appartenance à
+# public.admins. Le gateway ne sait pas faire cette distinction :
+# la vérification JWT globale est donc désactivée ici aussi, et la
+# fonction autorise plus strictement que lui.
+verify_jwt = false
+
+[functions.paiement-recette]
+# La fonction valide elle-même le JWT client, la propriété du devis,
+# l'origine Preview exacte et le préfixe QA. Elle n'appelle aucun
+# prestataire et reste inaccessible depuis le domaine de production.
+verify_jwt = false

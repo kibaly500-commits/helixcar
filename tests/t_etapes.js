@@ -19,6 +19,13 @@ async function etatBouton(page) {
 
   // ── A. LE SCÉNARIO SIGNALÉ ──
   await L.chooseService(page, 'professionnel');
+  // LOT F01 (F01-023..025) — ANCIEN COMPORTEMENT ADAPTÉ : les quatre
+  // rubriques métier vivaient sous le choix du service (étape 2). Elles
+  // vivent désormais dans l'étape 3 dédiée : on y entre par
+  // « Continuer », que le seul choix du service active.
+  await page.click('#client-step-next-btn');
+  await page.waitForTimeout(150);
+  L.check('A0 : le choix du service ouvre l\'étape 3 dédiée', (await L.step(page)) === 3);
   await page.evaluate(() => proBasculerRubrique('besoin'));
   await page.waitForTimeout(80);
   await page.click('input[name="pro-categorie"][value="technicien"]');
@@ -28,7 +35,9 @@ async function etatBouton(page) {
   L.check('A1 : professionnel incomplet — le bouton reste ACTIF et cliquable',
     proIncomplet.disabled === false && proIncomplet.visible === true, JSON.stringify(proIncomplet));
 
-  // Retour à l'étape 1, puis bascule vers Nettoyage.
+  // Retour à l'étape 1 (deux retours depuis l'étape 3), puis bascule vers Nettoyage.
+  await page.evaluate(() => clientStepPrev());
+  await page.waitForTimeout(150);
   await page.evaluate(() => clientStepPrev());
   await page.waitForTimeout(150);
   const etape1 = await etatBouton(page);
