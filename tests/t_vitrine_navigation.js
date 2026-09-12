@@ -17,8 +17,13 @@ function check(libelle, condition, detail) {
       && /nav-account-action/.test(source) && /nav-menu-lines/.test(source)
       && /site-menu-panel/.test(source) && !/site-menu-quick/.test(source));
   check('N3 : le nouveau texte commercial exact remplace le doublon',
-    source.includes('Prix transparent, du devis à la livraison.')
-      && !source.includes('Prix transparent, sans surprise'));
+    source.includes('Tout est défini avant le départ.')
+      && source.includes('Prestation, conditions et montant : chaque élément est confirmé avant votre validation. Vous gardez une vision claire, du devis à la livraison.')
+      && !source.includes('Prix transparent, sans surprise')
+      && !source.includes('Prix transparent, du devis à la livraison.'));
+  check('N3a : l’action du renfort professionnel adopte le libellé validé',
+    source.includes('>Renforcer votre équipe</button>')
+      && !source.includes('>Organiser un renfort</button>'));
   check('N3b : le bloc services contient son accroche et le visuel Mercedes',
     source.includes('L’automobile, dans toutes ses exigences.')
       && source.includes('Des prestations pensées comme un ensemble cohérent')
@@ -40,6 +45,8 @@ function check(libelle, condition, detail) {
     const menuTrigger = document.querySelector('.nav-menu-trigger').getBoundingClientRect();
     const services = document.getElementById('services');
     const showcase = document.querySelector('.services-showcase img');
+    const challenge = document.querySelector('.convoyeur-challenge');
+    const podium = document.querySelector('.podium-item');
     const bande = services.previousElementSibling;
     const cartes = Array.from(document.querySelectorAll('.services-grid .service-card'));
     return {
@@ -55,6 +62,8 @@ function check(libelle, condition, detail) {
       espaceConnexionMenu: Math.round(menuTrigger.left - account.right),
       espaceServices: services.getBoundingClientRect().top - bande.getBoundingClientRect().bottom,
       visuelServicesCharge: showcase.complete && showcase.naturalWidth >= 1700,
+      challengeRadius: parseFloat(getComputedStyle(challenge).borderTopLeftRadius),
+      podiumRadius: parseFloat(getComputedStyle(podium).borderTopLeftRadius),
       cartes: cartes.length,
       largeurs: cartes.map(el => Math.round(el.getBoundingClientRect().width)),
       hauteurs: cartes.map(el => Math.round(el.getBoundingClientRect().height)),
@@ -75,6 +84,8 @@ function check(libelle, condition, detail) {
     JSON.stringify({ largeurs: bureau.largeurs, hauteurs: bureau.hauteurs, grille: bureau.grille }));
   check('N7b : le visuel automobile haute définition est chargé dans Nos services',
     bureau.visuelServicesCharge, JSON.stringify(bureau));
+  check('N7c : le challenge trimestriel et ses paliers ont des angles arrondis',
+    bureau.challengeRadius >= 12 && bureau.podiumRadius >= 8, JSON.stringify(bureau));
 
   await page.locator('#nav-menu-btn').click();
   const menu = await page.evaluate(() => ({
