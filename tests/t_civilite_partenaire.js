@@ -17,15 +17,36 @@ const fs = require('fs');
       avantEmail: !!e && !!document.getElementById('conv-email')
         && !!(e.compareDocumentPosition(document.getElementById('conv-email')) & Node.DOCUMENT_POSITION_FOLLOWING),
       valeurs: e ? Array.from(e.options).map(o => o.value) : [],
-      obligatoire: !!e && /\*/.test((document.querySelector('label[for="conv-civilite"]') || {}).textContent || '')
+      obligatoire: !!e && /\*/.test((document.querySelector('label[for="conv-civilite"]') || {}).textContent || ''),
+      personnalise: !!e && !!e.closest('.hc-select-wrap')
+        && !!e.closest('.hc-select-wrap').querySelector('.hc-select-btn')
+        && !!e.closest('.hc-select-wrap').querySelector('.hc-select-menu'),
+      natifMasque: !!e && getComputedStyle(e).opacity === '0'
     };
   });
   L.check('A1 : la civilité est proposée au-dessus de l’email', champ.avantEmail, JSON.stringify(champ));
   L.check('A2 : les trois choix demandés sont les seuls choix actifs',
-    champ.valeurs.join(',') === ',madame,monsieur,non_precise', champ.valeurs.join(','));
+    champ.valeurs.join(',') === ',monsieur,madame,non_precise', champ.valeurs.join(','));
   L.check('A3 : la civilité est obligatoire pour une nouvelle candidature', champ.obligatoire);
   L.check('A4 : la valeur choisie est envoyée avec la candidature',
     /civilite\s*:\s*civilite/.test(index));
+  L.check('A5 : le menu civilité utilise le sélecteur HelixCar sans surbrillance native bleue',
+    champ.personnalise && champ.natifMasque, JSON.stringify(champ));
+  const interaction = await page.evaluate(() => {
+    const e = document.getElementById('conv-civilite');
+    const wrap = e && e.closest('.hc-select-wrap');
+    const choix = wrap && Array.from(wrap.querySelectorAll('.hc-select-option'))
+      .find(b => b.textContent === 'Monsieur');
+    if (choix) choix.click();
+    return {
+      valeur: e && e.value,
+      libelle: wrap && wrap.querySelector('.hc-select-btn').textContent,
+      ferme: !!wrap && !wrap.classList.contains('open')
+    };
+  });
+  L.check('A6 : un choix personnalisé alimente toujours le vrai champ puis ferme le menu',
+    interaction.valeur === 'monsieur' && interaction.libelle === 'Monsieur' && interaction.ferme,
+    JSON.stringify(interaction));
 
   await browser.close();
 
