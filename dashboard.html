@@ -1707,7 +1707,7 @@ body.scroll-verrouille { overflow: hidden; }
       <!-- CONVOYEUR: Profil -->
       <div class="page" id="page-convoyeur-profil">
         <div class="card">
-          <div class="card-header"><div class="card-title">Mon profil convoyeur</div></div>
+          <div class="card-header"><div class="card-title" id="profil-partenaire-titre">Mon profil convoyeur</div></div>
           <div id="profil-statut-note" class="hc-note" role="status"></div>
           <div class="profile-grid">
             <div class="form-group"><label>Prénom</label><input type="text" id="profil-prenom" value=""></div>
@@ -2184,6 +2184,7 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
     name: (conv.prenom || '') + ' ' + (conv.nom || ''),
     initials: (conv.prenom || '?')[0].toUpperCase()
   });
+  _appliquerCiviliteEspacePartenaire(conv);
   return true;
 }
 
@@ -2983,6 +2984,11 @@ async function loadEvaluationsClient() {
 var OPP_ACTIVITES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
 var LIB_STATUT_OPPORTUNITE = { brouillon: 'Brouillon', a_pourvoir: 'À pourvoir', pourvue: 'Pourvue / clôturée' };
 var LIB_ETAT_CANDIDATURE = { a_etudier: 'À étudier', preselectionne: 'Présélectionné', retenu: 'Retenu', non_retenu: 'Non retenu' };
+function _libEtatCandidature(etat, partenaire) {
+  var masculin = LIB_ETAT_CANDIDATURE[etat] || etat;
+  var feminin = { preselectionne: 'Présélectionnée', retenu: 'Retenue', non_retenu: 'Non retenue' }[etat] || masculin;
+  return _accordPartenaire(partenaire, masculin, feminin);
+}
 var _oppCourante = null;
 
 function _oppLibCategorie(c) { return LIB_ACTIVITE_DECISION[c] || c || '—'; }
@@ -3030,7 +3036,7 @@ function _oppCarteHtml(o, options) {
     html += '<div id="opp-msg-' + escapeHtml(o.id) + '" class="hc-note" role="status"></div>';
     if (o.ma_candidature_etat) {
       html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
-        + 'Votre candidature : ' + escapeHtml(LIB_ETAT_CANDIDATURE[o.ma_candidature_etat] || o.ma_candidature_etat) + '</span>'
+        + 'Votre candidature : ' + escapeHtml(_libEtatCandidature(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
         + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
         + '</div>';
     } else if (o.statut === 'a_pourvoir') {
@@ -3109,7 +3115,7 @@ async function _oppChargerDetail(id) {
   const r = await Promise.all([
     sbAuth.from('v_opportunites_admin').select('*').eq('id', id).limit(1),
     sbAuth.from('opportunite_candidatures').select('id, convoyeur_id, etat, created_at, decidee_le').eq('opportunite_id', id).order('created_at', { ascending: true }),
-    sbFetchToutePage('convoyeurs?select=id,prenom,nom,activites,statut,bloque')
+    sbFetchToutePage('convoyeurs?select=id,prenom,nom,civilite,activites,statut,bloque')
   ]);
   if (r[0].error) throw new Error(r[0].error.message);
   if (r[1].error) throw new Error(r[1].error.message);
@@ -3164,17 +3170,19 @@ function _oppCandidaturesHtml(detail) {
     liste.forEach(function (c) {
       const cv = detail.convoyeurs[c.convoyeur_id] || {};
       const nom = [cv.prenom, cv.nom].filter(Boolean).join(' ') || 'Partenaire';
+      const etatPersonnel = _libEtatCandidature(etat, cv);
       let boutons = '';
       const bt = function (etatCible, libelle, cls) {
         return '<button type="button" class="btn btn-sm ' + (cls || 'btn-outline') + '" style="margin-left:6px" '
           + actionHtml('deciderCandidature', [c.id, etatCible]) + '>' + libelle + '</button>';
       };
-      if (etat === 'a_etudier') boutons = bt('preselectionne', 'Présélectionner') + bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Non retenu');
-      else if (etat === 'preselectionne') boutons = bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Non retenu');
+      if (etat === 'a_etudier') boutons = bt('preselectionne', 'Présélectionner') + bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Ne pas retenir');
+      else if (etat === 'preselectionne') boutons = bt('retenu', 'Retenir', 'btn-primary') + bt('non_retenu', 'Ne pas retenir');
       else if (etat === 'retenu') boutons = bt('non_retenu', 'Annuler la sélection');
       else boutons = bt('a_etudier', 'Réétudier');
       html += '<div data-candidature="' + escapeHtml(c.id) + '" style="margin-bottom:6px">'
         + '<strong>' + escapeHtml(nom) + '</strong>'
+        + ' <span class="badge badge-pending">' + escapeHtml(etatPersonnel) + '</span>'
         + ' <span style="font-size:.75rem;color:#888">' + escapeHtml((normaliserActivites(cv.activites) || []).map(_oppLibCategorie).join(', ')) + '</span>'
         + ' <button type="button" class="btn btn-sm btn-outline" style="margin-left:6px" ' + actionHtml('voirConvoyeurSb', [c.convoyeur_id]) + '>Profil</button>'
         + boutons + '</div>';
@@ -6212,7 +6220,7 @@ function loadCandidatures() {
           + '<td>' + dateStr + '</td>'
           + '<td style="display:flex;gap:6px;flex-wrap:wrap">'
           + '<button class="btn btn-sm btn-outline" ' + actionHtml('openDossierSb', [c.id]) + '>Dossier</button>'
-          + '<button class="btn btn-sm btn-green" ' + actionHtml('validerConvoyeur', [c.id, nomBrut, c.email]) + '>✓ Valider</button>'
+          + '<button class="btn btn-sm btn-green" ' + actionHtml('validerConvoyeur', [c.id, nomBrut, c.email, c.civilite || null]) + '>✓ Valider</button>'
           + '<button class="btn btn-sm btn-red" ' + actionHtml('refuserConvoyeur', [c.id]) + '>✗ Refuser</button>'
           + '</td></tr>';
       }).join('');
@@ -6241,6 +6249,7 @@ function openDossierSb(id) {
   };
   document.getElementById('dossier-content').innerHTML = `
     <div class="detail-row"><span class="detail-label">Nom</span><span class="detail-val">${escapeHtml(nom)}</span></div>
+    <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
     <div class="detail-row"><span class="detail-label">Téléphone</span><span class="detail-val">${escapeHtml(c.telephone)}</span></div>
     <div class="detail-row"><span class="detail-label">Activités</span><span class="detail-val">${escapeHtml(libellesActivites(c.activites))}</span></div>
@@ -6284,7 +6293,7 @@ var LIB_ACTIVITE_DECISION = {
 };
 
 // Fiche actuellement ouverte : identifiant, nom, décisions chargées.
-var _partenaireFiche = { id: null, nom: '', activites: [], decisions: {} };
+var _partenaireFiche = { id: null, nom: '', civilite: null, activites: [], decisions: {} };
 
 function _sbAuthPret() {
   return (typeof sbAuth !== 'undefined') && !!sbAuth && !!sbAuth.from;
@@ -6341,6 +6350,7 @@ async function rendreDecisionsPartenaire(convoyeur) {
   _partenaireFiche = {
     id: convoyeur ? convoyeur.id : null,
     nom: ((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || ''),
+    civilite: convoyeur ? (convoyeur.civilite || null) : null,
     activites: activites,
     decisions: {}
   };
@@ -6468,7 +6478,7 @@ async function toggleBlockConvoyeur() {
     if (!confirm(
       'Bloquer l\'accès de ' + nom + ' ?\n\n' +
       'Motif : ' + motif + '\n\n' +
-      'Il perdra l\'accès à son espace partenaire et à ses missions.'
+      _accordPartenaire(_partenaireFiche, 'Il', 'Elle') + ' perdra l\'accès à son espace partenaire et à ses missions.'
     )) return;
     try { await definirBlocagePartenaire(id, true, motif); }
     catch (e) { alert('Le blocage n\'a pas pu être enregistré.\n\n' + e.message); return; }
@@ -6501,11 +6511,12 @@ function _memoriserEtatBlocage(id, bloque, motif) {
   }
 }
 
-function _majBoutonBlocage(bloque) {
+function _majBoutonBlocage(bloque, partenaire) {
   // Le badge de la fiche suit le bouton : après un blocage, la fiche
   // ouverte ne peut pas continuer d'annoncer « Actif ».
   const badge = document.getElementById('dossier-statut-partenaire');
-  if (badge) badge.innerHTML = _badgeEtatPartenaire({ bloque: !!bloque });
+  partenaire = partenaire || _partenaireFiche;
+  if (badge) badge.innerHTML = _badgeEtatPartenaire({ bloque: !!bloque, civilite: partenaire.civilite || null });
   const btn = document.getElementById('dossier-btn-block');
   if (!btn) return;
   btn.textContent = bloque ? '🔓 Débloquer l\'accès' : '🚫 Bloquer l\'accès';
@@ -6519,7 +6530,7 @@ async function preparerFichePartenaire(convoyeur) {
   window._currentConvNom = (((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || '')).trim()
     || 'ce partenaire';
   window._currentConvBlocked = !!(convoyeur && convoyeur.bloque);
-  _majBoutonBlocage(window._currentConvBlocked);
+  _majBoutonBlocage(window._currentConvBlocked, convoyeur);
   const groupeMotif = document.getElementById('block-reason-group');
   if (groupeMotif) groupeMotif.style.display = 'none';
   await rendreDecisionsPartenaire(convoyeur);
@@ -6718,10 +6729,35 @@ function _partenaireEstBloque(c) {
   return !!(c && c.bloque === true);
 }
 
+// La civilité est la seule source d'accord grammatical. Les anciennes
+// candidatures et « Je préfère ne pas préciser » conservent le masculin
+// par défaut, conformément au choix produit.
+function _partenaireEstFemme(c) {
+  return !!(c && c.civilite === 'madame');
+}
+function _accordPartenaire(c, masculin, feminin) {
+  return _partenaireEstFemme(c) ? feminin : masculin;
+}
+function _libelleCivilite(c) {
+  return c && c.civilite === 'madame' ? 'Madame'
+    : c && c.civilite === 'monsieur' ? 'Monsieur'
+    : c && c.civilite === 'non_precise' ? 'Je préfère ne pas préciser'
+    : 'Non renseignée';
+}
+function _appliquerCiviliteEspacePartenaire(c) {
+  const role = _accordPartenaire(c, 'Convoyeur', 'Convoyeuse');
+  const roleEl = document.getElementById('sb-role');
+  if (roleEl) roleEl.textContent = role;
+  const section = document.querySelector('#sidebar-nav .nav-section-label');
+  if (section) section.textContent = _accordPartenaire(c, 'Espace convoyeur', 'Espace convoyeuse');
+  const titre = document.getElementById('profil-partenaire-titre');
+  if (titre) titre.textContent = _accordPartenaire(c, 'Mon profil convoyeur', 'Mon profil convoyeuse');
+}
+
 function _badgeEtatPartenaire(c) {
   return _partenaireEstBloque(c)
-    ? '<span class="badge badge-refused">🚫 Bloqué</span>'
-    : '<span class="badge badge-active">Actif</span>';
+    ? '<span class="badge badge-refused">🚫 ' + _accordPartenaire(c, 'Bloqué', 'Bloquée') + '</span>'
+    : '<span class="badge badge-active">' + _accordPartenaire(c, 'Actif', 'Active') + '</span>';
 }
 
 function afficherConvoyeursActifs(rows) {
@@ -6762,9 +6798,9 @@ function filtrerConvoyeursActifs(texte) {
 
 function supprimerConvoyeur(id) {
   const c = (window._convoyeursActifsData || {})[id];
-  const nom = c ? ((c.prenom || '') + ' ' + (c.nom || '')).trim() : 'ce convoyeur';
-  const avertMissions = c && c.nb_missions > 0 ? '\n\n⚠️ Ce convoyeur a ' + c.nb_missions + ' mission(s) enregistrée(s) — les supprimer aussi n\'est PAS fait automatiquement.' : '';
-  if (!confirm('Supprimer définitivement "' + nom + '" ?' + avertMissions + '\n\nCette action est irréversible (le compte de connexion Supabase Auth associé, lui, n\'est pas supprimé — seule la fiche convoyeur l\'est).')) return;
+  const nom = c ? ((c.prenom || '') + ' ' + (c.nom || '')).trim() : 'ce partenaire';
+  const avertMissions = c && c.nb_missions > 0 ? '\n\n⚠️ ' + _accordPartenaire(c, 'Ce convoyeur', 'Cette convoyeuse') + ' a ' + c.nb_missions + ' mission(s) enregistrée(s) — les supprimer aussi n\'est PAS fait automatiquement.' : '';
+  if (!confirm('Supprimer définitivement "' + nom + '" ?' + avertMissions + '\n\nCette action est irréversible (le compte de connexion Supabase Auth associé, lui, n\'est pas supprimé — seule la fiche partenaire l\'est).')) return;
 
   sbFetch('convoyeurs?id=eq.' + id, { method: 'DELETE' })
     .then(function() {
@@ -6827,16 +6863,17 @@ function voirConvoyeurSb(id) {
       : '<span class="badge badge-pending">⏳ Manquant</span>';
   };
 
-  document.getElementById('dossier-name').textContent = nom + ' — ' + id;
+  document.getElementById('dossier-name').textContent = _accordPartenaire(c, 'Convoyeur', 'Convoyeuse') + ' — ' + nom;
   document.getElementById('dossier-content').innerHTML = `
-    <div class="detail-row"><span class="detail-label">N° convoyeur</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${id}</span></div>
+    <div class="detail-row"><span class="detail-label">N° ${_accordPartenaire(c, 'convoyeur', 'convoyeuse')}</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${id}</span></div>
+    <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
     <div class="detail-row"><span class="detail-label">Missions</span><span class="detail-val">${c.nb_missions || 0}</span></div>
     <div class="detail-row"><span class="detail-label">Km total</span><span class="detail-val">${c.km_total || 0} km</span></div>
     <div class="detail-row"><span class="detail-label">Note</span><span class="detail-val" style="color:${noteColor};font-weight:700;font-size:1rem">${note}</span></div>
     <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val" id="dossier-statut-partenaire">${_badgeEtatPartenaire(c)}</span></div>
     ${_partenaireEstBloque(c) ? `<div class="detail-row"><span class="detail-label">Motif du blocage</span><span class="detail-val">${escapeHtml(c.bloque_motif || 'Non précisé')}</span></div>
-    <div class="detail-row"><span class="detail-label">Bloqué le</span><span class="detail-val">${escapeHtml((typeof _dateHeureFr === 'function' ? _dateHeureFr(c.bloque_le) : c.bloque_le) || '—')}</span></div>` : ''}
+    <div class="detail-row"><span class="detail-label">${_accordPartenaire(c, 'Bloqué', 'Bloquée')} le</span><span class="detail-val">${escapeHtml((typeof _dateHeureFr === 'function' ? _dateHeureFr(c.bloque_le) : c.bloque_le) || '—')}</span></div>` : ''}
     <div class="detail-row"><span class="detail-label">Justificatif d'immatriculation</span><span class="detail-val">${docLink(c.kbis_url, "le justificatif d'immatriculation")}</span></div>
     <div class="detail-row"><span class="detail-label">RC Pro</span><span class="detail-val">${docLink(c.rc_pro_url, 'la RC Pro')}</span></div>
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
@@ -6869,7 +6906,8 @@ function voirConvoyeurSb(id) {
     });
 }
 
-function validerConvoyeur(id, name, email) {
+function validerConvoyeur(id, name, email, civilite) {
+  const partenaire = { civilite: civilite || null };
   closeModal('dossier');
   const row = document.getElementById('cand-' + id);
   if (row) row.cells[row.cells.length - 1].innerHTML = '<span class="badge">⏳ Validation en cours…</span>';
@@ -6885,8 +6923,8 @@ function validerConvoyeur(id, name, email) {
         const prenom = (name || '').split(' ')[0];
         const lienCompte = _hcOrigineOfficielle() + '/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
         const msg = 'Bonjour ' + prenom + ',\n\n' +
-          'Votre compte convoyeur HelixCar est validé ! Bienvenue dans le programme Convoyeurs d\'Excellence.\n\n' +
-          'Dernière étape : créez votre mot de passe pour accéder à votre espace convoyeur et voir les missions disponibles :\n' +
+          'Votre compte partenaire HelixCar est validé ! Bienvenue dans le réseau HelixCar.\n\n' +
+          'Dernière étape : créez votre mot de passe pour accéder à votre espace partenaire et voir les missions disponibles :\n' +
           lienCompte + '\n\n' +
           'Quelques règles importantes à respecter à chaque mission :\n' +
           '- Tenue professionnelle obligatoire (baskets et tenues décontractées interdites)\n' +
@@ -6906,13 +6944,13 @@ function validerConvoyeur(id, name, email) {
       }
     } catch (e) { console.error('EmailJS exception:', e); }
 
-    document.getElementById('confirm-title').textContent = name + ' est validé(e) !';
-    document.getElementById('confirm-msg').textContent = 'Un email de confirmation a été envoyé automatiquement. ' + name + ' a maintenant accès à son espace convoyeur et aux missions disponibles. Ses documents seront inclus au prochain clic sur "Synchroniser" dans l\'onglet Archivage.';
+    document.getElementById('confirm-title').textContent = name + ' est ' + _accordPartenaire(partenaire, 'validé', 'validée') + ' !';
+    document.getElementById('confirm-msg').textContent = 'Un email de confirmation a été envoyé automatiquement. ' + name + ' a maintenant accès à son espace partenaire et aux missions disponibles. Ses documents seront inclus au prochain clic sur "Synchroniser" dans l\'onglet Archivage.';
     openModal('confirm');
     loadCandidatures();
     loadConvoyeursActifs();
   }).catch(function(e) {
-    alert('❌ Erreur lors de la validation (voir la console). Le convoyeur n\'a pas été mis à jour dans Supabase.');
+    alert('❌ Erreur lors de la validation (voir la console). ' + _accordPartenaire(partenaire, 'Le convoyeur', 'La convoyeuse') + ' n\'a pas été mis' + _accordPartenaire(partenaire, '', 'e') + ' à jour dans Supabase.');
     loadCandidatures();
   });
 }

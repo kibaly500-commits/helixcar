@@ -7691,6 +7691,16 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
 
         <div class="modal-form-group">
+          <label for="conv-civilite">Civilité <span class="field-required">*</span></label>
+          <select id="conv-civilite">
+            <option value="">— Sélectionnez —</option>
+            <option value="madame">Madame</option>
+            <option value="monsieur">Monsieur</option>
+            <option value="non_precise">Je préfère ne pas préciser</option>
+          </select>
+        </div>
+
+        <div class="modal-form-group">
           <label>Email <span class="field-required">*</span></label>
           <input type="email" id="conv-email" placeholder="antoine.martin@email.com">
         </div>
@@ -12190,8 +12200,10 @@ function construireRecapConvoyeur() {
   if (!zone) return;
   var g = function (id) { return (document.getElementById(id) || {}).value || ''; };
 
+  var civilites = { madame: 'Madame', monsieur: 'Monsieur', non_precise: 'Je préfère ne pas préciser' };
   var infos = _recapLigne('Prénom', g('conv-prenom')) +
               _recapLigne('Nom', g('conv-nom')) +
+              _recapLigne('Civilité', civilites[g('conv-civilite')] || '—') +
               _recapLigne('Email', g('conv-email')) +
               _recapLigne('Téléphone', g('conv-tel'));
   var html = _recapBlocConvoyeur('Informations', infos, 1);
@@ -15802,6 +15814,7 @@ function _validateConvStep(n) {
     }
   }
   if (n === 1) {
+    mark(_checkSelect('conv-civilite', true), 'conv-civilite');
     mark(_checkEmail('conv-email', true), 'conv-email');
     mark(_checkPhone('conv-tel', true), 'conv-tel');
   }
@@ -19016,6 +19029,7 @@ async function _supprimerFichierTeleverse(url) {
 async function submitConvoyeurForm() {
   var prenom = (document.getElementById('conv-prenom') || {}).value || '';
   var nom    = (document.getElementById('conv-nom') || {}).value || '';
+  var civilite = (document.getElementById('conv-civilite') || {}).value || '';
   var email  = (document.getElementById('conv-email') || {}).value || '';
   var tel    = (document.getElementById('conv-tel') || {}).value || '';
   var expEl  = document.getElementById('conv-experience');
@@ -19028,8 +19042,8 @@ async function submitConvoyeurForm() {
 
   prenom = prenom.trim(); nom = nom.trim(); email = email.trim(); tel = tel.trim();
 
-  if (!email || !tel) {
-    _convAfficherEchecCandidature('Renseignez au moins votre adresse e-mail et votre téléphone.');
+  if (['madame', 'monsieur', 'non_precise'].indexOf(civilite) === -1 || !email || !tel) {
+    _convAfficherEchecCandidature('Renseignez votre civilité, votre adresse e-mail et votre téléphone.');
     return;
   }
 
@@ -19128,6 +19142,7 @@ async function submitConvoyeurForm() {
   var payloadCandidature = {
     prenom: prenom,
     nom: nom,
+    civilite: civilite,
     email: email,
     telephone: tel,
     experience: experience || null,
