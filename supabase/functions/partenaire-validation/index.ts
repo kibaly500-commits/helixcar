@@ -10,6 +10,13 @@ export const ORIGINES_AUTORISEES = [
   "https://helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app",
 ];
 
+// Adresse stable de la branche de recette actuelle. L'ancien alias
+// helixcar-i89b.vercel.app sert encore certains écrans historiques, mais
+// il ne doit plus jamais être placé dans un nouveau mail partenaire.
+export const ORIGINE_RECETTE_PARTENAIRE =
+  "https://helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app";
+const ORIGINE_LEGACY_PARTENAIRE = "https://helixcar-i89b.vercel.app";
+
 function originesSupplementaires(valeur: string | null | undefined): string[] {
   return String(valeur || "").split(",").map((o) => o.trim())
     .filter((o) => /^https:\/\/[a-z0-9.-]+$/i.test(o));
@@ -43,16 +50,15 @@ function echapperHtml(valeur: unknown): string {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-function urlPublique(env: Record<string, string | undefined>, origine: string | null): string {
-  // En recette, le lien doit rester sur la version depuis laquelle
-  // l'administrateur a validé la candidature. Sinon un test lancé sur la
-  // PR était renvoyé vers l'ancien site principal et réaffichait sa
-  // maquette. L'origine n'est acceptée qu'après contrôle strict par la
-  // liste blanche utilisée pour le CORS.
-  if (origine && ORIGINES_AUTORISEES.concat(originesSupplementaires(env.HELIXCAR_ORIGINES_SUPPLEMENTAIRES)).includes(origine)) return origine;
+function urlPublique(env: Record<string, string | undefined>, _origine: string | null): string {
   const configuree = String(env.HELIXCAR_URL_PUBLIQUE || "").trim().replace(/\/+$/, "");
-  if (/^https:\/\/[a-z0-9.-]+$/i.test(configuree)) return configuree;
-  return "https://helixcar.vercel.app";
+  // Le futur domaine officiel gardera la priorité dès qu'il sera configuré.
+  // En revanche, une ancienne variable encore réglée sur l'alias legacy est
+  // volontairement ignorée afin qu'il ne puisse plus réapparaître.
+  if (/^https:\/\/[a-z0-9.-]+$/i.test(configuree) && configuree !== ORIGINE_LEGACY_PARTENAIRE) {
+    return configuree;
+  }
+  return ORIGINE_RECETTE_PARTENAIRE;
 }
 
 async function preuveLien(secret: string, id: string, email: string): Promise<string> {
