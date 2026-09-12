@@ -12,6 +12,9 @@ function check(libelle, condition, detail) {
 (async () => {
   const source = fs.readFileSync(fichier('index.html'), 'utf8');
   check('N1 : l’inspiration n’introduit aucune marque ou ressource Gucci dans le site', !/gucci/i.test(source));
+  check('N1b : Cupra remplace Porsche dans les deux cycles du bandeau',
+    (source.match(/<span class="slogan-item">Cupra<\/span>/g) || []).length === 2
+      && !/<span class="slogan-item">Porsche<\/span>/.test(source));
   check('N2 : les deux actions conservées et et le panneau latéral sont versionnés',
     /nav-quote-action/.test(source) && !/nav-partner-action/.test(source)
       && /nav-account-action/.test(source) && /nav-menu-lines/.test(source)
