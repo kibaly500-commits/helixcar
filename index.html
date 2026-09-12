@@ -6701,15 +6701,15 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <div class="modal-form-group">
         <label style="font-size:1.05rem;font-weight:700">Comment pouvons-nous vous accompagner ? <span class="field-required">*</span></label>
         <div style="display:flex;flex-direction:column;gap:8px" id="service-type-group">
-          <label class="radio-opt"><input type="radio" name="type-service" value="stockage" onclick="onChoixService()"><span>Stockage automobile <button type="button" class="hc-help-btn" data-help="Le stockage peut être associé à une prise en charge et/ou une livraison de votre véhicule par HelixCar." aria-label="Aide sur le stockage automobile">i</button></span></label>
-          <label class="radio-opt"><input type="radio" name="type-service" value="convoyage" onclick="onChoixService()"><span>Convoyage automobile</span></label>
-          <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService()"><span>Trouver un professionnel automobile</span></label>
+          <label class="radio-opt"><input type="radio" name="type-service" value="stockage" onclick="onChoixService(this.value)"><span>Stockage automobile <button type="button" class="hc-help-btn" data-help="Le stockage peut être associé à une prise en charge et/ou une livraison de votre véhicule par HelixCar." aria-label="Aide sur le stockage automobile">i</button></span></label>
+          <label class="radio-opt"><input type="radio" name="type-service" value="convoyage" onclick="onChoixService(this.value)"><span>Convoyage automobile</span></label>
+          <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService(this.value)"><span>Trouver un professionnel automobile</span></label>
           <!-- LOT F01 (F01-010/011) — option réservée aux entreprises : pour un
                particulier, le bouton radio est réellement désactivé
                (nettSyncOptionService) et l'option grisée ; le serveur
                applique la même interdiction (migration 112). -->
-          <label class="radio-opt" id="type-service-nettoyage-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService()"><span>Nettoyage automobile professionnel<span class="hc-opt-desc" id="type-service-nettoyage-desc">Réservé aux entreprises</span></span></label>
-          <label class="radio-opt"><input type="radio" name="type-service" value="compte" onclick="onChoixService()"><span>Je souhaite simplement créer mon compte pour l'instant</span></label>
+          <label class="radio-opt" id="type-service-nettoyage-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService(this.value)"><span>Nettoyage automobile professionnel<span class="hc-opt-desc" id="type-service-nettoyage-desc">Réservé aux entreprises</span></span></label>
+          <label class="radio-opt"><input type="radio" name="type-service" value="compte" onclick="onChoixService(this.value)"><span>Je souhaite simplement créer mon compte pour l'instant</span></label>
         </div>
       </div>
 
@@ -10727,9 +10727,42 @@ function _libelleTypeVehicule(v) {
   return v || '';
 }
 
+// Le service définit une fiche métier complète. Lorsqu'un utilisateur
+// remplace explicitement une activité par une autre, aucune identité,
+// plaque, adresse ou date du service précédent ne doit être réutilisée.
+// Les appels internes sans argument (restauration d'un brouillon, rendu)
+// restent silencieux et ne détruisent jamais les données restaurées.
+var _clientDernierServiceVehicules = '';
+function _reinitialiserVehiculesPourNouveauService() {
+  _memoireVehicules = {};
+  _memoireGlobale = null;
+
+  var conteneur = document.getElementById('bloc-vehicules-multiples');
+  if (conteneur) conteneur.innerHTML = '';
+
+  var idsGlobaux = ['stock-debut', 'stock-fin'];
+  if (typeof CHAMPS_GLOBAUX_TRAJET !== 'undefined') {
+    idsGlobaux = idsGlobaux.concat(CHAMPS_GLOBAUX_TRAJET);
+  }
+  idsGlobaux.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+    else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+    else el.value = '';
+    _clearFieldError(id);
+  });
+  _clearGroupError('bloc-vehicules-multiples');
+}
+
 // Affiche uniquement les blocs correspondant au service choisi.
-function onChoixService() {
+function onChoixService(serviceDeclencheur) {
   var t = _typeServiceChoisi();
+  var choixUtilisateur = typeof serviceDeclencheur === 'string';
+  if (choixUtilisateur && _clientDernierServiceVehicules && t && t !== _clientDernierServiceVehicules) {
+    _reinitialiserVehiculesPourNouveauService();
+  }
+  _clientDernierServiceVehicules = t || '';
   // Changer de service rend inapplicables les erreurs et les blocages
   // laissés par le service précédent : on les efface AVANT tout le
   // reste, sans quoi un champ devenu caché continuerait de bloquer.
@@ -11640,16 +11673,16 @@ function _majBarreVehicule(i) {
   if (!el) return;
   var n = _nbVehicules();
   var marque = ((document.getElementById('veh-' + i + '-marque') || {}).value || '').trim();
+  var immatriculation = ((document.getElementById('veh-' + i + '-immat') || {}).value || '').trim().toUpperCase();
   var complet = _vehiculeComplet(i);
   var chkR = document.getElementById('veh-' + i + '-restit');
   var titre = '<span class="veh-titre">VÉHICULE ' + (i + 1) + ' SUR ' + n + '</span>';
   var extras = [];
-  // Point 1 (V52) — l'en-tête identifie désormais le véhicule par
-  // Marque/modèle plutôt que par l'immatriculation, plus parlant pour
-  // le client. Réutilise exactement _vehiculeComplet() déjà existante,
-  // aucune nouvelle logique de validation créée.
+  // L'en-tête permet de distinguer immédiatement les fiches par leur
+  // marque/modèle ET leur plaque, sans changer la règle de complétude.
   if (complet) {
     if (marque) extras.push(_attr(marque));
+    if (immatriculation) extras.push(_attr(immatriculation));
   } else {
     extras.push('À compléter');
   }
@@ -11666,7 +11699,7 @@ function _majBarreVehicule(i) {
   // système de duplication lui-même (détection des fiches vierges,
   // modal, copie) reste strictement identique — seule cette condition
   // d'affichage change.
-  if (i === 0 && complet) {
+  if (n > 1 && i === 0 && complet) {
     boutonDupliquer = '<span class="veh-btn-dupliquer" onclick="event.stopPropagation();_hcOuvrirDupliquer(' + i + ')">+ Dupliquer</span>';
   }
   el.innerHTML = '<span class="veh-etat ' + (complet ? 'ok' : 'warn') + '">' +
@@ -11964,18 +11997,18 @@ function _hcExisteVehiculeDisponible(i) {
 // par VALEUR (dst.value = src.value) : aucune référence partagée,
 // aucune liaison créée entre les deux fiches.
 function _hcCopierVehiculeVers(source, cible) {
-  ['type', 'marque', 'immat', 'vin',
-   // V55 — identité du véhicule à restituer, dupliquée comme les autres
-   // données opérationnelles. Copie par VALEUR : aucune référence
-   // partagée, les copies restent indépendantes après duplication.
-   'restit-vtype', 'restit-marque', 'restit-immat', 'restit-vin'].forEach(function (suffixe) {
+  // Une plaque identifie un véhicule précis : ni l'immatriculation
+  // principale ni celle du véhicule à restituer ne sont dupliquées.
+  // Toutes les autres informations restent reprises par valeur.
+  ['type', 'marque', 'vin',
+   'restit-vtype', 'restit-marque', 'restit-vin'].forEach(function (suffixe) {
     var src = document.getElementById('veh-' + source + '-' + suffixe);
     var dst = document.getElementById('veh-' + cible + '-' + suffixe);
     if (src && dst) dst.value = src.value;
   });
   ['pc', 'liv', 'restit'].forEach(function (prefixe) {
     var b = 'veh-' + cible + '-' + prefixe, bs = 'veh-' + source + '-' + prefixe;
-    ['rue', 'cp', 'ville', 'date'].forEach(function (suffixe) {
+    ['rue', 'cp', 'ville', 'contact', 'tel', 'date'].forEach(function (suffixe) {
       var src = document.getElementById(bs + '-' + suffixe);
       var dst = document.getElementById(b + '-' + suffixe);
       if (src && dst) dst.value = src.value;
@@ -11994,6 +12027,9 @@ function _hcCopierVehiculeVers(source, cible) {
     var dstConsignes = document.getElementById(b + '-consignes');
     if (srcConsignes && dstConsignes) dstConsignes.value = srcConsignes.value;
   });
+  var srcRecuperation = document.getElementById('veh-' + source + '-recup-heure');
+  var dstRecuperation = document.getElementById('veh-' + cible + '-recup-heure');
+  if (srcRecuperation && dstRecuperation) dstRecuperation.value = srcRecuperation.value;
   ['liv', 'restit'].forEach(function (cle) {
     var srcActif = document.querySelector('input[name="veh-' + source + '-' + cle + '-active"]:checked');
     if (srcActif) {
@@ -13423,6 +13459,21 @@ function _convAfficherEmailDejaUtilise() {
   }
 }
 
+function _clientAfficherEmailDejaUtilise() {
+  _showFieldError('client-email', 'Cette adresse e-mail est déjà utilisée.');
+  var msgEl = document.getElementById('client-email-err');
+  if (msgEl) {
+    msgEl.classList.add('hc-email-existe');
+    msgEl.innerHTML = '<strong>Adresse déjà associée à un compte</strong>'
+      + '<span>Cette adresse e-mail est déjà utilisée. Connectez-vous pour faire une nouvelle demande.</span>';
+  }
+  var champ = document.getElementById('client-email');
+  if (champ) {
+    try { champ.focus({ preventScroll: true }); } catch (e) { champ.focus(); }
+    try { champ.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
+  }
+}
+
 // V50.1H — une validation globale ne doit pas effacer une erreur plus
 // spécifique de la chaîne stockage déjà posée sur le même champ.
 function _clearFieldErrorHorsChronologieStockage(id) {
@@ -13479,14 +13530,15 @@ function _clearFieldErrorOnInput(id) {
 // Le message « adresse déjà utilisée » disparaît dès que le candidat
 // corrige l'adresse. La nouvelle valeur sera contrôlée au prochain clic.
 (function () {
-  function effacerEmailPartenaire(e) {
-    if (!e.target || e.target.id !== 'conv-email') return;
-    _clearFieldError('conv-email');
-    var msgEl = document.getElementById('conv-email-err');
+  function effacerEmailDejaUtilise(e) {
+    if (!e.target || (e.target.id !== 'conv-email' && e.target.id !== 'client-email')) return;
+    var id = e.target.id;
+    _clearFieldError(id);
+    var msgEl = document.getElementById(id + '-err');
     if (msgEl) msgEl.classList.remove('hc-email-existe');
   }
-  document.addEventListener('input', effacerEmailPartenaire, true);
-  document.addEventListener('change', effacerEmailPartenaire, true);
+  document.addEventListener('input', effacerEmailDejaUtilise, true);
+  document.addEventListener('change', effacerEmailDejaUtilise, true);
 })();
 
 function _showGroupError(afterId, msg) {
@@ -14010,7 +14062,45 @@ function _validateClientStep(n) {
   return ok;
 }
 
-function clientStepNext() {
+var _clientVerificationEmailEnCours = false;
+
+async function _clientEmailDejaUtilise(email) {
+  // L'échec du contrôle préalable ne remplace pas les protections finales :
+  // Supabase Auth garde l'unicité du compte au moment de l'inscription.
+  if (!_sb || typeof _sb.rpc !== 'function') return false;
+  try {
+    var resultat = await _sb.rpc('email_client_deja_utilise', { p_email: email });
+    if (resultat && resultat.error) throw resultat.error;
+    return !!(resultat && resultat.data === true);
+  } catch (err) {
+    console.error('[HelixCar] Vérification préalable de l\'adresse client impossible.', err);
+    return false;
+  }
+}
+
+async function clientStepNext() {
+  if (_clientVerificationEmailEnCours) return;
+
+  if (_formStepState.client === 1 && !_hcIdCompteConnecte()) {
+    if (!_validateClientStep(1)) return;
+    var champEmail = document.getElementById('client-email');
+    var emailVerifie = ((champEmail && champEmail.value) || '').trim().toLowerCase();
+    var btnEtape = document.getElementById('client-step-next-btn');
+    var texteBtn = btnEtape ? btnEtape.textContent : '';
+    _clientVerificationEmailEnCours = true;
+    if (btnEtape) { btnEtape.disabled = true; btnEtape.textContent = 'Vérification…'; }
+    var dejaUtilise = await _clientEmailDejaUtilise(emailVerifie);
+    _clientVerificationEmailEnCours = false;
+    if (btnEtape) { btnEtape.disabled = false; btnEtape.textContent = texteBtn || 'Continuer →'; }
+
+    var emailActuel = (((document.getElementById('client-email') || {}).value) || '').trim().toLowerCase();
+    if (emailActuel !== emailVerifie) return;
+    if (dejaUtilise) {
+      _clientAfficherEmailDejaUtilise();
+      return;
+    }
+  }
+
   // _naviguerVersEtape revalide : la règle est strictement identique
   // que l'on clique sur Continuer ou sur un numéro de l'étapeur.
   _naviguerVersEtape(_prochaineEtape(_formStepState.client), { ignorerAccessibilite: true });
@@ -14055,6 +14145,10 @@ document.addEventListener('click', function(e) {
   if (!_peutNaviguerVersEtape(cible) && cible !== prochaine) return;
   e.preventDefault();
   e.stopImmediatePropagation();
+  if (courant === 1 && cible === prochaine) {
+    clientStepNext();
+    return;
+  }
   _naviguerVersEtape(cible);
 }, true);
 
@@ -14572,6 +14666,7 @@ window.onbeforeunload = _avertirAvantSortie;
 function _purgerMemoiresBranches() {
   _memoireVehicules = {};
   _memoireGlobale = null;
+  _clientDernierServiceVehicules = '';
 }
 
 function resetClientForm() {
@@ -22436,12 +22531,15 @@ document.addEventListener('click', function (e) {
   transition: background-color 999999s ease-in-out 0s !important;
 }
 #modal-convoyeur #conv-email.field-error,
-#modal-convoyeur #conv-email.field-error:focus {
+#modal-convoyeur #conv-email.field-error:focus,
+#modal-client #client-email.field-error,
+#modal-client #client-email.field-error:focus {
   background: linear-gradient(90deg,#fff8f3 0%,#fff 52%,#fff 100%) !important;
   border-color: #A84448 !important;
   box-shadow: 0 0 0 3px rgba(168,68,72,.10) !important;
 }
-#modal-convoyeur .field-error-msg.hc-email-existe {
+#modal-convoyeur .field-error-msg.hc-email-existe,
+#modal-client .field-error-msg.hc-email-existe {
   display: none;
   position: relative;
   margin-top: 9px;
@@ -22455,16 +22553,19 @@ document.addEventListener('click', function (e) {
   font-size: .78rem;
   line-height: 1.4;
 }
-#modal-convoyeur .field-error-msg.hc-email-existe.visible {
+#modal-convoyeur .field-error-msg.hc-email-existe.visible,
+#modal-client .field-error-msg.hc-email-existe.visible {
   display: grid !important;
   gap: 2px;
   animation: hcBulleErreur .16s ease both;
 }
-#modal-convoyeur .field-error-msg.hc-email-existe strong {
+#modal-convoyeur .field-error-msg.hc-email-existe strong,
+#modal-client .field-error-msg.hc-email-existe strong {
   color: #7f3037;
   font-size: .82rem;
 }
-#modal-convoyeur .field-error-msg.hc-email-existe span { color: #6b5254; }
+#modal-convoyeur .field-error-msg.hc-email-existe span,
+#modal-client .field-error-msg.hc-email-existe span { color: #6b5254; }
 @keyframes hcAutofillDetecte { from {} to {} }
 </style>
 <script id="hc-v50-autofill-filet">

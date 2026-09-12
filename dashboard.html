@@ -6921,17 +6921,14 @@ function validerConvoyeur(id, name, email, civilite) {
     try {
       if (window.emailjs && email) {
         const prenom = (name || '').split(' ')[0];
+        // Le domaine définitif sera branché dans un lot dédié lorsque le
+        // site sera prêt. D'ici là, le lien conserve l'origine utilisée.
         const lienCompte = _hcOrigineOfficielle() + '/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
         const msg = 'Bonjour ' + prenom + ',\n\n' +
           'Votre compte partenaire HelixCar est validé ! Bienvenue dans le réseau HelixCar.\n\n' +
           'Dernière étape : créez votre mot de passe pour accéder à votre espace partenaire et voir les missions disponibles :\n' +
           lienCompte + '\n\n' +
-          'Quelques règles importantes à respecter à chaque mission :\n' +
-          '- Tenue professionnelle obligatoire (baskets et tenues décontractées interdites)\n' +
-          '- Tout retard, absence injustifiée ou infraction routière peut entraîner une retenue\n' +
-          '- Annulation client < 48h avant : 50% de la mission vous est dû ; annulation le jour J : 100%\n' +
-          '- Le véhicule doit être restitué avec le même niveau de carburant qu\'à la prise en charge\n\n' +
-          'À très vite sur la route,\nCordialement,\nL\'équipe HelixCar';
+          'Cordialement,\nL\'équipe HelixCar';
         emailjs.send('service_jmckybp', 'template_n26gasf', {
           email: email,
           titre: '✅ Compte validé — Bienvenue chez HelixCar !',
@@ -7735,7 +7732,11 @@ function envoyerEmailFicheMission(missionId, conv) {
       restitTxt + notesTxt +
       '\n\n📸 L\'état des lieux (photos + signature) se fait directement depuis votre espace convoyeur, au départ et à l\'arrivée.\n' +
       '📄 N\'oubliez pas de faire signer la lettre de voiture par le client au départ et à l\'arrivée.\n\n' +
-      'Rappel : tenue professionnelle obligatoire, véhicule à restituer avec le même niveau de carburant qu\'à la prise en charge.\n\n' +
+      'Quelques règles importantes à respecter pour cette mission :\n' +
+      '- Tenue professionnelle obligatoire (baskets et tenues décontractées interdites)\n' +
+      '- Tout retard, absence injustifiée ou infraction routière peut entraîner une retenue\n' +
+      '- Annulation client < 48h avant : 50% de la mission vous est dû ; annulation le jour J : 100%\n' +
+      '- Le véhicule doit être restitué avec le même niveau de carburant qu\'à la prise en charge\n\n' +
       'Bonne route,\nCordialement,\nL\'équipe HelixCar';
     emailjs.send('service_jmckybp', 'template_n26gasf', {
       email: conv.email,

@@ -7,6 +7,7 @@ const fs = require('fs');
   const migration = fs.readFileSync(L.fichier('migrations/125_email_partenaire_unique.sql'), 'utf8');
   const verification = fs.readFileSync(L.fichier('migrations/126_verification_precoce_email_partenaire.sql'), 'utf8');
   const correction = fs.readFileSync(L.fichier('migrations/127_correction_verification_email_partenaire.sql'), 'utf8');
+  const verificationClient = fs.readFileSync(L.fichier('migrations/128_verification_precoce_email_client.sql'), 'utf8');
 
   L.check('E1 : le serveur normalise l’adresse partenaire avant comparaison',
     /email_normalise\s*:=\s*pg_catalog\.lower\(new\.email\)/i.test(migration));
@@ -46,6 +47,21 @@ const fs = require('fs');
       && /Adresse déjà associée à un compte/i.test(index));
   L.check('E12 : le bleu natif est neutralisé aussi pour le formulaire partenaire',
     /#modal-convoyeur input[^\n]*:-webkit-autofill[\s\S]{0,1400}box-shadow:\s*0 0 0 1000px #fff inset !important/i.test(index));
+  L.check('E13 : le serveur vérifie les comptes et les dossiers client',
+    /function public\.email_client_deja_utilise\(p_email text\)[\s\S]*from auth\.users[\s\S]*from public\.clients/i.test(verificationClient));
+  L.check('E14 : le contrôle client ne renvoie qu’un booléen borné',
+    /returns boolean/i.test(verificationClient)
+      && /length\(v_email_normalise\) > 254/i.test(verificationClient));
+  L.check('E15 : les permissions de la RPC client sont explicites',
+    /revoke all on function public\.email_client_deja_utilise\(text\)[\s\S]*from public, anon, authenticated/i.test(verificationClient)
+      && /grant execute on function public\.email_client_deja_utilise\(text\)[\s\S]*to anon, authenticated/i.test(verificationClient));
+  L.check('E16 : le client est vérifié dès le premier clic sur Continuer',
+    /async function clientStepNext\(\)[\s\S]{0,2200}_clientEmailDejaUtilise\(emailVerifie\)[\s\S]{0,900}_clientAfficherEmailDejaUtilise\(\)[\s\S]{0,200}return;/i.test(index));
+  L.check('E17 : un client déjà connecté n’est pas bloqué par sa propre adresse',
+    /_formStepState\.client === 1 && !_hcIdCompteConnecte\(\)/.test(index));
+  L.check('E18 : le message client reprend la carte rouge et ivoire du partenaire',
+    /#modal-client \.field-error-msg\.hc-email-existe[\s\S]{0,800}background:\s*#fff8f3/i.test(index)
+      && /Cette adresse e-mail est déjà utilisée\. Connectez-vous pour faire une nouvelle demande\./i.test(index));
 
   process.exit(L.results() ? 1 : 0);
 })();
