@@ -44,9 +44,14 @@ function echapperHtml(valeur: unknown): string {
 }
 
 function urlPublique(env: Record<string, string | undefined>, origine: string | null): string {
+  // En recette, le lien doit rester sur la version depuis laquelle
+  // l'administrateur a validé la candidature. Sinon un test lancé sur la
+  // PR était renvoyé vers l'ancien site principal et réaffichait sa
+  // maquette. L'origine n'est acceptée qu'après contrôle strict par la
+  // liste blanche utilisée pour le CORS.
+  if (origine && ORIGINES_AUTORISEES.concat(originesSupplementaires(env.HELIXCAR_ORIGINES_SUPPLEMENTAIRES)).includes(origine)) return origine;
   const configuree = String(env.HELIXCAR_URL_PUBLIQUE || "").trim().replace(/\/+$/, "");
   if (/^https:\/\/[a-z0-9.-]+$/i.test(configuree)) return configuree;
-  if (origine && ORIGINES_AUTORISEES.concat(originesSupplementaires(env.HELIXCAR_ORIGINES_SUPPLEMENTAIRES)).includes(origine)) return origine;
   return "https://helixcar.vercel.app";
 }
 

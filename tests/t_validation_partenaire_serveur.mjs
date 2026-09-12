@@ -37,8 +37,8 @@ const env={RESEND_API_KEY:'secret-test',HELIXCAR_URL_PUBLIQUE:'https://helixcar.
   const d=double();const r=await traiterRequete(d.sb,req({action:'valider',convoyeur_id:ID}),env,d.fetch);const j=await r.json();
   check('V1 : validation et e-mail sont automatiques',r.status===200&&j.email_accepte===true&&d.partenaire.statut==='actif'&&d.journal.envois.length===1);
   check('V2 : le destinataire est relu en base',d.journal.envois[0].payload.to[0]==='vraie-adresse@example.com');
-  check('V3 : le lien de mot de passe utilise le domaine canonique et une preuve signée',
-    /https:\/\/helixcar\.fr\/creer-compte-convoyeur\.html\?email=.+&dossier=.+&preuve=[0-9a-f]{64}/.test(d.journal.envois[0].payload.text));
+  check('V3 : le lien de recette reste sur la version validée et porte une preuve signée',
+    /https:\/\/helixcar-i89b\.vercel\.app\/creer-compte-convoyeur\.html\?email=.+&dossier=.+&preuve=[0-9a-f]{64}/.test(d.journal.envois[0].payload.text));
   check('V4 : une clé d’idempotence protège le double envoi',/helixcar-partenaire\/.+\/initial/.test(d.journal.envois[0].options.headers['Idempotency-Key']));
 
   const lien=d.journal.envois[0].payload.text.match(/https:\/\/[^\s]+/)[0];
