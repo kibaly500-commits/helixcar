@@ -2466,9 +2466,14 @@ async function rendreInfosDemandeAdmin(c) {
   })[0] || c;
   const devis = (typeof _devisParClient !== 'undefined') ? _devisParClient[String(c.id)] : null;
 
-  const recues = lignes.filter(function (l) { return l.statut !== 'attendue'; });
-  const manquantes = lignes.filter(function (l) { return l.statut === 'attendue'; });
-  const nouvelles = lignes.filter(function (l) { return l.statut === 'transmise'; });
+  // Le récapitulatif reste une liste de travail : les informations déjà
+  // reçues et définitivement traitées (fournie / validée) n'y encombrent
+  // plus l'écran. En revanche, une information transmise attend encore la
+  // décision de l'administrateur et une information à corriger reste à
+  // suivre : toutes deux doivent donc demeurer visibles.
+  const restantes = lignes.filter(function (l) {
+    return l.statut === 'attendue' || l.statut === 'transmise' || l.statut === 'a_corriger';
+  });
 
   const ligneHtml = function (l) {
     const badge = l.statut === 'validee' ? 'badge-active'
@@ -2505,19 +2510,9 @@ async function rendreInfosDemandeAdmin(c) {
     + escapeHtml(demande.numero_client || '—') + '</span></div>'
     + '<div class="detail-row"><span class="detail-label">Devis associé</span><span class="detail-val">'
     + escapeHtml(devis && devis.reference ? devis.reference : 'Aucun') + '</span></div>'
-    + (nouvelles.length
-        ? '<div class="detail-row"><span class="detail-label">Transmises le</span><span class="detail-val">'
-          + nouvelles.map(function (l) {
-              return escapeHtml(l.libelle) + ' — ' + escapeHtml(_dateHeureFr(l.transmise_le) || 'récemment');
-            }).join('<br>')
-          + '</span></div>'
-        : '')
-    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Déjà reçues</div>'
-    + (recues.length ? recues.map(ligneHtml).join('')
-        : '<div style="font-size:.85rem;color:#666">Aucune pour le moment.</div>')
-    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes</div>'
-    + (manquantes.length ? manquantes.map(ligneHtml).join('')
-        : '<div style="font-size:.85rem;color:#666">Aucune : tout a été transmis.</div>')
+    + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes ou à traiter</div>'
+    + (restantes.length ? restantes.map(ligneHtml).join('')
+        : '<div style="font-size:.85rem;color:#666">Aucune : tout a été reçu et traité.</div>')
     + '</div>';
 }
 
@@ -3765,16 +3760,9 @@ async function loadInfosClient() {
     // visibles par véhicule lorsqu'une autre rubrique de la demande manque.
     if (complet) return;
     const groupes = _infosGrouper(lignes);
-    const dejaRecues = lignes.filter(function (l) { return !_estRestante(l); });
     let corps = '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
       + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '') + ' sur ' + lignes.length + '</strong> déjà '
       + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
-    if (dejaRecues.length) {
-      corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Déjà reçues</div>'
-        + '<div style="font-size:.82rem;color:#555">'
-        + dejaRecues.map(function (l) { return escapeHtml(String(l.libelle || l.cle || '')); }).join('<br>')
-        + '</div>';
-    }
     corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
     groupes.forEach(function (g) {
       const gRestantes = g.lignes.filter(_estRestante);
@@ -9250,6 +9238,33 @@ function _aConvoyage(c) {
   return t === 'convoyage' || t === 'convoyage_stockage';
 }
 
+// Un convoyage qui immobilise les véhicules plus de deux jours fait
+// apparaître une période de stockage sur le devis. Il ne devient pas pour
+// autant une demande de stockage et son tarif n'est pas recalculé ici :
+// cette information décrit uniquement la période réellement couverte.
+// Pour une flotte, les bornes sont globales (première prise en charge et
+// dernière livraison), comme demandé dans la maquette du devis.
+function _stockageAutomatiqueConvoyage(c) {
+  if (!c || !_aConvoyage(c) || _aStockage(c)) return null;
+
+  var vehicules = (c._vehicules && c._vehicules.length) ? c._vehicules : [];
+  var debuts = vehicules.map(function (v) { return v && v.date_prise_en_charge; }).filter(Boolean);
+  var fins = vehicules.map(function (v) { return v && v.date_livraison; }).filter(Boolean);
+
+  // Compatibilité avec les demandes mono-véhicule historiques, dont les
+  // dates sont portées directement par le dossier.
+  if (!debuts.length && c.date_prise_en_charge) debuts.push(c.date_prise_en_charge);
+  if (!fins.length && c.date_livraison) fins.push(c.date_livraison);
+  if (!debuts.length || !fins.length) return null;
+
+  debuts = debuts.map(function (d) { return String(d).slice(0, 10); }).sort();
+  fins = fins.map(function (d) { return String(d).slice(0, 10); }).sort();
+  var debut = debuts[0];
+  var fin = fins[fins.length - 1];
+  var duree = _joursEntreDatesDash(debut, fin);
+  return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
+}
+
 var SOURCES_ACQUISITION = [
   { cle: 'google',          libelle: 'Google' },
   { cle: 'reseaux-sociaux', libelle: 'Réseaux sociaux' },
@@ -11224,12 +11239,16 @@ function _construirePdfDevis(c, d) {
   }
 
   // ══ STOCKAGE — mêmes codes graphiques que les autres blocs ══
-  if (_aStockage(c)) {
+  // Le stockage automatique d'un convoyage long réutilise volontairement
+  // CE bloc, sans variante graphique : le PDF reste identique à la maquette.
+  var _stockageAutoPdf = _stockageAutomatiqueConvoyage(c);
+  if (_aStockage(c) || _stockageAutoPdf) {
     // V50.4A — Objectifs 5/6/11 : durée réelle MONO uniquement (jamais en
     // multi — chaque véhicule a la sienne, affichée plus bas dans la
     // section Véhicules).
     var _nbVehPdfStock = _nbVehiculesDossier(c);
-    var _finEffPdfStock = _finStockageEffectiveDossier(c);
+    var _debutAfficheStock = _stockageAutoPdf ? _stockageAutoPdf.debut : c.stockage_date_debut;
+    var _finEffPdfStock = _stockageAutoPdf ? _stockageAutoPdf.fin : _finStockageEffectiveDossier(c);
     // CORRECTION MÉTIER — la durée doit être recalculée dès que la fin
     // effective diffère de la fin prévue, dans LES DEUX SENS (sortie
     // anticipée désormais possible, pas seulement prolongation comme
@@ -11257,7 +11276,10 @@ function _construirePdfDevis(c, d) {
     // renvoie sa fin PRÉVUE inchangée par cette même fonction : aucune
     // prolongation fictive n'est jamais introduite.
     var _finAfficheeStock, _jAfficheStock;
-    if (_nbVehPdfStock < 2) {
+    if (_stockageAutoPdf) {
+      _finAfficheeStock = _stockageAutoPdf.fin;
+      _jAfficheStock = _stockageAutoPdf.duree;
+    } else if (_nbVehPdfStock < 2) {
       _finAfficheeStock = _finEffPdfStock || c.stockage_date_fin;
       _jAfficheStock = _prolongePdfStock ? _joursEntreDatesDash(c.stockage_date_debut, _finEffPdfStock) : c.stockage_nb_jours;
     } else {
@@ -11290,8 +11312,8 @@ function _construirePdfDevis(c, d) {
     // le formulaire client (miroir de _heureEntreeStockageApplicable() /
     // _heureSortieStockageApplicable()) — jamais une heure devenue non
     // applicable, même si une valeur historique existe encore en base.
-    var _entreeAppliDash = _heureEntreeApplicableDash(c);
-    var _sortieAppliDash = _heureSortieApplicableDash(c);
+    var _entreeAppliDash = !_stockageAutoPdf && _heureEntreeApplicableDash(c);
+    var _sortieAppliDash = !_stockageAutoPdf && _heureSortieApplicableDash(c);
 
     sectionAvecBloc('Stockage automobile', function (dess) {
       var y0 = y, cur = y0 + 6.5;
@@ -11349,8 +11371,10 @@ function _construirePdfDevis(c, d) {
         // V50.38 — deux micro-ajustements visuels uniquement :
         // nombre de véhicules légèrement plus bas ; durée légèrement plus haute.
         // Début/fin du stockage, tailles, colonnes, pagination et logique restent inchangés.
-        valeur(c.stockage_nb_vehicules ? String(c.stockage_nb_vehicules) : '—', xNbVeh, cur + 1.4, 9.8);
-        valeur(_dvDate(c.stockage_date_debut), xDebutStock, cur - 2.0, 9.8);
+        valeur(_stockageAutoPdf
+          ? String(_nbVehPdfStock)
+          : (c.stockage_nb_vehicules ? String(c.stockage_nb_vehicules) : '—'), xNbVeh, cur + 1.4, 9.8);
+        valeur(_dvDate(_debutAfficheStock), xDebutStock, cur - 2.0, 9.8);
         valeur(_dvDate(_finAfficheeStock), xJusquauStock, cur - 2.0, 9.8);
         valeur(_jAfficheStock ? _jAfficheStock + (_jAfficheStock > 1 ? ' jours' : ' jour') : '—', xDureeStock, cur - 2.0, 9.8);
       }
