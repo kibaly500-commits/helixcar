@@ -18,17 +18,17 @@ Chrome Android, Safari iPhone.
 
 | # | Étape | Attendu |
 |---|---|---|
-| 1 | Formulaire partenaire, cocher **Nettoyage** seul | Aucune zone vidéo affichée |
-| 2 | Cocher **Convoyage** | Zone vidéo affichée, « **1 minute maximum** » |
+| 1 | Formulaire partenaire, cocher **Nettoyage** seul | Zone vidéo affichée, « **2 minutes maximum** » |
+| 2 | Cocher **Convoyage** | Zone vidéo affichée, « **2 minutes maximum** » |
 | 3 | Cocher aussi **Renfort** | « **2 minutes maximum** », toujours **une seule** zone |
 | 4 | « Enregistrer une vidéo » sur téléphone | L'appareil photo s'ouvre |
 | 5 | Enregistrer ~20 s puis valider | Nom, taille et **durée** affichés, « Vidéo prête à être envoyée » |
 | 6 | « Choisir un fichier » → **MP4** de ~30 s | Accepté, durée correcte affichée |
 | 7 | Idem avec un **MOV** (iPhone) de ~30 s | Accepté, durée correcte affichée |
 | 8 | Idem avec un **WebM** de ~30 s | Accepté, durée correcte affichée |
-| 9 | MP4 de **1 min 30** avec Convoyage seul | Refusé : « Vidéo trop longue… Remplacez-la » |
-| 10 | Cocher **Renfort** sans rien changer d'autre | La même vidéo **redevient valide** |
-| 11 | Décocher **Renfort** (Convoyage reste) | Elle **repasse** à « à remplacer », **Continuer** rebloqué |
+| 9 | MP4 de **1 min 30** avec Convoyage seul | Accepté : « Vidéo prête à être envoyée » |
+| 10 | Cocher **Renfort** sans rien changer d'autre | La même vidéo reste valide |
+| 11 | Décocher **Renfort** (Convoyage reste) | Elle reste valide, la limite commune ne change pas |
 | 12 | MP4 de **2 min 30** | Refusé même avec Renfort |
 | 13 | Fichier **.avi** ou **.mkv** | « Format non pris en charge » |
 | 14 | Fichier vidéo **> 300 Mo** | « Fichier trop volumineux » |

@@ -30,7 +30,7 @@ export async function verifierObjet(sb:any,c:any,env:Record<string,string|undefi
    const sig=await sb.storage.from(BUCKET).createSignedUrl(final,180);
    if(sig.error||!sig.data?.signedUrl)return {ok:false,code:'VERIFICATION_INDISPONIBLE'};
    entetes.Authorization='Bearer '+secret;
-   corpsWorker={url:sig.data.signedUrl,candidature_id:c.id,mime:c.video_envoi_mime,duree_max:Array.isArray(c.activites)&&c.activites.length===1&&c.activites[0]==='convoyage'?60:120};
+   corpsWorker={url:sig.data.signedUrl,candidature_id:c.id,mime:c.video_envoi_mime,duree_max:120};
  }else{
    const brut=new Uint8Array(32);crypto.getRandomValues(brut);const jeton=base64url(brut),hash=await sha256(jeton);
    const jetonMaj=await sb.from('video_verifications').update({jeton_worker_hash:hash,jeton_worker_expire_le:new Date(Date.now()+180000).toISOString(),jeton_worker_consomme_le:null}).eq('chemin_source',source).eq('etat','en_attente');

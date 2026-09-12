@@ -191,10 +191,9 @@ export function dureeMaxPourActivites(activites: unknown): number {
   }
   liste = liste.filter(Boolean);
   if (liste.length === 0) return 0;
-  // Une minute uniquement pour le convoyage seul. Toute autre candidature
-  // (nettoyage, renfort, technicien ou combinaison de métiers) dispose de
-  // deux minutes pour sa vidéo, désormais obligatoire pour tous.
-  return liste.length === 1 && liste[0] === "convoyage" ? 60 : 120;
+  // La vidéo est obligatoire et limitée à deux minutes pour tous les
+  // métiers, convoyage compris.
+  return 120;
 }
 
 // ------------------------------------------------------------

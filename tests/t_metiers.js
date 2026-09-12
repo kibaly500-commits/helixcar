@@ -189,7 +189,7 @@ async function etat(page) {
   L.check('E4 : convoyage combiné à un autre métier garde deux minutes', e.dureeMax === 120, String(e.dureeMax));
   await retirer(page, 'nettoyage');
   e = await etat(page);
-  L.check('E5 : un convoyeur seul garde sa minute', e.dureeMax === 60, String(e.dureeMax));
+  L.check('E5 : un convoyeur seul dispose aussi de deux minutes', e.dureeMax === 120, String(e.dureeMax));
   await ajouter(page, 'nettoyage');
 
   // ── F. LE PAYLOAD PORTE LES DEUX NIVEAUX ──

@@ -72,7 +72,7 @@ async function etatVideo(page) {
   await activites(page, ['convoyage']);
   e = await etatVideo(page);
   L.check('A4 : convoyage seul -> vidéo obligatoire', e.requise === true);
-  L.check('A5 : convoyage seul -> 1 minute maximum', e.max === 60 && /1 minute maximum/.test(e.texteDuree), e.texteDuree);
+  L.check('A5 : convoyage seul -> 2 minutes maximum', e.max === 120 && /2 minutes maximum/.test(e.texteDuree), e.texteDuree);
   L.check('A6 : convoyage sans vidéo -> progression bloquée', e.ok === false);
 
   await activites(page, ['renfort']);
@@ -161,9 +161,9 @@ async function etatVideo(page) {
   await deposer(page, V90);
   et = await attendreEtat(page, ['prete', 'invalide'], 25000);
   e = await etatVideo(page);
-  L.check('E4 : WebM 90 s REFUSÉ pour le convoyage (max 1 min)',
-    et === 'invalide' && /trop longue/i.test(e.msg), et + ' / ' + e.msg);
-  L.check('E5 : durée dépassée -> progression bloquée', e.ok === false);
+  L.check('E4 : WebM 90 s accepté pour le convoyage (max 2 min)',
+    et === 'prete' && e.ok === true, et + ' / ' + e.msg);
+  L.check('E5 : vidéo de 90 s -> progression débloquée', e.ok === true);
 
   await activites(page, ['renfort']);
   e = await etatVideo(page);
@@ -176,7 +176,7 @@ async function etatVideo(page) {
   L.check('E7 : WebM 150 s refusé même pour le renfort',
     et === 'invalide' && /trop longue/i.test(e.msg), et + ' / ' + e.msg);
 
-  // ── F. Retrait du renfort : la vidéo > 1 min doit être remplacée ──
+  // ── F. Changement de métier : la limite commune reste stable ──
   await activites(page, ['convoyage', 'renfort']);
   await deposer(page, V90);
   et = await attendreEtat(page, ['prete', 'invalide'], 25000);
@@ -185,14 +185,14 @@ async function etatVideo(page) {
 
   await activites(page, ['convoyage']);   // le renfort est retiré
   e = await etatVideo(page);
-  L.check('F2 : renfort retiré, convoyage gardé -> vidéo de 90 s à remplacer',
-    e.etat === 'invalide' && /trop longue/i.test(e.msg), e.etat + ' / ' + e.msg);
-  L.check('F3 : progression de nouveau bloquée', e.ok === false);
+  L.check('F2 : renfort retiré, convoyage gardé -> vidéo de 90 s toujours valide',
+    e.etat === 'prete' && e.ok === true, e.etat + ' / ' + e.msg);
+  L.check('F3 : progression reste débloquée', e.ok === true);
   L.check('F4 : le fichier n\'est pas supprimé en silence', e.nom !== null);
 
   await activites(page, ['convoyage', 'renfort']);   // le renfort revient
   e = await etatVideo(page);
-  L.check('F5 : renfort remis -> la même vidéo redevient valide',
+  L.check('F5 : renfort remis -> la même vidéo reste valide',
     e.etat === 'prete' && e.ok === true, e.etat + ' / ' + e.msg);
 
   // ── G. Remplacement et suppression ──
