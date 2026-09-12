@@ -189,9 +189,12 @@ export function dureeMaxPourActivites(activites: unknown): number {
   else if (typeof activites === "string") {
     liste = activites.replace(/^\{|\}$/g, "").split(",").map((s) => s.replace(/^"|"$/g, "").trim());
   }
-  if (liste.includes("renfort") || liste.includes("technicien")) return 120;
-  if (liste.includes("convoyage")) return 60;
-  return 0; // nettoyage seul : aucune vidéo attendue
+  liste = liste.filter(Boolean);
+  if (liste.length === 0) return 0;
+  // Une minute uniquement pour le convoyage seul. Toute autre candidature
+  // (nettoyage, renfort, technicien ou combinaison de métiers) dispose de
+  // deux minutes pour sa vidéo, désormais obligatoire pour tous.
+  return liste.length === 1 && liste[0] === "convoyage" ? 60 : 120;
 }
 
 // ------------------------------------------------------------

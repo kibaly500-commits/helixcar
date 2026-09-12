@@ -65,9 +65,9 @@ async function etatVideo(page) {
   // ── A. Exigence et durée selon les activités ──
   await activites(page, ['nettoyage']);
   let e = await etatVideo(page);
-  L.check('A1 : nettoyage seul -> aucune vidéo demandée', e.requise === false && e.max === 0);
-  L.check('A2 : nettoyage seul -> bloc vidéo masqué', e.groupeVisible === 'none');
-  L.check('A3 : nettoyage seul -> progression non bloquée', e.ok === true);
+  L.check('A1 : nettoyage seul -> vidéo obligatoire (2 minutes)', e.requise === true && e.max === 120);
+  L.check('A2 : nettoyage seul -> bloc vidéo visible', e.groupeVisible !== 'none');
+  L.check('A3 : nettoyage seul sans vidéo -> progression bloquée', e.ok === false);
 
   await activites(page, ['convoyage']);
   e = await etatVideo(page);
@@ -247,9 +247,10 @@ async function etatVideo(page) {
   L.check('I2 : vidéo valide -> Continuer débloqué', btn === false);
 
   await activites(page, ['nettoyage']);
+  await page.evaluate(() => convSupprimerVideo());
   await page.waitForTimeout(120);
   btn = await page.evaluate(() => document.getElementById('conv-step-next-btn').disabled);
-  L.check('I3 : nettoyage seul -> Continuer jamais bloqué par la vidéo', btn === false);
+  L.check('I3 : nettoyage seul sans vidéo -> Continuer reste bloqué', btn === true);
 
   // La validation au clic reste un garde-fou
   await activites(page, ['convoyage']);

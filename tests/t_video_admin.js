@@ -108,8 +108,8 @@ async function definirResultatSignature(page, litteral) {
   await page.evaluate(() => openDossierSb('cand-3'));
   await page.waitForTimeout(80);
   fiche = await page.evaluate(() => document.getElementById('dossier-content').textContent);
-  check('A7 : nettoyage seul -> « Non requise », jamais « Manquante »',
-    /Non requise/i.test(fiche) && !/Manquante/i.test(fiche), fiche.slice(-160));
+  check('A7 : nettoyage seul sans vidéo -> « Manquante »',
+    /Manquante/i.test(fiche) && !/Non requise/i.test(fiche), fiche.slice(-160));
 
   await page.evaluate(() => openDossierSb('cand-4'));
   await page.waitForTimeout(80);

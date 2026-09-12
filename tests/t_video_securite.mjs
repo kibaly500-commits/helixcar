@@ -438,8 +438,8 @@ async function executerSuite() {
     etat.convoyeurs[0].video_upload_jeton_hash = hashA;
     const { sb } = creerDouble(etat);
     const r = await appeler(sb, { action: 'autoriser', jeton: JETON_A, mime: 'video/mp4', taille_octets: 1000, duree_secondes: 30, activites: ['renfort'] });
-    check('4.8 Nettoyage seul -> aucune vidéo attendue, même si le client prétend le contraire',
-      r.statut === 400 && r.json.code === 'VIDEO_NON_ATTENDUE', JSON.stringify(r.json));
+    check('4.8 Nettoyage seul -> vidéo acceptée avec la règle lue en base',
+      r.statut === 200 && r.json.ok === true, JSON.stringify(r.json));
   }
 
   // ── 5. Propriétaire authentifié ──
@@ -857,11 +857,13 @@ async function executerSuite() {
   }
 
   // ── 8. Règle métier centralisée ──
-  check('8.1 Durée max : nettoyage seul = aucune vidéo', dureeMaxPourActivites(['nettoyage']) === 0);
+  check('8.1 Durée max : nettoyage seul = 120 s', dureeMaxPourActivites(['nettoyage']) === 120);
   check('8.2 Durée max : convoyage = 60 s', dureeMaxPourActivites(['convoyage']) === 60);
   check('8.3 Durée max : dès renfort = 120 s', dureeMaxPourActivites(['convoyage', 'renfort']) === 120);
   check('8.4 Durée max : format tableau texte PostgreSQL accepté',
     dureeMaxPourActivites('{convoyage,renfort}') === 120);
+  check('8.5 Durée max : convoyage combiné au nettoyage = 120 s',
+    dureeMaxPourActivites(['convoyage', 'nettoyage']) === 120);
 
   // ── 9. Aucun secret ni URL persistée ──
   {

@@ -149,29 +149,35 @@ async function etat(page) {
   await ajouter(page, 'nettoyage');
   let docs = await page.evaluate(() => ({
     manquants: _docsPartenaireManquants().map(d => d.input),
-    aide: (document.getElementById('conv-documents-aide') || {}).textContent || '',
     rcStatut: (document.getElementById('conv-rcpro-statut') || {}).textContent || '',
+    rcEtoile: (document.getElementById('conv-rcpro-required') || {}).style.display || '',
+    aidePresente: !!document.getElementById('conv-documents-aide'),
+    etoilesCommunes: ['conv-doc-identite', 'conv-doc-permis', 'conv-doc-kbis'].every(id => {
+      const label = document.querySelector('label[for="' + id + '"]');
+      return !!label && /\*/.test(label.textContent || '');
+    }),
   }));
   L.check('D4 : le justificatif Kbis/RNE est requis pour tout partenaire',
-    docs.manquants.indexOf('conv-doc-kbis') !== -1, JSON.stringify(docs));
+    docs.manquants.indexOf('conv-doc-kbis') !== -1 && docs.etoilesCommunes, JSON.stringify(docs));
+  L.check('D4b : le bloc explicatif redondant a été retiré', docs.aidePresente === false, JSON.stringify(docs));
   L.check('D5 : sans convoyage, la RC Pro est bien facultative',
     docs.manquants.indexOf('conv-doc-rcpro') === -1
-      && /facultative/i.test(docs.aide + ' ' + docs.rcStatut), JSON.stringify(docs));
+      && /facultative/i.test(docs.rcStatut) && docs.rcEtoile === 'none', JSON.stringify(docs));
   await ajouter(page, 'convoyage');
   docs = await page.evaluate(() => ({
     manquants: _docsPartenaireManquants().map(d => d.input),
-    aide: (document.getElementById('conv-documents-aide') || {}).textContent || '',
     rcStatut: (document.getElementById('conv-rcpro-statut') || {}).textContent || '',
+    rcEtoile: (document.getElementById('conv-rcpro-required') || {}).style.display || '',
   }));
   L.check('D6 : avec convoyage, la RC Pro devient obligatoire',
     docs.manquants.indexOf('conv-doc-rcpro') !== -1
-      && /obligatoire/i.test(docs.aide + ' ' + docs.rcStatut), JSON.stringify(docs));
+      && /obligatoire/i.test(docs.rcStatut) && docs.rcEtoile === 'inline-block', JSON.stringify(docs));
   await retirer(page, 'convoyage');
 
   // ── E. LA VIDÉO SUIT LE MÉTIER RÉELLEMENT DÉCLARÉ ──
   e = await etat(page);
-  L.check('E1 : un nettoyeur seul n\'a aucune vidéo à fournir',
-    e.videoRequise === false && e.dureeMax === 0, JSON.stringify(e));
+  L.check('E1 : un nettoyeur seul doit aussi fournir sa vidéo',
+    e.videoRequise === true && e.dureeMax === 120, JSON.stringify(e));
   await ajouter(page, 'diagnostic');
   e = await etat(page);
   L.check('E2 : un technicien, qui intervient chez le client, doit se présenter',
@@ -180,7 +186,11 @@ async function etat(page) {
   await retirer(page, 'diagnostic');
   await ajouter(page, 'convoyage');
   e = await etat(page);
-  L.check('E4 : un convoyeur seul garde sa minute', e.dureeMax === 60, String(e.dureeMax));
+  L.check('E4 : convoyage combiné à un autre métier garde deux minutes', e.dureeMax === 120, String(e.dureeMax));
+  await retirer(page, 'nettoyage');
+  e = await etat(page);
+  L.check('E5 : un convoyeur seul garde sa minute', e.dureeMax === 60, String(e.dureeMax));
+  await ajouter(page, 'nettoyage');
 
   // ── F. LE PAYLOAD PORTE LES DEUX NIVEAUX ──
   const payload = await page.evaluate(() => ({

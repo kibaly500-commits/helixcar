@@ -7745,33 +7745,30 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div class="modal-form-group">
           <label>Documents requis</label>
-          <div id="conv-documents-aide" style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
-            Pièce d'identité, permis de conduire et justificatif d'immatriculation sont requis. La RC Pro est facultative tant que le convoyage automobile n'est pas sélectionné.
-          </div>
           <div class="hc-doc-zone" id="conv-zone-identite" data-doc-id="conv-doc-identite" style="margin-bottom:14px">
-            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Pièce d'identité <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
+            <label for="conv-doc-identite" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Pièce d'identité <span class="field-required">*</span> <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-identite" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
           <div class="hc-doc-zone" id="conv-zone-permis" data-doc-id="conv-doc-permis" style="margin-bottom:14px">
-            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Permis de conduire <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
+            <label for="conv-doc-permis" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Permis de conduire <span class="field-required">*</span> <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-permis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
           <div class="hc-doc-zone" id="conv-zone-kbis" data-doc-id="conv-doc-kbis" style="margin-bottom:14px">
-            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Justificatif d'immatriculation (Kbis ou attestation RNE) <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
+            <label for="conv-doc-kbis" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Justificatif d'immatriculation (Kbis ou attestation RNE) <span class="field-required">*</span> <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-kbis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
           <div class="hc-doc-zone" id="conv-zone-rcpro" data-doc-id="conv-doc-rcpro" style="margin-bottom:4px">
-            <label style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">RC Pro en cours de validité <span id="conv-rcpro-statut" class="field-optional-hint">— Facultative sans convoyage · PDF, JPG ou PNG</span></label>
+            <label for="conv-doc-rcpro" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">RC Pro en cours de validité <span id="conv-rcpro-required" class="field-required" style="display:none">*</span> <span id="conv-rcpro-statut" class="field-optional-hint">— Facultative sans convoyage · PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-rcpro" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
         </div>
 
-        <!-- VIDÉO DE PRÉSENTATION — affichée uniquement quand une activité
-             la rend réellement nécessaire. La durée maximale annoncée
+        <!-- VIDÉO DE PRÉSENTATION — affichée dès qu'un métier est retenu.
+             La durée maximale annoncée
              s'adapte aux activités choisies ; aucune explication interne
              sur le nombre de vidéos n'est montrée au candidat. -->
         <div class="modal-form-group" id="conv-video-group" style="display:none">
-          <label>Vidéo de présentation</label>
+          <label>Vidéo de présentation <span class="field-required">*</span></label>
           <div style="background:#fff;border:1px solid rgba(21,27,33,.08);border-left:3px solid var(--accent);border-radius:12px;padding:16px 18px;font-size:.82rem;color:#555d63;margin-bottom:16px;line-height:1.62;box-shadow:0 7px 22px rgba(21,27,33,.035)">
             Présentez-vous brièvement en vidéo : <b><span id="conv-video-duree-txt">1 minute maximum</span></b>. Formats acceptés : MP4, MOV ou WebM.
           </div>
@@ -12214,8 +12211,8 @@ function construireRecapConvoyeur() {
              _recapLigne('Permis de conduire', _recapNomFichier('conv-doc-permis') || 'Non ajouté') +
              _recapLigne('Justificatif d\'immatriculation', _recapNomFichier('conv-doc-kbis') || 'Non ajouté') +
              _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || (_partenaireAvecConvoyage() ? 'Non ajouté' : 'Facultative — non ajoutée'));
-  // La ligne vidéo n'apparaît que si une activité la rend nécessaire :
-  // un candidat « nettoyage seul » ne doit jamais la voir.
+  // La vidéo est obligatoire pour toute candidature portant au moins
+  // un métier ; elle apparaît donc toujours dans un récapitulatif valide.
   if (typeof _convVideoRequise === 'function' && _convVideoRequise()) {
     docs += _recapLigne('Vidéo de présentation',
       (_convVideo && _convVideoUtilisable())
@@ -14596,11 +14593,10 @@ function _docsPartenaireManquants() {
 // ══════════════════════════════════════════════════════════════
 // VIDÉO DE PRÉSENTATION DE LA CANDIDATURE
 // ══════════════════════════════════════════════════════════════
-// Une candidature ne porte qu'UNE vidéo. L'exigence et la durée
-// maximale se déduisent des activités reellement selectionnees :
-//   nettoyage seul                -> aucune video
-//   convoyage (sans renfort)      -> obligatoire, 60 s
-//   des que renfort est coche     -> obligatoire, 120 s
+// Une candidature ne porte qu'UNE vidéo, obligatoire pour tous les
+// métiers. Seule la durée maximale dépend des activités sélectionnées :
+//   convoyage seul                -> obligatoire, 60 s
+//   tout autre métier/combinaison -> obligatoire, 120 s
 // Cette regle interne n'est JAMAIS expliquee au candidat : il ne voit
 // qu'une seule zone et la duree maximale qui s'applique a lui.
 //
@@ -14633,18 +14629,13 @@ function _reinitialiserVideoPartenaire() {
 }
 
 function _convVideoRequise() {
-  var a = _activitesPartenaire();
-  // Le technicien intervient chez le client, en face-à-face, comme le
-  // renfort : il se presente dans les memes conditions.
-  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1
-      || a.indexOf('technicien') !== -1;
+  return _metiersPartenaire().length > 0;
 }
-// Duree maximale REELLE pour les activites en cours. 0 = aucune video.
+// Duree maximale REELLE pour les activites en cours. 0 = aucun métier.
 function _convVideoDureeMax() {
   var a = _activitesPartenaire();
-  if (a.indexOf('renfort') !== -1 || a.indexOf('technicien') !== -1) return 120;
-  if (a.indexOf('convoyage') !== -1) return 60;
-  return 0;
+  if (!a.length) return 0;
+  return (a.length === 1 && a[0] === 'convoyage') ? 60 : 120;
 }
 function _convVideoDureeMaxTexte() {
   return (_convVideoDureeMax() === 120) ? '2 minutes maximum' : '1 minute maximum';
@@ -15783,10 +15774,8 @@ function onChoixActivitesPartenaire() {
   var conv = _partenaireAvecConvoyage();
   var grp = document.getElementById('conv-experience-group');
   if (grp) grp.style.display = conv ? 'block' : 'none';
-  var aide = document.getElementById('conv-documents-aide');
-  if (aide) aide.textContent = conv
-    ? "Pièce d'identité, permis de conduire, justificatif d'immatriculation et RC Pro en cours de validité sont requis pour le convoyage automobile."
-    : "Pièce d'identité, permis de conduire et justificatif d'immatriculation sont requis. La RC Pro est facultative tant que le convoyage automobile n'est pas sélectionné.";
+  var etoileRc = document.getElementById('conv-rcpro-required');
+  if (etoileRc) etoileRc.style.display = conv ? 'inline-block' : 'none';
   var statutRc = document.getElementById('conv-rcpro-statut');
   if (statutRc) statutRc.textContent = conv
     ? '— Obligatoire pour le convoyage · PDF, JPG ou PNG'
@@ -15857,8 +15846,8 @@ function _validateConvStep(n) {
     if (_partenaireAvecConvoyage()) {
       mark(_checkSelect('conv-experience', true), 'conv-experience');
     }
-    // Vidéo de présentation : exigée uniquement quand une activité la
-    // rend réellement nécessaire. Le message reste factuel — il ne
+    // Vidéo de présentation : exigée pour toute candidature métier.
+    // Le message reste factuel — il ne
     // révèle jamais la règle interne du nombre de vidéos.
     if (_convVideoRequise() && !_convVideoUtilisable()) {
       ok = false;

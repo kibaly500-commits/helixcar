@@ -6564,12 +6564,11 @@ async function verifierAccesPartenaireEnCours() {
 // demande, uniquement pour un administrateur authentifié (les
 // politiques du bucket privé refusent la signature à quiconque d'autre).
 
-// La vidéo n'est attendue que pour le convoyage et le renfort : un
-// candidat « nettoyage seul » n'a pas de vidéo manquante, il n'en a
-// simplement pas besoin.
+// La vidéo de présentation est attendue pour toute candidature ayant
+// déclaré au moins un métier, quel que soit le type de mission visé.
 function _videoAttenduePourActivites(activites) {
   var a = normaliserActivites(activites);
-  return a.indexOf('convoyage') !== -1 || a.indexOf('renfort') !== -1;
+  return a.length > 0;
 }
 
 function _celluleVideoCandidature(c) {
