@@ -3885,6 +3885,7 @@ async function finaliserSessionAdmin(email, alertEl, authUserId, signOutSiEchec)
 // auth.uid().
 window._hcRolesAutorises = [];
 window._hcRoleActif = null;
+window._hcLectureRolesEnErreur = false;
 
 const HC_LIB_ROLE = { admin: 'Admin', partenaire: 'Partenaire', client: 'Client' };
 const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace partenaire', client: 'Espace client' };
@@ -3893,16 +3894,63 @@ const HC_LIB_ESPACE = { admin: 'Administration', partenaire: 'Espace partenaire'
 // panne, on repart sur une liste vide : l'ancien enchainement prend
 // alors le relais, et aucun espace n'est ouvert par defaut.
 async function _hcRolesDeLaSession() {
+  window._hcLectureRolesEnErreur = false;
   try {
-    if (!_sbAuthPret || !_sbAuthPret()) return [];
+    if (!_sbAuthPret || !_sbAuthPret()) {
+      window._hcLectureRolesEnErreur = true;
+      return [];
+    }
     const { data, error } = await sbAuth.rpc('roles_utilisateur');
-    if (error) { console.warn('roles_utilisateur :', error); return []; }
+    if (error) {
+      window._hcLectureRolesEnErreur = true;
+      console.warn('roles_utilisateur :', error);
+      return [];
+    }
     return (data || [])
       .map(r => (typeof r === 'string' ? r : (r && r.role)))
       .filter(Boolean);
   } catch (e) {
+    window._hcLectureRolesEnErreur = true;
     console.warn('roles_utilisateur :', e);
     return [];
+  }
+}
+
+// Retour du lien de confirmation d'adresse d'un nouveau convoyeur.
+// Le navigateur possède maintenant une session Auth confirmée : la
+// fonction serveur peut enfin vérifier que l'adresse de la session est
+// exactement celle du dossier, puis rattacher le rôle. Le simple numéro
+// de dossier présent dans l'URL ne donne donc aucun droit à lui seul.
+async function _hcRattacherPartenaireApresConfirmation() {
+  let url;
+  try { url = new URL(location.href); } catch (e) { return false; }
+  if (url.searchParams.get('activation') !== 'partenaire') return false;
+
+  const dossier = (url.searchParams.get('dossier') || '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dossier)) {
+    console.warn('Activation partenaire : dossier invalide.');
+    return false;
+  }
+
+  try {
+    const { data, error } = await sbAuth.rpc('ajouter_role_partenaire', {
+      p_convoyeur_id: dossier
+    });
+    const code = data && data.code;
+    if (error || (code !== 'RATTACHEE' && code !== 'DEJA_RATTACHEE' && code !== 'ROLE_DEJA_PRESENT')) {
+      console.warn('Activation partenaire refusée :', error || code);
+      return false;
+    }
+
+    // Nettoyage seulement après réussite. Le fragment Supabase éventuel
+    // est conservé jusqu'à ce que la bibliothèque l'ait consommé.
+    url.searchParams.delete('activation');
+    url.searchParams.delete('dossier');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    return true;
+  } catch (e) {
+    console.warn('Activation partenaire :', e);
+    return false;
   }
 }
 
@@ -3971,17 +4019,31 @@ async function _hcPreparerRoles(roleOuvert, email, authUserId) {
 }
 
 async function finaliserSessionParUid(email, authUserId) {
+  // Doit précéder roles_utilisateur : au premier retour de confirmation,
+  // le rôle n'existe précisément pas encore tant que cet appel n'a pas
+  // rattaché la fiche convoyeur à l'identité Auth.
+  await _hcRattacherPartenaireApresConfirmation();
   window._hcRolesAutorises = await _hcRolesDeLaSession();
 
   // Repli si le serveur ne repond pas ou si la migration 104 n'est pas
   // encore appliquee : l'enchainement historique, strictement
   // inchange. Aucun espace n'est ouvert sans que son role existe.
-  if (!window._hcRolesAutorises.length) {
+  if (!window._hcRolesAutorises.length && window._hcLectureRolesEnErreur) {
     const estAdmin = await finaliserSessionAdmin(email, null, authUserId, false);
     if (estAdmin) return;
     const estConvoyeur = await finaliserSessionConvoyeur(email, null, authUserId, false);
     if (estConvoyeur) return;
     await finaliserSessionClient(email, null, authUserId, false);
+    return;
+  }
+
+  // Une réponse serveur valide mais vide signifie « aucun espace ».
+  // Elle ne doit surtout pas être transformée en espace client : c'est
+  // exactement ce qui donnait au convoyeur l'écran montré par erreur.
+  if (!window._hcRolesAutorises.length) {
+    try { await sbAuth.auth.signOut(); } catch (e) {}
+    _hcEcranAttente('Aucun espace HelixCar n’est encore rattaché à ce compte.',
+      'Reprenez le lien reçu par e-mail ou contactez HelixCar.', true);
     return;
   }
 

@@ -292,7 +292,16 @@ async function creerCompte() {
     var result = await sb.auth.signUp({
       email: email,
       password: pw,
-      options: { emailRedirectTo: _ccOrigineOfficielle() + '/dashboard.html' }
+      // Lorsque la confirmation d'adresse est active, signUp() ne rend
+      // aucune session : le rattachement ne peut donc pas être fait ici.
+      // Le dossier est transmis au Dashboard, qui appellera la fonction
+      // serveur sécurisée dès que le clic dans l'e-mail aura créé la
+      // vraie session confirmée.
+      options: {
+        emailRedirectTo: _ccOrigineOfficielle()
+          + '/dashboard.html?activation=partenaire&dossier='
+          + encodeURIComponent(convoyeurId)
+      }
     });
     if (result.error) {
       showError('Erreur : ' + result.error.message);
@@ -303,7 +312,8 @@ async function creerCompte() {
     // Le rattachement de la fiche ne peut se faire QU'AVEC une session
     // reelle : c'est la fonction serveur qui verifie l'adresse
     // confirmee. Sans session (confirmation d'e-mail encore requise),
-    // il aura lieu a la premiere connexion.
+    // il aura lieu au retour du lien de confirmation, grâce à
+    // activation=partenaire&dossier=… dans l'URL ci-dessus.
     if (result.data && result.data.session) {
       try { await sb.rpc('ajouter_role_partenaire', { p_convoyeur_id: convoyeurId }); }
       catch (e) { console.error('Rattachement du role partenaire :', e); }

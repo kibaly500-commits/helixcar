@@ -289,6 +289,12 @@ function etatEspace(page) {
     !/convoyeurs\?id=eq\.[\s\S]{0,400}auth_user_id/.test(cc));
   check('F8 : et plus aucune adresse d\'aperçu codée en dur',
     !/helixcar-i89b/.test(cc));
+  check('F9 : le retour de confirmation conserve le dossier convoyeur',
+    /dashboard\.html\?activation=partenaire&dossier=/.test(cc));
+  check('F10 : le Dashboard rattache le dossier AVANT de relire les rôles',
+    /async function finaliserSessionParUid[\s\S]{0,500}await _hcRattacherPartenaireApresConfirmation\(\);[\s\S]{0,200}await _hcRolesDeLaSession\(\)/.test(dash));
+  check('F11 : une liste de rôles vide ne devient plus un espace client',
+    /if \(!window\._hcRolesAutorises\.length\) \{[\s\S]{0,300}Aucun espace HelixCar/.test(dash));
 
   await navigateur.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
