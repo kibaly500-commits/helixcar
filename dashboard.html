@@ -4231,6 +4231,7 @@ const sbAuth = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPA
 // LOT A01-036 — plus d'URL absolue dispersée : la fonction devis-secure
 // est adressée à partir de l'URL du projet Supabase, unique et centralisée.
 const URL_FONCTION_DEVIS = SUPABASE_URL + '/functions/v1/devis-secure';
+const URL_FONCTION_VALIDATION_PARTENAIRE = SUPABASE_URL + '/functions/v1/partenaire-validation';
 
 // RESTAURATION DE « SESSION DÉMO » SUPPRIMÉE.
 // Elle ouvrait l'interface sur la seule foi d'une valeur écrite dans le
@@ -6763,11 +6764,14 @@ function afficherConvoyeursActifs(rows) {
     const actionBlocage = bloque
       ? '<button class="btn btn-sm btn-outline" ' + actionHtml('debloquerConvoyeur', [c.id]) + '>↩ Débloquer</button>'
       : '<button class="btn btn-sm btn-red" ' + actionHtml('bloquerConvoyeur', [c.id]) + '>🚫 Bloquer</button>';
+    const actionCreationCompte = c.auth_user_id
+      ? ''
+      : '<button class="btn btn-sm btn-outline" ' + actionHtml('renvoyerLienCreationPartenaire', [c.id]) + '>✉ Renvoyer le lien</button>';
     return '<tr' + (bloque ? ' class="blocked"' : '') + '><td><strong>' + nom + '</strong></td><td>' + escapeHtml(c.email) + '</td>'
       + '<td>' + (c.nb_missions || 0) + '</td><td>' + (c.km_total || 0) + ' km</td>'
       + '<td>' + _badgeEtatPartenaire(c) + '</td>'
       + '<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" ' + actionHtml('voirConvoyeurSb', [c.id]) + '>Voir</button>'
-      + actionBlocage + '</td>'
+      + actionCreationCompte + actionBlocage + '</td>'
       + '<td><button class="btn btn-sm btn-red" ' + actionHtml('supprimerConvoyeur', [c.id]) + ' title="Supprimer">🗑️</button></td></tr>';
   }).join('');
 }
@@ -6894,50 +6898,92 @@ function voirConvoyeurSb(id) {
     });
 }
 
-function validerConvoyeur(id, name, email, civilite) {
+async function _appelerValidationPartenaire(convoyeurId, action) {
+  if (!sbAuth) return { ok: false, code: 'NO_AUTH_CLIENT', message: 'Service de connexion indisponible.' };
+  let session;
+  try {
+    const r = await sbAuth.auth.getSession();
+    session = r && r.data ? r.data.session : null;
+  } catch (e) {
+    return { ok: false, code: 'SESSION_ERROR', message: 'Impossible de vérifier la session administrateur.' };
+  }
+  if (!session || !session.access_token) {
+    return { ok: false, code: 'NO_SESSION', message: 'Reconnectez-vous puis réessayez.' };
+  }
+  let reponse;
+  try {
+    reponse = await fetch(URL_FONCTION_VALIDATION_PARTENAIRE, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: action,
+        convoyeur_id: convoyeurId,
+        envoi_cle: action === 'renvoyer' ? _hcCleTentative() : undefined
+      })
+    });
+  } catch (e) {
+    return { ok: false, code: 'NETWORK_ERROR', message: 'Le serveur de validation est momentanément inaccessible.' };
+  }
+  let resultat = null;
+  try { resultat = await reponse.json(); } catch (e) {}
+  if (!resultat) return { ok: false, code: 'BAD_RESPONSE', message: 'Réponse du serveur illisible.' };
+  return resultat;
+}
+
+async function renvoyerLienCreationPartenaire(id) {
+  const c = (window._convoyeursActifsData || {})[id];
+  if (!c) {
+    alert('Impossible de retrouver ce partenaire. Actualisez la page puis réessayez.');
+    return;
+  }
+  if (c.auth_user_id) {
+    alert('Ce partenaire possède déjà son compte de connexion. Aucun lien de création n’est nécessaire.');
+    return;
+  }
+  const nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim();
+  const resultat = await _appelerValidationPartenaire(id, 'renvoyer');
+  if (resultat.ok && resultat.email_accepte) {
+    document.getElementById('confirm-title').textContent = 'Lien envoyé';
+    document.getElementById('confirm-msg').textContent = 'Le service de messagerie a accepté l’envoi du lien de création de mot de passe à ' + c.email + '.';
+  } else if (resultat.ok && resultat.compte_deja_cree) {
+    document.getElementById('confirm-title').textContent = 'Compte déjà créé';
+    document.getElementById('confirm-msg').textContent = nom + ' possède déjà son accès partenaire.';
+    loadConvoyeursActifs();
+  } else {
+    document.getElementById('confirm-title').textContent = 'Lien non envoyé';
+    document.getElementById('confirm-msg').textContent = resultat.message || 'Le service de messagerie n’a pas confirmé l’envoi. Réessayez dans quelques instants.';
+  }
+  openModal('confirm');
+}
+
+async function validerConvoyeur(id, name, email, civilite) {
   const partenaire = { civilite: civilite || null };
   closeModal('dossier');
   const row = document.getElementById('cand-' + id);
   if (row) row.cells[row.cells.length - 1].innerHTML = '<span class="badge">⏳ Validation en cours…</span>';
 
-  sbFetch('convoyeurs?id=eq.' + id, {
-    method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ statut: 'actif' })
-  }).then(function() {
-    // Email de validation via EmailJS
-    try {
-      if (window.emailjs && email) {
-        const prenom = (name || '').split(' ')[0];
-        // Le domaine définitif sera branché dans un lot dédié lorsque le
-        // site sera prêt. D'ici là, le lien conserve l'origine utilisée.
-        const lienCompte = _hcOrigineOfficielle() + '/creer-compte-convoyeur.html?email=' + encodeURIComponent(email);
-        const msg = 'Bonjour ' + prenom + ',\n\n' +
-          'Votre compte partenaire HelixCar est validé ! Bienvenue dans le réseau HelixCar.\n\n' +
-          'Dernière étape : créez votre mot de passe pour accéder à votre espace partenaire et voir les missions disponibles :\n' +
-          lienCompte + '\n\n' +
-          'Cordialement,\nL\'équipe HelixCar';
-        emailjs.send('service_jmckybp', 'template_n26gasf', {
-          email: email,
-          titre: '✅ Compte validé — Bienvenue chez HelixCar !',
-          message: msg
-        }).then(function() {
-          /* Acceptation prestataire, réception non prouvée. */
-        }, function(err) {
-          console.error('Erreur envoi email de validation:', err);
-        });
-      }
-    } catch (e) { console.error('EmailJS exception:', e); }
-
+  try {
+    const resultat = await _appelerValidationPartenaire(id, 'valider');
+    if (!resultat.ok && !resultat.validation_enregistree) {
+      throw new Error(resultat.message || 'La validation a échoué.');
+    }
     document.getElementById('confirm-title').textContent = name + ' est ' + _accordPartenaire(partenaire, 'validé', 'validée') + ' !';
-    document.getElementById('confirm-msg').textContent = 'Un email de confirmation a été envoyé automatiquement. ' + name + ' a maintenant accès à son espace partenaire et aux missions disponibles. Ses documents seront inclus au prochain clic sur "Synchroniser" dans l\'onglet Archivage.';
+    document.getElementById('confirm-msg').textContent = resultat.ok && resultat.email_accepte
+      ? 'Le service de messagerie a accepté l’envoi du lien de création de mot de passe. Le partenaire pourra ensuite activer son accès.'
+      : resultat.ok && resultat.compte_deja_cree
+        ? 'Le partenaire possède déjà son compte de connexion : aucun nouveau lien n’était nécessaire.'
+        : 'La validation est bien enregistrée, mais le lien de création de mot de passe n’a pas été envoyé. Utilisez « Renvoyer le lien » dans la liste des partenaires actifs.';
     openModal('confirm');
     loadCandidatures();
     loadConvoyeursActifs();
-  }).catch(function(e) {
-    alert('❌ Erreur lors de la validation (voir la console). ' + _accordPartenaire(partenaire, 'Le convoyeur', 'La convoyeuse') + ' n\'a pas été mis' + _accordPartenaire(partenaire, '', 'e') + ' à jour dans Supabase.');
+  } catch (e) {
+    alert('❌ ' + (e && e.message ? e.message : 'Erreur lors de la validation.') + ' ' + _accordPartenaire(partenaire, 'Le convoyeur', 'La convoyeuse') + ' n\'a pas été mis' + _accordPartenaire(partenaire, '', 'e') + ' à jour.');
     loadCandidatures();
-  });
+  }
 }
 
 function refuserConvoyeur(id) {
@@ -13571,7 +13617,7 @@ function declencherChampFichier(id) {
   'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',
   'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
   'ouvrirPhotosMission', 'ouvrirRibPartenaire', 'ouvrirVideoCandidature', 'previsualiserDevis',
-  'refuserConvoyeur', 'showPage', 'supprimerConvoyeur', 'terminerMission',
+  'refuserConvoyeur', 'renvoyerLienCreationPartenaire', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',
   'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',
   'voirPhotosMission'

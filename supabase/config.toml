@@ -49,3 +49,9 @@ verify_jwt = false
 # l'origine Preview exacte et le préfixe QA. Elle n'appelle aucun
 # prestataire et reste inaccessible depuis le domaine de production.
 verify_jwt = false
+
+[functions.partenaire-validation]
+# Appelée uniquement par un administrateur connecté. Le gateway vérifie
+# le JWT, puis la fonction confirme elle-même que l'utilisateur possède
+# une ligne active dans public.admins avant toute décision ou tout envoi.
+verify_jwt = true
