@@ -1,7 +1,7 @@
 -- HelixCar — 124 : civilité des partenaires.
 -- Les candidatures existantes restent sans valeur et utilisent donc le
 -- masculin par défaut dans le dashboard. Les nouvelles candidatures
--- choisissent Madame, Monsieur ou « Je préfère ne pas préciser ».
+-- choisissent Monsieur, Madame ou « Je préfère ne pas préciser ».
 begin;
 
 alter table public.convoyeurs
