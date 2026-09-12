@@ -13405,6 +13405,24 @@ function _clearFieldError(id) {
   }
 }
 
+// L'erreur d'adresse partenaire connue est volontairement plus explicite
+// qu'une erreur de format : quand le verrou serveur la détecte, elle est
+// présentée dans une carte HelixCar, sans couleur système bleue.
+function _convAfficherEmailDejaUtilise() {
+  _showFieldError('conv-email', 'Cette adresse e-mail est déjà utilisée.');
+  var msgEl = document.getElementById('conv-email-err');
+  if (msgEl) {
+    msgEl.classList.add('hc-email-existe');
+    msgEl.innerHTML = '<strong>Adresse déjà associée à un compte</strong>'
+      + '<span>Cette adresse e-mail est déjà utilisée. Connectez-vous à votre espace partenaire.</span>';
+  }
+  var champ = document.getElementById('conv-email');
+  if (champ) {
+    try { champ.focus({ preventScroll: true }); } catch (e) { champ.focus(); }
+    try { champ.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
+  }
+}
+
 // V50.1H — une validation globale ne doit pas effacer une erreur plus
 // spécifique de la chaîne stockage déjà posée sur le même champ.
 function _clearFieldErrorHorsChronologieStockage(id) {
@@ -13456,6 +13474,19 @@ function _clearFieldErrorOnInput(id) {
   }
   document.addEventListener('input', onInteraction, true);
   document.addEventListener('change', onInteraction, true);
+})();
+
+// Le message « adresse déjà utilisée » disparaît dès que le candidat
+// corrige l'adresse. La nouvelle valeur sera contrôlée au prochain clic.
+(function () {
+  function effacerEmailPartenaire(e) {
+    if (!e.target || e.target.id !== 'conv-email') return;
+    _clearFieldError('conv-email');
+    var msgEl = document.getElementById('conv-email-err');
+    if (msgEl) msgEl.classList.remove('hc-email-existe');
+  }
+  document.addEventListener('input', effacerEmailPartenaire, true);
+  document.addEventListener('change', effacerEmailPartenaire, true);
 })();
 
 function _showGroupError(afterId, msg) {
@@ -15872,8 +15903,47 @@ function _validateConvStep(n) {
   return ok;
 }
 
-function convStepNext() {
+var _convVerificationEmailEnCours = false;
+
+async function _convEmailDejaUtilise(email) {
+  // En cas de coupure réseau, on laisse avancer : le verrou atomique de
+  // l'envoi final reste la source de vérité et empêchera toujours le doublon.
+  if (!_sb || typeof _sb.rpc !== 'function') return false;
+  try {
+    var resultat = await _sb.rpc('email_partenaire_deja_utilise', { p_email: email });
+    if (resultat && resultat.error) throw resultat.error;
+    return !!(resultat && resultat.data === true);
+  } catch (err) {
+    console.error('[HelixCar] Vérification préalable de l\'adresse partenaire impossible.', err);
+    return false;
+  }
+}
+
+async function convStepNext() {
+  if (_convVerificationEmailEnCours) return;
   if (!_validateConvStep(_formStepState.convoyeur)) return;
+
+  if (_formStepState.convoyeur === 1) {
+    var champEmail = document.getElementById('conv-email');
+    var emailVerifie = ((champEmail && champEmail.value) || '').trim().toLowerCase();
+    var btnEtape = document.getElementById('conv-step-next-btn');
+    var texteBtn = btnEtape ? btnEtape.textContent : '';
+    _convVerificationEmailEnCours = true;
+    if (btnEtape) { btnEtape.disabled = true; btnEtape.textContent = 'Vérification…'; }
+    var dejaUtilise = await _convEmailDejaUtilise(emailVerifie);
+    _convVerificationEmailEnCours = false;
+    if (btnEtape) { btnEtape.disabled = false; btnEtape.textContent = texteBtn || 'Continuer →'; }
+
+    // Si l'adresse a changé pendant l'appel, aucun résultat ancien ne doit
+    // être affiché. Le prochain clic vérifiera la nouvelle valeur.
+    var emailActuel = (((document.getElementById('conv-email') || {}).value) || '').trim().toLowerCase();
+    if (emailActuel !== emailVerifie) return;
+    if (dejaUtilise) {
+      _convAfficherEmailDejaUtilise();
+      return;
+    }
+  }
+
   _formStepState.convoyeur = Math.min(_formStepState.convoyeur + 1, _dernierePasType('convoyeur'));
   if (_formStepState.convoyeur > (_etapeMaxConvoyeur || 1)) _etapeMaxConvoyeur = _formStepState.convoyeur;
   _renderFormStep('convoyeur');
@@ -19214,12 +19284,7 @@ async function submitConvoyeurForm() {
     if (erreurEmailDejaUtilise) {
       _formStepState.convoyeur = 1;
       _renderFormStep('convoyeur');
-      _showFieldError('conv-email', 'Cette adresse e-mail est déjà utilisée.');
-      var champEmailConvoyeur = document.getElementById('conv-email');
-      if (champEmailConvoyeur) {
-        try { champEmailConvoyeur.focus({ preventScroll: true }); } catch (e) { champEmailConvoyeur.focus(); }
-        try { champEmailConvoyeur.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
-      }
+      _convAfficherEmailDejaUtilise();
       return;
     }
     _convAfficherEchecCandidature(
@@ -22347,6 +22412,59 @@ document.addEventListener('click', function (e) {
      comme autofillé — filet de sécurité en complément du CSS seul. */
   animation-name: hcAutofillDetecte;
 }
+
+/* Partenaire — neutralisation définitive du bleu navigateur. Le champ reste
+   ivoire/blanc ; l'erreur est portée par le contour et la carte sous le
+   champ, jamais par un aplat bleu. */
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]),
+#modal-convoyeur select,
+#modal-convoyeur textarea {
+  background: linear-gradient(90deg,#fbf6f1 0%,#fff 42%,#fff 100%) !important;
+  color: var(--ink) !important;
+  outline: none !important;
+}
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]):-webkit-autofill,
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]):-webkit-autofill:hover,
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]):-webkit-autofill:focus,
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]):-webkit-autofill:active,
+#modal-convoyeur input:not([type="radio"]):not([type="checkbox"]):not([type="button"]):not([type="submit"]):not([type="file"]):autofill {
+  background: #fff !important;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+  box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  caret-color: var(--ink) !important;
+  transition: background-color 999999s ease-in-out 0s !important;
+}
+#modal-convoyeur #conv-email.field-error,
+#modal-convoyeur #conv-email.field-error:focus {
+  background: linear-gradient(90deg,#fff8f3 0%,#fff 52%,#fff 100%) !important;
+  border-color: #A84448 !important;
+  box-shadow: 0 0 0 3px rgba(168,68,72,.10) !important;
+}
+#modal-convoyeur .field-error-msg.hc-email-existe {
+  display: none;
+  position: relative;
+  margin-top: 9px;
+  padding: 11px 13px 11px 15px;
+  background: #fff8f3;
+  border: 1px solid rgba(168,68,72,.24);
+  border-left: 3px solid #A84448;
+  border-radius: 10px;
+  box-shadow: 0 5px 16px rgba(16,24,32,.08);
+  color: #713238;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+#modal-convoyeur .field-error-msg.hc-email-existe.visible {
+  display: grid !important;
+  gap: 2px;
+  animation: hcBulleErreur .16s ease both;
+}
+#modal-convoyeur .field-error-msg.hc-email-existe strong {
+  color: #7f3037;
+  font-size: .82rem;
+}
+#modal-convoyeur .field-error-msg.hc-email-existe span { color: #6b5254; }
 @keyframes hcAutofillDetecte { from {} to {} }
 </style>
 <script id="hc-v50-autofill-filet">

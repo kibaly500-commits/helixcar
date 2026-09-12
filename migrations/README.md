@@ -87,6 +87,8 @@ vérifiant qu'il se termine sans erreur avant de passer au suivant.
 | 36 | **E** | `123_video_deux_minutes_tous_partenaires.sql` | Uniformise la durée maximale à 120 s pour tous les métiers, convoyage compris. |
 | 37 | **E** | `124_civilite_partenaire.sql` | Ajoute la civilité partenaire (`Monsieur`, `Madame`, `Je préfère ne pas préciser`) ; les valeurs absentes ou non précisées conservent le masculin par défaut dans le dashboard. |
 | 38 | **E** | `125_email_partenaire_unique.sql` | Refuse atomiquement toute nouvelle candidature partenaire dont l’adresse e-mail existe déjà, sans supprimer ni modifier les éventuels doublons historiques. |
+| 39 | **E** | `126_verification_precoce_email_partenaire.sql` | Vérifie une adresse partenaire connue dès « Continuer » via une réponse booléenne minimale ; le registre et les candidatures restent privés. |
+| 40 | **E** | `127_correction_verification_email_partenaire.sql` | Corrige l’ambiguïté SQL du nom normalisé détectée lors de la recette réelle de la RPC `126`. |
 | 24 | **E** | `111_evaluations_et_missions_client.sql` | **lot D01** : `evaluations` (une par mission, écriture par `evaluer_mission` seulement), `v_mes_missions`. Testée par `tests/rls/d01.sh` |
 | 25 | **E** | `112_plafonds_mission_et_nettoyage_reserve.sql` | **lot F01** : plafonds serveur Mission 166 / Type de mission 156, contrôle des changements de catégorie, Nettoyage réservé aux entreprises, conservation des anciens dossiers. Tests préparés dans `tests/rls/f01.sh`, **non exécutés pendant la reprise Codex** (PostgreSQL indisponible). Aucune application distante. |
 | 26 | **E** | `113_devis_identite_et_archives.sql` | Identité des décisions, archives immuables du devis et opérations d'envoi privées. |
