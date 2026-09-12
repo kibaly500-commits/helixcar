@@ -69,8 +69,11 @@ function check(libelle, condition, detail) {
       challengeRadius: parseFloat(getComputedStyle(challenge).borderTopLeftRadius),
       podiumRadius: parseFloat(getComputedStyle(podium).borderTopLeftRadius),
       couleurTexteClient: getComputedStyle(exempleClient).color,
-      couleursExemples: [exempleClient, exempleConvoyeur, exempleConnexion, exempleParrainage]
-        .map(el => getComputedStyle(el, '::placeholder').color),
+      stylesExemples: [exempleClient, exempleConvoyeur, exempleConnexion, exempleParrainage]
+        .map(el => {
+          const style = getComputedStyle(el, '::placeholder');
+          return { couleur: style.color, opacite: style.opacity };
+        }),
       cartes: cartes.length,
       largeurs: cartes.map(el => Math.round(el.getBoundingClientRect().width)),
       hauteurs: cartes.map(el => Math.round(el.getBoundingClientRect().height)),
@@ -94,7 +97,7 @@ function check(libelle, condition, detail) {
   check('N7c : le challenge trimestriel et ses paliers ont des angles arrondis',
     bureau.challengeRadius >= 12 && bureau.podiumRadius >= 8, JSON.stringify(bureau));
   check('N7d : les exemples de tous les formulaires clairs restent pâles face au texte saisi',
-    bureau.couleursExemples.every(c => c === 'rgb(248, 248, 248)')
+    bureau.stylesExemples.every(s => s.couleur === 'rgb(111, 118, 125)' && s.opacite === '0.08')
       && bureau.couleurTexteClient === 'rgb(58, 63, 69)', JSON.stringify(bureau));
 
   await page.locator('#nav-menu-btn').click();
