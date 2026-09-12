@@ -50,6 +50,24 @@ function urlPublique(env: Record<string, string | undefined>, origine: string | 
   return "https://helixcar.vercel.app";
 }
 
+async function preuveLien(secret: string, id: string, email: string): Promise<string> {
+  const encodeur = new TextEncoder();
+  const cle = await crypto.subtle.importKey(
+    "raw", encodeur.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC", cle, encodeur.encode(`${id}:${email.trim().toLowerCase()}`),
+  );
+  return Array.from(new Uint8Array(signature)).map((octet) => octet.toString(16).padStart(2, "0")).join("");
+}
+
+function identiquesTempsConstant(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return difference === 0;
+}
+
 async function adminAuthentifie(sb: any, req: Request, headers: Record<string, string>) {
   const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (!jwt) return { refus: erreur("UNAUTHORIZED", "Authentification requise.", 401, headers) };
@@ -76,12 +94,41 @@ export async function traiterRequete(
   if (!c.autorisee) return erreur("ORIGIN_NOT_ALLOWED", "Origine non autorisée.", 403, c.headers);
   if (req.method !== "POST") return erreur("METHOD_NOT_ALLOWED", "Seul POST est accepté.", 405, c.headers);
 
-  const auth = await adminAuthentifie(sb, req, c.headers);
-  if ("refus" in auth) return auth.refus;
-
   let body: any;
   try { body = await req.json(); } catch { return erreur("BAD_REQUEST", "Demande invalide.", 400, c.headers); }
+
+  // Le lien reçu par e-mail contient une preuve HMAC : la page peut ainsi
+  // vérifier UNE candidature précise sans ouvrir la table des convoyeurs aux
+  // visiteurs anonymes et sans transformer l'API en annuaire d'adresses.
+  if (body?.action === "verifier_lien") {
+    const id = typeof body?.convoyeur_id === "string" ? body.convoyeur_id : "";
+    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    const preuve = typeof body?.preuve === "string" ? body.preuve.toLowerCase() : "";
+    const secret = String(env.PARTENAIRE_LIEN_SECRET || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      || !/^[0-9a-f]{64}$/.test(preuve) || !secret) {
+      return erreur("LIEN_INVALIDE", "Ce lien de création de compte n'est pas valide.", 400, c.headers);
+    }
+    const attendue = await preuveLien(secret, id, email);
+    if (!identiquesTempsConstant(preuve, attendue)) {
+      return erreur("LIEN_INVALIDE", "Ce lien de création de compte n'est pas valide.", 403, c.headers);
+    }
+    const { data: partenaire, error: erreurLecture } = await sb.from("convoyeurs")
+      .select("id,email,statut,auth_user_id").eq("id", id).maybeSingle();
+    if (erreurLecture || !partenaire || String(partenaire.email || "").trim().toLowerCase() !== email.toLowerCase()) {
+      return erreur("LIEN_INVALIDE", "Ce lien de création de compte n'est pas valide.", 404, c.headers);
+    }
+    return json({
+      ok: true,
+      convoyeur_id: partenaire.id,
+      statut: partenaire.statut,
+      compte_deja_cree: !!partenaire.auth_user_id,
+    }, 200, c.headers);
+  }
+
   if (!["valider", "renvoyer"].includes(body?.action)) return erreur("BAD_REQUEST", "Action inconnue.", 400, c.headers);
+  const auth = await adminAuthentifie(sb, req, c.headers);
+  if ("refus" in auth) return auth.refus;
   if (typeof body?.convoyeur_id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.convoyeur_id)) {
     return erreur("BAD_REQUEST", "Identifiant partenaire invalide.", 400, c.headers);
   }
@@ -122,7 +169,12 @@ export async function traiterRequete(
   }
 
   const nom = [partenaire.prenom, partenaire.nom].filter(Boolean).join(" ") || "partenaire HelixCar";
-  const lien = `${urlPublique(env, origine)}/creer-compte-convoyeur.html?email=${encodeURIComponent(destinataire)}`;
+  const secretLien = String(env.PARTENAIRE_LIEN_SECRET || "");
+  if (!secretLien) {
+    return erreur("SERVER_MISCONFIGURED", "La création du lien partenaire n'est pas configurée.", 500, c.headers, { validation_enregistree: true });
+  }
+  const preuve = await preuveLien(secretLien, partenaire.id, destinataire);
+  const lien = `${urlPublique(env, origine)}/creer-compte-convoyeur.html?email=${encodeURIComponent(destinataire)}&dossier=${encodeURIComponent(partenaire.id)}&preuve=${preuve}`;
   const nomHtml = echapperHtml(nom);
   const lienHtml = echapperHtml(lien);
   const sujet = "Compte partenaire HelixCar validé";
@@ -176,6 +228,7 @@ if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
       HELIXCAR_ORIGINES_SUPPLEMENTAIRES: Deno.env.get("HELIXCAR_ORIGINES_SUPPLEMENTAIRES"),
       HELIXCAR_ENV: Deno.env.get("HELIXCAR_ENV"),
       HELIXCAR_DESTINATAIRES_RECETTE: Deno.env.get("HELIXCAR_DESTINATAIRES_RECETTE"),
+      PARTENAIRE_LIEN_SECRET: Deno.env.get("PARTENAIRE_LIEN_SECRET") || cle,
     }, fetch);
   });
 }

@@ -23,6 +23,11 @@ check('X affiché dans le rouge HelixCar',
   /\.logo-x\s*\{[^}]*color\s*:\s*#C8102E/i.test(source));
 check('texte et bordure du message d erreur en rouge',
   /\.alert-error\s*\{[^}]*color\s*:\s*#C8102E[^}]*border[^;]*#C8102E/is.test(source));
+check('la page ne lit plus directement la table convoyeurs en visiteur anonyme',
+  !/\/rest\/v1\/convoyeurs\?email=/.test(source));
+check('la candidature est vérifiée par le lien serveur signé',
+  /partenaire-validation/.test(source) && /action:\s*'verifier_lien'/.test(source)
+    && /convoyeur_id:\s*ccDossier/.test(source) && /preuve:\s*ccPreuve/.test(source));
 
 console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
 process.exitCode = fail ? 1 : 0;

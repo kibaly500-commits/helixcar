@@ -31,14 +31,30 @@ function double({admin=true,statut='en_attente',authUserId=null,email='vraie-adr
   };
 }
 function req(body,jwt='jwt-admin',origine=ORIGINE){return new Request('https://edge.invalid',{method:'POST',headers:{origin:origine,authorization:'Bearer '+jwt,'content-type':'application/json'},body:JSON.stringify(body)});}
-const env={RESEND_API_KEY:'secret-test',HELIXCAR_URL_PUBLIQUE:'https://helixcar.fr'};
+const env={RESEND_API_KEY:'secret-test',HELIXCAR_URL_PUBLIQUE:'https://helixcar.fr',PARTENAIRE_LIEN_SECRET:'preuve-test-ne-pas-utiliser-en-production'};
 
 {
   const d=double();const r=await traiterRequete(d.sb,req({action:'valider',convoyeur_id:ID}),env,d.fetch);const j=await r.json();
   check('V1 : validation et e-mail sont automatiques',r.status===200&&j.email_accepte===true&&d.partenaire.statut==='actif'&&d.journal.envois.length===1);
   check('V2 : le destinataire est relu en base',d.journal.envois[0].payload.to[0]==='vraie-adresse@example.com');
-  check('V3 : le lien de mot de passe utilise le domaine canonique',/https:\/\/helixcar\.fr\/creer-compte-convoyeur\.html/.test(d.journal.envois[0].payload.text));
+  check('V3 : le lien de mot de passe utilise le domaine canonique et une preuve signée',
+    /https:\/\/helixcar\.fr\/creer-compte-convoyeur\.html\?email=.+&dossier=.+&preuve=[0-9a-f]{64}/.test(d.journal.envois[0].payload.text));
   check('V4 : une clé d’idempotence protège le double envoi',/helixcar-partenaire\/.+\/initial/.test(d.journal.envois[0].options.headers['Idempotency-Key']));
+
+  const lien=d.journal.envois[0].payload.text.match(/https:\/\/[^\s]+/)[0];
+  const u=new URL(lien);
+  const verification=await traiterRequete(d.sb,req({
+    action:'verifier_lien',convoyeur_id:u.searchParams.get('dossier'),
+    email:u.searchParams.get('email'),preuve:u.searchParams.get('preuve')
+  },'cle-anon'),env,d.fetch);
+  const resultat=await verification.json();
+  check('V4b : le lien signé retrouve la candidature sans session administrateur',
+    verification.status===200&&resultat.ok===true&&resultat.convoyeur_id===ID);
+
+  const falsifie=await traiterRequete(d.sb,req({
+    action:'verifier_lien',convoyeur_id:ID,email:'autre@example.com',preuve:u.searchParams.get('preuve')
+  },'cle-anon'),env,d.fetch);
+  check('V4c : une adresse modifiée invalide la preuve du lien',falsifie.status===403);
 }
 {
   const d=double({admin:false});const r=await traiterRequete(d.sb,req({action:'valider',convoyeur_id:ID}),env,d.fetch);

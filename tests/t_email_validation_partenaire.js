@@ -48,7 +48,7 @@ const fs = require('fs');
     /from\("admins"\)/.test(serveur)
       && /from\("convoyeurs"\)/.test(serveur)
       && /to: \[destinataire\]/.test(serveur)
-      && !/body\?\.email/.test(serveur));
+      && /destinataire = String\(partenaire\.email/.test(serveur));
 
   process.exit(L.results() ? 1 : 0);
 })();

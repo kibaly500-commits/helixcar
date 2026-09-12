@@ -111,11 +111,16 @@
 const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const URL_VALIDATION_PARTENAIRE = SUPABASE_URL + '/functions/v1/partenaire-validation';
+var ccDossier = '';
+var ccPreuve = '';
 
 // Pré-remplit l'email depuis le lien reçu par email : creer-compte-convoyeur.html?email=xxx
 (function() {
   var params = new URLSearchParams(window.location.search);
   var email = params.get('email');
+  ccDossier = params.get('dossier') || '';
+  ccPreuve = params.get('preuve') || '';
   if (email) {
     var emailInput = document.getElementById('cc-email');
     emailInput.value = email;
@@ -181,24 +186,36 @@ async function creerCompte() {
   if (pw.length < 8) { showError('Le mot de passe doit contenir au moins 8 caractères.'); return; }
   if (pw !== pw2) { showError('Les mots de passe ne correspondent pas.'); return; }
 
-  // Vérifie que cet email correspond bien à un convoyeur validé
+  // Vérifie côté serveur la candidature précise désignée par le lien signé.
+  // La table convoyeurs reste illisible aux visiteurs anonymes.
   btn.disabled = true; btn.textContent = 'Vérification…';
   try {
-    var checkResp = await fetch(SUPABASE_URL + '/rest/v1/convoyeurs?email=eq.' + encodeURIComponent(email) + '&select=id,statut,prenom&order=created_at.desc&limit=1', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-    });
-    var rows = await checkResp.json();
-    if (!rows || rows.length === 0) {
-      showError('Aucun dossier convoyeur trouvé avec cet email. Vérifie l\'adresse ou contacte HelixCar.');
+    if (!ccDossier || !ccPreuve) {
+      showError('Ce lien est ancien ou incomplet. Demande un nouveau lien de création de compte à HelixCar.');
       btn.disabled = false; btn.textContent = 'Créer mon compte →';
       return;
     }
-    if (rows[0].statut !== 'actif') {
+    var checkResp = await fetch(URL_VALIDATION_PARTENAIRE, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ action: 'verifier_lien', convoyeur_id: ccDossier, email: email, preuve: ccPreuve })
+    });
+    var verification = await checkResp.json();
+    if (!checkResp.ok || !verification || !verification.ok) {
+      showError((verification && verification.message) || 'Ce lien de création de compte n\'est pas valide.');
+      btn.disabled = false; btn.textContent = 'Créer mon compte →';
+      return;
+    }
+    if (verification.statut !== 'actif') {
       showError('Ton dossier n\'est pas encore validé par l\'équipe HelixCar. Réessaie une fois validé.');
       btn.disabled = false; btn.textContent = 'Créer mon compte →';
       return;
     }
-    var convoyeurId = rows[0].id;
+    var convoyeurId = verification.convoyeur_id;
   } catch (e) {
     showError('Erreur de vérification (voir la console).');
     console.error(e);
