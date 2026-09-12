@@ -47,6 +47,10 @@ function check(libelle, condition, detail) {
     const showcase = document.querySelector('.services-showcase img');
     const challenge = document.querySelector('.convoyeur-challenge');
     const podium = document.querySelector('.podium-item');
+    const exempleClient = document.getElementById('client-email');
+    const exempleConvoyeur = document.getElementById('conv-email');
+    const exempleConnexion = document.getElementById('connexion-email');
+    const exempleParrainage = document.getElementById('parr-email');
     const bande = services.previousElementSibling;
     const cartes = Array.from(document.querySelectorAll('.services-grid .service-card'));
     return {
@@ -64,6 +68,9 @@ function check(libelle, condition, detail) {
       visuelServicesCharge: showcase.complete && showcase.naturalWidth >= 1700,
       challengeRadius: parseFloat(getComputedStyle(challenge).borderTopLeftRadius),
       podiumRadius: parseFloat(getComputedStyle(podium).borderTopLeftRadius),
+      couleurTexteClient: getComputedStyle(exempleClient).color,
+      couleursExemples: [exempleClient, exempleConvoyeur, exempleConnexion, exempleParrainage]
+        .map(el => getComputedStyle(el, '::placeholder').color),
       cartes: cartes.length,
       largeurs: cartes.map(el => Math.round(el.getBoundingClientRect().width)),
       hauteurs: cartes.map(el => Math.round(el.getBoundingClientRect().height)),
@@ -76,7 +83,7 @@ function check(libelle, condition, detail) {
     bureau.actions === 2 && bureau.traits === 3 && bureau.ancienMenu === 0 && bureau.recontact === '#recontact'
       && bureau.margeContact >= 70 && bureau.margeActions >= 70, JSON.stringify(bureau));
   check('N5b : les icônes devis et connexion sont rapprochées sans coller le menu',
-    bureau.espaceDevisConnexion <= 0 && bureau.espaceConnexionMenu >= 10, JSON.stringify(bureau));
+    bureau.espaceDevisConnexion <= -8 && bureau.espaceConnexionMenu >= 10, JSON.stringify(bureau));
   check('N6 : Nos services remonte sous la barre défilante',
     bureau.espaceServices >= 0 && bureau.espaceServices <= 55, String(bureau.espaceServices));
   check('N7 : les huit services sont conservés dans une composition de tailles hiérarchisées',
@@ -86,6 +93,9 @@ function check(libelle, condition, detail) {
     bureau.visuelServicesCharge, JSON.stringify(bureau));
   check('N7c : le challenge trimestriel et ses paliers ont des angles arrondis',
     bureau.challengeRadius >= 12 && bureau.podiumRadius >= 8, JSON.stringify(bureau));
+  check('N7d : les exemples de tous les formulaires clairs restent pâles face au texte saisi',
+    bureau.couleursExemples.every(c => c === 'rgb(226, 228, 230)')
+      && bureau.couleurTexteClient === 'rgb(58, 63, 69)', JSON.stringify(bureau));
 
   await page.locator('#nav-menu-btn').click();
   const menu = await page.evaluate(() => ({

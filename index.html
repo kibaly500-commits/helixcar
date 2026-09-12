@@ -133,7 +133,7 @@
   .nav-contact-link:hover { color: var(--accent); }
 
   .nav-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 8px; }
-  .nav-quote-action + .nav-account-action { margin-left: -14px; }
+  .nav-quote-action + .nav-account-action { margin-left: -18px; }
   .nav-account-action + .nav-menu-trigger { margin-left: 4px; }
   .nav-icon-action,
   .nav-menu-trigger {
@@ -22325,8 +22325,14 @@ document.addEventListener('animationstart', function (e) {
    saisi. Cause probable de la confusion "je pensais avoir rempli un
    champ". Rendu explicitement plus clair et nettement distinct. */
 #modal-client input::placeholder,
-#modal-client textarea::placeholder {
-  color: #D3D6D9 !important;
+#modal-client textarea::placeholder,
+#modal-convoyeur input::placeholder,
+#modal-convoyeur textarea::placeholder,
+#modal-parrainage input::placeholder,
+#modal-parrainage textarea::placeholder,
+#modal-connexion input::placeholder,
+#modal-connexion textarea::placeholder {
+  color: #E2E4E6 !important;
   opacity: 1 !important;
 }
 /* Point 14 (V52) — texte réellement saisi rendu en anthracite plus
