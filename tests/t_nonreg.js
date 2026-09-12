@@ -256,6 +256,8 @@ const futur = dansNJours;
   const PERIMETRE = [
     'index.html',
     'dashboard.html',
+    // Visuel éditorial demandé pour la section « Nos services ».
+    'assets/helixcar-services-mercedes.webp',
     'creer-compte-convoyeur.html',
     // Le réglage sans lequel la fonction vidéo répondrait 401 à toute
     // candidature. Versionné exprès, plutôt que coché à la main.
@@ -312,7 +314,7 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 24,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 25,
     PERIMETRE.length + ' entrées');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
