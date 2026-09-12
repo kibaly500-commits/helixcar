@@ -210,6 +210,8 @@ const DEVIS = { reference: 'DEV-2026-TESTQA', prix: 1250, statut: 'genere', date
   t = (r.textes || []).join(' | ');
   check('Convoyage long : bloc Stockage automobile ajouté',
     r.ok && /Stockage automobile/i.test(t), t.slice(0, 900));
+  check('Convoyage long : Stockage automobile figure aussi dans les prestations',
+    (t.match(/Stockage automobile/gi) || []).length >= 2, t.slice(-900));
   check('Convoyage long : première prise en charge et dernière livraison affichées',
     /12\/09\/2026/.test(t) && /18\/09\/2026/.test(t), t.slice(0, 900));
   check('Convoyage long : durée globale de 6 jours affichée', /6 jours/.test(t), t.slice(0, 900));

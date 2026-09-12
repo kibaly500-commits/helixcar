@@ -12391,6 +12391,10 @@ function _construirePdfDevis(c, d) {
     if (_operationDossier(c, 'liv')) prestations.push('Livraison après stockage');
   } else if (_aConvoyage(c)) {
     prestations.push('Convoyage automobile');
+    // Même source de vérité que le bloc récapitulatif situé plus haut :
+    // dès qu'un convoyage long fait apparaître du stockage sur le devis,
+    // cette prestation doit également être nommée dans la liste finale.
+    if (_stockageAutomatiqueConvoyage(c)) prestations.push('Stockage automobile');
   }
   if (c.plateau === 'Oui') prestations.push('Transport sur plateau');
   if (c.urgence === 'Oui') prestations.push('Transport prioritaire / urgent');
