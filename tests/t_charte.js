@@ -117,10 +117,10 @@ function paletteDuSite() {
   }));
   check('D1 : le texte courant est en Instrument Sans, comme le site',
     /Instrument Sans/.test(polices.corps), polices.corps);
-  check('D2 : les titres sont en Fraunces, comme le site',
-    /Fraunces/.test(polices.titre), polices.titre);
+  check('D2 : les titres sont en Instrument Sans, comme le site',
+    /Instrument Sans/.test(polices.titre), polices.titre);
   check('D3 : les commandes restent en sans-serif (libellés compacts)',
-    /Instrument Sans/.test(polices.bouton) && !/Fraunces/.test(polices.bouton), polices.bouton);
+    /Instrument Sans/.test(polices.bouton), polices.bouton);
 
   // ── E. AUCUNE COULEUR DE L'ANCIENNE CHARTE NE SUBSISTE ──
   // Les commentaires SQL/CSS sont retirés avant comptage : une couleur

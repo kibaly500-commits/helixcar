@@ -30,6 +30,9 @@ function check(libelle, condition, detail) {
     const nav = document.querySelector('nav').getBoundingClientRect();
     const logo = document.querySelector('nav .logo').getBoundingClientRect();
     const contact = document.querySelector('.nav-contact').getBoundingClientRect();
+    const quote = document.querySelector('.nav-quote-action').getBoundingClientRect();
+    const account = document.querySelector('.nav-account-action').getBoundingClientRect();
+    const menuTrigger = document.querySelector('.nav-menu-trigger').getBoundingClientRect();
     const navActions = document.querySelector('.nav-actions').getBoundingClientRect();
     const services = document.getElementById('services');
     const bande = services.previousElementSibling;
@@ -42,6 +45,8 @@ function check(libelle, condition, detail) {
       ancienMenu: document.querySelectorAll('nav .nav-links').length,
       recontact: document.querySelector('.nav-contact-link').getAttribute('href'),
       margeContact: Math.round(contact.left - nav.left),
+      espaceDevisConnexion: Math.round(account.left - quote.right),
+      espaceConnexionMenu: Math.round(menuTrigger.left - account.right),
       margeActions: Math.round(nav.right - navActions.right),
       espaceServices: services.getBoundingClientRect().top - bande.getBoundingClientRect().bottom,
       cartes: cartes.length,
@@ -54,6 +59,8 @@ function check(libelle, condition, detail) {
     Math.abs(bureau.centreLogo - bureau.centreNav) <= 1, JSON.stringify(bureau));
   check('N5 : la barre recentrée montre deux icônes, trois traits et aucun ancien menu horizontal',
     bureau.actions === 2 && bureau.traits === 3 && bureau.ancienMenu === 0 && bureau.recontact === '#recontact'
+  check('N5b : les icônes devis et connexion sont rapprochées sans coller le menu',
+    bureau.espaceDevisConnexion <= 0 && bureau.espaceConnexionMenu >= 10, JSON.stringify(bureau));
       && bureau.margeContact >= 70 && bureau.margeActions >= 70, JSON.stringify(bureau));
   check('N6 : Nos services remonte sous la barre défilante',
     bureau.espaceServices >= 0 && bureau.espaceServices <= 55, String(bureau.espaceServices));
@@ -143,10 +150,15 @@ function check(libelle, condition, detail) {
   const bandeau = await page.evaluate(() => ({
     cycles: document.querySelectorAll('.slogan-cycle').length,
     groupes: document.querySelectorAll('.slogan-group').length,
-    labels: Array.from(document.querySelectorAll('.slogan-cycle:first-child .slogan-group-label')).map(el => el.textContent.trim())
+    labels: Array.from(document.querySelectorAll('.slogan-cycle:first-child .slogan-group-label')).map(el => el.textContent.trim()),
+    polices: Array.from(document.querySelectorAll('.slogan-cycle:first-child .slogan-group-label, .slogan-cycle:first-child .slogan-item')).map(el => getComputedStyle(el).fontFamily),
+    tailles: Array.from(document.querySelectorAll('.slogan-cycle:first-child .slogan-group-label, .slogan-cycle:first-child .slogan-item')).map(el => getComputedStyle(el).fontSize)
   }));
   check('N13b : le bandeau distingue marques, expertises et engagements',
     bandeau.cycles === 2 && bandeau.groupes === 6
+  check('N13c : toute la bande utilise la même police et la même taille compactes',
+    new Set(bandeau.polices).size === 1 && /Instrument Sans/.test(bandeau.polices[0])
+      && new Set(bandeau.tailles).size === 1 && bandeau.tailles[0] === '10.88px', JSON.stringify(bandeau));
       && bandeau.labels.join('|') === 'Ils nous font confiance|Nos expertises|Nos engagements', JSON.stringify(bandeau));
   await page.setViewportSize({ width: 390, height: 844 });
   const mobile = await page.evaluate(() => {
