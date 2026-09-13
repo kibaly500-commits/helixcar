@@ -9608,6 +9608,27 @@ function _resumeTrajetListe(c) {
   return nb + ' véhicule' + (nb > 1 ? 's' : '');
 }
 
+function _dateSouhaiteeListe(c) {
+  if (!c) return null;
+  // La colonne est commune à tous les services : elle doit lire la date
+  // propre au service, pas uniquement l'ancien champ du convoyage.
+  if (_aStockage(c) && c.stockage_date_debut) return c.stockage_date_debut;
+  if (_estDemandeNettoyage(c)) {
+    var nd = _nettDetails(c) || {};
+    if (nd.date_souhaitee) return nd.date_souhaitee;
+  }
+  if (_estDemandeProfessionnel(c)) {
+    var pd = _proDetails(c) || {};
+    if (pd.date_debut) return pd.date_debut;
+  }
+  if (c.date_prise_en_charge) return c.date_prise_en_charge;
+  var datesVehicules = (c._vehicules || [])
+    .map(function (v) { return v && v.date_prise_en_charge; })
+    .filter(Boolean)
+    .sort();
+  return datesVehicules[0] || null;
+}
+
 function _rendreTableDemandesDevis(liste) {
   var tbody = document.getElementById('tbody-demandes-devis');
   if (!tbody) return;
@@ -9632,7 +9653,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td><span class="badge-service">' + _escapeHtml(_libelleService(c)) + '</span></td>' +
       '<td>' + _escapeHtml(trajet) + '</td>' +
       '<td>' + _escapeHtml(_dv(vehicule)) + '</td>' +
-      '<td>' + _dvDate(c.date_prise_en_charge) + '</td>' +
+      '<td>' + _dvDate(_dateSouhaiteeListe(c)) + '</td>' +
       '<td>' + _statutDevisBadge(statut) + '</td>' +
       '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirFicheDemande', [c.id]) + '>Ouvrir</button></td>' +
       '</tr>';
