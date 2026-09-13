@@ -27,7 +27,6 @@ const L = require('./lib.js');
       poser('veh-0-pc-tel', '+33601020304');
       poser('veh-0-pc-date', '2030-01-10');
       poser('veh-0-pc-heure', '08:45');
-      poser('veh-0-recup-heure', '07:30');
       poser('veh-0-restit-marque', 'Peugeot 208');
       poser('veh-0-restit-immat', 'CC-456-DD');
       poser('veh-0-restit-vin', 'VIN-RESTIT-456');
@@ -43,7 +42,7 @@ const L = require('./lib.js');
       return {
         marque: val('veh-1-marque'), immat: val('veh-1-immat'), vin: val('veh-1-vin'),
         rue: val('veh-1-pc-rue'), contact: val('veh-1-pc-contact'), tel: val('veh-1-pc-tel'),
-        date: val('veh-1-pc-date'), heure: val('veh-1-pc-heure'), recuperation: val('veh-1-recup-heure'),
+        date: val('veh-1-pc-date'), heure: val('veh-1-pc-heure'),
         restitMarque: val('veh-1-restit-marque'), restitImmat: val('veh-1-restit-immat'),
         restitVin: val('veh-1-restit-vin'), consignes: val('veh-1-restit-consignes'),
         mode: (document.querySelector('input[name="veh-1-mode"]:checked') || {}).value || ''
@@ -53,8 +52,7 @@ const L = require('./lib.js');
       copie.marque === 'Renault Clio V' && copie.vin === 'VIN-SOURCE-123'
       && copie.rue === '10 rue du Départ' && copie.contact === 'Mme Départ'
       && copie.tel === '+33601020304' && copie.date === '2030-01-10'
-      && copie.heure === '08:45' && copie.recuperation === '07:30'
-      && copie.restitMarque === 'Peugeot 208' && copie.restitVin === 'VIN-RESTIT-456'
+      && copie.heure === '08:45'      && copie.restitMarque === 'Peugeot 208' && copie.restitVin === 'VIN-RESTIT-456'
       && copie.consignes === 'Accès portail nord' && copie.mode === 'plateau', JSON.stringify(copie));
     L.check('RV2 : aucune plaque d’immatriculation n’est dupliquée',
       copie.immat === '' && copie.restitImmat === '', JSON.stringify(copie));
