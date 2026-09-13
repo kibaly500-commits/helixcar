@@ -684,6 +684,7 @@ async function modesParVehicule(page, n) {
     await page.waitForTimeout(600);
     return page.evaluate(() => ({
       ecran: (document.getElementById('client-success-msg') || {}).textContent || '',
+      erreurEmail: (document.getElementById('client-email-err') || {}).textContent || '',
       comptes: window.__comptes.slice(),
       demandes: window.__demandesEcrites.slice()
     }));
@@ -724,8 +725,10 @@ async function modesParVehicule(page, n) {
     const r2 = await parcoursCompteSeul(page2, { email: 'rejeu@example.invalid' });
     check('Gbis7 : une adresse déjà inscrite ne crée AUCUN second compte',
       r2.comptes.length === 1, JSON.stringify(r2.comptes));
-    check('Gbis8 : et l\'écran le dit, sans prétendre avoir créé quoi que ce soit',
-      /existait déjà avec cette adresse/i.test(r2.ecran), r2.ecran.slice(0, 300));
+    check('Gbis8 : et l\'écran le dit avant tout envoi, sans prétendre avoir créé quoi que ce soit',
+      /adresse e-mail est déjà utilisée/i.test(r2.erreurEmail)
+      && !/compte HelixCar est maintenant créé/i.test(r2.ecran),
+      (r2.erreurEmail + ' | ' + r2.ecran).slice(0, 300));
     await page.close(); await page2.close();
   }
 
