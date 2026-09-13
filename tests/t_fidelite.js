@@ -36,12 +36,13 @@ const SOURCE_MIGRATION = fs.readFileSync(fichier('migrations/109_fidelite_points
 check('C10 : aucune règle d\'expiration des points n\'est inventée dans l\'interface',
   !/points n['’]expirent pas/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD)
   && !/expiration des points/i.test(SOURCE_VITRINE + SOURCE_DASHBOARD));
-check('C10 : la règle de calcul reste explicite dans l’espace privé, sans discours marchand sur l’argent dans la vitrine',
+check('C10 : l’espace privé explique l’attribution sans afficher de formule monétaire',
   !SOURCE_VITRINE.includes("1 point par euro TTC entier, arrondi à l'inférieur")
   && !/1\s*€\s*payé/i.test(SOURCE_VITRINE)
   && SOURCE_VITRINE.includes('Une fois votre prestation terminée, vos points sont automatiquement ajoutés à votre compte')
-  && SOURCE_DASHBOARD.includes('1 € TTC entier payé = 1 point')
-  && SOURCE_DASHBOARD.includes('1 € TTC entier payé sur une prestation terminée = 1 point'));
+  && SOURCE_DASHBOARD.includes("Vous n\\'avez pas encore de points. Ils vous sont attribués lorsqu\\'une ")
+  && SOURCE_DASHBOARD.includes('prestation est terminée et payée.</div>')
+  && !SOURCE_DASHBOARD.includes('1 € TTC entier payé'));
 check('C10 : le serveur crédite floor(prix TTC), sans règle provisoire résiduelle',
   SOURCE_MIGRATION.includes('v_points := floor(d.prix)::integer')
   && SOURCE_MIGRATION.includes('123,99 € TTC → 123 points')
