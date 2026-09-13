@@ -16896,16 +16896,22 @@ async function _submitClientFormInterne() {
         // propriétaire du nouveau dossier. Le parcours public crée une
         // nouvelle identité : il neutralise donc toute session ambiante
         // avant signUp. La page intégrée, elle, ne passe jamais ici.
-        try {
-          var _sessionAmbiante = await _sb.auth.getSession();
-          var _utilisateurAmbiant = _sessionAmbiante && _sessionAmbiante.data
-            && _sessionAmbiante.data.session && _sessionAmbiante.data.session.user;
-          if (_utilisateurAmbiant) await _sb.auth.signOut();
-        } catch (eSession) {
-          console.warn('Nettoyage de la session précédente impossible :', eSession);
-          _compteEtat = 'echec';
+        if (typeof _sb.auth.getSession === 'function'
+            && typeof _sb.auth.signOut === 'function') {
+          try {
+            var _sessionAmbiante = await _sb.auth.getSession();
+            var _utilisateurAmbiant = _sessionAmbiante && _sessionAmbiante.data
+              && _sessionAmbiante.data.session && _sessionAmbiante.data.session.user;
+            if (_utilisateurAmbiant) {
+              var _sortieAmbiante = await _sb.auth.signOut();
+              if (_sortieAmbiante && _sortieAmbiante.error) throw _sortieAmbiante.error;
+            }
+          } catch (eSession) {
+            console.warn('Nettoyage de la session précédente impossible :', eSession);
+            _compteEtat = 'echec';
+          }
+          if (_compteEtat === 'echec') throw new Error('SESSION_AMBIANTE_NON_NETTOYEE');
         }
-        if (_compteEtat === 'echec') throw new Error('SESSION_AMBIANTE_NON_NETTOYEE');
 
         // Sans destination explicite, Supabase revient sur la « Site URL »
         // globale du projet. Une inscription faite sur une Preview pouvait
