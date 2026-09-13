@@ -3108,8 +3108,7 @@
   body.hc-integre > nav,
   body.hc-integre > footer,
   body.hc-integre > section,
-  body.hc-integre > main,
-  body.hc-integre > div:not(.modal-overlay) { display: none !important; }
+  body.hc-integre > main { display: none !important; }
   body.hc-integre { background: #fff; overflow: auto !important; }
   body.hc-integre #modal-client.modal-overlay {
     position: static;
@@ -3121,6 +3120,7 @@
     overflow: visible;
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
   }
   body.hc-integre #modal-client .modal {
     max-width: 100%;
@@ -3145,6 +3145,7 @@
     position: static; display: block; background: transparent;
     backdrop-filter: none; -webkit-backdrop-filter: none;
     padding: 0; overflow: visible; opacity: 1; visibility: visible;
+    pointer-events: auto;
   }
   body.hc-integre #modal-completer .modal {
     max-width: 100%; width: 100%; min-height: 0; margin: 0;
@@ -3158,6 +3159,11 @@
      « Créez votre compte », ni pastille d'identité. */
   body.hc-integre #client-modal-titre, body.hc-integre #client-modal-sous-titre,
   body.hc-sans-identite #client-modal-titre, body.hc-sans-identite #client-modal-sous-titre { display: none !important; }
+  /* L'étape identité est retirée pour un compte connecté : sa ligne
+     adjacente doit disparaître elle aussi, sinon l'étapeur commence par
+     un trait isolé avant la première pastille visible. */
+  body.hc-sans-identite #client-step-indicator
+    .step-indicator-item[data-step-item="1"] + .step-indicator-line { display: none !important; }
   /* D01-008 — dans l'espace client, « Continuer » n'occupe plus toute la
      largeur du bloc : la grande barre rouge sous le formulaire, c'était lui. */
   body.hc-integre #client-step-nav .btn-step-next { flex: 0 0 auto; min-width: 220px; margin-left: auto; }
@@ -9344,6 +9350,10 @@ function _hcTransmettreHauteur() {
 function _hcActiverModeIntegre() {
   if (!_hcModeIntegre()) return;
   document.body.classList.add('hc-integre');
+  // La garde anti-flash n'est utile qu'avant l'activation. La conserver
+  // masquerait aussi les interfaces créées ensuite dans <body>
+  // (calendrier, aide contextuelle, suggestions d'adresse).
+  document.documentElement.classList.remove('hc-integre-tot');
   // La hauteur suit le formulaire : etapes, accordeons, fiches
   // vehicules ajoutees ou retirees.
   try {
