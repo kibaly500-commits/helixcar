@@ -52,7 +52,8 @@ const L = require('./lib.js');
       copie.marque === 'Renault Clio V' && copie.vin === 'VIN-SOURCE-123'
       && copie.rue === '10 rue du Départ' && copie.contact === 'Mme Départ'
       && copie.tel === '+33601020304' && copie.date === '2030-01-10'
-      && copie.heure === '08:45'      && copie.restitMarque === 'Peugeot 208' && copie.restitVin === 'VIN-RESTIT-456'
+      && copie.heure === '08:45'
+      && copie.restitMarque === 'Peugeot 208' && copie.restitVin === 'VIN-RESTIT-456'
       && copie.consignes === 'Accès portail nord' && copie.mode === 'plateau', JSON.stringify(copie));
     L.check('RV2 : aucune plaque d’immatriculation n’est dupliquée',
       copie.immat === '' && copie.restitImmat === '', JSON.stringify(copie));
