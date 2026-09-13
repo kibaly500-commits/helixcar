@@ -451,7 +451,9 @@ function _stockageAutomatiqueConvoyage(c) {
   return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
 }
 
-function _construirePdfDevis(c, d) {
+function _construirePdfDevis(c, d, options) {
+  options = options || {};
+  var estRecapitulatif = options.recapitulatif === true;
   // V50.24 — passe typographique homogène + identité véhicule gauche/centre/droite.
   // V50.23 — passe de lisibilité VISIBLE : opérations véhicule + prestations + pied de page réellement agrandis, pagination basse plus exploitée.
   // V50.12 — FINITION PREMIUM : respiration multi + pagination intelligente des cartes + séparateur stockage.
@@ -460,6 +462,7 @@ function _construirePdfDevis(c, d) {
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF non chargé');
 
   var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  var COULEUR_ACCENT = estRecapitulatif ? [42, 101, 110] : ROUGE;
   var M = 16, L = 210 - M, LARGEUR = L - M;
   var IVOIRE = [247, 246, 243];
   // ══ V50.6 PREMIUM — PALETTE ══════════════════════════════════
@@ -598,8 +601,10 @@ function _construirePdfDevis(c, d) {
   }
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
-  doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
-  T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
+  doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
+  if (!estRecapitulatif) {
+    T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
+  }
 
   // V50.36 — métadonnées d'en-tête plus lisibles, sans concurrencer le numéro de devis.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.6);
@@ -613,7 +618,7 @@ function _construirePdfDevis(c, d) {
   // total volontairement MODESTE (+2.5mm) pour améliorer la respiration
   // sans risquer de faire basculer un document d'une page à deux.
   y += 18.5;
-  doc.setDrawColor(ROUGE[0], ROUGE[1], ROUGE[2]); doc.setLineWidth(0.6);
+  doc.setDrawColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]); doc.setLineWidth(0.6);
   doc.line(M, y, L, y);
   y += 9.5;
 
@@ -624,7 +629,7 @@ function _construirePdfDevis(c, d) {
     // soulignement plus fin (0.15 au lieu de 0.2) et plus clair.
     // HAUTEURS STRICTEMENT INCHANGÉES (2.3 puis 1.5) : la pagination,
     // qui réserve 5.8mm par titre, n'est en rien affectée.
-    doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+    doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
     doc.rect(M, y - 2.2, 1.25, 4.6, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.4);
     doc.setTextColor(20, 23, 27);
@@ -1322,7 +1327,7 @@ function _construirePdfDevis(c, d) {
         // colonnes et le chevron rouge. Retrait de l'ajout V50.6.1 pour
         // reproduction fidèle.
         doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('>', M + LARGEUR / 2 - 28, y0 + 6.5); // V50.32 — même X validé, Y remonté à hauteur de PRISE EN CHARGE / LIVRAISON
       }
     }
@@ -1411,10 +1416,10 @@ function _construirePdfDevis(c, d) {
       }
       cur += 5.5;
       if (dess) {
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.circle(xG + 1.4, cur - 1.1, 1.4, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('RESTITUTION', xG + 5, cur);
         valeur(_villeCP(c.ville_restit, c.code_postal_restit,
           !estVide(c.adresse_restitution) ? c.adresse_restitution : c.ville_depart), xD, cur, 10.5);
@@ -1498,7 +1503,7 @@ function _construirePdfDevis(c, d) {
       var y0 = y, cur = y0 + 8.0;
       if (dess) {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(9.3);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('VÉHICULE ' + (v.position || i + 1), xG, cur);
       }
       cur += 6.0;
@@ -1647,7 +1652,7 @@ function _construirePdfDevis(c, d) {
       // EXACTEMENT à xDebut (= xG, même X que TEST-V1/Berline/etc.),
       // jamais à gauche de cet axe. Longueur = LARGEUR_TIRET_OP.
       function _dessinerTiretOperationPdf(xDebut, yPremiereLigne) {
-        doc.setDrawColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setDrawColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.setLineWidth(0.6);
         // G.6 — léger réajustement supplémentaire de l'offset Y (1.15 ->
         // 1.0), rapproché encore de la ligne de base pour un centrage
@@ -2073,7 +2078,7 @@ function _construirePdfDevis(c, d) {
         cur += 2.8;
         if (dess) {
           doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-          doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+          doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
           T('RESTITUTION PRÉVUE', xG, cur);
         }
         cur += 6.8;
@@ -2155,7 +2160,7 @@ function _construirePdfDevis(c, d) {
         var y0 = y;
         doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
         doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'F');
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.rect(M, y0, 1.3, h, 'F');
         y = y0;
         _dessinerCarteVehicule(v, _k, true);
@@ -2198,7 +2203,7 @@ function _construirePdfDevis(c, d) {
       // V50.13 — finition premium : pas de contour gris autour des cartes
       // véhicules. Le fond très léger + la barre rouge suffisent à structurer
       // la carte et évitent les traits parasites visibles sur les PDF multi.
-      doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+      doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
       doc.rect(M, y0, 1.3, h, 'F');
       y = y0;
       _dessinerCarteVehicule(v, i, true);
@@ -2258,7 +2263,7 @@ function _construirePdfDevis(c, d) {
       var yy = cur + rang * 6.2;
       var x = xG + col * (LARGEUR / 2);
       if (dess) {
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.circle(x + 1, yy - 1.1, 1, 'F');
         doc.setFont('helvetica', 'normal'); doc.setFontSize(10.4);
         doc.setTextColor(ANTHRACITE[0], ANTHRACITE[1], ANTHRACITE[2]);
@@ -2270,9 +2275,9 @@ function _construirePdfDevis(c, d) {
   }
 
   var _hPrestFinal = _contenuPrestationsPdf(false);
-  var _espaceTarifMiniFinal = 1.5;
-  var _hauteurTarifFinal = 18;
-  var _margeTarifFinal = 2;
+  var _espaceTarifMiniFinal = estRecapitulatif ? 0 : 1.5;
+  var _hauteurTarifFinal = estRecapitulatif ? 0 : 18;
+  var _margeTarifFinal = estRecapitulatif ? 0 : 2;
   var _limitePhysiqueFinale = 291;
   var _espacePrestations = _espaceAvantTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
   var _besoinPaquetFinal = (_espacePrestations + 7.2) + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
@@ -2311,6 +2316,7 @@ function _construirePdfDevis(c, d) {
   // seulement quelques millimètres, on réduit UNIQUEMENT cette respiration
   // (jamais le contenu, les cartes ni la typographie) tout en conservant au
   // minimum 3 mm d'air entre PRESTATIONS et TARIF PROPOSÉ.
+  if (!estRecapitulatif) {
   var yFinPrestations = y;
   y += ESPACE_AVANT_PRESTATIONS;
 
@@ -2362,7 +2368,7 @@ function _construirePdfDevis(c, d) {
   // visuelle forte et cohérente. Dessiné À L'INTÉRIEUR du bandeau
   // existant — HAUTEUR (21mm), position, largeur et logique de
   // pagination H.1 STRICTEMENT INCHANGÉES.
-  doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+  doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
   doc.rect(M, y, 1.6, 18, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.setTextColor(255, 255, 255);
@@ -2392,12 +2398,14 @@ function _construirePdfDevis(c, d) {
   }
   y += 18;
 
+  }
+
   // ══ PIED DE PAGE — inchangé ══
   var lignesPied = [];
-  if (HELIXCAR_MENTIONS_LEGALES && HELIXCAR_MENTIONS_LEGALES.length) {
+  if (!estRecapitulatif && HELIXCAR_MENTIONS_LEGALES && HELIXCAR_MENTIONS_LEGALES.length) {
     lignesPied = lignesPied.concat(HELIXCAR_MENTIONS_LEGALES);
   }
-  if (HELIXCAR_MENTION_TVA) lignesPied.push(HELIXCAR_MENTION_TVA);
+  if (!estRecapitulatif && HELIXCAR_MENTION_TVA) lignesPied.push(HELIXCAR_MENTION_TVA);
   lignesPied = lignesPied.slice(0, 3);
 
   var yPied = Math.max(y + 9, 284 - (lignesPied.length - 1) * 3.4);
