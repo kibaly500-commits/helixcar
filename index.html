@@ -16800,24 +16800,12 @@ async function _submitClientFormInterne() {
   payload.id = _hcNouvelIdentifiant();
 
   // La preuve de rattachement doit exister AVANT l'envoi de l'e-mail de
-  // confirmation. Elle voyage dans la destination de confirmation afin
-  // que l'inscription puisse être terminée sur un autre téléphone ou un
-  // autre navigateur. Le serveur exige toujours, en plus, une session
-  // confirmée portant exactement l'adresse de la demande.
+  // confirmation. Elle est enregistrée dans les métadonnées du compte
+  // Auth : contrairement à localStorage, elle suit la session lorsqu'on
+  // ouvre l'e-mail sur un autre téléphone ou un autre navigateur.
+  // Le serveur exige toujours, en plus, une session confirmée portant
+  // exactement l'adresse de la demande.
   var cleReclamation = _convGenererJetonEnvoi();
-  var retourConfirmationClient = (function () {
-    try {
-      var u = new URL(HELIXCAR_URL_DASHBOARD, location.href);
-      u.searchParams.set('activation', 'client');
-      u.searchParams.set('dossier', payload.id);
-      u.searchParams.set('reclamation', cleReclamation);
-      return u.toString();
-    } catch (e) {
-      return HELIXCAR_URL_DASHBOARD
-        + '?activation=client&dossier=' + encodeURIComponent(payload.id)
-        + '&reclamation=' + encodeURIComponent(cleReclamation);
-    }
-  })();
 
   // ── RATTACHEMENT : SEULE UNE SESSION COMPTE ──
   //
@@ -16897,7 +16885,14 @@ async function _submitClientFormInterne() {
         var rCompte = await _sb.auth.signUp({
           email: email_val,
           password: mdpSaisi,
-          options: { emailRedirectTo: retourConfirmationClient }
+          options: {
+            emailRedirectTo: HELIXCAR_URL_DASHBOARD,
+            data: {
+              hc_activation: 'client',
+              hc_client_dossier: payload.id,
+              hc_client_reclamation: cleReclamation
+            }
+          }
         });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
         var msgErr = String((rCompte && rCompte.error && rCompte.error.message) || '');
