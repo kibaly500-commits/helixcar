@@ -149,7 +149,8 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
       appelInscription: window.__journal.find(j => j.op === 'signUp') || null,
       appels: appels,
       succesTexte: zone ? zone.textContent : '',
-      succesVisible: getComputedStyle(document.getElementById('modal-client-success')).display !== 'none',
+      succesVisible: !!document.getElementById('modal-client-success')
+        && getComputedStyle(document.getElementById('modal-client-success')).display !== 'none',
       erreurTexte: (document.getElementById('supabase-debug') || {}).textContent || '',
       prenomConserve: (document.getElementById('client-prenom') || {}).value || '',
       emails: window.__journal.filter(j => j.op === 'email').length,
