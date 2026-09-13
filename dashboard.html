@@ -3919,21 +3919,47 @@ async function _hcRolesDeLaSession() {
 // Retour du lien de confirmation d'adresse d'un nouveau client.
 //
 // La demande peut avoir été remplie sur un ordinateur et l'e-mail ouvert
-// sur un téléphone. localStorage ne traverse ni les appareils ni les
-// navigateurs : la preuve à usage unique voyage donc dans le lien.
-// Elle ne suffit jamais seule : reclamer_demande exige aussi une session
-// confirmée et la même adresse e-mail que celle de la demande.
+// sur un téléphone. La preuve à usage unique est lue en priorité dans
+// les métadonnées Auth du compte : elle traverse les appareils, même si
+// Supabase raccourcit la destination de confirmation. Les paramètres
+// d'URL restent acceptés comme repli pour les liens déjà émis.
+// Cette preuve ne suffit jamais seule : reclamer_demande exige aussi une
+// session confirmée et la même adresse e-mail que celle de la demande.
 async function _hcRattacherClientApresConfirmation() {
-  let url;
-  try { url = new URL(location.href); } catch (e) { return false; }
-  if (url.searchParams.get('activation') !== 'client') return false;
+  let url = null;
+  let dossier = '';
+  let cle = '';
+  let depuisUrl = false;
+  try {
+    url = new URL(location.href);
+    if (url.searchParams.get('activation') === 'client') {
+      dossier = (url.searchParams.get('dossier') || '').trim();
+      cle = (url.searchParams.get('reclamation') || '').trim();
+      depuisUrl = true;
+    }
+  } catch (e) {}
 
-  const dossier = (url.searchParams.get('dossier') || '').trim();
-  const cle = (url.searchParams.get('reclamation') || '').trim();
+  // Parcours normal : la preuve est attachée au compte créé par signUp.
+  // getUser interroge le serveur Auth et ne fait confiance ni à un champ
+  // de formulaire ni au stockage local de l'appareil d'inscription.
+  if (!dossier || !cle) {
+    try {
+      const r = await sbAuth.auth.getUser();
+      const u = r && r.data && r.data.user;
+      const m = (u && u.user_metadata) || {};
+      if (m.hc_activation === 'client') {
+        dossier = String(m.hc_client_dossier || '').trim();
+        cle = String(m.hc_client_reclamation || '').trim();
+      }
+    } catch (e) {
+      console.warn('Activation client : métadonnées Auth indisponibles.');
+    }
+  }
+
   const uuidValide = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dossier);
   const cleValide = /^[0-9a-f]{64}$/i.test(cle);
   if (!uuidValide || !cleValide) {
-    console.warn('Activation client : paramètres invalides.');
+    if (depuisUrl) console.warn('Activation client : paramètres invalides.');
     return false;
   }
 
@@ -3948,13 +3974,25 @@ async function _hcRattacherClientApresConfirmation() {
       return false;
     }
 
-    // Le serveur a consommé la preuve. On la retire aussitôt de l'URL
-    // et du stockage éventuel de l'appareil d'inscription.
-    url.searchParams.delete('activation');
-    url.searchParams.delete('dossier');
-    url.searchParams.delete('reclamation');
-    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    // Le serveur a consommé la preuve. On l'efface de tous les endroits
+    // où elle pourrait encore se trouver.
+    if (url && depuisUrl) {
+      url.searchParams.delete('activation');
+      url.searchParams.delete('dossier');
+      url.searchParams.delete('reclamation');
+      history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
     if (typeof _hcOublierReclamation === 'function') _hcOublierReclamation(dossier);
+    try {
+      await sbAuth.auth.updateUser({ data: {
+        hc_activation: null,
+        hc_client_dossier: null,
+        hc_client_reclamation: null
+      } });
+    } catch (e) {
+      // Sans gravité : le secret est déjà consommé côté serveur.
+      console.warn('Activation client : nettoyage des métadonnées différé.');
+    }
     return true;
   } catch (e) {
     console.warn('Activation client :', e);
