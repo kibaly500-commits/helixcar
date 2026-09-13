@@ -3104,11 +3104,11 @@
      disparait, et la fenetre devient un bloc large et aere qui suit la
      largeur de son conteneur. Aucune question, aucune regle, aucun
      champ n'est modifie — seule la mise en page change. */
-  body.hc-integre > header,
-  body.hc-integre > nav,
-  body.hc-integre > footer,
-  body.hc-integre > section,
-  body.hc-integre > main { display: none !important; }
+  /* Masque toute la vitrine, mais conserve les couches interactives
+     créées directement sous <body> par le vrai formulaire. */
+  body.hc-integre > *:not(.modal-overlay):not(.hc-cal-overlay):not(.hc-help-popover):not(.hp-overlay):not(#hc-dupliquer-overlay) {
+    display: none !important;
+  }
   body.hc-integre { background: #fff; overflow: auto !important; }
   body.hc-integre #modal-client.modal-overlay {
     position: static;
@@ -10769,7 +10769,8 @@ function _reinitialiserVehiculesPourNouveauService() {
 function onChoixService(serviceDeclencheur) {
   var t = _typeServiceChoisi();
   var choixUtilisateur = typeof serviceDeclencheur === 'string';
-  if (choixUtilisateur && _clientDernierServiceVehicules && t && t !== _clientDernierServiceVehicules) {
+  var _clientDernierServiceVehiculesAvant = _clientDernierServiceVehicules;
+  if (choixUtilisateur && _clientDernierServiceVehiculesAvant && t && t !== _clientDernierServiceVehiculesAvant) {
     _reinitialiserVehiculesPourNouveauService();
   }
   _clientDernierServiceVehicules = t || '';
@@ -10816,6 +10817,13 @@ function onChoixService(serviceDeclencheur) {
   _majBlocsTransport();
   _majVisibiliteHeuresStockage();
   onNbVehiculesChange();
+  // Le rendu d'une nouvelle activité crée ses fiches vierges. Il ne doit
+  // pas recréer une mémoire fantôme juste après l'effacement explicite.
+  if (choixUtilisateur && _clientDernierServiceVehiculesAvant
+      && t && t !== _clientDernierServiceVehiculesAvant) {
+    _memoireVehicules = {};
+    _memoireGlobale = null;
+  }
 
   // Lot 2 (V72) — conteneurs socle dédiés Nettoyage / Professionnel.
   // Contenu réel construit dans les lots 3 et 4 ; ici uniquement un
