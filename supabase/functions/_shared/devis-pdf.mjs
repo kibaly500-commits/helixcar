@@ -430,6 +430,27 @@ var HELIXCAR_MENTIONS_LEGALES = [];
 
 var HELIXCAR_MENTION_TVA = 'TVA non applicable, art. 293 B du CGI';
 
+function _stockageAutomatiqueConvoyage(c) {
+  if (!c || !_aConvoyage(c) || _aStockage(c)) return null;
+
+  var vehicules = (c._vehicules && c._vehicules.length) ? c._vehicules : [];
+  var debuts = vehicules.map(function (v) { return v && v.date_prise_en_charge; }).filter(Boolean);
+  var fins = vehicules.map(function (v) { return v && v.date_livraison; }).filter(Boolean);
+
+  // Compatibilité avec les demandes mono-véhicule historiques, dont les
+  // dates sont portées directement par le dossier.
+  if (!debuts.length && c.date_prise_en_charge) debuts.push(c.date_prise_en_charge);
+  if (!fins.length && c.date_livraison) fins.push(c.date_livraison);
+  if (!debuts.length || !fins.length) return null;
+
+  debuts = debuts.map(function (d) { return String(d).slice(0, 10); }).sort();
+  fins = fins.map(function (d) { return String(d).slice(0, 10); }).sort();
+  var debut = debuts[0];
+  var fin = fins[fins.length - 1];
+  var duree = _joursEntreDatesDash(debut, fin);
+  return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
+}
+
 function _construirePdfDevis(c, d) {
   // V50.24 — passe typographique homogène + identité véhicule gauche/centre/droite.
   // V50.23 — passe de lisibilité VISIBLE : opérations véhicule + prestations + pied de page réellement agrandis, pagination basse plus exploitée.
@@ -1056,12 +1077,16 @@ function _construirePdfDevis(c, d) {
   }
 
   // ══ STOCKAGE — mêmes codes graphiques que les autres blocs ══
-  if (_aStockage(c)) {
+  // Le stockage automatique d'un convoyage long réutilise volontairement
+  // CE bloc, sans variante graphique : le PDF reste identique à la maquette.
+  var _stockageAutoPdf = _stockageAutomatiqueConvoyage(c);
+  if (_aStockage(c) || _stockageAutoPdf) {
     // V50.4A — Objectifs 5/6/11 : durée réelle MONO uniquement (jamais en
     // multi — chaque véhicule a la sienne, affichée plus bas dans la
     // section Véhicules).
     var _nbVehPdfStock = _nbVehiculesDossier(c);
-    var _finEffPdfStock = _finStockageEffectiveDossier(c);
+    var _debutAfficheStock = _stockageAutoPdf ? _stockageAutoPdf.debut : c.stockage_date_debut;
+    var _finEffPdfStock = _stockageAutoPdf ? _stockageAutoPdf.fin : _finStockageEffectiveDossier(c);
     // CORRECTION MÉTIER — la durée doit être recalculée dès que la fin
     // effective diffère de la fin prévue, dans LES DEUX SENS (sortie
     // anticipée désormais possible, pas seulement prolongation comme
@@ -1089,7 +1114,10 @@ function _construirePdfDevis(c, d) {
     // renvoie sa fin PRÉVUE inchangée par cette même fonction : aucune
     // prolongation fictive n'est jamais introduite.
     var _finAfficheeStock, _jAfficheStock;
-    if (_nbVehPdfStock < 2) {
+    if (_stockageAutoPdf) {
+      _finAfficheeStock = _stockageAutoPdf.fin;
+      _jAfficheStock = _stockageAutoPdf.duree;
+    } else if (_nbVehPdfStock < 2) {
       _finAfficheeStock = _finEffPdfStock || c.stockage_date_fin;
       _jAfficheStock = _prolongePdfStock ? _joursEntreDatesDash(c.stockage_date_debut, _finEffPdfStock) : c.stockage_nb_jours;
     } else {
@@ -1122,8 +1150,8 @@ function _construirePdfDevis(c, d) {
     // le formulaire client (miroir de _heureEntreeStockageApplicable() /
     // _heureSortieStockageApplicable()) — jamais une heure devenue non
     // applicable, même si une valeur historique existe encore en base.
-    var _entreeAppliDash = _heureEntreeApplicableDash(c);
-    var _sortieAppliDash = _heureSortieApplicableDash(c);
+    var _entreeAppliDash = !_stockageAutoPdf && _heureEntreeApplicableDash(c);
+    var _sortieAppliDash = !_stockageAutoPdf && _heureSortieApplicableDash(c);
 
     sectionAvecBloc('Stockage automobile', function (dess) {
       var y0 = y, cur = y0 + 6.5;
@@ -1181,8 +1209,10 @@ function _construirePdfDevis(c, d) {
         // V50.38 — deux micro-ajustements visuels uniquement :
         // nombre de véhicules légèrement plus bas ; durée légèrement plus haute.
         // Début/fin du stockage, tailles, colonnes, pagination et logique restent inchangés.
-        valeur(c.stockage_nb_vehicules ? String(c.stockage_nb_vehicules) : '—', xNbVeh, cur + 1.4, 9.8);
-        valeur(_dvDate(c.stockage_date_debut), xDebutStock, cur - 2.0, 9.8);
+        valeur(_stockageAutoPdf
+          ? String(_nbVehPdfStock)
+          : (c.stockage_nb_vehicules ? String(c.stockage_nb_vehicules) : '—'), xNbVeh, cur + 1.4, 9.8);
+        valeur(_dvDate(_debutAfficheStock), xDebutStock, cur - 2.0, 9.8);
         valeur(_dvDate(_finAfficheeStock), xJusquauStock, cur - 2.0, 9.8);
         valeur(_jAfficheStock ? _jAfficheStock + (_jAfficheStock > 1 ? ' jours' : ' jour') : '—', xDureeStock, cur - 2.0, 9.8);
       }
@@ -2199,6 +2229,10 @@ function _construirePdfDevis(c, d) {
     if (_operationDossier(c, 'liv')) prestations.push('Livraison après stockage');
   } else if (_aConvoyage(c)) {
     prestations.push('Convoyage automobile');
+    // Même source de vérité que le bloc récapitulatif situé plus haut :
+    // dès qu'un convoyage long fait apparaître du stockage sur le devis,
+    // cette prestation doit également être nommée dans la liste finale.
+    if (_stockageAutomatiqueConvoyage(c)) prestations.push('Stockage automobile');
   }
   if (c.plateau === 'Oui') prestations.push('Transport sur plateau');
   if (c.urgence === 'Oui') prestations.push('Transport prioritaire / urgent');
