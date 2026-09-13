@@ -16891,6 +16891,22 @@ async function _submitClientFormInterne() {
     if (mdpSaisi) {
       _compteEtat = 'echec';
       try {
+        // Une session ouverte dans un autre onglet (notamment l'admin)
+        // partage le même stockage Supabase. Elle ne doit JAMAIS devenir
+        // propriétaire du nouveau dossier. Le parcours public crée une
+        // nouvelle identité : il neutralise donc toute session ambiante
+        // avant signUp. La page intégrée, elle, ne passe jamais ici.
+        try {
+          var _sessionAmbiante = await _sb.auth.getSession();
+          var _utilisateurAmbiant = _sessionAmbiante && _sessionAmbiante.data
+            && _sessionAmbiante.data.session && _sessionAmbiante.data.session.user;
+          if (_utilisateurAmbiant) await _sb.auth.signOut();
+        } catch (eSession) {
+          console.warn('Nettoyage de la session précédente impossible :', eSession);
+          _compteEtat = 'echec';
+        }
+        if (_compteEtat === 'echec') throw new Error('SESSION_AMBIANTE_NON_NETTOYEE');
+
         // Sans destination explicite, Supabase revient sur la « Site URL »
         // globale du projet. Une inscription faite sur une Preview pouvait
         // donc être confirmée sur téléphone puis ouvrir une ancienne version
@@ -17198,15 +17214,12 @@ async function _submitClientFormInterne() {
       if (!_rattachee) _hcMemoriserReclamation(payload.id, cleReclamation, email_val);
       if ((_compteEtat === 'cree') && !_rattachee) {
         html += '<div class="hc-succes-note" style="margin-top:10px">'
-          + '<strong>Confirmez votre adresse e-mail</strong> pour activer votre '
-          + 'espace client : un message vient de vous être envoyé. '
-          + 'Votre demande est bien enregistrée et notre équipe la traite déjà — '
-          + 'elle apparaîtra dans votre espace une fois votre adresse confirmée.'
+          + '<strong>Confirmez votre compte grâce au message envoyé par e-mail.</strong>'
           + '</div>';
       } else if (_rattachee) {
-        html += '<div class="hc-succes-note" style="margin-top:10px">'
-          + 'Votre demande est dès maintenant visible dans votre espace client.'
-          + '</div>';
+        // Aucun petit texte supplémentaire sur l'écran final. Le
+        // rattachement est conservé comme preuve technique, sans
+        // encombrer le message demandé par le client.
         _hcOublierReclamation(payload.id);
       }
 
