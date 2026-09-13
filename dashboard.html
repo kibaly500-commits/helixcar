@@ -13933,6 +13933,14 @@ function declencherChampFichier(id) {
     contenu.innerHTML=html;
   };
   window.fermerApercuDemandeClient=function(){var f=document.getElementById('hc-apercu-demande');if(f)f.classList.remove('ouvert');};
+  // Les boutons du Dashboard passent par le registre sécurisé HC_ACTIONS.
+  // Sans cette inscription, l'œil était visible mais le clic était rejeté
+  // comme « action inconnue » avant même d'ouvrir la fenêtre.
+  if (typeof HC_ACTIONS === 'object') {
+    HC_ACTIONS.ouvrirApercuDemandeClient = function (id) {
+      return window.ouvrirApercuDemandeClient(id);
+    };
+  }
   window.imprimerApercuDemandeClient=function(){
     var contenu=document.getElementById('hc-apercu-contenu'), ref=document.getElementById('hc-apercu-reference');
     if(!contenu) return;
