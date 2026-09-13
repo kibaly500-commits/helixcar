@@ -20355,7 +20355,7 @@ function rendreFichesVehicules() {
       '<div class="veh-contenu" id="veh-contenu-'+i+'">';
 
     var identite='<div class="veh-sstitre">Identité du véhicule</div>'+
-      '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
+      '<div class="modal-form-group"><label class="hc-identite-type-requis">Type</label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
@@ -23059,6 +23059,10 @@ console.log('HelixCar ' + window.HC_VERSION);
 }
 #modal-client .veh-sous-accordeon.termine > .veh-sous-barre .veh-sous-num {
   background:#E8F4EC !important; color:#247443 !important;
+}
+
+#modal-client label.hc-identite-type-requis::after {
+  content:' *'; color:#B5313E; font-weight:700;
 }
 </style>
 <script id="hc-pr6-validation-vehicules">
