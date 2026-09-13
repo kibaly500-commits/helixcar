@@ -1133,7 +1133,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="stat-card green"><div class="stat-label">Convoyeurs actifs</div><div class="stat-value" id="stat-convoyeurs">…</div></div>
           <div class="stat-card blue"><div class="stat-label">Clients inscrits</div><div class="stat-value" id="stat-clients">…</div></div>
           <div class="stat-card orange"><div class="stat-label">Missions en cours</div><div class="stat-value" id="stat-missions">…</div></div>
-          <div class="stat-card red"><div class="stat-label">Devis acceptés ce mois (€)</div><div class="stat-value" id="stat-ca">…</div><div class="stat-sub" id="stat-ca-sub"></div></div>
+          <div class="stat-card red"><div class="stat-label">Devis acceptés ce mois</div><div class="stat-value" id="stat-ca">…</div><div class="stat-sub" id="stat-ca-sub"></div></div>
         </div>
 
         <div class="alert alert-warning" id="alerte-candidatures" style="display:none;cursor:pointer" onclick="showPage('admin-candidatures')"></div>
@@ -1173,7 +1173,7 @@ body.scroll-verrouille { overflow: hidden; }
         <div class="alert alert-info">📋 Les candidatures ci-dessous sont en attente de votre validation. Vérifiez les pièces jointes avant d'accepter.</div>
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Candidatures convoyeurs</div><div class="card-sub">3 en attente de validation</div></div>
+            <div><div class="card-title">Candidatures convoyeurs</div><div class="card-sub" id="candidatures-count-sub">Chargement…</div></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -1337,9 +1337,9 @@ body.scroll-verrouille { overflow: hidden; }
 <!-- ADMIN: Facturation -->
       <div class="page" id="page-admin-facturation">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-          <div class="stat-card yellow"><div class="stat-label">Factures en attente</div><div class="stat-value" id="fc-admin-stat-attente">0</div><div class="stat-sub">À valider</div></div>
-          <div class="stat-card blue"><div class="stat-label">Factures à payer</div><div class="stat-value" id="fc-admin-stat-a-payer">0</div><div class="stat-sub">Paiement sous 9 jours ouvrés</div></div>
-          <div class="stat-card"><div class="stat-label">Payé ce mois</div><div class="stat-value" id="fc-admin-stat-paye">0 €</div><div class="stat-sub" id="fc-admin-stat-paye-sub">0 facture(s) payée(s)</div></div>
+          <div class="stat-card yellow"><div class="stat-label">Factures en attente</div><div class="stat-value" id="fc-admin-stat-attente">…</div><div class="stat-sub">À valider</div></div>
+          <div class="stat-card blue"><div class="stat-label">Factures à payer</div><div class="stat-value" id="fc-admin-stat-a-payer">…</div><div class="stat-sub">Paiement sous 9 jours ouvrés</div></div>
+          <div class="stat-card"><div class="stat-label">Payé ce mois</div><div class="stat-value" id="fc-admin-stat-paye">…</div><div class="stat-sub" id="fc-admin-stat-paye-sub">Chargement…</div></div>
         </div>
 
         <div class="card">
@@ -1548,7 +1548,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div id="fc-conv-missions-list" style="padding:4px 0"><p style="color:#888;font-size:.85rem">Chargement…</p></div>
           <div id="fc-conv-blocage-msg" style="display:none;background:rgba(201,123,46,.08);color:#A65E22;border:1px solid rgba(201,123,46,.2);border-radius:8px;padding:10px 12px;font-size:.8rem;margin-top:8px"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:2px solid #eee">
-            <div style="font-weight:700">Total : <span style="color:var(--green);font-size:1.1rem" id="fc-conv-total">0 €</span></div>
+            <div style="font-weight:700">Total : <span style="color:var(--green);font-size:1.1rem" id="fc-conv-total">…</span></div>
             <button class="btn btn-primary" id="fc-conv-generer-btn" onclick="genererFactureConvoyeur()" disabled>🧾 Générer la facture</button>
           </div>
         </div>
@@ -2361,6 +2361,18 @@ async function remplirStatsAccueilConvoyeur(conv) {
 // Ouvre l'espace client sur une session RÉELLE. On lit la vue
 // v_mes_demandes (jamais la table clients) : elle filtre elle-même sur
 // auth.uid() et ne projette aucune donnée interne.
+function _hcIdentiteClient(c) {
+  c = c || {};
+  var personne = ((c.prenom || '') + ' ' + (c.nom || '')).trim();
+  var societe = String(c.societe || '').trim();
+  if (c.type_client === 'pro' && societe) return societe + (personne ? ' / ' + personne : '');
+  return personne || String(c.email || '').trim() || '—';
+}
+function _hcInitialesClient(c) {
+  var base = c && c.type_client === 'pro' && c.societe ? c.societe : ((c && c.prenom) || (c && c.email) || '?');
+  return String(base).trim().slice(0, 2).toUpperCase() || '?';
+}
+
 async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec) {
   if (signOutSiEchec === undefined) signOutSiEchec = true;
   if (!authUserId) return false;
@@ -2404,17 +2416,17 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
   }
 
   const premiere = (demandes || [])[0] || {};
-  window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [] };
+  window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [], profil: premiere };
   currentRole = 'client';
   const prenom = premiere.prenom || '';
-  const nom = premiere.nom || '';
   if (PAGE_TITLES['client-dashboard']) {
     PAGE_TITLES['client-dashboard'][1] = 'Bienvenue' + (prenom ? ' ' + prenom : '');
   }
   initApp({
     role: 'client',
-    name: ((prenom + ' ' + nom).trim()) || email,
-    initials: (prenom || email || '?')[0].toUpperCase()
+    roleLabel: premiere.type_client === 'pro' ? 'Client professionnel' : 'Client',
+    name: _hcIdentiteClient(premiere),
+    initials: _hcInitialesClient(premiere)
   });
   return true;
 }
@@ -2638,13 +2650,19 @@ window.addEventListener('message', function (ev) {
       return;
     }
     if (m.type === 'hc-demande-enregistree') {
-      // La liste est rechargée depuis la base : la référence et le
-      // statut affichés sont ceux que le SERVEUR a enregistrés, jamais
-      // ceux que le cadre annonce.
-      if (typeof chargerDemandesClient === 'function') chargerDemandesClient();
+      // Une demande envoyée est terminée : on détruit le formulaire
+      // chargé pour empêcher une seconde soumission du même dossier,
+      // puis on relit et rerend la liste depuis Supabase.
+      cadre.setAttribute('src', 'about:blank');
+      cadre.removeAttribute('src');
+      cadre.style.height = '';
+      window._hcCadreMode = null;
       showPage('client-dashboard');
-      const zone = document.getElementById('client-demandes-liste');
-      if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+      Promise.resolve(typeof loadDemandesClient === 'function' ? loadDemandesClient() : null)
+        .then(function () {
+          const zone = document.getElementById('client-demandes-liste');
+          if (zone) { try { zone.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+        });
       return;
     }
     // LOT D01 — complétion dans le cadre : l'onglet « Informations à
@@ -2754,6 +2772,8 @@ async function loadDemandesClient() {
       + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
       + ' · <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—') + '</span>'
       + (etat ? ' <span class="badge ' + etat.cls + '" data-etat-devis>' + escapeHtml(etat.texte) + '</span>' : '')
+      + ' <button class="btn btn-sm btn-outline hc-demande-apercu-btn" aria-label="Afficher le récapitulatif" title="Afficher le récapitulatif" '
+      + actionHtml('ouvrirApercuDemandeClient', [d.id]) + '>👁</button>'
       + (dv && ['envoye','accepte','refuse'].indexOf(dv.statut) !== -1 ? ' <a class="btn btn-sm btn-outline" href="devis.html?id=' + encodeURIComponent(dv.id) + '">Consulter mon devis</a>' : '')
       + '</span></div>';
   }).join('');
@@ -4196,7 +4216,7 @@ function initApp(user) {
   document.getElementById('sb-avatar').textContent = user.initials;
   document.getElementById('sb-name').textContent = user.name;
   const roleEl = document.getElementById('sb-role');
-  roleEl.textContent = user.role === 'admin' ? 'Admin' : user.role === 'convoyeur' ? 'Convoyeur' : 'Client';
+  roleEl.textContent = user.roleLabel || (user.role === 'admin' ? 'Admin' : user.role === 'convoyeur' ? 'Convoyeur' : 'Client');
   roleEl.className = 'user-role role-' + user.role;
 
   buildNav(user.role);
@@ -7385,6 +7405,8 @@ var _clientsAdminListe = [];
 function majBadgeCandidatures() {
   _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
     .then(function (n) {
+      var sousCandidatures = document.getElementById('candidatures-count-sub');
+      if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
       if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
     })
@@ -7395,7 +7417,7 @@ function chargerClientsAdmin() {
   var tbody = document.getElementById('clients-table');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
-  sbFetchToutePage('clients?select=id,numero_client,prenom,nom,email,telephone,type_client,created_at,auth_user_id'
+  sbFetchToutePage('clients?select=id,numero_client,prenom,nom,societe,email,telephone,type_client,created_at,auth_user_id'
                    + '&auth_user_id=not.is.null&order=created_at.desc')
     .then(function (rows) {
       _clientsAdminListe = rows || [];
@@ -7428,7 +7450,7 @@ function afficherClientsAdmin(rows) {
   });
   tbody.innerHTML = Object.keys(parCompte).map(function (cle) {
     var c = parCompte[cle].ref;
-    var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—';
+    var nom = _hcIdentiteClient(c);
     var type = c.type_client === 'pro' ? 'Professionnel'
              : c.type_client === 'particulier' ? 'Particulier' : '—';
     return '<tr>'
@@ -7449,7 +7471,7 @@ function filtrerClientsAdmin(texte) {
   var t = (texte || '').trim().toLowerCase();
   if (!t) { afficherClientsAdmin(_clientsAdminListe); return; }
   afficherClientsAdmin(_clientsAdminListe.filter(function (c) {
-    return [c.numero_client, c.prenom, c.nom, c.email, c.telephone]
+    return [c.numero_client, c.prenom, c.nom, c.societe, c.email, c.telephone]
       .some(function (v) { return String(v || '').toLowerCase().indexOf(t) !== -1; });
   }));
 }
@@ -7492,7 +7514,11 @@ function _ecrireStat(id, valeur) {
 
 function _premierJourDuMois() {
   var d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+}
+function _premierJourDuMoisSuivant() {
+  var d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
 }
 
 function chargerAccueilAdmin() {
@@ -7503,6 +7529,8 @@ function chargerAccueilAdmin() {
       _ecrireStat('stat-pending', n);
       // Le badge du menu affichait « 3 » en dur, quel que soit le
       // nombre réel de candidatures en attente.
+      var sousCandidatures = document.getElementById('candidatures-count-sub');
+      if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
       if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
       var al = document.getElementById('alerte-candidatures');
@@ -7530,15 +7558,18 @@ function chargerAccueilAdmin() {
     .then(function (n) { _ecrireStat('stat-missions', n); })
     .catch(function () { _ecrireStat('stat-missions', '—'); });
 
-  // Le chiffre d'affaires n'était rattaché à rien. On affiche à la place
-  // ce qui EXISTE réellement : le montant des devis acceptés ce mois-ci.
-  sbFetchToutePage('devis?select=prix,statut,date_generation&statut=eq.accepte'
-                   + '&date_generation=gte.' + _premierJourDuMois())
+  // Compte exact des devis réellement acceptés pendant le mois civil.
+  // La date d'acceptation est la source de vérité : aucune estimation.
+  sbFetchToutePage('devis?select=prix,statut,date_acceptation&statut=eq.accepte'
+                   + '&date_acceptation=gte.' + encodeURIComponent(_premierJourDuMois())
+                   + '&date_acceptation=lt.' + encodeURIComponent(_premierJourDuMoisSuivant()))
     .then(function (rows) {
-      var total = (rows || []).reduce(function (a, d) { return a + (Number(d.prix) || 0); }, 0);
-      _ecrireStat('stat-ca', total.toLocaleString('fr-FR'));
+      rows = rows || [];
+      var total = rows.reduce(function (a, d) { return a + (Number(d.prix) || 0); }, 0);
+      _ecrireStat('stat-ca', rows.length.toLocaleString('fr-FR'));
       var sub = document.getElementById('stat-ca-sub');
-      if (sub) sub.textContent = (rows || []).length + ' devis accepté(s)';
+      if (sub) sub.textContent = total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+        + ' de devis acceptés';
     })
     .catch(function () {
       _ecrireStat('stat-ca', '—');
@@ -7571,7 +7602,7 @@ function chargerInscriptionsRecentes() {
   if (!tbody) return;
   Promise.all([
     sbFetch('convoyeurs?select=id,prenom,nom,email,statut,created_at&order=created_at.desc&limit=5'),
-    sbFetch('clients?select=id,prenom,nom,email,statut,created_at,auth_user_id&auth_user_id=not.is.null&order=created_at.desc&limit=5')
+    sbFetch('clients?select=id,prenom,nom,societe,email,type_client,statut,created_at,auth_user_id&auth_user_id=not.is.null&order=created_at.desc&limit=5')
   ]).then(function (res) {
     var lignes = []
       .concat((res[0] || []).map(function (c) { return { type: 'Partenaire', page: 'admin-candidatures', l: c }; }))
@@ -7584,10 +7615,11 @@ function chargerInscriptionsRecentes() {
     }
     tbody.innerHTML = lignes.map(function (x) {
       var c = x.l;
-      var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—';
+      var nom = x.type === 'Client' ? _hcIdentiteClient(c) : (((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—');
+      var typeAffiche = x.type === 'Client' && c.type_client === 'pro' ? 'Client professionnel' : x.type;
       var badge = _badgeStatutInscription(c.statut);
       return '<tr><td><strong>' + escapeHtml(nom) + '</strong></td>'
-        + '<td>' + x.type + '</td>'
+        + '<td>' + typeAffiche + '</td>'
         + '<td>' + escapeHtml(c.email || '—') + '</td>'
         + '<td>' + (_dvDate ? _dvDate(c.created_at) : '—') + '</td>'
         + '<td>' + badge + '</td>'
@@ -9693,7 +9725,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td>' + _dvDate(c.created_at) + '</td>' +
       '<td><b>' + _escapeHtml(_dv(c.numero_client)) + '</b></td>' +
       '<td>' + (nonLue ? '<span class="pastille-non-lue" title="Non consultée"></span>' : '') +
-        '<span class="nom-client">' + _escapeHtml(_dv(c.prenom) + ' ' + _dv(c.nom)) + '</span>' +
+        '<span class="nom-client">' + _escapeHtml(_hcIdentiteClient(c)) + '</span>' +
         '<div style="font-size:.75rem;color:#888">' + _escapeHtml(_dv(c.email)) + '</div></td>' +
       '<td>' + _escapeHtml(c.type_client === 'pro' ? 'Pro' : 'Particulier') + '</td>' +
       '<td><span class="badge-service">' + _escapeHtml(_libelleService(c)) + '</span></td>' +
@@ -9711,7 +9743,7 @@ function filtrerDemandesDevis(texte) {
   var q = (texte || '').toLowerCase().trim();
   if (!q) { _rendreTableDemandesDevis(_demandesDevisListe); return; }
   var filtre = _demandesDevisListe.filter(function(c) {
-    var blob = [c.numero_client, c.prenom, c.nom, c.email, c.telephone, c.ville_depart, c.ville_arrivee, c.marque_modele]
+    var blob = [c.numero_client, c.prenom, c.nom, c.societe, c.email, c.telephone, c.ville_depart, c.ville_arrivee, c.marque_modele]
       .map(function(x) { return (x || '').toString().toLowerCase(); }).join(' ');
     return blob.indexOf(q) !== -1;
   });
@@ -13840,5 +13872,77 @@ function declencherChampFichier(id) {
   else console.error('Action déclarée mais introuvable :', nom);
 });
 </script>
+
+<style id="hc-pr6-apercu-demande">
+.hc-apercu-fond{position:fixed;inset:0;z-index:10020;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(16,24,32,.58);backdrop-filter:blur(7px)}
+.hc-apercu-fond.ouvert{display:flex}.hc-apercu-carte{width:min(650px,100%);max-height:86vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:22px}
+.hc-apercu-entete{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.hc-apercu-entete h2{margin:0;font-size:1.35rem}.hc-apercu-fermer{border:0;background:#f1f1f1;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.2rem}
+.hc-apercu-grille{display:grid;grid-template-columns:1fr 1fr;gap:9px}.hc-apercu-ligne{padding:10px 12px;background:#f7f7f5;border-radius:9px}.hc-apercu-ligne.large{grid-column:1/-1}.hc-apercu-ligne small{display:block;color:#777;margin-bottom:3px}.hc-apercu-vehicules{margin:13px 0 0;padding:0;list-style:none}.hc-apercu-vehicules li{padding:8px 0;border-bottom:1px solid #eee}.hc-apercu-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media(max-width:620px){.hc-apercu-grille{grid-template-columns:1fr}.hc-apercu-ligne.large{grid-column:auto}.hc-apercu-carte{padding:16px}}
+</style>
+<script id="hc-pr6-apercu-demande">
+(function(){
+  function val(v){ return v === null || v === undefined || v === '' ? '—' : String(v); }
+  function ligne(label, valeur, large){
+    return '<div class="hc-apercu-ligne' + (large ? ' large' : '') + '"><small>' + escapeHtml(label) + '</small><strong>' + escapeHtml(val(valeur)) + '</strong></div>';
+  }
+  function demandeParId(id){
+    var liste = window._currentClient && window._currentClient.demandes || [];
+    return liste.find(function(d){ return String(d.id) === String(id); }) || null;
+  }
+  async function vehiculesDemande(id){
+    if (!_sbAuthPret()) return [];
+    try {
+      var r = await sbAuth.from('vehicules').select('*').eq('dossier_id', id).order('position', { ascending: true });
+      return r.error ? [] : (r.data || []);
+    } catch(e) { return []; }
+  }
+  function assurerModale(){
+    var fond=document.getElementById('hc-apercu-demande');
+    if(fond) return fond;
+    fond=document.createElement('div');
+    fond.id='hc-apercu-demande'; fond.className='hc-apercu-fond'; fond.setAttribute('role','dialog'); fond.setAttribute('aria-modal','true');
+    fond.innerHTML='<div class="hc-apercu-carte"><div class="hc-apercu-entete"><div><h2>Récapitulatif de la demande</h2><div id="hc-apercu-reference"></div></div><button class="hc-apercu-fermer" aria-label="Fermer" onclick="fermerApercuDemandeClient()">×</button></div><div id="hc-apercu-contenu"></div><div class="hc-apercu-actions"><button class="btn btn-outline" onclick="imprimerApercuDemandeClient()">Imprimer / enregistrer en PDF</button><button class="btn btn-primary" onclick="fermerApercuDemandeClient()">Fermer</button></div></div>';
+    fond.addEventListener('click',function(e){if(e.target===fond) fermerApercuDemandeClient();});
+    document.body.appendChild(fond); return fond;
+  }
+  window.ouvrirApercuDemandeClient=async function(id){
+    var d=demandeParId(id); if(!d) return;
+    var fond=assurerModale(), contenu=document.getElementById('hc-apercu-contenu');
+    document.getElementById('hc-apercu-reference').textContent=d.numero_client || '';
+    contenu.innerHTML='<div style="color:#777">Chargement…</div>'; fond.classList.add('ouvert');
+    var vs=await vehiculesDemande(id);
+    var service=_libelleServiceClient(d.type_service);
+    var statut=LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—';
+    var html='<div class="hc-apercu-grille">'
+      +ligne('Prestation',service)+ligne('Statut',statut)
+      +ligne('Date souhaitée',_dvDate(_dateSouhaiteeListe(d)))
+      +ligne('Nombre de véhicules',d.nb_vehicules || vs.length || 1);
+    if(d.stockage_date_debut || d.stockage_date_fin) html+=ligne('Période de stockage',_dvDate(d.stockage_date_debut)+' → '+_dvDate(d.stockage_date_fin),true);
+    if(d.adresse_depart_rue || d.ville_depart) html+=ligne('Départ',[d.adresse_depart_rue,d.code_postal_depart,d.ville_depart].filter(Boolean).join(', '),true);
+    if(d.adresse_arrivee_rue || d.ville_arrivee) html+=ligne('Arrivée',[d.adresse_arrivee_rue,d.code_postal_arrivee,d.ville_arrivee].filter(Boolean).join(', '),true);
+    html+='</div>';
+    if(vs.length){
+      html+='<ul class="hc-apercu-vehicules">';
+      vs.forEach(function(v,i){
+        var ident=[v.type_vehicule || v.type, v.marque_modele || v.marque, v.immatriculation].filter(Boolean).join(' · ');
+        html+='<li><strong>Véhicule '+(i+1)+'</strong><br><span>'+escapeHtml(ident || 'Informations à compléter')+'</span></li>';
+      });
+      html+='</ul>';
+    }
+    contenu.innerHTML=html;
+  };
+  window.fermerApercuDemandeClient=function(){var f=document.getElementById('hc-apercu-demande');if(f)f.classList.remove('ouvert');};
+  window.imprimerApercuDemandeClient=function(){
+    var contenu=document.getElementById('hc-apercu-contenu'), ref=document.getElementById('hc-apercu-reference');
+    if(!contenu) return;
+    var w=window.open('','_blank');
+    if(!w) return;
+    w.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Demande '+escapeHtml(ref ? ref.textContent : '')+'</title><style>body{font:14px Arial,sans-serif;color:#182028;max-width:760px;margin:32px auto;padding:0 18px}h1{font-size:22px}.hc-apercu-grille{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hc-apercu-ligne{padding:10px;background:#f4f4f4}.hc-apercu-ligne.large{grid-column:1/-1}small{display:block;color:#666}li{padding:8px 0}</style></head><body><h1>Récapitulatif de la demande</h1><p>'+escapeHtml(ref ? ref.textContent : '')+'</p>'+contenu.innerHTML+'</body></html>');
+    w.document.close(); w.focus(); w.print();
+  };
+})();
+</script>
+
 </body>
 </html>
