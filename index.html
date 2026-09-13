@@ -23073,8 +23073,31 @@ console.log('HelixCar ' + window.HC_VERSION);
     return req;
   };
 
+  // Toute rubrique commence rouge. Elle ne devient verte qu'après un
+  // clic réussi sur SON bouton OK, même si ses champs étaient préremplis.
+  var sousVehOrig = window._hcSousVeh;
+  window._hcSousVeh = function () {
+    return sousVehOrig.apply(this, arguments)
+      .replace('class="veh-sous-accordeon', 'class="veh-sous-accordeon incomplet');
+  };
+
+  function etapeApplicable(bloc) {
+    return !!(bloc && _isVisible(bloc));
+  }
+  function toutesEtapesConfirmees(i) {
+    var contenu = document.getElementById('veh-contenu-' + i);
+    if (!contenu) return false;
+    var visibles = Array.prototype.filter.call(
+      contenu.querySelectorAll('.veh-sous-accordeon'),
+      etapeApplicable
+    );
+    return visibles.length > 0 && visibles.every(function (bloc) {
+      return bloc.dataset.hcDejaValide === '1';
+    });
+  }
+
   var vehiculeCompletOrig = window._vehiculeComplet;
-  window._vehiculeComplet = function (i) {
+  function donneesVehiculeCompletes(i) {
     if (!vehiculeCompletOrig(i)) return false;
     var blocLiv = document.getElementById('veh-' + i + '-liv-active-group');
     if (blocLiv && _isVisible(blocLiv) && !blocLiv.querySelector('input[type="radio"]:checked')) return false;
@@ -23083,10 +23106,13 @@ console.log('HelixCar ' + window.HC_VERSION);
     var blocMode = document.getElementById('veh-' + i + '-sous-mode');
     if (blocMode && _isVisible(blocMode) && !blocMode.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
     return true;
+  }
+  window._vehiculeComplet = function (i) {
+    return donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);
   };
 
   function etapeComplete(i, bloc) {
-    if (!bloc || !_isVisible(bloc)) return true;
+    if (!etapeApplicable(bloc)) return true;
     var cle = String(bloc.id || '').replace('veh-' + i + '-sous-', '');
     var req = _champsRequisVehicule(i);
     for (var k = 0; k < req.length; k++) {
@@ -23099,7 +23125,7 @@ console.log('HelixCar ' + window.HC_VERSION);
       var rest = document.getElementById('veh-' + i + '-restit-active-group');
       if (rest && _isVisible(rest) && !rest.querySelector('input[type="radio"]:checked')) return false;
     }
-    if (cle === 'mode' && _isVisible(bloc) && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
+    if (cle === 'mode' && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
     var prefixes = _prefixesHoraireRequis(i);
     for (var j = 0; j < prefixes.length; j++) {
       var probe = document.getElementById('veh-' + i + '-' + prefixes[j] + '-heure');
@@ -23113,13 +23139,17 @@ console.log('HelixCar ' + window.HC_VERSION);
     var contenu = document.getElementById('veh-contenu-' + i);
     if (!contenu) return;
     contenu.querySelectorAll('.veh-sous-accordeon').forEach(function (bloc) {
-      var complet = etapeComplete(i, bloc);
-      bloc.classList.toggle('termine', complet);
-      bloc.classList.toggle('incomplet', !complet);
+      if (!etapeApplicable(bloc)) {
+        bloc.classList.remove('termine', 'incomplet');
+        return;
+      }
+      var confirme = bloc.dataset.hcDejaValide === '1' && etapeComplete(i, bloc);
+      bloc.classList.toggle('termine', confirme);
+      bloc.classList.toggle('incomplet', !confirme);
     });
     var bouton = contenu.querySelector('.veh-btn-valider');
     if (bouton) {
-      var completVehicule = _vehiculeComplet(i);
+      var completVehicule = donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);
       bouton.disabled = !completVehicule;
       bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');
     }
@@ -23133,16 +23163,19 @@ console.log('HelixCar ' + window.HC_VERSION);
 
   var okSousOrig = window._hcOkSousVeh;
   window._hcOkSousVeh = function (i, cle) {
-    if (cle === 'mode') {
-      var bloc = document.getElementById('veh-' + i + '-sous-mode');
-      if (bloc && _isVisible(bloc) && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) {
-        bloc.classList.add('incomplet');
-        bloc.classList.remove('termine');
-        majEtapes(i);
-        return;
-      }
+    var bloc = document.getElementById('veh-' + i + '-sous-' + cle);
+    if (!bloc) return;
+    if (cle === 'mode' && etapeApplicable(bloc)
+        && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) {
+      bloc.dataset.hcDejaValide = '0';
+      bloc.classList.add('incomplet');
+      bloc.classList.remove('termine');
+      majEtapes(i);
+      return;
     }
     okSousOrig(i, cle);
+    // La fonction d'origine pose hcDejaValide=1 uniquement quand toutes
+    // les validations de cette rubrique ont réussi.
     majEtapes(i);
     _majBarreVehicule(i);
   };
@@ -23152,6 +23185,12 @@ console.log('HelixCar ' + window.HC_VERSION);
     if (!contenu) return;
     var i = parseInt(contenu.id.replace('veh-contenu-', ''), 10);
     if (isNaN(i)) return;
+    var bloc = cible.closest('.veh-sous-accordeon');
+    if (bloc && bloc.dataset.hcDejaValide === '1') {
+      bloc.dataset.hcDejaValide = '0';
+      bloc.classList.remove('termine');
+      bloc.classList.add('incomplet');
+    }
     _majBarreVehicule(i);
     _majProgressionVehicules();
   }
