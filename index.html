@@ -3171,7 +3171,7 @@
   body.hc-integre #client-step-nav .btn-step-next { flex: 0 0 auto; min-width: 220px; margin-left: auto; }
   #modal-client input.hc-date-verrouillee {
     background: #eef0f2 !important; color: #66707a !important;
-    cursor: not-allowed !important; opacity: 1;
+    cursor: default !important; pointer-events: none !important; opacity: 1;
   }
   body.hc-integre .hc-cal-overlay,
   body.hc-integre .hp-overlay { background: rgba(16,24,32,.10); }
@@ -20443,12 +20443,12 @@ function rendreFichesVehicules() {
     // autant. Le recapitulatif applique exactement la meme regle.
     if (sc.pc || sc.liv) {
       var mode='<div class="veh-sstitre">Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></div><div style="display:flex;flex-direction:column;gap:7px">'+
-        '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='plateau'?'':'checked')+'><span>Convoyage par la route</span></label>'+
+        '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='standard'?'checked':'')+'><span>Convoyage par la route</span></label>'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="plateau" '+(v.mode_transport==='plateau'?'checked':'')+'><span>Transport sur plateau</span></label></div>';
       html+=_hcSousVeh(i,'mode',no++,'Mode de transport',mode,false);
     }
 
-    html+='<div class="veh-actions"><button type="button" class="veh-btn-effacer" onclick="effacerVehicule('+i+')">Effacer ce véhicule</button><button type="button" class="btn btn-primary veh-btn-valider" onclick="validerVehicule('+i+')">Valider ce véhicule</button></div></div></div>';
+    html+='<div class="veh-actions"><button type="button" class="veh-btn-effacer" onclick="effacerVehicule('+i+')">Effacer ce véhicule</button><button type="button" class="btn btn-primary veh-btn-valider" onclick="validerVehicule('+i+')" disabled aria-disabled="true">Valider ce véhicule</button></div></div></div>';
   }
   conteneur.innerHTML=html; conteneur.style.display='block';
   for (var k=0;k<n;k++) _majBarreVehicule(k);
@@ -21528,7 +21528,7 @@ document.addEventListener('click', function (e) {
     _hpOuvrirPicker(champ);
   }
 });
-</script>\n
+</script>
 
 <style id="hc-v50-41-premium-corrections">
 /* V50.41 — corrections validées Devenir client, sans changement métier */
@@ -23047,6 +23047,116 @@ console.log('HelixCar ' + window.HC_VERSION);
   stockage.insertAdjacentElement('afterend', tarifs);
   tarifs.insertAdjacentElement('afterend', equipe);
   if (renfort) equipe.insertAdjacentElement('afterend', renfort);
+})();
+</script>
+
+<style id="hc-pr6-validation-vehicules">
+#modal-client .veh-btn-valider:disabled {
+  opacity:.42 !important; cursor:default !important; pointer-events:none !important;
+  box-shadow:none !important; transform:none !important;
+}
+#modal-client .veh-sous-accordeon.incomplet > .veh-sous-barre .veh-sous-num {
+  background:#FCE8E8 !important; color:#C62828 !important;
+}
+#modal-client .veh-sous-accordeon.termine > .veh-sous-barre .veh-sous-num {
+  background:#E8F4EC !important; color:#247443 !important;
+}
+</style>
+<script id="hc-pr6-validation-vehicules">
+(function () {
+  var champsRequisOrig = window._champsRequisVehicule;
+  window._champsRequisVehicule = function (i) {
+    var req = champsRequisOrig(i).slice();
+    ['immat', 'vin'].forEach(function (cle) {
+      if (req.indexOf(cle) === -1) req.push(cle);
+    });
+    return req;
+  };
+
+  var vehiculeCompletOrig = window._vehiculeComplet;
+  window._vehiculeComplet = function (i) {
+    if (!vehiculeCompletOrig(i)) return false;
+    var blocLiv = document.getElementById('veh-' + i + '-liv-active-group');
+    if (blocLiv && _isVisible(blocLiv) && !blocLiv.querySelector('input[type="radio"]:checked')) return false;
+    var blocRest = document.getElementById('veh-' + i + '-restit-active-group');
+    if (blocRest && _isVisible(blocRest) && !blocRest.querySelector('input[type="radio"]:checked')) return false;
+    var blocMode = document.getElementById('veh-' + i + '-sous-mode');
+    if (blocMode && _isVisible(blocMode) && !blocMode.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
+    return true;
+  };
+
+  function etapeComplete(i, bloc) {
+    if (!bloc || !_isVisible(bloc)) return true;
+    var cle = String(bloc.id || '').replace('veh-' + i + '-sous-', '');
+    var req = _champsRequisVehicule(i);
+    for (var k = 0; k < req.length; k++) {
+      var champ = document.getElementById('veh-' + i + '-' + req[k]);
+      if (champ && bloc.contains(champ) && !(champ.value || '').trim()) return false;
+    }
+    if (cle === 'livraison') {
+      var liv = document.getElementById('veh-' + i + '-liv-active-group');
+      if (liv && _isVisible(liv) && !liv.querySelector('input[type="radio"]:checked')) return false;
+      var rest = document.getElementById('veh-' + i + '-restit-active-group');
+      if (rest && _isVisible(rest) && !rest.querySelector('input[type="radio"]:checked')) return false;
+    }
+    if (cle === 'mode' && _isVisible(bloc) && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
+    var prefixes = _prefixesHoraireRequis(i);
+    for (var j = 0; j < prefixes.length; j++) {
+      var probe = document.getElementById('veh-' + i + '-' + prefixes[j] + '-heure');
+      if (probe && bloc.contains(probe) && _verifierHoraire(i, prefixes[j])) return false;
+    }
+    if ((cle === 'pc' || cle === 'livraison') && !_chronologieVehiculeOk(i)) return false;
+    return true;
+  }
+
+  function majEtapes(i) {
+    var contenu = document.getElementById('veh-contenu-' + i);
+    if (!contenu) return;
+    contenu.querySelectorAll('.veh-sous-accordeon').forEach(function (bloc) {
+      var complet = etapeComplete(i, bloc);
+      bloc.classList.toggle('termine', complet);
+      bloc.classList.toggle('incomplet', !complet);
+    });
+    var bouton = contenu.querySelector('.veh-btn-valider');
+    if (bouton) {
+      var completVehicule = _vehiculeComplet(i);
+      bouton.disabled = !completVehicule;
+      bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');
+    }
+  }
+
+  var majBarreOrig = window._majBarreVehicule;
+  window._majBarreVehicule = function (i) {
+    majBarreOrig(i);
+    majEtapes(i);
+  };
+
+  var okSousOrig = window._hcOkSousVeh;
+  window._hcOkSousVeh = function (i, cle) {
+    if (cle === 'mode') {
+      var bloc = document.getElementById('veh-' + i + '-sous-mode');
+      if (bloc && _isVisible(bloc) && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) {
+        bloc.classList.add('incomplet');
+        bloc.classList.remove('termine');
+        majEtapes(i);
+        return;
+      }
+    }
+    okSousOrig(i, cle);
+    majEtapes(i);
+    _majBarreVehicule(i);
+  };
+
+  function actualiserDepuisChamp(cible) {
+    var contenu = cible && cible.closest && cible.closest('[id^="veh-contenu-"]');
+    if (!contenu) return;
+    var i = parseInt(contenu.id.replace('veh-contenu-', ''), 10);
+    if (isNaN(i)) return;
+    _majBarreVehicule(i);
+    _majProgressionVehicules();
+  }
+  document.addEventListener('input', function (e) { actualiserDepuisChamp(e.target); }, true);
+  document.addEventListener('change', function (e) { actualiserDepuisChamp(e.target); }, true);
 })();
 </script>
 
