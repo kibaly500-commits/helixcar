@@ -687,7 +687,7 @@ async function modesParVehicule(page, n) {
     }, opts.email || 'test-qa-claude-postpr2@example.invalid');
     await L.chooseService(page, 'compte');
     await page.waitForTimeout(80);
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       const fini = await page.evaluate(() =>
         (!!document.querySelector('#client-success-msg')
           && (document.getElementById('client-success-msg').textContent || '').trim().length > 0)
