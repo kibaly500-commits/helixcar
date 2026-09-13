@@ -3110,9 +3110,10 @@
     display: none !important;
   }
   body.hc-integre { background: #fff; overflow: auto !important; }
-  body.hc-integre #modal-client.modal-overlay {
+  body.hc-integre #modal-client.modal-overlay { display: none !important; }
+  body.hc-integre.hc-mode-demande #modal-client.modal-overlay {
     position: static;
-    display: block;
+    display: block !important;
     background: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -3123,26 +3124,27 @@
     pointer-events: auto;
   }
   body.hc-integre #modal-client .modal {
-    max-width: 100%;
-    width: 100%;
+    max-width: 760px;
+    width: calc(100% - 24px);
     min-height: 0;
-    margin: 0;
-    border-radius: 0;
-    border: 0;
-    box-shadow: none;
-    padding: 26px 30px 34px;
+    margin: 12px auto 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(16,24,32,.08);
+    box-shadow: 0 12px 34px rgba(16,24,32,.12);
+    padding: 22px 24px 28px;
   }
   body.hc-integre #modal-client .modal::before { display: none; }
   /* La croix de fermeture n'a plus d'objet : c'est « Retour a mes
      demandes » qui referme, dans l'espace client. */
   body.hc-integre #modal-client .modal-close { display: none; }
   @media (max-width: 640px) {
-    body.hc-integre #modal-client .modal { padding: 20px 16px 28px; }
+    body.hc-integre #modal-client .modal { width: calc(100% - 16px); margin: 8px auto 14px; padding: 18px 14px 24px; }
   }
   /* LOT D01 — l'écran « Compléter mes informations » vit lui aussi dans
      l'espace client : même mise en page intégrée que le formulaire. */
-  body.hc-integre #modal-completer.modal-overlay {
-    position: static; display: block; background: transparent;
+  body.hc-integre #modal-completer.modal-overlay { display: none !important; }
+  body.hc-integre.hc-mode-completion #modal-completer.modal-overlay {
+    position: static; display: block !important; background: transparent;
     backdrop-filter: none; -webkit-backdrop-filter: none;
     padding: 0; overflow: visible; opacity: 1; visibility: visible;
     pointer-events: auto;
@@ -3167,6 +3169,12 @@
   /* D01-008 — dans l'espace client, « Continuer » n'occupe plus toute la
      largeur du bloc : la grande barre rouge sous le formulaire, c'était lui. */
   body.hc-integre #client-step-nav .btn-step-next { flex: 0 0 auto; min-width: 220px; margin-left: auto; }
+  #modal-client input.hc-date-verrouillee {
+    background: #eef0f2 !important; color: #66707a !important;
+    cursor: not-allowed !important; opacity: 1;
+  }
+  body.hc-integre .hc-cal-overlay,
+  body.hc-integre .hp-overlay { background: rgba(16,24,32,.10); }
   /* Regroupement par véhicule dans l'écran de complétion. */
   .completer-groupe { margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .completer-groupe strong { font-size: .9rem; }
@@ -7524,7 +7532,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
 
             <div>
-              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution (facultatif)</label>
+              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution</label>
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
               <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
@@ -9315,6 +9323,10 @@ function _hcAppliquerModeConnecte() {
     courriel.setAttribute('aria-readonly', 'true');
     courriel.style.background = '#F3F4F6';
   }
+  var boutonDemande = document.getElementById('client-submit-btn');
+  if (boutonDemande && typeof _hcModeIntegre === 'function' && _hcModeIntegre()) {
+    boutonDemande.textContent = 'Créer une nouvelle demande →';
+  }
   _hcNote('hc-bandeau-connecte', 'Vous êtes connecté'
     + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
     + '. Vos informations de compte sont déjà renseignées.', 'succes');
@@ -9379,6 +9391,8 @@ function _hcPrevenirEspaceClient() {
 async function _hcDemarrerDepuisEspaceClient() {
   var params = new URLSearchParams(window.location.search || '');
   if (params.get('nouvelle-demande') !== '1') return false;
+  document.body.classList.add('hc-mode-demande');
+  document.body.classList.remove('hc-mode-completion');
   _hcActiverModeIntegre();
   await _hcChargerSessionClient();
   if (!_hcSessionClient) {
@@ -9728,6 +9742,8 @@ async function _hcOuvrirCompletionDepuisUrl() {
   if (!id) return false;
   // LOT D01 — dans l'espace client (cadre intégré), la vitrine s'efface
   // et l'écran de complétion occupe le bloc.
+  document.body.classList.add('hc-mode-completion');
+  document.body.classList.remove('hc-mode-demande');
   _hcActiverModeIntegre();
   await ouvrirCompleterInformations(id);
   return true;
@@ -9938,10 +9954,10 @@ function _validateNettoyageEtape2() {
 // c'est la validation des DATES qui les reclame, pas celle-ci.
 function _nettChronologieOk(dateDebut, heureDebut, dateFin, heureFin) {
   if (!heureDebut || !heureFin) return true;
-  if (!dateDebut || !dateFin) return heureFin > heureDebut;
-  if (dateFin > dateDebut) return true;
-  if (dateFin < dateDebut) return false;
-  return heureFin > heureDebut;
+  if (!dateDebut || !dateFin) return _hcCreneauRespecte15Minutes(heureDebut, heureFin);
+  var debut = new Date(dateDebut + 'T' + heureDebut + ':00');
+  var fin = new Date(dateFin + 'T' + heureFin + ':00');
+  return !isNaN(debut) && !isNaN(fin) && (fin.getTime() - debut.getTime() >= 15 * 60 * 1000);
 }
 
 function _validateNettoyageEtape4() {
@@ -10488,8 +10504,8 @@ function proOnDateChange() {
 // (fin de journee du dernier jour).
 function proOnHoraireChange() {
   _clearFieldError('pro-horaire-cfin');
-  if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
-    _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+  if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && !_hcCreneauRespecte15Minutes(_proHeureDebut(), _proHeureFin())) {
+    _showFieldError('pro-horaire-cfin', "L'heure de fin doit être au moins 15 minutes après l'heure de début.");
   }
   _proMajBoutonContinuer();
 }
@@ -10543,8 +10559,8 @@ function _proValiderRubrique(cle, fail) {
     if (d && f && f < d) { _showFieldError('pro-date-fin', 'La date de fin ne peut pas précéder la date de début.'); ko('pro-date-fin'); }
     if (!_checkRequiredText('pro-horaire-cdeb', null, true)) ko('pro-horaire-cdeb');
     if (!_checkRequiredText('pro-horaire-cfin', null, true)) ko('pro-horaire-cfin');
-    if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && _proHeureFin() <= _proHeureDebut()) {
-      _showFieldError('pro-horaire-cfin', "L'heure de fin doit être postérieure à l'heure de début.");
+    if (_proMemeJour() && _proHeureDebut() && _proHeureFin() && !_hcCreneauRespecte15Minutes(_proHeureDebut(), _proHeureFin())) {
+      _showFieldError('pro-horaire-cfin', "L'heure de fin doit être au moins 15 minutes après l'heure de début.");
       ko('pro-horaire-cfin');
     }
     return ok;
@@ -10608,7 +10624,7 @@ function _proRubriqueComplete(cle) {
     var d = _proDateDebut(), f = _proDateFin();
     if (!d || !f || f < d) return false;
     if (!_proHeureDebut() || !_proHeureFin()) return false;
-    if (_proMemeJour() && _proHeureFin() <= _proHeureDebut()) return false;
+    if (_proMemeJour() && !_hcCreneauRespecte15Minutes(_proHeureDebut(), _proHeureFin())) return false;
     return true;
   }
   if (cle === 'mission') return !!_proDescription().trim() && !_proDescriptionTropLongue();
@@ -11316,7 +11332,7 @@ function _verifierHoraireGlobal(pref) {
     var f = (document.getElementById('client-' + pref + '-cfin') || {}).value || '';
     if (!d) return { id: 'client-' + pref + '-cdeb', msg: 'Ce champ est obligatoire.' };
     if (!f) return { id: 'client-' + pref + '-cfin', msg: 'Ce champ est obligatoire.' };
-    if (f <= d) return { id: 'client-' + pref + '-cfin', msg: 'La fin du créneau doit être postérieure au début.' };
+    if (!_hcCreneauRespecte15Minutes(d, f)) return { id: 'client-' + pref + '-cfin', msg: 'La fin du créneau doit être au moins 15 minutes après le début.' };
     return null;
   }
   var h = (document.getElementById(idH) || {}).value || '';
@@ -11617,7 +11633,7 @@ function _verifierHoraire(i, prefixe) {
     var fin = (document.getElementById(b + '-cfin') || {}).value || '';
     if (!deb) return { id: b + '-cdeb', msg: 'Ce champ est obligatoire.' };
     if (!fin) return { id: b + '-cfin', msg: 'Ce champ est obligatoire.' };
-    if (fin <= deb) return { id: b + '-cfin', msg: 'La fin du créneau doit être postérieure au début.' };
+    if (!_hcCreneauRespecte15Minutes(deb, fin)) return { id: b + '-cfin', msg: 'La fin du créneau doit être au moins 15 minutes après le début.' };
     return null;
   }
   var h = (document.getElementById(b + '-heure') || {}).value || '';
@@ -16335,7 +16351,9 @@ function clientCalcWithKm(km, vtype, clean, plateau, restit, resultEl, priceEl, 
   }
   detailEl.innerHTML = html;
   if (devisMsg) devisMsg.style.display = 'none';
-  if (submitBtn) submitBtn.textContent = submitBtn.dataset.mission === 'true' ? 'Obtenir mon devis gratuitement →' : 'Créer mon compte →';
+  if (submitBtn) submitBtn.textContent = (typeof _hcModeIntegre === 'function' && _hcModeIntegre())
+    ? 'Créer une nouvelle demande →'
+    : (submitBtn.dataset.mission === 'true' ? 'Obtenir mon devis gratuitement →' : 'Créer mon compte →');
   var nonRoul = vtype === 'non-fonctionnel';
   var rolEl = document.getElementById('client-vehicle-roulant');
   var nrEl  = document.getElementById('client-vehicle-nonroulant');
@@ -16369,7 +16387,9 @@ function selectDispo(label, val) {
 
     submitBtn.dataset.mission = val !== 'pas-maintenant' ? 'true' : 'false';
 
-    submitBtn.textContent = val === 'pas-maintenant' ? 'Créer mon compte →' : 'Obtenir mon devis gratuitement →';
+    submitBtn.textContent = (typeof _hcModeIntegre === 'function' && _hcModeIntegre())
+      ? 'Créer une nouvelle demande →'
+      : (val === 'pas-maintenant' ? 'Créer mon compte →' : 'Obtenir mon devis gratuitement →');
 
   }
 
@@ -17162,8 +17182,7 @@ async function _submitClientFormInterne() {
           '<strong>Votre demande de devis a bien été enregistrée.</strong><br>' +
           'Votre devis personnalisé vous sera envoyé par e-mail <span class="hc-succes-delai">sous 1 heure</span>. ' +
           'Notre équipe pourra également vous contacter si des informations complémentaires sont nécessaires.' +
-          '</div>' +
-          '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
+          '</div>';
       } else if (_compteEtat === 'cree') {
         html += '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé.</div>';
       } else if (_compteEtat === 'existe_deja') {
@@ -17219,13 +17238,16 @@ async function _submitClientFormInterne() {
       if (!_rattachee) _hcMemoriserReclamation(payload.id, cleReclamation, email_val);
       if ((_compteEtat === 'cree') && !_rattachee) {
         html += '<div class="hc-succes-note" style="margin-top:10px">'
-          + '<strong>Confirmez votre compte grâce au message envoyé par e-mail.</strong>'
+          + '<strong>Pour activer votre espace HelixCar, cliquez sur le lien reçu par e-mail.</strong>'
           + '</div>';
       } else if (_rattachee) {
         // Aucun petit texte supplémentaire sur l'écran final. Le
         // rattachement est conservé comme preuve technique, sans
         // encombrer le message demandé par le client.
         _hcOublierReclamation(payload.id);
+      }
+      if (missionReelle) {
+        html += '<div class="hc-succes-note">Pensez à vérifier vos courriers indésirables si vous ne trouvez pas notre e-mail.</div>';
       }
 
       document.getElementById('client-success-msg').innerHTML = html;
@@ -17970,9 +17992,14 @@ async function submitConnexionForm() {
     return;
   }
   if (!res || res.error || !res.data || !res.data.session) {
-    // Message volontairement identique quelle que soit la cause : ne pas
-    // révéler si une adresse existe ou non.
-    afficher('Adresse e-mail ou mot de passe incorrect.');
+    var erreurConnexion = String((res && res.error && res.error.message) || '');
+    if (/email[^\n]*(not|non)[^\n]*(confirm|valid)|confirm[^\n]*email|courriel[^\n]*(non|pas)[^\n]*(confirm|valid)/i.test(erreurConnexion)) {
+      afficher('Veuillez valider votre compte à l’aide du lien reçu par e-mail.');
+    } else {
+      // Une autre erreur reste volontairement neutre pour ne pas révéler
+      // si une adresse est inscrite.
+      afficher('Adresse e-mail ou mot de passe incorrect.');
+    }
     return;
   }
   // La session est ouverte : l'espace la retrouve tel quel, puisque les
@@ -20331,7 +20358,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Type</label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
+      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
     html+=_hcSousVeh(i,'identite',1,'Identité du véhicule',identite,true);
 
     var no=2;
@@ -20373,7 +20400,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
+      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
@@ -22826,6 +22853,177 @@ console.log('HelixCar ' + window.HC_VERSION);
   var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}},20);});
   function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
   document.addEventListener('DOMContentLoaded',startConv);if(document.readyState!=='loading')setTimeout(startConv,0);
+})();
+</script>
+
+<script id="hc-lot-pr6-non-regression">
+(function () {
+  'use strict';
+
+  function minutes(v) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(v || '');
+    return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+  }
+  function heure(total) {
+    total = Math.max(0, Math.min(1439, total));
+    return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+  }
+  window._hcCreneauRespecte15Minutes = function (debut, fin) {
+    var d = minutes(debut), f = minutes(fin);
+    return d !== null && f !== null && f - d >= 15;
+  };
+
+  // La prise en charge HelixCar reprend la date de début de stockage :
+  // valeur visible, grisée, non modifiable, sans calendrier.
+  function verrouillerDatePriseEnCharge() {
+    var actif = typeof _avecStockage === 'function' && _avecStockage()
+      && typeof _acheminementStockage === 'function' && _acheminementStockage() === 'helixcar';
+    var debut = (document.getElementById('stock-debut') || {}).value || '';
+    var champs = [];
+    var mono = document.getElementById('client-date-pc');
+    if (mono) champs.push(mono);
+    document.querySelectorAll('input[id^="veh-"][id$="-pc-date"]').forEach(function (el) { champs.push(el); });
+    champs.forEach(function (champ) {
+      if (actif && debut) champ.value = debut;
+      champ.disabled = !!actif;
+      champ.readOnly = true;
+      champ.classList.toggle('hc-date-verrouillee', !!actif);
+      if (actif) {
+        champ.setAttribute('aria-disabled', 'true');
+        champ.title = 'Cette date reprend automatiquement le début du stockage.';
+      } else {
+        champ.removeAttribute('aria-disabled');
+        champ.removeAttribute('title');
+      }
+    });
+  }
+  var syncDate = window._synchroniserPriseEnChargeAvecDebutStockage;
+  if (typeof syncDate === 'function') {
+    window._synchroniserPriseEnChargeAvecDebutStockage = function () {
+      syncDate.apply(this, arguments);
+      verrouillerDatePriseEnCharge();
+    };
+  }
+  var rendreVehicules = window.rendreFichesVehicules;
+  if (typeof rendreVehicules === 'function') {
+    window.rendreFichesVehicules = function () {
+      var retour = rendreVehicules.apply(this, arguments);
+      verrouillerDatePriseEnCharge();
+      return retour;
+    };
+  }
+  document.addEventListener('change', function (e) {
+    if (e.target && (e.target.id === 'stock-debut' || e.target.name === 'stock-acheminement')) {
+      setTimeout(verrouillerDatePriseEnCharge, 0);
+    }
+  }, true);
+
+  // Les calendriers et horaires du formulaire intégré s'ouvrent près du
+  // champ concerné, dans la zone visible du cadre.
+  function ancrer(champ, panneau) {
+    if (!document.body.classList.contains('hc-integre') || !champ || !panneau) return;
+    var r = champ.getBoundingClientRect();
+    var largeur = panneau.offsetWidth || 300;
+    var hauteur = panneau.offsetHeight || 300;
+    var gauche = Math.max(8, Math.min(r.left, window.innerWidth - largeur - 8));
+    var haut = r.bottom + 8;
+    if (haut + hauteur > window.innerHeight - 8) haut = Math.max(8, r.top - hauteur - 8);
+    panneau.style.position = 'fixed';
+    panneau.style.left = gauche + 'px';
+    panneau.style.top = haut + 'px';
+    panneau.style.margin = '0';
+  }
+  var ouvrirCal = window._hcOuvrirCalendrier;
+  if (typeof ouvrirCal === 'function') {
+    window._hcOuvrirCalendrier = function (champ) {
+      if (!champ || champ.disabled) return;
+      ouvrirCal.apply(this, arguments);
+      requestAnimationFrame(function () {
+        ancrer(champ, _hcCalOverlay && _hcCalOverlay.querySelector('.hc-cal'));
+      });
+    };
+  }
+  var ouvrirHeure = window._hpOuvrirPicker;
+  if (typeof ouvrirHeure === 'function') {
+    window._hpOuvrirPicker = function (champ) {
+      ouvrirHeure.apply(this, arguments);
+      requestAnimationFrame(function () {
+        ancrer(champ, _hpOverlay && _hpOverlay.querySelector('.hp-picker'));
+      });
+    };
+  }
+
+  // Le sélecteur affiche et impose directement la borne minimale.
+  var rendreGroupe = window._hpRendreGroupeSimple;
+  if (typeof rendreGroupe === 'function') {
+    window._hpRendreGroupeSimple = function (idChamp) {
+      var hm = _hpLireHeureMinute(idChamp);
+      if (hm.h === null && _hpContexteActif && _hpContexteActif.mode === 'creneau'
+          && idChamp === _hpContexteActif.idFin) {
+        var d = _hpLireHeureMinute(_hpContexteActif.idDebut);
+        var dm = d.h === null ? 14 * 60 + 30 : d.h * 60 + d.min;
+        var total = Math.min(1439, dm + 15);
+        var champ = document.getElementById(idChamp);
+        if (champ) champ.dataset.hcPickerSuggestion = heure(total);
+        var original = champ ? champ.value : '';
+        if (champ) champ.value = heure(total);
+        var html = rendreGroupe.call(this, idChamp);
+        if (champ) champ.value = original;
+        return html;
+      }
+      return rendreGroupe.apply(this, arguments);
+    };
+  }
+  window._hpAjuster = function (idChamp, type, delta) {
+    if (!_hpContexteActif || _hpContexteActif.mode !== 'creneau') return;
+    var debutId = _hpContexteActif.idDebut, finId = _hpContexteActif.idFin;
+    var d = minutes((document.getElementById(debutId) || {}).value);
+    var f = minutes((document.getElementById(finId) || {}).value);
+    if (d === null) d = 14 * 60 + 30;
+    if (f === null || f < d + 15) f = Math.min(1439, d + 15);
+    var courant = idChamp === debutId ? d : f;
+    var candidat = courant + delta * (type === 'h' ? 60 : 15);
+    if (idChamp === debutId) {
+      d = Math.max(0, Math.min(1424, candidat));
+      if (f < d + 15) f = Math.min(1439, d + 15);
+    } else {
+      f = Math.max(d + 15, Math.min(1439, candidat));
+    }
+    _hpEcrireHeure(debutId, Math.floor(d / 60), d % 60);
+    _hpEcrireHeure(finId, Math.floor(f / 60), f % 60);
+    _hpRendrePicker();
+  };
+  var validerHeure = window._hpValiderPicker;
+  window._hpValiderPicker = function () {
+    if (_hpContexteActif && _hpContexteActif.mode === 'creneau') {
+      var debutId = _hpContexteActif.idDebut, finId = _hpContexteActif.idFin;
+      var d = minutes((document.getElementById(debutId) || {}).value);
+      var f = minutes((document.getElementById(finId) || {}).value);
+      if (d === null) d = 14 * 60 + 30;
+      d = Math.min(1424, d);
+      if (f === null || f < d + 15) f = d + 15;
+      _hpEcrireHeure(debutId, Math.floor(d / 60), d % 60);
+      _hpEcrireHeure(finId, Math.floor(f / 60), f % 60);
+      _hpFermerPicker();
+      return;
+    }
+    validerHeure.apply(this, arguments);
+  };
+
+  // L'horaire professionnel utilise la même règle métier.
+  if (typeof window.proOnHoraireChange === 'function') {
+    var proChange = window.proOnHoraireChange;
+    window.proOnHoraireChange = function () {
+      proChange.apply(this, arguments);
+      if (_proMemeJour() && _proHeureDebut() && _proHeureFin()
+          && !_hcCreneauRespecte15Minutes(_proHeureDebut(), _proHeureFin())) {
+        _showFieldError('pro-horaire-cfin', "L'heure de fin doit être au moins 15 minutes après l'heure de début.");
+      }
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', verrouillerDatePriseEnCharge);
+  if (document.readyState !== 'loading') setTimeout(verrouillerDatePriseEnCharge, 0);
 })();
 </script>
 
