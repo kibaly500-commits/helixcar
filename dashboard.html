@@ -3916,6 +3916,52 @@ async function _hcRolesDeLaSession() {
   }
 }
 
+// Retour du lien de confirmation d'adresse d'un nouveau client.
+//
+// La demande peut avoir été remplie sur un ordinateur et l'e-mail ouvert
+// sur un téléphone. localStorage ne traverse ni les appareils ni les
+// navigateurs : la preuve à usage unique voyage donc dans le lien.
+// Elle ne suffit jamais seule : reclamer_demande exige aussi une session
+// confirmée et la même adresse e-mail que celle de la demande.
+async function _hcRattacherClientApresConfirmation() {
+  let url;
+  try { url = new URL(location.href); } catch (e) { return false; }
+  if (url.searchParams.get('activation') !== 'client') return false;
+
+  const dossier = (url.searchParams.get('dossier') || '').trim();
+  const cle = (url.searchParams.get('reclamation') || '').trim();
+  const uuidValide = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dossier);
+  const cleValide = /^[0-9a-f]{64}$/i.test(cle);
+  if (!uuidValide || !cleValide) {
+    console.warn('Activation client : paramètres invalides.');
+    return false;
+  }
+
+  try {
+    const { data, error } = await sbAuth.rpc('reclamer_demande', {
+      p_client_id: dossier,
+      p_cle: cle
+    });
+    if (error || !data || data.ok !== true
+        || (data.code !== 'RATTACHEE' && data.code !== 'DEJA_RATTACHEE')) {
+      console.warn('Activation client refusée :', error || (data && data.code));
+      return false;
+    }
+
+    // Le serveur a consommé la preuve. On la retire aussitôt de l'URL
+    // et du stockage éventuel de l'appareil d'inscription.
+    url.searchParams.delete('activation');
+    url.searchParams.delete('dossier');
+    url.searchParams.delete('reclamation');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    if (typeof _hcOublierReclamation === 'function') _hcOublierReclamation(dossier);
+    return true;
+  } catch (e) {
+    console.warn('Activation client :', e);
+    return false;
+  }
+}
+
 // Retour du lien de confirmation d'adresse d'un nouveau convoyeur.
 // Le navigateur possède maintenant une session Auth confirmée : la
 // fonction serveur peut enfin vérifier que l'adresse de la session est
@@ -4023,6 +4069,7 @@ async function finaliserSessionParUid(email, authUserId) {
   // le rôle n'existe précisément pas encore tant que cet appel n'a pas
   // rattaché la fiche convoyeur à l'identité Auth.
   await _hcRattacherPartenaireApresConfirmation();
+  await _hcRattacherClientApresConfirmation();
   window._hcRolesAutorises = await _hcRolesDeLaSession();
 
   // Repli si le serveur ne repond pas ou si la migration 104 n'est pas
