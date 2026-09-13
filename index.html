@@ -16908,9 +16908,8 @@ async function _submitClientFormInterne() {
             }
           } catch (eSession) {
             console.warn('Nettoyage de la session précédente impossible :', eSession);
-            _compteEtat = 'echec';
+            throw new Error('SESSION_AMBIANTE_NON_NETTOYEE');
           }
-          if (_compteEtat === 'echec') throw new Error('SESSION_AMBIANTE_NON_NETTOYEE');
         }
 
         // Sans destination explicite, Supabase revient sur la « Site URL »
