@@ -371,6 +371,15 @@ window.emailjs = { init: function () {},
     !/from\('demande_informations_manquantes'\)[\s\S]{0,200}update/.test(idx),
     'index.html doit passer par repondre_informations_demande');
   check('D6 : aucune erreur JS', erreursJs.length === 0, erreursJs.join(' | '));
+  const migrationVin = fs.readFileSync(fichier('migrations/130_vin_information_attendue.sql'), 'utf8');
+  check('D7 : le VIN manquant devient une information attendue côté serveur',
+    /vehicule_' \|\| rang::text \|\| '_vin'/.test(migrationVin)
+      && /Numéro de châssis \(VIN\)/.test(migrationVin));
+  const debutRequisVin = idx.indexOf('function _champsRequisVehicule');
+  const finRequisVin = idx.indexOf('return req;', debutRequisVin);
+  const blocRequisVin = idx.slice(debutRequisVin, finRequisVin);
+  check('D8 : le VIN reste non bloquant pour l’enregistrement du devis',
+    !/req\.push\([^)]*['"](?:restit-)?vin['"]/.test(blocRequisVin));
 
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));
