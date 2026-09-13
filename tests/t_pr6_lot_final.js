@@ -26,8 +26,9 @@ check('Type de trajet limité au service principal convoyage',
 // Duplication : la limite dépend du total, jamais de l'état antérieur des fiches.
 check('Toutes les autres fiches sont duplicables',
   index.includes("for (var j = 0; j < n; j++) { if (j !== source) out.push(j); }"));
-check('Les identifiants véhicule sont eux aussi remplacés par la source',
-  index.includes("['type', 'marque', 'immat', 'vin',"));
+check('Les données duplicables remplacent la cible sans copier ses plaques',
+  index.includes("['type', 'marque', 'vin',") &&
+  index.includes('Les plaques restent propres à chaque véhicule et ne sont jamais copiées.'));
 check('L’ancien message de blocage de duplication a disparu',
   !index.includes("Aucune fiche véhicule vierge n'est disponible"));
 
