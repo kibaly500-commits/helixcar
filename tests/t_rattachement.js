@@ -29,11 +29,12 @@ function check(l, c, e) {
 //   false -> confirmation ACTIVE : un utilisateur, aucune session, et
 //            signInWithPassword refuse tant que l'adresse n'est pas
 //            confirmée.
-function init(avecSession) {
+function init(avecSession, refusInscription) {
   return `
 window.__journal = [];
 window.__session = null;
 window.__avecSession = ${avecSession ? 'true' : 'false'};
+window.__refusInscription = ${refusInscription ? 'true' : 'false'};
 window.__emails = [];
 // L'e-mail de confirmation au client est un comportement PRODUIT. Il
 // est intercepte ici : rien ne part reellement. Ce qui compte est son
@@ -54,6 +55,10 @@ window.supabase = { createClient: function () { return {
         retour: ident && ident.options && ident.options.emailRedirectTo,
         data: ident && ident.options && JSON.parse(JSON.stringify(ident.options.data || {}))
       });
+      if (window.__refusInscription) {
+        return { data: { user: null, session: null },
+          error: { message: 'redirect URL not allowed' } };
+      }
       if (window.__avecSession) {
         window.__session = { access_token: 'jwt-client', user: UTILISATEUR };
         return { data: { user: UTILISATEUR, session: window.__session }, error: null };
@@ -93,12 +98,12 @@ window.supabase = { createClient: function () { return {
 `;
 }
 
-async function deposerCompteSeul(browser, avecSession) {
+async function deposerCompteSeul(browser, avecSession, refusInscription) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.addInitScript(init(avecSession));
+  await page.addInitScript(init(avecSession, refusInscription));
   await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
 
@@ -113,7 +118,9 @@ async function deposerCompteSeul(browser, avecSession) {
     // La fin, c'est l'ECRITURE reellement partie — pas un balisage de
     // succes qui existe deja dans le document, masque.
     const fini = await page.evaluate(() =>
-      window.__journal.some(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules'));
+      window.__journal.some(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')
+      || /compte et votre demande n'ont pas pu être enregistrés/i.test(
+           (document.getElementById('supabase-debug') || {}).textContent || ''));
     if (fini) break;
     await page.evaluate(() => {
       const mdp = document.getElementById('client-password');
@@ -142,6 +149,9 @@ async function deposerCompteSeul(browser, avecSession) {
       appelInscription: window.__journal.find(j => j.op === 'signUp') || null,
       appels: appels,
       succesTexte: zone ? zone.textContent : '',
+      succesVisible: getComputedStyle(document.getElementById('modal-client-success')).display !== 'none',
+      erreurTexte: (document.getElementById('supabase-debug') || {}).textContent || '',
+      prenomConserve: (document.getElementById('client-prenom') || {}).value || '',
       emails: window.__journal.filter(j => j.op === 'email').length,
       emailAvantEcriture: (function () {
         const iMail = window.__journal.findIndex(j => j.op === 'email');
@@ -186,15 +196,33 @@ async function deposerCompteSeul(browser, avecSession) {
   check('B5 : aucune erreur JavaScript', b.erreurs.length === 0, b.erreurs.slice(0, 2).join(' | '));
   await b.page.close();
 
+  // Régression observée en recette : Auth refuse l'inscription (par
+  // exemple une Redirect URL de Preview non autorisée). Le parcours ne
+  // doit ni continuer vers l'écriture, ni fabriquer un faux succès.
+  const refus = await deposerCompteSeul(browser, true, true);
+  check('B6 : un refus de création de compte arrête la demande avant toute écriture',
+    refus.etat.appels.length === 0, JSON.stringify(refus.etat.journal));
+  check('B7 : aucun écran de réussite ni faux numéro client n\'est affiché',
+    refus.etat.succesVisible === false && !/HC-/.test(refus.etat.succesTexte),
+    refus.etat.succesTexte.slice(0, 200));
+  check('B8 : le client reçoit une erreur claire et ses informations restent saisies',
+    /compte et votre demande n'ont pas pu être enregistrés/i.test(refus.etat.erreurTexte)
+      && refus.etat.prenomConserve === 'Jean',
+    JSON.stringify({ erreur: refus.etat.erreurTexte, prenom: refus.etat.prenomConserve }));
+  check('B9 : le refus ne déclenche aucun e-mail de succès',
+    refus.etat.emails === 0, String(refus.etat.emails));
+  check('B10 : aucune erreur JavaScript dans ce cas réel',
+    refus.erreurs.length === 0, refus.erreurs.slice(0, 2).join(' | '));
+  await refus.page.close();
+
   // ══ C. signUp NE DONNE PAS DE SESSION (confirmation d'e-mail) ══
   const c = await deposerCompteSeul(browser, false);
   check('C1 : un compte est créé', c.etat.journal.indexOf('signUp') !== -1,
     JSON.stringify(c.etat.journal));
-  const retourConfirmation = new URL((c.etat.appelInscription && c.etat.appelInscription.retour) || 'https://invalid.invalid/');
   const appelCreation = c.etat.appels[0] && c.etat.appels[0].params;
   const metaInscription = (c.etat.appelInscription && c.etat.appelInscription.data) || {};
-  check('C1 bis : avec confirmation requise, le retour vise aussi le Dashboard',
-    /\/dashboard\.html$/.test(retourConfirmation.pathname),
+  check('C1 bis : une Preview ne force plus une Redirect URL refusée par Supabase',
+    !c.etat.appelInscription.retour,
     JSON.stringify(c.etat.appelInscription));
   check('C1 ter : le compte Auth transporte la demande et sa preuve à usage unique',
     metaInscription.hc_activation === 'client'
