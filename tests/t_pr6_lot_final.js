@@ -74,7 +74,7 @@ check('Valider ce véhicule reste désactivé tant que toutes les étapes ne son
   index.includes("bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');"));
 check('Chaque étape démarre rouge et ne passe au vert qu’après son bouton OK',
   index.includes(".replace('class=\\\"veh-sous-accordeon', 'class=\\\"veh-sous-accordeon incomplet')") &&
-  index.includes("var confirme = bloc.dataset.hcDejaValide === '1' && etapeValide(i, num);") &&
+  index.includes("var confirme = bloc.dataset.hcDejaValide === '1' && etapeComplete(i, bloc);") &&
   index.includes("bloc.classList.toggle('termine', confirme);") &&
   index.includes("bloc.classList.toggle('incomplet', !confirme);"));
 check('Modifier une étape déjà confirmée la repasse en rouge',
