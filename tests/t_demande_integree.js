@@ -193,6 +193,49 @@ window.fetch = function (url, options) {
         memeCode.services.length === 4, JSON.stringify(memeCode.services));
       check('A13 : et ce sont les mêmes règles métier, pas une copie',
         memeCode.fonctions.length === 5, JSON.stringify(memeCode.fonctions));
+
+      // Régression constatée en recette réelle : le mode intégré masquait
+      // les couches ajoutées directement dans <body>. Les clics existaient,
+      // mais calendriers et bulles d'aide restaient invisibles.
+      const interactions = await cadres[0].evaluate(() => {
+        const aide = Array.from(document.querySelectorAll('.hc-help-btn'))
+          .find(el => el.offsetParent !== null);
+        if (aide) aide.click();
+        const pop = document.querySelector('.hc-help-popover');
+        const aideVisible = !!pop && getComputedStyle(pop).display !== 'none'
+          && getComputedStyle(pop).visibility !== 'hidden';
+
+        const stockage = document.querySelector('input[name="type-service"][value="stockage"]');
+        if (stockage) stockage.click();
+        const date = document.getElementById('stock-debut');
+        if (date) date.click();
+        const calendrier = document.querySelector('.hc-cal-overlay');
+        const calendrierVisible = !!calendrier
+          && calendrier.classList.contains('open')
+          && getComputedStyle(calendrier).display !== 'none';
+
+        const modale = document.getElementById('modal-client');
+        const item1 = document.querySelector(
+          '#client-step-indicator .step-indicator-item[data-step-item="1"]');
+        const ligneAvantPremiereEtape = item1 && item1.nextElementSibling;
+        return {
+          gardeRetiree: !document.documentElement.classList.contains('hc-integre-tot'),
+          modaleCliquable: getComputedStyle(modale).pointerEvents !== 'none',
+          aideVisible,
+          calendrierVisible,
+          identiteMasquee: !!item1 && getComputedStyle(item1).display === 'none',
+          traitInitialMasque: !!ligneAvantPremiereEtape
+            && getComputedStyle(ligneAvantPremiereEtape).display === 'none'
+        };
+      });
+      check('A13a : le formulaire intégré accepte réellement les clics',
+        interactions.gardeRetiree && interactions.modaleCliquable, JSON.stringify(interactions));
+      check('A13b : les aides contextuelles sont visibles au clic',
+        interactions.aideVisible, JSON.stringify(interactions));
+      check('A13c : le calendrier de début de stockage s’ouvre au clic',
+        interactions.calendrierVisible, JSON.stringify(interactions));
+      check('A13d : identité et trait initial sont retirés pour le compte connecté',
+        interactions.identiteMasquee && interactions.traitInitialMasque, JSON.stringify(interactions));
     }
 
     // Retour : on revient à ses demandes, toujours sans quitter la page.
