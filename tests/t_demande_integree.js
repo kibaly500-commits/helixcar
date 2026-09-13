@@ -340,6 +340,24 @@ window.fetch = function (url, options) {
     /params\.get\('nouvelle-demande'\) !== '1'\) return false;/.test(idx));
   check('D7 : l\'écran de succès public ne s\'affiche pas dans l\'espace client',
     /if \(type === 'client' && typeof _hcModeIntegre === 'function' && _hcModeIntegre\(\)\)/.test(idx));
+  check('D8 : nouvelle demande et complétion sont deux modes exclusifs',
+    /hc-mode-demande/.test(idx) && /hc-mode-completion/.test(idx)
+      && /#modal-client\.modal-overlay \{ display: none !important; \}/.test(idx)
+      && /#modal-completer\.modal-overlay \{ display: none !important; \}/.test(idx));
+  check('D9 : la nouvelle demande garde un format compact',
+    /max-width: 760px/.test(idx) && /width: min\(780px/.test(dash));
+  check('D10 : le Dashboard reste visible et flouté derrière la demande',
+    /#page-client-nouvelle-demande\.active[\s\S]{0,300}backdrop-filter: blur\(7px\)/.test(dash));
+  check('D11 : la fin du parcours intégré crée une nouvelle demande',
+    /Créer une nouvelle demande →/.test(idx));
+  check('D12 : la prise en charge liée au stockage est vraiment verrouillée',
+    /champ\.disabled = !!actif/.test(idx) && /hc-date-verrouillee/.test(idx)
+      && /if \(!champ \|\| champ\.disabled\) return;/.test(idx));
+  check('D13 : le créneau impose quinze minutes minimum',
+    /_hcCreneauRespecte15Minutes/.test(idx)
+      && /f = Math\.max\(d \+ 15/.test(idx));
+  check('D14 : le VIN n\'est plus présenté comme facultatif',
+    !/VIN <span class="field-optional-hint">\(facultatif\)<\/span>/.test(idx));
 
   await navigateur.close();
   await new Promise(r => serveur.close(r));
