@@ -718,7 +718,7 @@ async function modesParVehicule(page, n) {
     check('Gbis5 : et l\'écran n\'annonce PAS un compte créé',
       !/compte HelixCar est maintenant créé/i.test(r.ecran), r.ecran.slice(0, 300));
     check('Gbis6 : il indique l\'échec sans prétendre que la demande est partie',
-      /compte et votre demande n'a pas pu être enregistrés/i.test(r.erreurGenerale)
+      /compte et votre demande n'ont pas pu être enregistrés/i.test(r.erreurGenerale)
       && !/demande de devis a bien été enregistrée/i.test(r.ecran),
       (r.erreurGenerale + ' | ' + r.ecran).slice(0, 300));
     await page.close();
