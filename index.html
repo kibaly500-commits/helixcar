@@ -12039,10 +12039,11 @@ function _hcExisteVehiculeDisponible(i) {
 // par VALEUR (dst.value = src.value) : aucune référence partagée,
 // aucune liaison créée entre les deux fiches.
 function _hcCopierVehiculeVers(source, cible) {
-  // La duplication remplace intégralement les informations déjà présentes
+  // La duplication remplace les informations duplicables déjà présentes
   // dans la cible : les valeurs de la source confirmée sont prioritaires.
-  ['type', 'marque', 'immat', 'vin',
-   'restit-vtype', 'restit-marque', 'restit-immat', 'restit-vin'].forEach(function (suffixe) {
+  // Les plaques restent propres à chaque véhicule et ne sont jamais copiées.
+  ['type', 'marque', 'vin',
+   'restit-vtype', 'restit-marque', 'restit-vin'].forEach(function (suffixe) {
     var src = document.getElementById('veh-' + source + '-' + suffixe);
     var dst = document.getElementById('veh-' + cible + '-' + suffixe);
     if (src && dst) dst.value = src.value;
