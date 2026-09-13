@@ -139,8 +139,8 @@ window.fetch = function(u, o){
     stats.clients === '2', stats.clients);
   check('B4 : missions en cours — les statuts actifs seulement, pas les terminées',
     stats.missions === '2', stats.missions);
-  check('B5 : le « CA » inventé est remplacé par les devis réellement acceptés',
-    stats.ca === '650' && /2 devis/.test(stats.caSub), JSON.stringify(stats));
+  check('B5 : le compteur affiche le nombre réel de devis acceptés et leur montant exact',
+    stats.ca === '2' && /650,00/.test(stats.caSub), JSON.stringify(stats));
 
   const contenu = await page.evaluate(() => ({
     inscriptions: (document.getElementById('inscriptions-recentes') || {}).textContent || '',
