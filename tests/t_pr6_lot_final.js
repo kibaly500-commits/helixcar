@@ -54,5 +54,50 @@ for (const [nom, source] of [['navigateur', dashboard], ['serveur', pdfServeur]]
     source.includes("prestations.push('Convoyage automobile');"));
 }
 
+
+// Lot suivant — validation stricte des véhicules et absence de résidus visuels.
+check('Le résidu littéral antislash-n est supprimé à la source',
+  !index.includes('</script>\\n'));
+check('La date de prise en charge verrouillée ne montre plus de curseur interdit',
+  index.includes('cursor: default !important; pointer-events: none !important;') &&
+  !index.includes('#modal-client input.hc-date-verrouillee {\n    background: #eef0f2 !important; color: #66707a !important;\n    cursor: not-allowed'));
+check('Le mode de transport ne peut plus être présélectionné artificiellement',
+  index.includes("v.mode_transport==='standard'?'checked':''") &&
+  !index.includes("v.mode_transport==='plateau'?'':'checked'"));
+check('Plaque, VIN et mode de transport participent à la validation obligatoire',
+  index.includes("['immat', 'vin'].forEach") &&
+  index.includes("querySelector('input[name=\"veh-' + i + '-mode\"]:checked')"));
+check('Valider ce véhicule reste désactivé tant que la fiche est incomplète',
+  index.includes('disabled aria-disabled="true">Valider ce véhicule</button>') &&
+  index.includes("bouton.disabled = !completVehicule;") &&
+  index.includes("bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');"));
+check('Chaque étape véhicule incomplète est signalée en rouge',
+  index.includes("bloc.classList.toggle('incomplet', !complet);") &&
+  index.includes('veh-sous-accordeon.incomplet > .veh-sous-barre .veh-sous-num'));
+
+// Après envoi, l'ancien formulaire est détruit et les demandes réelles sont rerendues.
+check('Une demande client envoyée ne peut pas se rouvrir ni être renvoyée',
+  dashboard.includes("cadre.setAttribute('src', 'about:blank');") &&
+  dashboard.includes("cadre.removeAttribute('src');") &&
+  dashboard.includes("loadDemandesClient()"));
+check('Mes demandes propose un aperçu compact en lecture seule',
+  dashboard.includes("actionHtml('ouvrirApercuDemandeClient', [d.id])") &&
+  dashboard.includes("window.ouvrirApercuDemandeClient=async function(id)") &&
+  dashboard.includes('Imprimer / enregistrer en PDF'));
+
+// Identité pro et compteurs : uniquement les vraies données.
+check('La société est affichée avant le nom pour un compte professionnel',
+  dashboard.includes("if (c.type_client === 'pro' && societe) return societe + (personne ? ' / ' + personne : '');") &&
+  dashboard.includes("roleLabel: premiere.type_client === 'pro' ? 'Client professionnel' : 'Client'"));
+check('Le compteur mensuel compte les acceptations réelles avec deux bornes',
+  dashboard.includes("devis?select=prix,statut,date_acceptation&statut=eq.accepte") &&
+  dashboard.includes("'&date_acceptation=gte.'") &&
+  dashboard.includes("'&date_acceptation=lt.'") &&
+  dashboard.includes("_ecrireStat('stat-ca', rows.length.toLocaleString('fr-FR'));"));
+check('Aucun compteur d’administration ne démarre sur une valeur fictive',
+  !/class="stat-value"[^>]*>\s*\d+(?:\s*€)?\s*</.test(dashboard) &&
+  !dashboard.includes('3 en attente de validation') &&
+  !dashboard.includes('id="fc-conv-total">0 €'));
+
 console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
 if (fail) process.exit(1);
