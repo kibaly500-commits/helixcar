@@ -635,12 +635,17 @@ async function modesParVehicule(page, n) {
   check('G1 : la phrase « compte créé » n\'accompagne QUE la création réelle (lot A01)',
     /_compteEtat === 'cree'\) \{\s*html \+= '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé/.test(idx)
     && (idx.match(/hc-succes-txt">Votre compte HelixCar est maintenant créé/g) || []).length === 1);
-  check('G2 : un refus du serveur est dit tel quel',
-    /_compteEtat === 'echec'/.test(idx) && /Votre compte n\\'a pas pu être créé/.test(idx));
+  check('G2 : un refus du serveur arrête le parcours sans faux succès',
+    /_compteEtat === 'echec'/.test(idx)
+    && /Votre compte et votre demande n\\'ont pas pu être enregistrés/.test(idx)
+    && /return;/.test(idx.slice(idx.indexOf("if (!_idCompteDepot && _compteEtat === 'echec')"),
+                                 idx.indexOf("if (!_idCompteDepot && _compteEtat === 'echec')") + 900)));
   check('G3 : une adresse déjà inscrite n\'est pas un échec',
     /_compteEtat = 'existe_deja'/.test(idx) && /rien n\\'a été créé en double/.test(idx));
-  check('G4 : le numéro affiché est celui que le SERVEUR a renvoyé',
-    /_retourSrv\.numero_client \|\| clientNum/.test(idx));
+  check('G4 : le numéro affiché vient uniquement de la preuve SERVEUR',
+    /var _numeroReel = _retourSrv\.numero_client;/.test(idx)
+    && /HC_REPONSE_CREATION_INCOMPLETE/.test(idx)
+    && !/_retourSrv\.numero_client \|\| clientNum/.test(idx));
   check('G5 : le succès n\'est plus déduit d\'un bloc finally',
     !/finally\s*\{[^}]*succes/i.test(idx));
 
@@ -664,8 +669,9 @@ async function modesParVehicule(page, n) {
     await page.waitForTimeout(80);
     for (let i = 0; i < 10; i++) {
       const fini = await page.evaluate(() =>
-        !!document.querySelector('#client-success-msg') &&
-        (document.getElementById('client-success-msg').textContent || '').trim().length > 0);
+        (!!document.querySelector('#client-success-msg')
+          && (document.getElementById('client-success-msg').textContent || '').trim().length > 0)
+        || ((document.getElementById('supabase-debug') || {}).textContent || '').trim().length > 0);
       if (fini) break;
       await page.evaluate(() => {
         const mdp = document.getElementById('client-password');
@@ -685,6 +691,7 @@ async function modesParVehicule(page, n) {
     return page.evaluate(() => ({
       ecran: (document.getElementById('client-success-msg') || {}).textContent || '',
       erreurEmail: (document.getElementById('client-email-err') || {}).textContent || '',
+      erreurGenerale: (document.getElementById('supabase-debug') || {}).textContent || '',
       comptes: window.__comptes.slice(),
       demandes: window.__demandesEcrites.slice()
     }));
@@ -710,8 +717,10 @@ async function modesParVehicule(page, n) {
       r.comptes.length === 0, JSON.stringify(r.comptes));
     check('Gbis5 : et l\'écran n\'annonce PAS un compte créé',
       !/compte HelixCar est maintenant créé/i.test(r.ecran), r.ecran.slice(0, 300));
-    check('Gbis6 : il dit au contraire que le compte n\'a pas pu être créé',
-      /compte n'a pas pu être créé/i.test(r.ecran), r.ecran.slice(0, 300));
+    check('Gbis6 : il indique l\'échec sans prétendre que la demande est partie',
+      /compte et votre demande n'a pas pu être enregistrés/i.test(r.erreurGenerale)
+      && !/demande de devis a bien été enregistrée/i.test(r.ecran),
+      (r.erreurGenerale + ' | ' + r.ecran).slice(0, 300));
     await page.close();
   }
 
