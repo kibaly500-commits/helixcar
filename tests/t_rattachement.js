@@ -156,7 +156,7 @@ async function deposerCompteSeul(browser, avecSession) {
 (async () => {
   const browser = await L.lancerNavigateur();
   const idx = fs.readFileSync(fichier('index.html'), 'utf8');
-  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
+  const dashRattachement = fs.readFileSync(fichier('dashboard.html'), 'utf8');
 
   // ══ A. LE NAVIGATEUR NE DÉCIDE PLUS DU PROPRIÉTAIRE ══
   check('A1 : le code n\'envoie plus d\'auth_user_id dans la demande',
@@ -202,10 +202,10 @@ async function deposerCompteSeul(browser, avecSession) {
       && metaInscription.hc_client_reclamation === (appelCreation && appelCreation.p_cle_reclamation),
     JSON.stringify(metaInscription));
   check('C1 quater : le Dashboard consomme cette preuve avant de lire les rôles',
-    /async function _hcRattacherClientApresConfirmation\(\)/.test(dash)
-      && /sbAuth\.auth\.getUser\(\)/.test(dash)
-      && /sbAuth\.rpc\('reclamer_demande'/.test(dash)
-      && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dash),
+    /async function _hcRattacherClientApresConfirmation\(\)/.test(dashRattachement)
+      && /sbAuth\.auth\.getUser\(\)/.test(dashRattachement)
+      && /sbAuth\.rpc\('reclamer_demande'/.test(dashRattachement)
+      && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dashRattachement),
     'rattachement client absent ou appelé trop tard');
   check('C2 : une session est RÉELLEMENT tentée avant d\'écrire',
     c.etat.journal.indexOf('signIn') !== -1
