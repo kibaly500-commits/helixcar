@@ -67,13 +67,20 @@ check('Le mode de transport ne peut plus être présélectionné artificiellemen
 check('Plaque, VIN et mode de transport participent à la validation obligatoire',
   index.includes("['immat', 'vin'].forEach") &&
   index.includes("querySelector('input[name=\"veh-' + i + '-mode\"]:checked')"));
-check('Valider ce véhicule reste désactivé tant que la fiche est incomplète',
+check('Valider ce véhicule reste désactivé tant que toutes les étapes ne sont pas confirmées',
   index.includes('disabled aria-disabled="true">Valider ce véhicule</button>') &&
+  index.includes("var completVehicule = donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);") &&
   index.includes("bouton.disabled = !completVehicule;") &&
   index.includes("bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');"));
-check('Chaque étape véhicule incomplète est signalée en rouge',
-  index.includes("bloc.classList.toggle('incomplet', !complet);") &&
-  index.includes('veh-sous-accordeon.incomplet > .veh-sous-barre .veh-sous-num'));
+check('Chaque étape démarre rouge et ne passe au vert qu’après son bouton OK',
+  index.includes(".replace('class=\\\"veh-sous-accordeon', 'class=\\\"veh-sous-accordeon incomplet')") &&
+  index.includes("var confirme = bloc.dataset.hcDejaValide === '1' && etapeValide(i, num);") &&
+  index.includes("bloc.classList.toggle('termine', confirme);") &&
+  index.includes("bloc.classList.toggle('incomplet', !confirme);"));
+check('Modifier une étape déjà confirmée la repasse en rouge',
+  index.includes("bloc.dataset.hcDejaValide = '0';") &&
+  index.includes("bloc.classList.remove('termine');") &&
+  index.includes("bloc.classList.add('incomplet');"));
 
 // Après envoi, l'ancien formulaire est détruit et les demandes réelles sont rerendues.
 check('Une demande client envoyée ne peut pas se rouvrir ni être renvoyée',
@@ -83,6 +90,7 @@ check('Une demande client envoyée ne peut pas se rouvrir ni être renvoyée',
 check('Mes demandes propose un aperçu compact en lecture seule',
   dashboard.includes("actionHtml('ouvrirApercuDemandeClient', [d.id])") &&
   dashboard.includes("window.ouvrirApercuDemandeClient=async function(id)") &&
+  dashboard.includes("HC_ACTIONS.ouvrirApercuDemandeClient") &&
   dashboard.includes('Imprimer / enregistrer en PDF'));
 
 // Identité pro et compteurs : uniquement les vraies données.
