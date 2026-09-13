@@ -5218,10 +5218,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
    active, sans aucun changement. */
 #modal-client label.radio-opt.hc-opt-reservee {
   opacity: .55;
-  cursor: not-allowed;
+  cursor: default;
 }
-#modal-client label.radio-opt.hc-opt-reservee input[type="radio"] { cursor: not-allowed; }
-#modal-client label.radio-opt.hc-opt-reservee .hc-opt-desc { color: var(--accent); font-weight: 600; }
+#modal-client label.radio-opt.hc-opt-reservee input[type="radio"] { cursor: default; }
+#modal-client label.radio-opt.hc-opt-reservee .hc-opt-desc { color: #7A7F84; font-weight: 400; }
 
 /* LOT F01 (F01-035/036) — compteur discret sous un texte plafonné
    (Mission : 166 caractères, Type de mission : 156). Il devient rouge
@@ -8248,7 +8248,7 @@ function resetFormSteps(type) {
     var choiceEl = document.getElementById('client-step2-choice');
     if (choiceEl) choiceEl.style.display = 'none';
     var trajetEl = document.getElementById('trajet-type-group');
-    if (trajetEl) trajetEl.style.display = 'block';
+    if (trajetEl) trajetEl.style.display = 'none';
   }
   if (type === 'convoyeur') {
     // Lot 1 (V69) — repartir sur un formulaire partenaire vierge :
@@ -8380,7 +8380,10 @@ function _toggleClientStep2Choice(val) {
   var trajetEl = document.getElementById('trajet-type-group');
   var isPasMaintenant = (val === 'pas-maintenant');
   if (choiceEl) choiceEl.style.display = isPasMaintenant ? 'block' : 'none';
-  if (trajetEl) trajetEl.style.display = isPasMaintenant ? 'none' : 'block';
+  if (trajetEl) {
+    var serviceTrajet = _typeServiceChoisi();
+    trajetEl.style.display = (!isPasMaintenant && (serviceTrajet === 'convoyage' || serviceTrajet === 'convoyage_stockage')) ? 'block' : 'none';
+  }
   _clearGroupError('disponibilite-group');
   _renderFormStep('client');
 }
@@ -8396,7 +8399,10 @@ function clientContinueWithMission() {
   var choiceEl = document.getElementById('client-step2-choice');
   var trajetEl = document.getElementById('trajet-type-group');
   if (choiceEl) choiceEl.style.display = 'none';
-  if (trajetEl) trajetEl.style.display = 'block';
+  if (trajetEl) {
+    var serviceTrajet = _typeServiceChoisi();
+    trajetEl.style.display = (serviceTrajet === 'convoyage' || serviceTrajet === 'convoyage_stockage') ? 'block' : 'none';
+  }
   _renderFormStep('client');
 }
 
@@ -10811,7 +10817,8 @@ function onChoixService(serviceDeclencheur) {
   if (blocStock) blocStock.style.display = stock ? 'block' : 'none';
 
   var grpTrajet = document.getElementById('trajet-type-group');
-  if (grpTrajet) grpTrajet.style.display = conv ? 'block' : 'none';
+  var servicePrincipalConvoyage = (t === 'convoyage' || t === 'convoyage_stockage');
+  if (grpTrajet) grpTrajet.style.display = servicePrincipalConvoyage ? 'block' : 'none';
 
   var blocLiv = document.getElementById('bloc-livraison');
   if (blocLiv) blocLiv.style.display = conv ? 'block' : 'none';
@@ -12012,11 +12019,12 @@ function _hcVehiculeEstVierge(j) {
   if (modePlateau && modePlateau.checked) return false;
   return true;
 }
-// Liste ordonnée des indices disponibles, source exclue par sécurité
-// (un véhicule source complet n'est de toute façon jamais vierge).
+// Liste ordonnée des véhicules duplicables : tous les autres emplacements
+// prévus dans la demande, qu'ils soient vierges ou déjà renseignés.
+// La copie confirmée devient la nouvelle source de vérité de la cible.
 function _hcListeVehiculesDisponibles(source) {
   var n = _nbVehicules(), out = [];
-  for (var j = 0; j < n; j++) { if (j !== source && _hcVehiculeEstVierge(j)) out.push(j); }
+  for (var j = 0; j < n; j++) { if (j !== source) out.push(j); }
   return out;
 }
 function _hcExisteVehiculeDisponible(i) {
@@ -12031,11 +12039,10 @@ function _hcExisteVehiculeDisponible(i) {
 // par VALEUR (dst.value = src.value) : aucune référence partagée,
 // aucune liaison créée entre les deux fiches.
 function _hcCopierVehiculeVers(source, cible) {
-  // Une plaque identifie un véhicule précis : ni l'immatriculation
-  // principale ni celle du véhicule à restituer ne sont dupliquées.
-  // Toutes les autres informations restent reprises par valeur.
-  ['type', 'marque', 'vin',
-   'restit-vtype', 'restit-marque', 'restit-vin'].forEach(function (suffixe) {
+  // La duplication remplace intégralement les informations déjà présentes
+  // dans la cible : les valeurs de la source confirmée sont prioritaires.
+  ['type', 'marque', 'immat', 'vin',
+   'restit-vtype', 'restit-marque', 'restit-immat', 'restit-vin'].forEach(function (suffixe) {
     var src = document.getElementById('veh-' + source + '-' + suffixe);
     var dst = document.getElementById('veh-' + cible + '-' + suffixe);
     if (src && dst) dst.value = src.value;
@@ -12163,16 +12170,10 @@ function _hcOuvrirDupliquer(i) {
   var simple = overlay.querySelector('#hc-dupliquer-simple');
   var compteur = overlay.querySelector('#hc-dupliquer-compteur');
   var boutonGo = overlay.querySelector('#hc-dupliquer-go');
-  // Aucune fiche réellement vierge : le bouton reste visible et
-  // cliquable, mais on explique pourquoi la copie est impossible plutôt
-  // que de laisser un clic sans effet. La protection anti-écrasement
-  // (V52.1) est inchangée : une fiche commencée n'est jamais écrasée.
+  // Un seul véhicule total : aucun emplacement cible, donc aucune boîte
+  // de dialogue inutile. Dans tous les autres cas, les cibles existent.
   if (!disponibles.length) {
-    simple.style.display = 'block';
-    simple.textContent = 'Aucune fiche véhicule vierge n\'est disponible : les autres véhicules contiennent déjà des informations et ne seront pas écrasés.';
-    compteur.style.display = 'none';
-    boutonGo.style.display = 'none';
-    overlay.style.display = 'flex';
+    _hcDupliquerSource = null;
     return;
   }
   boutonGo.style.display = '';
@@ -12193,9 +12194,8 @@ function _hcFermerDupliquer() {
   if (_hcDupliquerOverlay) _hcDupliquerOverlay.style.display = 'none';
   _hcDupliquerSource = null;
 }
-// Point 7 (V52) — n'utilise QUE les véhicules réellement disponibles au
-// moment du clic, jamais un véhicule déjà renseigné. La quantité est
-// déjà bornée au maximum disponible par _hcAjusterDupliquerQte.
+// La quantité est bornée par le nombre total de véhicules moins la source.
+// Les cibles déjà renseignées sont volontairement remplacées.
 function _hcConfirmerDupliquer() {
   if (_hcDupliquerSource === null) return;
   var source = _hcDupliquerSource;
@@ -22974,8 +22974,11 @@ console.log('HelixCar ' + window.HC_VERSION);
       return rendreGroupe.apply(this, arguments);
     };
   }
+  var ajusterHeureSimple = window._hpAjuster;
   window._hpAjuster = function (idChamp, type, delta) {
-    if (!_hpContexteActif || _hpContexteActif.mode !== 'creneau') return;
+    if (!_hpContexteActif || _hpContexteActif.mode !== 'creneau') {
+      return ajusterHeureSimple.apply(this, arguments);
+    }
     var debutId = _hpContexteActif.idDebut, finId = _hpContexteActif.idFin;
     var d = minutes((document.getElementById(debutId) || {}).value);
     var f = minutes((document.getElementById(finId) || {}).value);
@@ -23046,6 +23049,26 @@ console.log('HelixCar ' + window.HC_VERSION);
 })();
 </script>
 
+<script>
+(function () {
+  function retirerNParasiteIntegre() {
+    if (!document.body.classList.contains('hc-integre')) return;
+    var racine = document.getElementById('modal-client');
+    if (!racine || !document.createTreeWalker) return;
+    var walker = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT);
+    var aRetirer = [], noeud;
+    while ((noeud = walker.nextNode())) {
+      if (noeud.nodeValue && noeud.nodeValue.trim() === 'n') aRetirer.push(noeud);
+    }
+    aRetirer.forEach(function (texte) { texte.parentNode && texte.parentNode.removeChild(texte); });
+  }
+  document.addEventListener('DOMContentLoaded', retirerNParasiteIntegre);
+  var racine = document.getElementById('modal-client');
+  if (racine && window.MutationObserver) {
+    new MutationObserver(retirerNParasiteIntegre).observe(racine, { childList: true, subtree: true });
+  }
+})();
+</script>
 </body>
 
 </html>
