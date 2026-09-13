@@ -7403,7 +7403,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
         <div class="modal-row">
           <div class="modal-form-group">
-            <label>Marque / Modèle <span class="field-required">*</span></label>
+            <label>Marque / Modèle <span class="field-optional-hint">(facultatif)</span></label>
             <input type="text" id="client-marque" placeholder="Ex : BMW 320d">
           </div>
           <div class="modal-form-group">
@@ -14030,9 +14030,8 @@ function _validateClientStep(n) {
         _clearGroupError('bloc-vehicules-multiples');
       }
     } else {
-      // Mono-véhicule : les champs du bloc unique restent exigés.
+      // Mono-véhicule : seul le type est requis pour établir le devis.
       mark(_checkSelect('client-vtype'), 'client-vtype');
-      mark(_checkRequiredText('client-marque'), 'client-marque');
     }
     // Le mode de transport n'est plus validé ici : il n'existe plus de
     // champ global. Chaque fiche véhicule valide le sien.
@@ -14418,11 +14417,11 @@ function _afficherNoticeBrouillonRestaure() {
 
   var titre = document.createElement('div');
   titre.className = 'brouillon-carte-titre';
-  titre.textContent = 'Votre demande est toujours là';
+  titre.textContent = 'Demande en cours';
 
   var sousTexte = document.createElement('div');
   sousTexte.className = 'brouillon-carte-sous';
-  sousTexte.textContent = 'Nous avons restauré les informations enregistrées.';
+  sousTexte.textContent = 'Reprenez votre demande ou recommencez depuis le début.';
 
   corps.appendChild(titre);
   corps.appendChild(sousTexte);
@@ -14435,7 +14434,7 @@ function _afficherNoticeBrouillonRestaure() {
   var btnReprendre = document.createElement('button');
   btnReprendre.type = 'button';
   btnReprendre.className = 'btn btn-yellow brouillon-btn-principal';
-  btnReprendre.textContent = 'Reprendre ma demande';
+  btnReprendre.textContent = 'Reprendre';
   btnReprendre.onclick = function () {
     if (notice.parentNode) notice.parentNode.removeChild(notice);
   };
@@ -14447,7 +14446,7 @@ function _afficherNoticeBrouillonRestaure() {
   var btnRecommencer = document.createElement('button');
   btnRecommencer.type = 'button';
   btnRecommencer.className = 'brouillon-btn-secondaire';
-  btnRecommencer.textContent = 'Recommencer';
+  btnRecommencer.textContent = 'Supprimer et recommencer';
   btnRecommencer.onclick = _demanderNouvelleDemandeClient;
 
   actions.appendChild(btnReprendre);
@@ -20185,7 +20184,7 @@ function basculerRestitVehicule(i) {
 }
 
 function _champsRequisVehicule(i) {
-  var req=['type','marque'];
+  var req=['type'];
   var sc=_scenarioTrajet(), commun=_trajetCommun();
   if (sc.pc && !commun) req.push('pc-rue','pc-cp','pc-ville','pc-date');
   if (sc.liv) {
@@ -20356,7 +20355,7 @@ function rendreFichesVehicules() {
       '<div class="veh-contenu" id="veh-contenu-'+i+'">';
 
     var identite='<div class="veh-sstitre">Identité du véhicule</div>'+
-      '<div class="modal-form-group"><label>Type</label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
+      '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
@@ -23064,14 +23063,9 @@ console.log('HelixCar ' + window.HC_VERSION);
 </style>
 <script id="hc-pr6-validation-vehicules">
 (function () {
-  var champsRequisOrig = window._champsRequisVehicule;
-  window._champsRequisVehicule = function (i) {
-    var req = champsRequisOrig(i).slice();
-    ['immat', 'vin'].forEach(function (cle) {
-      if (req.indexOf(cle) === -1) req.push(cle);
-    });
-    return req;
-  };
+  // Au stade du devis, seule la catégorie du véhicule est bloquante
+  // dans l'identité. Le VIN absent reste suivi comme information attendue
+  // côté mission, sans empêcher l'envoi de la demande de devis.
 
   // Toute rubrique commence rouge. Elle ne devient verte qu'après un
   // clic réussi sur SON bouton OK, même si ses champs étaient préremplis.
