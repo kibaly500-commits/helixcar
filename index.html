@@ -16900,11 +16900,15 @@ async function _submitClientFormInterne() {
         // aucun paramètre utilisateur, aucun referrer, aucune redirection
         // ouverte. Cette origine doit être autorisée dans les Redirect URLs
         // Supabase, comme pour le parcours partenaire.
+        // Ne jamais forcer ici l'URL éphémère d'une Preview Vercel :
+        // Supabase refuse l'inscription si cette origine n'est pas dans
+        // ses Redirect URLs. Le Site URL configuré reste la destination
+        // sûre ; les métadonnées permettent toujours de rattacher le
+        // dossier après confirmation.
         var rCompte = await _sb.auth.signUp({
           email: email_val,
           password: mdpSaisi,
           options: {
-            emailRedirectTo: HELIXCAR_URL_DASHBOARD,
             data: {
               hc_activation: 'client',
               hc_client_dossier: payload.id,
@@ -16947,6 +16951,20 @@ async function _submitClientFormInterne() {
       }
     }
   }
+  // Le parcours public « Devenir client » demande explicitement la
+  // création d'un compte. Si Auth la refuse, on n'envoie pas une demande
+  // anonyme et surtout on n'affiche jamais un écran de réussite.
+  if (!_idCompteDepot && _compteEtat === 'echec') {
+    _formStepState.client = 1;
+    _etapeMax = Math.max(_etapeMax, 1);
+    _renderFormStep('client');
+    _hcAfficherBandeauErreur(
+      'Votre compte et votre demande n\'ont pas pu être enregistrés. '
+      + 'Vos informations sont conservées : vérifiez-les puis réessayez. '
+      + 'Si le problème persiste, contactez HelixCar.');
+    return;
+  }
+
   // Conservé pour la lisibilité du reste de la fonction : « un compte a
   // réellement été créé à l'instant ».
   var _compteCree = (_compteEtat === 'cree');
@@ -17027,7 +17045,16 @@ async function _submitClientFormInterne() {
     })
       .then(function (res) {
         if (res && res.error) return { error: res.error.message || String(res.error) };
-        return { ok: true, row: { id: payload.id }, retour: res && res.data };
+        var retour = res && res.data;
+        // Une réponse HTTP réussie sans preuve métier n'est PAS une
+        // demande enregistrée. C'était la source du faux numéro affiché :
+        // le navigateur retombait sur son numéro local même avec data=null.
+        if (!retour || typeof retour !== 'object'
+            || retour.id !== payload.id
+            || !retour.numero_client) {
+          return { error: 'HC_REPONSE_CREATION_INCOMPLETE' };
+        }
+        return { ok: true, row: { id: payload.id }, retour: retour };
       })
       .catch(function (e) { return { error: String((e && e.message) || e) }; })
       .then(function(r) {
@@ -17099,8 +17126,8 @@ async function _submitClientFormInterne() {
       // renvoie, et on ne montre le code de parrainage que s'il existe
       // réellement : promettre une réduction sur un code qui n'a pas
       // été enregistré serait un mensonge de plus.
-      var _retourSrv = (r && r.retour) || {};
-      var _numeroReel = _retourSrv.numero_client || clientNum;
+      var _retourSrv = r.retour;
+      var _numeroReel = _retourSrv.numero_client;
       var html = '<div class="hc-succes-numlabel">Votre numéro client</div>' +
         '<div class="hc-succes-num">' + _attr(_numeroReel) + '</div>';
       if (parrCode) {
