@@ -566,10 +566,30 @@ async function modesParVehicule(page, n) {
     const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
     check('Kbis1 : le Dashboard lit mode_transport SUR LE VÉHICULE',
       /_libelleModeTransport|mt === 'plateau'/.test(dash));
+    check('Kbis1a : la colonne Date souhaitée utilise la règle propre à chaque service',
+      /function _dateSouhaiteeListe\(c\)/.test(dash)
+      && /_dvDate\(_dateSouhaiteeListe\(c\)\)/.test(dash)
+      && /c\.stockage_date_debut/.test(
+           dash.slice(dash.indexOf('function _dateSouhaiteeListe'),
+                      dash.indexOf('function _dateSouhaiteeListe') + 1400)));
     const pageD = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
     const errsD = [];
     pageD.on('pageerror', e => errsD.push(e.message));
     await pageD.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
+    const datesListe = await pageD.evaluate(() => ({
+      stockage: _dateSouhaiteeListe({
+        type_service: 'stockage', stockage_date_debut: '2026-10-02',
+        date_prise_en_charge: null, _vehicules: []
+      }),
+      convoyageMulti: _dateSouhaiteeListe({
+        type_service: 'convoyage', date_prise_en_charge: null,
+        _vehicules: [{ date_prise_en_charge: '2026-10-05' },
+                     { date_prise_en_charge: '2026-10-03' }]
+      })
+    }));
+    check('Kbis1b : stockage et convoyage multi retrouvent réellement leur date',
+      datesListe.stockage === '2026-10-02' && datesListe.convoyageMulti === '2026-10-03',
+      JSON.stringify(datesListe));
     const rendu = await pageD.evaluate(() => {
       const f = Object.keys(window).filter(k => /^_libelleMode|^_modeTransport/.test(k));
       const lu = [];
