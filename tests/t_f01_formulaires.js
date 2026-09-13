@@ -59,7 +59,7 @@ const REF_TYPE = 'Gestion administrative temporaire de dossiers clients, contrô
     await page.evaluate(()=>openModal('client'));
     L.check('D1 : ancien brouillon long conservé après rechargement',await champ.inputValue()===texteAvant);
     L.check('D2 : brouillon long reste bloqué, compteur synchronisé',await page.evaluate(()=>!_proValiderRubrique('mission',()=>{}) && document.getElementById('pro-description-compteur').textContent.includes(' / 156')));
-    await page.getByRole('button',{name:'Reprendre ma demande',exact:true}).click();
+    await page.getByRole('button',{name:'Reprendre',exact:true}).click();
     for(const width of [1280,390,320]) {
       await page.setViewportSize({width,height:900});
       await page.evaluate(()=>{_formStepState.client=3;_renderFormStep('client');if(!document.getElementById('pro-acc-mission').classList.contains('ouvert'))proBasculerRubrique('mission');});
