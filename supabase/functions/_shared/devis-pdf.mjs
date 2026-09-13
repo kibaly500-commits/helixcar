@@ -1478,9 +1478,7 @@ function _construirePdfDevis(c, d) {
     y += ESPACE_SECTION;
 
   } else if (vhPdf.length) {
-    var titreVeh = stockSeul
-      ? (vhPdf.length === 1 ? 'Véhicule à stocker' : 'Véhicules à stocker')
-      : (vhPdf.length === 1 ? 'Véhicule' : 'Véhicules');
+    var titreVeh = vhPdf.length === 1 ? 'Véhicule' : 'Véhicules';
     y += ESPACE_AVANT_TITRE_GLOBAL;
     // V50.4D — Objectif 1/2 : CAUSE DU BUG DE PAGINATION — tous les
     // véhicules étaient auparavant dessinés à l'intérieur d'un SEUL
@@ -2224,9 +2222,10 @@ function _construirePdfDevis(c, d) {
     var _pdPrest = _proPrestationTexte(_proDetails(c));
     if (_pdPrest) prestations.push(_pdPrest);
   } else if (_aStockage(c)) {
-    if (_operationDossier(c, 'pc')) prestations.push('Convoyage vers le stockage');
     prestations.push('Stockage automobile');
-    if (_operationDossier(c, 'liv')) prestations.push('Livraison après stockage');
+    if (_operationAssureeParHelixCar(c, 'pc') || _operationAssureeParHelixCar(c, 'liv')) {
+      prestations.push('Convoyage automobile');
+    }
   } else if (_aConvoyage(c)) {
     prestations.push('Convoyage automobile');
     // Même source de vérité que le bloc récapitulatif situé plus haut :
