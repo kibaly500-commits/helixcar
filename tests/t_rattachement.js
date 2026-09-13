@@ -149,6 +149,9 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
       && j.nom === 'creer_demande_avec_vehicules');
     return {
       journal: window.__journal.map(j => j.op),
+      journalDetail: window.__journal.map(j => ({
+        op: j.op, nom: j.nom || null, session: j.session || null
+      })),
       appelInscription: window.__journal.find(j => j.op === 'signUp') || null,
       appels: appels,
       succesTexte: zone ? zone.textContent : '',
@@ -223,12 +226,13 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
   // Régression réelle : une session ADMIN était déjà ouverte dans le
   // navigateur avant la création d'un nouveau compte client.
   const ambiante = await deposerCompteSeul(browser, false, false, true);
-  const iSortie = ambiante.etat.journal.indexOf('signOut');
-  const iInscription = ambiante.etat.journal.indexOf('signUp');
-  const iEcriture = ambiante.etat.journal.indexOf('rpc');
+  const iSortie = ambiante.etat.journalDetail.findIndex(j => j.op === 'signOut');
+  const iInscription = ambiante.etat.journalDetail.findIndex(j => j.op === 'signUp');
+  const iEcriture = ambiante.etat.journalDetail.findIndex(j =>
+    j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules');
   check('B11 : la session admin ambiante est fermée avant la nouvelle inscription',
     iSortie !== -1 && iSortie < iInscription && iInscription < iEcriture,
-    JSON.stringify(ambiante.etat.journal));
+    JSON.stringify(ambiante.etat.journalDetail));
   check('B12 : la demande en attente de confirmation ne part jamais sous le compte admin',
     ambiante.etat.appels.length === 1 && !ambiante.etat.appels[0].session,
     JSON.stringify(ambiante.etat.appels[0]));
@@ -244,7 +248,7 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
   const appelCreation = c.etat.appels[0] && c.etat.appels[0].params;
   const metaInscription = (c.etat.appelInscription && c.etat.appelInscription.data) || {};
   check('C1 bis : une Preview ne force plus une Redirect URL refusée par Supabase',
-    !c.etat.appelInscription.retour,
+    !!c.etat.appelInscription && !c.etat.appelInscription.retour,
     JSON.stringify(c.etat.appelInscription));
   check('C1 ter : le compte Auth transporte la demande et sa preuve à usage unique',
     metaInscription.hc_activation === 'client'
