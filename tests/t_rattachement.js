@@ -208,7 +208,7 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
     refus.etat.succesTexte.slice(0, 200));
   check('B8 : le client reçoit une erreur claire et ses informations restent saisies',
     /compte et votre demande n'ont pas pu être enregistrés/i.test(refus.etat.erreurTexte)
-      && refus.etat.prenomConserve === 'Jean',
+      && refus.etat.prenomConserve === 'TEST-QA',
     JSON.stringify({ erreur: refus.etat.erreurTexte, prenom: refus.etat.prenomConserve }));
   check('B9 : le refus ne déclenche aucun e-mail de succès',
     refus.etat.emails === 0, String(refus.etat.emails));
