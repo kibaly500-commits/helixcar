@@ -29,10 +29,12 @@ function check(l, c, e) {
 //   false -> confirmation ACTIVE : un utilisateur, aucune session, et
 //            signInWithPassword refuse tant que l'adresse n'est pas
 //            confirmée.
-function init(avecSession, refusInscription) {
+function init(avecSession, refusInscription, sessionAmbiante) {
   return `
 window.__journal = [];
-window.__session = null;
+window.__session = ${sessionAmbiante
+  ? "{ access_token: 'jwt-admin', user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'admin@helixcar.test' } }"
+  : 'null'};
 window.__avecSession = ${avecSession ? 'true' : 'false'};
 window.__refusInscription = ${refusInscription ? 'true' : 'false'};
 window.__emails = [];
@@ -74,7 +76,7 @@ window.supabase = { createClient: function () { return {
       }
       return { data: null, error: { message: 'Email not confirmed' } };
     },
-    async signOut() { window.__session = null; return {}; }
+    async signOut() { window.__journal.push({ op: 'signOut' }); window.__session = null; return {}; }
   },
   from() { return { select(){return this;}, eq(){return this;}, order(){return this;},
                     limit(){return this;},
@@ -83,7 +85,8 @@ window.supabase = { createClient: function () { return {
   // LE DOUBLE SE COMPORTE COMME LE SERVEUR : il ne rattache que s'il y
   // a une session au moment de l'appel, exactement comme auth.uid().
   async rpc(nom, params) {
-    window.__journal.push({ op: 'rpc', nom, params: JSON.parse(JSON.stringify(params || {})) });
+    window.__journal.push({ op: 'rpc', nom, params: JSON.parse(JSON.stringify(params || {})),
+      session: window.__session && window.__session.user && window.__session.user.id });
     if (nom !== 'creer_demande_avec_vehicules') return { data: null, error: null };
     const rattachee = !!window.__session;
     return { data: {
@@ -98,12 +101,12 @@ window.supabase = { createClient: function () { return {
 `;
 }
 
-async function deposerCompteSeul(browser, avecSession, refusInscription) {
+async function deposerCompteSeul(browser, avecSession, refusInscription, sessionAmbiante) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.addInitScript(init(avecSession, refusInscription));
+  await page.addInitScript(init(avecSession, refusInscription, sessionAmbiante));
   await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
 
@@ -191,9 +194,10 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
       && b.etat.appels[0].params.p_demande.auth_user_id === undefined,
     JSON.stringify(b.etat.appels[0] && b.etat.appels[0].params.p_demande
       && b.etat.appels[0].params.p_demande.auth_user_id));
-  check('B4 : le serveur la rattache, puisqu\'il y a une session',
-    /visible dans votre espace client/i.test(b.etat.succesTexte),
-    b.etat.succesTexte.slice(0, 200));
+  check('B4 : le serveur la rattache à la session créée, sans petit texte supplémentaire',
+    !!(b.etat.appels[0] && b.etat.appels[0].session)
+      && !/visible dans votre espace client/i.test(b.etat.succesTexte),
+    JSON.stringify({ appel: b.etat.appels[0], texte: b.etat.succesTexte.slice(0, 200) }));
   check('B5 : aucune erreur JavaScript', b.erreurs.length === 0, b.erreurs.slice(0, 2).join(' | '));
   await b.page.close();
 
@@ -215,6 +219,23 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
   check('B10 : aucune erreur JavaScript dans ce cas réel',
     refus.erreurs.length === 0, refus.erreurs.slice(0, 2).join(' | '));
   await refus.page.close();
+
+  // Régression réelle : une session ADMIN était déjà ouverte dans le
+  // navigateur avant la création d'un nouveau compte client.
+  const ambiante = await deposerCompteSeul(browser, false, false, true);
+  const iSortie = ambiante.etat.journal.indexOf('signOut');
+  const iInscription = ambiante.etat.journal.indexOf('signUp');
+  const iEcriture = ambiante.etat.journal.indexOf('rpc');
+  check('B11 : la session admin ambiante est fermée avant la nouvelle inscription',
+    iSortie !== -1 && iSortie < iInscription && iInscription < iEcriture,
+    JSON.stringify(ambiante.etat.journal));
+  check('B12 : la demande en attente de confirmation ne part jamais sous le compte admin',
+    ambiante.etat.appels.length === 1 && !ambiante.etat.appels[0].session,
+    JSON.stringify(ambiante.etat.appels[0]));
+  check('B13 : la validation du compte par e-mail reste explicitement obligatoire',
+    /Confirmez votre compte grâce au message envoyé par e-mail/i.test(ambiante.etat.succesTexte),
+    ambiante.etat.succesTexte.slice(0, 260));
+  await ambiante.page.close();
 
   // ══ C. signUp NE DONNE PAS DE SESSION (confirmation d'e-mail) ══
   const c = await deposerCompteSeul(browser, false);
@@ -252,8 +273,8 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
   check('C5 : l\'écran NE promet PAS un espace client utilisable',
     !/visible dans votre espace client/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
-  check('C6 : il demande la confirmation de l\'adresse e-mail',
-    /Confirmez votre adresse e-mail/i.test(c.etat.succesTexte),
+  check('C6 : il demande la confirmation du compte par e-mail',
+    /Confirmez votre compte grâce au message envoyé par e-mail/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
   check('C7 : et il rassure sur le sort de la demande',
     /demande est bien enregistr/i.test(c.etat.succesTexte),
@@ -578,10 +599,18 @@ async function deposerCompteSeul(browser, avecSession, refusInscription) {
     || (/_hcMemoriserReclamation\(/.test(idx) && /_hcReclamerDemandesEnAttente\(/.test(idx)),
     'phrase présente sans mécanisme de réclamation');
   const mig99 = fs.readFileSync(fichier('migrations/99_reclamation_demande.sql'), 'utf8');
+  const mig129 = fs.readFileSync(fichier('migrations/129_reparation_session_admin_client.sql'), 'utf8');
   check('D5 : le serveur exige une adresse RÉELLEMENT confirmée',
     /email_confirmed_at/.test(mig99) && /ADRESSE_NON_CONFIRMEE/.test(mig99));
   check('D6 : il exige que l\'adresse du compte soit celle de la demande',
     /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig99));
+  check('D6 bis : la réparation conserve l\'obligation d\'adresse confirmée',
+    /email_confirmed_at/.test(mig129) && /ADRESSE_NON_CONFIRMEE/.test(mig129));
+  check('D6 ter : seul un dossier capturé par un administrateur actif est transférable',
+    /exists \([\s\S]*public\.admins[\s\S]*a\.actif is true/.test(mig129)
+    && /if not v_depuis_admin[\s\S]*RECLAMATION_REFUSEE/.test(mig129));
+  check('D6 quater : l\'adresse confirmée doit rester celle de la demande',
+    /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig129));
   // Le calcul de l'empreinte a été déplacé dans public.empreinte_secret
   // (migration 92) pour que la séparation des usages soit faite en UN
   // seul endroit. Ce qui doit rester vrai : aucune colonne ne garde le
