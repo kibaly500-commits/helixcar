@@ -239,7 +239,7 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
     ambiante.etat.appels.length === 1 && !ambiante.etat.appels[0].session,
     JSON.stringify(ambiante.etat.appels[0]));
   check('B13 : la validation du compte par e-mail reste explicitement obligatoire',
-    /Confirmez votre compte grâce au message envoyé par e-mail/i.test(ambiante.etat.succesTexte),
+    /Pour activer votre espace HelixCar, cliquez sur le lien reçu par e-mail/i.test(ambiante.etat.succesTexte),
     ambiante.etat.succesTexte.slice(0, 260));
   await ambiante.page.close();
 
@@ -280,7 +280,7 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
     !/visible dans votre espace client/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
   check('C6 : il demande la confirmation du compte par e-mail',
-    /Confirmez votre compte grâce au message envoyé par e-mail/i.test(c.etat.succesTexte),
+    /Pour activer votre espace HelixCar, cliquez sur le lien reçu par e-mail/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
   check('C7 : le parcours compte seul ne prétend pas avoir enregistré un devis',
     !/demande de devis a bien été enregistrée/i.test(c.etat.succesTexte)
