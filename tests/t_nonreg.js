@@ -345,7 +345,11 @@ const futur = dansNJours;
     "if (result.data && result.data.user && result.data.user.id) {", "try {",
     "options: { emailRedirectTo: 'https://helixcar-i89b.vercel.app/dashboard.html' }",
     "var result = await sb.auth.signUp({", "btn.textContent = 'Création du compte…';",
-    "try {"
+    "try {",
+    // Lots A01/partenaire : identité visuelle HelixCar et lien signé.
+    ".logo { display:flex; align-items:center; gap:10px; font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; margin-bottom: 18px; }",
+    ".logo-badge { background:#F5C518; color:#0D0D0D; width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; }",
+    ".alert-error { background:rgba(239,68,68,.1); color:#C2410C; border:1.5px solid rgba(239,68,68,.3); }"
   ];
   const retraitsInattendus = lignesDiff('-')
     .filter(l => RETRAITS_CONVOYEUR.indexOf(l) === -1);
@@ -359,8 +363,8 @@ const futur = dansNJours;
   // RLS refusait en silence. E6d ci-dessous rend cette évolution
   // vérifiable, et interdit tout retour en arrière.
   L.check('E6c : l\'inscription partenaire ne change que le mot de passe et la logique de compte',
-    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)),
-    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)).slice(0, 3).join(' | '));
+    ajoutsConvoyeur.every(l => /mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|font-weight|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|dossier|preuve|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)),
+    ajoutsConvoyeur.filter(l => !/mot de passe|pw|password|mdp|oeil|Afficher|Masquer|svg|path d=|circle|aria-|minlength|autocomplete|padding-right|toggle|actif|selection|focus|libelle|bouton|input|button|display|align|justify|min-width|min-height|color|border-radius|line-height|position|background|font-weight|cursor|transform|right:|top:|var |try |catch|el\.|textContent|🙈|👁|return|function|\}|\{|signIn|signUp|rpc|role|convoyeur|compte|espace|adresse|dossier|preuve|origine|helixcar|LOT|\/\/|\*|autofill|background-clip|fill-color|caret-color|transition|ms-reveal|ms-clear|Lot A01|glyphes|gestionnaires|navigateur|Edge|doublon|revelation|révélation/i.test(l)).slice(0, 3).join(' | '));
   // L'ÉLARGISSEMENT CI-DESSUS EST COMPENSÉ, jamais laissé à nu : ces
   // trois contrôles interdisent tout retour au comportement d'avant.
   const srcConvoyeur = fs.readFileSync(fichier('creer-compte-convoyeur.html'), 'utf8');
