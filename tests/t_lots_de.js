@@ -505,8 +505,8 @@ function rubriquesVisibles(page, n) {
       poser(0, 'plateau'); poser(2, 'plateau');
       return _lireFichesVehicules().map(v => v && v.mode_transport);
     });
-    check('G3 : chaque véhicule garde sa propre valeur',
-      JSON.stringify(modes) === JSON.stringify(['plateau', 'standard', 'plateau', 'standard', 'standard']),
+    check('G3 : chaque véhicule garde sa propre valeur sans inventer de mode pour les autres',
+      JSON.stringify(modes) === JSON.stringify(['plateau', '', 'plateau', '', '']),
       JSON.stringify(modes));
 
     // Convoyage → Stockage → Convoyage : la structure revient intacte.
