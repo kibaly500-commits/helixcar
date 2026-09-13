@@ -155,6 +155,7 @@ async function deposerCompteSeul(browser, avecSession) {
 (async () => {
   const browser = await L.lancerNavigateur();
   const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
 
   // ══ A. LE NAVIGATEUR NE DÉCIDE PLUS DU PROPRIÉTAIRE ══
   check('A1 : le code n\'envoie plus d\'auth_user_id dans la demande',
@@ -188,9 +189,21 @@ async function deposerCompteSeul(browser, avecSession) {
   const c = await deposerCompteSeul(browser, false);
   check('C1 : un compte est créé', c.etat.journal.indexOf('signUp') !== -1,
     JSON.stringify(c.etat.journal));
+  const retourConfirmation = new URL((c.etat.appelInscription && c.etat.appelInscription.retour) || 'https://invalid.invalid/');
+  const appelCreation = c.etat.appels[0] && c.etat.appels[0].params;
   check('C1 bis : avec confirmation requise, le retour vise aussi le Dashboard',
-    c.etat.appelInscription && /\/dashboard\.html$/.test(c.etat.appelInscription.retour || ''),
+    /\/dashboard\.html$/.test(retourConfirmation.pathname),
     JSON.stringify(c.etat.appelInscription));
+  check('C1 ter : le lien transporte la demande et sa preuve à usage unique',
+    retourConfirmation.searchParams.get('activation') === 'client'
+      && retourConfirmation.searchParams.get('dossier') === (appelCreation && appelCreation.p_demande && appelCreation.p_demande.id)
+      && retourConfirmation.searchParams.get('reclamation') === (appelCreation && appelCreation.p_cle_reclamation),
+    retourConfirmation.toString());
+  check('C1 quater : le Dashboard consomme cette preuve avant de lire les rôles',
+    /async function _hcRattacherClientApresConfirmation\(\)/.test(dash)
+      && /sbAuth\.rpc\('reclamer_demande'/.test(dash)
+      && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dash),
+    'rattachement client absent ou appelé trop tard');
   check('C2 : une session est RÉELLEMENT tentée avant d\'écrire',
     c.etat.journal.indexOf('signIn') !== -1
       && c.etat.journal.indexOf('signIn') < c.etat.journal.lastIndexOf('rpc'),
