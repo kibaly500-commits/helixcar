@@ -295,8 +295,8 @@ async function modesParVehicule(page, n) {
       JSON.stringify(pendantStockage[2]));
     const modesStockage = await page.evaluate(() =>
       _lireFichesVehicules().map(v => v && v.mode_transport));
-    check('Dbis1 quater : REPRODUCTION — et aucun ne part en base avec un mode vide',
-      modesStockage.length === 3 && modesStockage.every(m => m === 'standard' || m === 'plateau'),
+    check('Dbis1 quater : aucun mode n’est inventé avant le choix du client',
+      modesStockage.length === 3 && modesStockage.every(m => m === ''),
       JSON.stringify(modesStockage));
 
     // Retour au Convoyage : c'est là que le bloc manquait.
@@ -313,8 +313,8 @@ async function modesParVehicule(page, n) {
       JSON.stringify(apresRetour[2]));
     const modesLus = await page.evaluate(() =>
       _lireFichesVehicules().map(v => v && v.mode_transport));
-    check('Dbis4 : le mode part au serveur pour les trois, jamais vide',
-      modesLus.length === 3 && modesLus.every(m => m === 'standard' || m === 'plateau'),
+    check('Dbis4 : le changement de service ne présélectionne aucun mode',
+      modesLus.length === 3 && modesLus.every(m => m === ''),
       JSON.stringify(modesLus));
     await page.close();
   }
@@ -344,12 +344,15 @@ async function modesParVehicule(page, n) {
     check('Dter2 : et il est dans sa fiche, pas sous les fiches',
       communModes.every(m => m.dansLeConteneur === 2), JSON.stringify(communModes));
     const distincts = await page.evaluate(() => {
-      const r = document.querySelector('input[name="veh-2-mode"][value="plateau"]');
-      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      const poser = (i, v) => {
+        const r = document.querySelector('input[name="veh-' + i + '-mode"][value="' + v + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      };
+      poser(0, 'standard'); poser(2, 'plateau');
       return _lireFichesVehicules().map(v => v && v.mode_transport);
     });
     check('Dter3 : deux véhicules du même trajet peuvent avoir des modes différents',
-      distincts.length === 3 && distincts[0] === 'standard' && distincts[2] === 'plateau',
+      distincts.length === 3 && distincts[0] === 'standard' && distincts[1] === '' && distincts[2] === 'plateau',
       JSON.stringify(distincts));
     await page.close();
   }
@@ -426,9 +429,13 @@ async function modesParVehicule(page, n) {
     const page = await pageClient(browser);
     await convoyageAvecVehicules(page, 3, false);
     await page.evaluate(() => {
-      // Véhicule 1 sur plateau, les deux autres par la route.
-      const r = document.querySelector('input[name="veh-1-mode"][value="plateau"]');
-      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      // Trois choix explicites et indépendants : le véhicule 2 sur
+      // plateau, les deux autres par la route.
+      const poser = (i, v) => {
+        const r = document.querySelector('input[name="veh-' + i + '-mode"][value="' + v + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      };
+      poser(0, 'standard'); poser(1, 'plateau'); poser(2, 'standard');
     });
     await page.waitForTimeout(120);
     const lues = await page.evaluate(() =>
