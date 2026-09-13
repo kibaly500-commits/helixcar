@@ -79,6 +79,9 @@ window.supabase = { createClient: function () { return {
     getSession: async function () { return { data: { session: window.__session } }; },
     signInWithPassword: async function (id) {
       window.__journal.push({ op: 'signIn', email: id && id.email });
+      if (id && id.email === 'nonconfirme@helixcar.test') {
+        return { data: { session: null, user: null }, error: { message: 'Email not confirmed' } };
+      }
       return { data: { session: window.__session, user: window.__session.user }, error: null };
     },
     signOut: async function () {
@@ -605,6 +608,23 @@ const ATTEIGNABLE = `(() => {
   check('I2 : un compte existant et un dépôt déjà connecté ont chacun leur phrase, honnête',
     /_compteEtat === 'existe_deja'\) \{\s*html \+= '<div class="hc-succes-txt">Vous avez déjà un compte HelixCar/.test(idx)
     && /_compteEtat === 'non_demande' && _idCompteDepot\) \{/.test(idx));
+
+  // ══ I bis. COMPTE NON ENCORE VALIDÉ ══
+  {
+    const page = await ouvrir(navigateur, urlFichier('index.html'));
+    const message = await page.evaluate(async () => {
+      openModal('connexion');
+      document.getElementById('connexion-email').value = 'nonconfirme@helixcar.test';
+      document.getElementById('connexion-password').value = 'MotDePasseValide93';
+      await submitConnexionForm();
+      return (document.getElementById('connexion-message') || {}).textContent || '';
+    });
+    check('I9 : un compte non validé reçoit une consigne de validation explicite',
+      /Veuillez valider votre compte à l’aide du lien reçu par e-mail/i.test(message), message);
+    check('I10 : aucune erreur JavaScript sur ce refus attendu',
+      page.jsErrors.length === 0, page.jsErrors.join(' | '));
+    await page.close();
+  }
 
   // ══ J. LES TROIS PAGES, MÊME SOIN ══
   check('J1 : aucun doublon de bouton œil sous Edge (::-ms-reveal masqué) sur les trois pages',
