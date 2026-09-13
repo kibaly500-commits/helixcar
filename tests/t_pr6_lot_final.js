@@ -64,8 +64,10 @@ check('La date de prise en charge verrouillée ne montre plus de curseur interdi
 check('Le mode de transport ne peut plus être présélectionné artificiellement',
   index.includes("v.mode_transport==='standard'?'checked':''") &&
   !index.includes("v.mode_transport==='plateau'?'':'checked'"));
-check('Plaque, VIN et mode de transport participent à la validation obligatoire',
-  index.includes("['immat', 'vin'].forEach") &&
+check('Seul le type bloque l’identité au stade du devis, le transport reste requis',
+  index.includes("var req=['type'];") &&
+  !index.includes("['immat', 'vin'].forEach") &&
+  !index.includes("_checkRequiredText('client-marque')") &&
   index.includes("querySelector('input[name=\"veh-' + i + '-mode\"]:checked')"));
 check('Valider ce véhicule reste désactivé tant que toutes les étapes ne sont pas confirmées',
   index.includes('disabled aria-disabled="true">Valider ce véhicule</button>') &&
@@ -91,7 +93,31 @@ check('Mes demandes propose un aperçu compact en lecture seule',
   dashboard.includes("actionHtml('ouvrirApercuDemandeClient', [d.id])") &&
   dashboard.includes("window.ouvrirApercuDemandeClient=async function(id)") &&
   dashboard.includes("HC_ACTIONS.ouvrirApercuDemandeClient") &&
-  dashboard.includes('Imprimer / enregistrer en PDF'));
+  dashboard.includes('Télécharger le PDF') &&
+  dashboard.includes("documentPdf.save('Recapitulatif_HelixCar_") &&
+  !dashboard.includes('Imprimer / enregistrer en PDF'));
+
+check('Le récapitulatif réutilise la maquette PDF, le logo et une couleur distincte',
+  dashboard.includes('function _construirePdfDevis(c, d, options)') &&
+  dashboard.includes('var estRecapitulatif = options.recapitulatif === true;') &&
+  dashboard.includes('var COULEUR_ACCENT = estRecapitulatif ? [42, 101, 110] : ROUGE;') &&
+  dashboard.includes('{recapitulatif:true}') &&
+  dashboard.includes("doc.addImage(HELIXCAR_LOGO_PDF"));
+check('Le récapitulatif masque le titre de devis, le tarif et les mentions commerciales',
+  dashboard.includes("if (!estRecapitulatif) {\n    T('DEVIS N° '") &&
+  dashboard.includes("if (!estRecapitulatif && HELIXCAR_MENTION_TVA)") &&
+  dashboard.includes("if (!estRecapitulatif) {\n  var yFinPrestations = y;"));
+check('Le bandeau de brouillon propose explicitement reprendre ou recommencer',
+  index.includes("titre.textContent = 'Demande en cours';") &&
+  index.includes("btnReprendre.textContent = 'Reprendre';") &&
+  index.includes("btnRecommencer.textContent = 'Supprimer et recommencer';"));
+check('La règle de fidélité en euros est retirée mais le message sans points reste',
+  !dashboard.includes('1 € TTC entier payé') &&
+  dashboard.includes("Vous n\\'avez pas encore de points. Ils vous sont attribués lorsqu\\'une ") &&
+  dashboard.includes('prestation est terminée et payée.</div>'));
+check('Le VIN reste transmis sans bloquer la demande de devis',
+  index.includes('vin:                    vin_val || null') &&
+  !index.includes("['immat', 'vin'].forEach"));
 
 // Identité pro et compteurs : uniquement les vraies données.
 check('La société est affichée avant le nom pour un compte professionnel',
