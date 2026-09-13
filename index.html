@@ -16799,6 +16799,26 @@ async function _submitClientFormInterne() {
   // On fournit donc l'identifiant nous-mêmes : plus aucune relecture.
   payload.id = _hcNouvelIdentifiant();
 
+  // La preuve de rattachement doit exister AVANT l'envoi de l'e-mail de
+  // confirmation. Elle voyage dans la destination de confirmation afin
+  // que l'inscription puisse être terminée sur un autre téléphone ou un
+  // autre navigateur. Le serveur exige toujours, en plus, une session
+  // confirmée portant exactement l'adresse de la demande.
+  var cleReclamation = _convGenererJetonEnvoi();
+  var retourConfirmationClient = (function () {
+    try {
+      var u = new URL(HELIXCAR_URL_DASHBOARD, location.href);
+      u.searchParams.set('activation', 'client');
+      u.searchParams.set('dossier', payload.id);
+      u.searchParams.set('reclamation', cleReclamation);
+      return u.toString();
+    } catch (e) {
+      return HELIXCAR_URL_DASHBOARD
+        + '?activation=client&dossier=' + encodeURIComponent(payload.id)
+        + '&reclamation=' + encodeURIComponent(cleReclamation);
+    }
+  })();
+
   // ── RATTACHEMENT : SEULE UNE SESSION COMPTE ──
   //
   // Le navigateur ne DÉCIDE PAS à qui appartient une demande. La
@@ -16877,7 +16897,7 @@ async function _submitClientFormInterne() {
         var rCompte = await _sb.auth.signUp({
           email: email_val,
           password: mdpSaisi,
-          options: { emailRedirectTo: HELIXCAR_URL_DASHBOARD }
+          options: { emailRedirectTo: retourConfirmationClient }
         });
         var utilisateur = rCompte && rCompte.data && rCompte.data.user;
         var msgErr = String((rCompte && rCompte.error && rCompte.error.message) || '');
@@ -16983,7 +17003,7 @@ async function _submitClientFormInterne() {
   // cette adresse soit celle de la demande. Et les deux empreintes sont
   // préfixées par leur usage côté serveur : présenter l'un à la place de
   // l'autre ne peut pas fonctionner.
-  var cleReclamation = _convGenererJetonEnvoi();
+  // Déjà généré avant signUp() pour être inclus dans le lien reçu par e-mail.
 
   function inserer(tentativesRestantes) {
     return _sb.rpc('creer_demande_avec_vehicules', {
@@ -17008,12 +17028,11 @@ async function _submitClientFormInterne() {
         parrCode = generateParrainageCode(clientNum);
         payload.numero_client = clientNum;
         payload.code_parrainage = parrCode;
-        payload.id = _hcNouvelIdentifiant();
-        // Nouvelle demande, nouveaux secrets : les anciens ne doivent
-        // pas pouvoir servir à reprendre ou à réclamer la ligne
-        // partielle abandonnée.
+        // L'insertion est atomique : un conflit sur le numéro client
+        // n'a créé aucune ligne. On conserve donc l'identifiant et la
+        // preuve déjà envoyés dans l'e-mail de confirmation, et on ne
+        // renouvelle que la preuve d'idempotence de cette tentative.
         cleCreation = _convGenererJetonEnvoi();
-        cleReclamation = _convGenererJetonEnvoi();
         return inserer(tentativesRestantes - 1);
       }
       return r;
