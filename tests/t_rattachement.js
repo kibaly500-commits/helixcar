@@ -282,8 +282,9 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
   check('C6 : il demande la confirmation du compte par e-mail',
     /Confirmez votre compte grâce au message envoyé par e-mail/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
-  check('C7 : et il rassure sur le sort de la demande',
-    /demande est bien enregistr/i.test(c.etat.succesTexte),
+  check('C7 : le parcours compte seul ne prétend pas avoir enregistré un devis',
+    !/demande de devis a bien été enregistrée/i.test(c.etat.succesTexte)
+      && /compte HelixCar est maintenant créé/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
   // L'e-mail de confirmation existait avant ce lot : ce qui doit etre
   // vrai, c'est qu'il ne parte JAMAIS avant que la demande soit ecrite.
