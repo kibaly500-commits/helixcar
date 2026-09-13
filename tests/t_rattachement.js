@@ -51,7 +51,8 @@ window.supabase = { createClient: function () { return {
       window.__journal.push({
         op: 'signUp',
         email: ident && ident.email,
-        retour: ident && ident.options && ident.options.emailRedirectTo
+        retour: ident && ident.options && ident.options.emailRedirectTo,
+        data: ident && ident.options && JSON.parse(JSON.stringify(ident.options.data || {}))
       });
       if (window.__avecSession) {
         window.__session = { access_token: 'jwt-client', user: UTILISATEUR };
@@ -191,16 +192,18 @@ async function deposerCompteSeul(browser, avecSession) {
     JSON.stringify(c.etat.journal));
   const retourConfirmation = new URL((c.etat.appelInscription && c.etat.appelInscription.retour) || 'https://invalid.invalid/');
   const appelCreation = c.etat.appels[0] && c.etat.appels[0].params;
+  const metaInscription = (c.etat.appelInscription && c.etat.appelInscription.data) || {};
   check('C1 bis : avec confirmation requise, le retour vise aussi le Dashboard',
     /\/dashboard\.html$/.test(retourConfirmation.pathname),
     JSON.stringify(c.etat.appelInscription));
-  check('C1 ter : le lien transporte la demande et sa preuve à usage unique',
-    retourConfirmation.searchParams.get('activation') === 'client'
-      && retourConfirmation.searchParams.get('dossier') === (appelCreation && appelCreation.p_demande && appelCreation.p_demande.id)
-      && retourConfirmation.searchParams.get('reclamation') === (appelCreation && appelCreation.p_cle_reclamation),
-    retourConfirmation.toString());
+  check('C1 ter : le compte Auth transporte la demande et sa preuve à usage unique',
+    metaInscription.hc_activation === 'client'
+      && metaInscription.hc_client_dossier === (appelCreation && appelCreation.p_demande && appelCreation.p_demande.id)
+      && metaInscription.hc_client_reclamation === (appelCreation && appelCreation.p_cle_reclamation),
+    JSON.stringify(metaInscription));
   check('C1 quater : le Dashboard consomme cette preuve avant de lire les rôles',
     /async function _hcRattacherClientApresConfirmation\(\)/.test(dash)
+      && /sbAuth\.auth\.getUser\(\)/.test(dash)
       && /sbAuth\.rpc\('reclamer_demande'/.test(dash)
       && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dash),
     'rattachement client absent ou appelé trop tard');
