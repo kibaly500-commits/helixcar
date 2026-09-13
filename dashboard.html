@@ -3629,8 +3629,8 @@ function _fidHtmlResume(o, prefixe) {
     + '</div>'
     + (vide
         ? '<div class="fid-note" id="' + prefixe + 'fid-vide">Vous n\'avez pas encore de points. Ils vous sont attribués lorsqu\'une '
-          + 'prestation est terminée et payée : 1 € TTC entier payé = 1 point.</div>'
-        : '<div class="fid-note">1 € TTC entier payé sur une prestation terminée = 1 point.</div>');
+          + 'prestation est terminée et payée.</div>'
+        : '');
 }
 
 function _fidHtmlPaliers(o) {
@@ -10905,7 +10905,9 @@ function _adresseCompleteOuVille(rue, cp, ville) {
 }
 function estVideGlobal(v) { return v === null || v === undefined || v === '' || v === '—'; }
 
-function _construirePdfDevis(c, d) {
+function _construirePdfDevis(c, d, options) {
+  options = options || {};
+  var estRecapitulatif = options.recapitulatif === true;
   // V50.24 — passe typographique homogène + identité véhicule gauche/centre/droite.
   // V50.23 — passe de lisibilité VISIBLE : opérations véhicule + prestations + pied de page réellement agrandis, pagination basse plus exploitée.
   // V50.12 — FINITION PREMIUM : respiration multi + pagination intelligente des cartes + séparateur stockage.
@@ -10914,6 +10916,7 @@ function _construirePdfDevis(c, d) {
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF non chargé');
 
   var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  var COULEUR_ACCENT = estRecapitulatif ? [42, 101, 110] : ROUGE;
   var M = 16, L = 210 - M, LARGEUR = L - M;
   var IVOIRE = [247, 246, 243];
   // ══ V50.6 PREMIUM — PALETTE ══════════════════════════════════
@@ -11052,8 +11055,10 @@ function _construirePdfDevis(c, d) {
   }
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
-  doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
-  T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
+  doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
+  if (!estRecapitulatif) {
+    T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
+  }
 
   // V50.36 — métadonnées d'en-tête plus lisibles, sans concurrencer le numéro de devis.
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.6);
@@ -11067,7 +11072,7 @@ function _construirePdfDevis(c, d) {
   // total volontairement MODESTE (+2.5mm) pour améliorer la respiration
   // sans risquer de faire basculer un document d'une page à deux.
   y += 18.5;
-  doc.setDrawColor(ROUGE[0], ROUGE[1], ROUGE[2]); doc.setLineWidth(0.6);
+  doc.setDrawColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]); doc.setLineWidth(0.6);
   doc.line(M, y, L, y);
   y += 9.5;
 
@@ -11078,7 +11083,7 @@ function _construirePdfDevis(c, d) {
     // soulignement plus fin (0.15 au lieu de 0.2) et plus clair.
     // HAUTEURS STRICTEMENT INCHANGÉES (2.3 puis 1.5) : la pagination,
     // qui réserve 5.8mm par titre, n'est en rien affectée.
-    doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+    doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
     doc.rect(M, y - 2.2, 1.25, 4.6, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9.4);
     doc.setTextColor(20, 23, 27);
@@ -11776,7 +11781,7 @@ function _construirePdfDevis(c, d) {
         // colonnes et le chevron rouge. Retrait de l'ajout V50.6.1 pour
         // reproduction fidèle.
         doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('>', M + LARGEUR / 2 - 28, y0 + 6.5); // V50.32 — même X validé, Y remonté à hauteur de PRISE EN CHARGE / LIVRAISON
       }
     }
@@ -11865,10 +11870,10 @@ function _construirePdfDevis(c, d) {
       }
       cur += 5.5;
       if (dess) {
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.circle(xG + 1.4, cur - 1.1, 1.4, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('RESTITUTION', xG + 5, cur);
         valeur(_villeCP(c.ville_restit, c.code_postal_restit,
           !estVide(c.adresse_restitution) ? c.adresse_restitution : c.ville_depart), xD, cur, 10.5);
@@ -11952,7 +11957,7 @@ function _construirePdfDevis(c, d) {
       var y0 = y, cur = y0 + 8.0;
       if (dess) {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(9.3);
-        doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         T('VÉHICULE ' + (v.position || i + 1), xG, cur);
       }
       cur += 6.0;
@@ -12101,7 +12106,7 @@ function _construirePdfDevis(c, d) {
       // EXACTEMENT à xDebut (= xG, même X que TEST-V1/Berline/etc.),
       // jamais à gauche de cet axe. Longueur = LARGEUR_TIRET_OP.
       function _dessinerTiretOperationPdf(xDebut, yPremiereLigne) {
-        doc.setDrawColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setDrawColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.setLineWidth(0.6);
         // G.6 — léger réajustement supplémentaire de l'offset Y (1.15 ->
         // 1.0), rapproché encore de la ligne de base pour un centrage
@@ -12527,7 +12532,7 @@ function _construirePdfDevis(c, d) {
         cur += 2.8;
         if (dess) {
           doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-          doc.setTextColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+          doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
           T('RESTITUTION PRÉVUE', xG, cur);
         }
         cur += 6.8;
@@ -12609,7 +12614,7 @@ function _construirePdfDevis(c, d) {
         var y0 = y;
         doc.setFillColor(GRIS_CARTE[0], GRIS_CARTE[1], GRIS_CARTE[2]);
         doc.roundedRect(M, y0, LARGEUR, h, 2, 2, 'F');
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.rect(M, y0, 1.3, h, 'F');
         y = y0;
         _dessinerCarteVehicule(v, _k, true);
@@ -12652,7 +12657,7 @@ function _construirePdfDevis(c, d) {
       // V50.13 — finition premium : pas de contour gris autour des cartes
       // véhicules. Le fond très léger + la barre rouge suffisent à structurer
       // la carte et évitent les traits parasites visibles sur les PDF multi.
-      doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+      doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
       doc.rect(M, y0, 1.3, h, 'F');
       y = y0;
       _dessinerCarteVehicule(v, i, true);
@@ -12712,7 +12717,7 @@ function _construirePdfDevis(c, d) {
       var yy = cur + rang * 6.2;
       var x = xG + col * (LARGEUR / 2);
       if (dess) {
-        doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+        doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
         doc.circle(x + 1, yy - 1.1, 1, 'F');
         doc.setFont('helvetica', 'normal'); doc.setFontSize(10.4);
         doc.setTextColor(ANTHRACITE[0], ANTHRACITE[1], ANTHRACITE[2]);
@@ -12724,9 +12729,9 @@ function _construirePdfDevis(c, d) {
   }
 
   var _hPrestFinal = _contenuPrestationsPdf(false);
-  var _espaceTarifMiniFinal = 1.5;
-  var _hauteurTarifFinal = 18;
-  var _margeTarifFinal = 2;
+  var _espaceTarifMiniFinal = estRecapitulatif ? 0 : 1.5;
+  var _hauteurTarifFinal = estRecapitulatif ? 0 : 18;
+  var _margeTarifFinal = estRecapitulatif ? 0 : 2;
   var _limitePhysiqueFinale = 291;
   var _espacePrestations = _espaceAvantTitre(prestations.length === 1 ? 'Prestation' : 'Prestations');
   var _besoinPaquetFinal = (_espacePrestations + 7.2) + _hPrestFinal + _espaceTarifMiniFinal + _hauteurTarifFinal + _margeTarifFinal;
@@ -12765,6 +12770,7 @@ function _construirePdfDevis(c, d) {
   // seulement quelques millimètres, on réduit UNIQUEMENT cette respiration
   // (jamais le contenu, les cartes ni la typographie) tout en conservant au
   // minimum 3 mm d'air entre PRESTATIONS et TARIF PROPOSÉ.
+  if (!estRecapitulatif) {
   var yFinPrestations = y;
   y += ESPACE_AVANT_PRESTATIONS;
 
@@ -12816,7 +12822,7 @@ function _construirePdfDevis(c, d) {
   // visuelle forte et cohérente. Dessiné À L'INTÉRIEUR du bandeau
   // existant — HAUTEUR (21mm), position, largeur et logique de
   // pagination H.1 STRICTEMENT INCHANGÉES.
-  doc.setFillColor(ROUGE[0], ROUGE[1], ROUGE[2]);
+  doc.setFillColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
   doc.rect(M, y, 1.6, 18, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.setTextColor(255, 255, 255);
@@ -12846,12 +12852,14 @@ function _construirePdfDevis(c, d) {
   }
   y += 18;
 
+  }
+
   // ══ PIED DE PAGE — inchangé ══
   var lignesPied = [];
-  if (HELIXCAR_MENTIONS_LEGALES && HELIXCAR_MENTIONS_LEGALES.length) {
+  if (!estRecapitulatif && HELIXCAR_MENTIONS_LEGALES && HELIXCAR_MENTIONS_LEGALES.length) {
     lignesPied = lignesPied.concat(HELIXCAR_MENTIONS_LEGALES);
   }
-  if (HELIXCAR_MENTION_TVA) lignesPied.push(HELIXCAR_MENTION_TVA);
+  if (!estRecapitulatif && HELIXCAR_MENTION_TVA) lignesPied.push(HELIXCAR_MENTION_TVA);
   lignesPied = lignesPied.slice(0, 3);
 
   var yPied = Math.max(y + 9, 284 - (lignesPied.length - 1) * 3.4);
@@ -13882,10 +13890,9 @@ function declencherChampFichier(id) {
 </style>
 <script id="hc-pr6-apercu-demande">
 (function(){
+  var documentPdf = null;
+  var urlPdf = null;
   function val(v){ return v === null || v === undefined || v === '' ? '—' : String(v); }
-  function ligne(label, valeur, large){
-    return '<div class="hc-apercu-ligne' + (large ? ' large' : '') + '"><small>' + escapeHtml(label) + '</small><strong>' + escapeHtml(val(valeur)) + '</strong></div>';
-  }
   function demandeParId(id){
     var liste = window._currentClient && window._currentClient.demandes || [];
     return liste.find(function(d){ return String(d.id) === String(id); }) || null;
@@ -13897,57 +13904,75 @@ function declencherChampFichier(id) {
       return r.error ? [] : (r.data || []);
     } catch(e) { return []; }
   }
+  function dateFr(v){
+    if(!v) return '—';
+    try { return _dvDate(v); } catch(e) { return val(v); }
+  }
+  function htmlSecours(d,vs){
+    var periode=dateFr(d.stockage_date_debut)+' au '+dateFr(d.stockage_date_fin);
+    var h='<div class="hc-apercu-grille">'
+      +'<div class="hc-apercu-ligne"><small>Prestation</small><strong>'+escapeHtml(val(d.type_service))+'</strong></div>'
+      +'<div class="hc-apercu-ligne"><small>Statut</small><strong>'+escapeHtml(val(d.statut))+'</strong></div>'
+      +'<div class="hc-apercu-ligne large"><small>Période de stockage</small><strong>'+escapeHtml(periode)+'</strong></div>'
+      +'<div class="hc-apercu-ligne"><small>Date d’émission</small><strong>'+escapeHtml(dateFr(d.created_at))+'</strong></div>'
+      +'<div class="hc-apercu-ligne"><small>Référence client</small><strong>'+escapeHtml(val(d.numero_client))+'</strong></div>'
+      +'</div>';
+    if(vs.length){
+      h+='<ul class="hc-apercu-vehicules">';
+      vs.forEach(function(v,i){
+        var ident=[v.type_vehicule || v.type, v.marque_modele || v.marque, v.immatriculation].filter(Boolean).join(' · ');
+        h+='<li><strong>Véhicule '+(i+1)+'</strong><br><span>'+escapeHtml(ident || 'Informations à compléter')+'</span></li>';
+      });
+      h+='</ul>';
+    }
+    return h;
+  }
   function assurerModale(){
     var fond=document.getElementById('hc-apercu-demande');
     if(fond) return fond;
     fond=document.createElement('div');
     fond.id='hc-apercu-demande'; fond.className='hc-apercu-fond'; fond.setAttribute('role','dialog'); fond.setAttribute('aria-modal','true');
-    fond.innerHTML='<div class="hc-apercu-carte"><div class="hc-apercu-entete"><div><h2>Récapitulatif de la demande</h2><div id="hc-apercu-reference"></div></div><button class="hc-apercu-fermer" aria-label="Fermer" onclick="fermerApercuDemandeClient()">×</button></div><div id="hc-apercu-contenu"></div><div class="hc-apercu-actions"><button class="btn btn-outline" onclick="imprimerApercuDemandeClient()">Imprimer / enregistrer en PDF</button><button class="btn btn-primary" onclick="fermerApercuDemandeClient()">Fermer</button></div></div>';
+    fond.innerHTML='<div class="hc-apercu-carte" style="width:min(960px,94vw)"><div class="hc-apercu-entete"><div><h2>Récapitulatif de la demande</h2><div id="hc-apercu-reference"></div></div><button class="hc-apercu-fermer" aria-label="Fermer" onclick="fermerApercuDemandeClient()">×</button></div><div id="hc-apercu-contenu"></div><iframe id="hc-apercu-pdf" title="Récapitulatif PDF HelixCar" style="display:none;width:100%;height:min(72vh,820px);border:0;background:#eef1f2"></iframe><div class="hc-apercu-actions"><button class="btn btn-outline" id="hc-apercu-telecharger" onclick="telechargerApercuDemandeClient()" disabled>Télécharger le PDF</button><button class="btn btn-primary" onclick="fermerApercuDemandeClient()">Fermer</button></div></div>';
     fond.addEventListener('click',function(e){if(e.target===fond) fermerApercuDemandeClient();});
     document.body.appendChild(fond); return fond;
   }
   window.ouvrirApercuDemandeClient=async function(id){
     var d=demandeParId(id); if(!d) return;
     var fond=assurerModale(), contenu=document.getElementById('hc-apercu-contenu');
+    var cadre=document.getElementById('hc-apercu-pdf'), bouton=document.getElementById('hc-apercu-telecharger');
     document.getElementById('hc-apercu-reference').textContent=d.numero_client || '';
-    contenu.innerHTML='<div style="color:#777">Chargement…</div>'; fond.classList.add('ouvert');
+    contenu.innerHTML='<div style="color:#777">Chargement…</div>'; cadre.style.display='none'; bouton.disabled=true;
+    fond.classList.add('ouvert');
     var vs=await vehiculesDemande(id);
-    var service=_libelleServiceClient(d.type_service);
-    var statut=LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—';
-    var html='<div class="hc-apercu-grille">'
-      +ligne('Prestation',service)+ligne('Statut',statut)
-      +ligne('Date souhaitée',_dvDate(_dateSouhaiteeListe(d)))
-      +ligne('Nombre de véhicules',d.nb_vehicules || vs.length || 1);
-    if(d.stockage_date_debut || d.stockage_date_fin) html+=ligne('Période de stockage',_dvDate(d.stockage_date_debut)+' → '+_dvDate(d.stockage_date_fin),true);
-    if(d.adresse_depart_rue || d.ville_depart) html+=ligne('Départ',[d.adresse_depart_rue,d.code_postal_depart,d.ville_depart].filter(Boolean).join(', '),true);
-    if(d.adresse_arrivee_rue || d.ville_arrivee) html+=ligne('Arrivée',[d.adresse_arrivee_rue,d.code_postal_arrivee,d.ville_arrivee].filter(Boolean).join(', '),true);
-    html+='</div>';
-    if(vs.length){
-      html+='<ul class="hc-apercu-vehicules">';
-      vs.forEach(function(v,i){
-        var ident=[v.type_vehicule || v.type, v.marque_modele || v.marque, v.immatriculation].filter(Boolean).join(' · ');
-        html+='<li><strong>Véhicule '+(i+1)+'</strong><br><span>'+escapeHtml(ident || 'Informations à compléter')+'</span></li>';
-      });
-      html+='</ul>';
+    contenu.innerHTML=htmlSecours(d,vs);
+    documentPdf=null;
+    if(urlPdf){ try{ URL.revokeObjectURL(urlPdf); }catch(e){} urlPdf=null; }
+    try {
+      documentPdf=_construirePdfDevis(Object.assign({},d,{_vehicules:vs}),{
+        reference:'',
+        date_generation:d.created_at || new Date().toISOString(),
+        prix:null
+      },{recapitulatif:true});
+      var blob=documentPdf.output('blob');
+      urlPdf=URL.createObjectURL(blob);
+      cadre.src=urlPdf; cadre.style.display='block'; contenu.style.display='none'; bouton.disabled=false;
+    } catch(ePdf) {
+      console.warn('Aperçu PDF indisponible, affichage de secours utilisé :',ePdf);
+      contenu.style.display='block';
     }
-    contenu.innerHTML=html;
   };
-  window.fermerApercuDemandeClient=function(){var f=document.getElementById('hc-apercu-demande');if(f)f.classList.remove('ouvert');};
-  // Les boutons du Dashboard passent par le registre sécurisé HC_ACTIONS.
-  // Sans cette inscription, l'œil était visible mais le clic était rejeté
-  // comme « action inconnue » avant même d'ouvrir la fenêtre.
+  window.fermerApercuDemandeClient=function(){
+    var f=document.getElementById('hc-apercu-demande');if(f)f.classList.remove('ouvert');
+  };
   if (typeof HC_ACTIONS === 'object') {
     HC_ACTIONS.ouvrirApercuDemandeClient = function (id) {
       return window.ouvrirApercuDemandeClient(id);
     };
   }
-  window.imprimerApercuDemandeClient=function(){
-    var contenu=document.getElementById('hc-apercu-contenu'), ref=document.getElementById('hc-apercu-reference');
-    if(!contenu) return;
-    var w=window.open('','_blank');
-    if(!w) return;
-    w.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Demande '+escapeHtml(ref ? ref.textContent : '')+'</title><style>body{font:14px Arial,sans-serif;color:#182028;max-width:760px;margin:32px auto;padding:0 18px}h1{font-size:22px}.hc-apercu-grille{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hc-apercu-ligne{padding:10px;background:#f4f4f4}.hc-apercu-ligne.large{grid-column:1/-1}small{display:block;color:#666}li{padding:8px 0}</style></head><body><h1>Récapitulatif de la demande</h1><p>'+escapeHtml(ref ? ref.textContent : '')+'</p>'+contenu.innerHTML+'</body></html>');
-    w.document.close(); w.focus(); w.print();
+  window.telechargerApercuDemandeClient=function(){
+    if(!documentPdf) return;
+    var ref=(document.getElementById('hc-apercu-reference')||{}).textContent || 'demande';
+    documentPdf.save('Recapitulatif_HelixCar_'+String(ref).replace(/[^a-z0-9_-]+/gi,'_')+'.pdf');
   };
 })();
 </script>
