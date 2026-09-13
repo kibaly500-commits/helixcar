@@ -35,6 +35,31 @@ const output='// GÉNÉRÉ par tests/construire-pdf-serveur.cjs. Ne pas modifier
   +'\nreturn _construirePdfDevis(dossier, devis);\n}\n';
 const target=path.join(root,'supabase/functions/_shared/devis-pdf.mjs');
 if(process.argv.includes('--check')) {
-  if(!fs.existsSync(target)||fs.readFileSync(target,'utf8')!==output) throw new Error('Moteur PDF serveur non synchronisé. Exécuter node tests/construire-pdf-serveur.cjs');
+  if(!fs.existsSync(target)) throw new Error('Moteur PDF serveur absent. Exécuter node tests/construire-pdf-serveur.cjs');
+  const cible=fs.readFileSync(target,'utf8');
+  const astCible=acorn.parse(cible,parserOptions);
+  const exportWrapper=astCible.body.find(n => n.type === 'ExportNamedDeclaration'
+    && n.declaration && n.declaration.type === 'FunctionDeclaration'
+    && n.declaration.id.name === 'construirePdfServeur');
+  if(!exportWrapper) throw new Error('Enveloppe construirePdfServeur absente.');
+  const defsCible=new Map();
+  for(const n of exportWrapper.declaration.body.body) {
+    if(n.type === 'FunctionDeclaration') defsCible.set(n.id.name,cible.slice(n.start,n.end));
+    if(n.type === 'VariableDeclaration') for(const d of n.declarations) {
+      if(d.id.name && d.id.name !== 'window') defsCible.set(d.id.name,n.kind+' '+cible.slice(d.start,d.end)+';');
+    }
+  }
+  const attendus=[...selected.keys()].sort();
+  const trouves=[...defsCible.keys()].sort();
+  if(JSON.stringify(attendus)!==JSON.stringify(trouves)
+    || attendus.some(n => defsCible.get(n)!==selected.get(n))) {
+    throw new Error('Moteur PDF serveur non synchronisé. Exécuter node tests/construire-pdf-serveur.cjs');
+  }
+  const dernier=exportWrapper.declaration.body.body.at(-1);
+  if(!dernier || dernier.type!=='ReturnStatement'
+    || !dernier.argument || dernier.argument.type!=='CallExpression'
+    || dernier.argument.callee.name!=='_construirePdfDevis') {
+    throw new Error('Retour du moteur PDF serveur invalide.');
+  }
   console.log('Moteur PDF serveur conforme à la source du Dashboard.');
 } else {fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,output);console.log('Moteur PDF serveur généré ('+selected.size+' définitions).');}
