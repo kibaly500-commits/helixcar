@@ -331,9 +331,11 @@ window.fetch = function (url, options) {
     /if \(ev\.origin !== window\.location\.origin\) return;/.test(dash));
   check('D3 : et que de notre propre cadre',
     /if \(!cadre \|\| ev\.source !== cadre\.contentWindow\) return;/.test(dash));
-  check('D4 : la liste est rechargée depuis la base, jamais depuis le message',
-    /chargerDemandesClient\(\);/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
-                                                 dash.indexOf('hc-demande-enregistree') + 900)));
+  check('D4 : la liste est rechargée et rerendue depuis la base, jamais depuis le message',
+    /loadDemandesClient\(\)/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
+                                               dash.indexOf('hc-demande-enregistree') + 1400))
+      && /removeAttribute\('src'\)/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
+                                                     dash.indexOf('hc-demande-enregistree') + 1400)));
   check('D5 : le mode intégré exige d\'être réellement encadré',
     /p\.get\('integre'\) === '1' && window\.parent !== window/.test(idx));
   check('D6 : le parcours public reste séparé et intact',
