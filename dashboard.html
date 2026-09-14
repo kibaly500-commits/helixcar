@@ -1019,9 +1019,8 @@ body.scroll-verrouille { overflow: hidden; }
 </style>
 <div id="login-screen" aria-live="polite">
   <div class="login-box" role="status">
-    <div class="login-logo">
-      <div class="logo-badge">HC</div>
-      HelixCar
+    <div class="login-logo hc-logo-officiel">
+      <img src="logo-helixcar.png" alt="HelixCar — Services automobiles">
     </div>
     <h2 id="attente-titre">Ouverture de votre espace…</h2>
     <p id="attente-texte">Un instant : votre session est en cours de vérification.</p>
@@ -1073,8 +1072,8 @@ body.scroll-verrouille { overflow: hidden; }
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-badge">HC</div> HelixCar
+    <div class="sidebar-logo hc-logo-officiel">
+      <img src="logo-helixcar.png" alt="HelixCar — Services automobiles">
     </div>
     <div class="sidebar-user">
       <div class="user-avatar" id="sb-avatar">H</div>
@@ -11056,7 +11055,9 @@ function _construirePdfDevis(c, d, options) {
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
-  if (!estRecapitulatif) {
+  if (estRecapitulatif) {
+    T('RÉCAPITULATIF DE LA DEMANDE', L, y + 3, { align: 'right' });
+  } else {
     T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
   }
 
@@ -12692,6 +12693,12 @@ function _construirePdfDevis(c, d, options) {
     // cette prestation doit également être nommée dans la liste finale.
     if (_stockageAutomatiqueConvoyage(c)) prestations.push('Stockage automobile');
   }
+  var livraisonDemandee = _operationAssureeParHelixCar(c, 'liv')
+    || !!(c._vehicules && c._vehicules.some(function (v) {
+      return v && v.livraison_apres_stockage !== false
+        && !!(v.adresse_arrivee_rue || v.ville_arrivee || v.date_livraison);
+    }));
+  if (livraisonDemandee && prestations.indexOf('Livraison') === -1) prestations.push('Livraison');
   if (c.plateau === 'Oui') prestations.push('Transport sur plateau');
   if (c.urgence === 'Oui') prestations.push('Transport prioritaire / urgent');
   if (aRestit) prestations.push('Restitution du véhicule');
@@ -13977,5 +13984,76 @@ function declencherChampFichier(id) {
 })();
 </script>
 
+
+<style id="hc-pr6-logo-icones">
+.hc-logo-officiel{display:flex;align-items:center}
+.hc-logo-officiel img{display:block;width:172px;max-width:100%;height:auto;object-fit:contain}
+.login-logo.hc-logo-officiel img{width:220px}
+.hc-ui-icon{display:inline-flex;align-items:center;justify-content:center;width:1.05em;height:1.05em;vertical-align:-.14em;margin-right:.25em;flex:0 0 auto}
+.hc-ui-icon svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-icon .hc-ui-icon{width:18px;height:18px;margin:0}
+.sidebar-footer .nav-icon{display:inline-flex;align-items:center;justify-content:center}
+</style>
+<script id="hc-pr6-icones-professionnelles">
+(function(){
+  var chemins={
+    dashboard:'<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
+    voiture:'<path d="M5 17h14l1-5-2-5H6l-2 5 1 5z"/><path d="M7 17v2M17 17v2M4 12h16M8 14h.01M16 14h.01"/>',
+    document:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h5M10 17h5"/>',
+    dossier:'<path d="M3 7h7l2 2h9v10H3z"/>',
+    utilisateur:'<circle cx="12" cy="8" r="3"/><path d="M5 21c.6-4 2.9-6 7-6s6.4 2 7 6"/>',
+    utilisateurs:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 21c.5-4 2.5-6 6-6s5.5 2 6 6M15 15c3.3 0 5.2 2 5.7 5"/>',
+    calendrier:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+    recherche:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
+    courrier:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>',
+    facture:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+    graphique:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    annonce:'<path d="M4 13V8l13-4v13L4 13zM7 14l2 6h4l-2-7"/>',
+    archive:'<path d="M4 7h16v14H4zM3 3h18v4H3zM9 12h6"/>',
+    reglages:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+    sortie:'<path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h10"/>',
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
+    validation:'<path d="m4 12 5 5L20 6"/>',
+    alerte:'<path d="M12 3 2 21h20L12 3zM12 9v5M12 18h.01"/>',
+    oeil:'<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>',
+    lieu:'<path d="M12 22s7-7 7-13a7 7 0 0 0-14 0c0 6 7 13 7 13z"/><circle cx="12" cy="9" r="2"/>',
+    camera:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="m8 6 1.5-3h5L16 6"/><circle cx="12" cy="13" r="4"/>'
+  };
+  var correspondance={
+    '📊':'dashboard','📈':'graphique','🚗':'voiture','🚛':'voiture','📁':'dossier','📦':'archive',
+    '👤':'utilisateur','👥':'utilisateurs','🚪':'sortie','📋':'document','📄':'document','📝':'document',
+    '🔎':'recherche','🔍':'recherche','📬':'courrier','✉':'courrier','🧾':'facture','💰':'facture','💸':'facture',
+    '📣':'annonce','⚙':'reglages','ℹ':'info','✅':'validation','⚠':'alerte','❌':'alerte','🚫':'alerte',
+    '👁':'oeil','📅':'calendrier','📍':'lieu','📌':'lieu','📸':'camera','📷':'camera','🎥':'camera',
+    '⏳':'calendrier','🔄':'reglages','🔓':'reglages','📎':'document','⭐':'validation','🎁':'validation',
+    '💡':'info','✨':'validation','🔵':'info','🧼':'reglages','📏':'reglages','🗜':'reglages',
+    '⚡':'alerte','👉':'info','↩':'sortie','🏦':'facture','⛽':'voiture','🔋':'voiture','💚':'validation','☰':'reglages','⬇':'document'
+  };
+  function creer(cle){
+    var span=document.createElement('span');
+    span.className='hc-ui-icon'; span.setAttribute('aria-hidden','true');
+    span.innerHTML='<svg viewBox="0 0 24 24">'+(chemins[cle]||chemins.info)+'</svg>';
+    return span;
+  }
+  function convertir(racine){
+    var walker=document.createTreeWalker(racine||document.body,NodeFilter.SHOW_TEXT);
+    var liste=[],n; while((n=walker.nextNode())) if(Array.from(n.nodeValue||'').some(function(c){return correspondance[c];})) liste.push(n);
+    liste.forEach(function(noeud){
+      if(noeud.parentElement && noeud.parentElement.closest('script,style,textarea,input')) return;
+      var frag=document.createDocumentFragment(),buf='';
+      Array.from(noeud.nodeValue.replace(/\uFE0F/g,'')).forEach(function(c){
+        if(correspondance[c]){
+          if(buf){frag.appendChild(document.createTextNode(buf));buf='';}
+          frag.appendChild(creer(correspondance[c]));
+        }else buf+=c;
+      });
+      if(buf)frag.appendChild(document.createTextNode(buf));
+      noeud.parentNode.replaceChild(frag,noeud);
+    });
+  }
+  function lancer(){convertir(document.body);new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1)convertir(n);else if(n.nodeType===3&&n.parentNode)convertir(n.parentNode);});});}).observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lancer);else lancer();
+})();
+</script>
 </body>
 </html>

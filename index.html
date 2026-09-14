@@ -6974,8 +6974,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <div class="modal-form-group" id="pro-categorie-group">
               <label>De quel professionnel avez-vous besoin ? <span class="field-required">*</span></label>
               <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-                <label class="radio-opt"><input type="radio" name="pro-categorie" value="technicien" onclick="proOnCategorieChange()"><span>Technicien automobile<span class="hc-opt-desc">Mécanique, carrosserie, diagnostic et autres spécialités</span></span></label>
-                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Jockey automobile, accueil en concession, soutien administratif, et d'autres missions</span></span></label>
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="technicien" onclick="proOnCategorieChange()"><span>Technicien automobile<span class="hc-opt-desc">Mécanique et autres spécialités</span></span></label>
+                <label class="radio-opt"><input type="radio" name="pro-categorie" value="renfort" onclick="proOnCategorieChange()"><span>Renfort automobile sur site<span class="hc-opt-desc">Accueil en concession et autres spécialités</span></span></label>
               </div>
             </div>
 
@@ -7526,13 +7526,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
                 <input type="text" id="client-restit-marque" placeholder="Ex : BMW 320d" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div>
-                <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">Plaque *</label>
+                <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">Immatriculation <span class="field-optional-hint">(attendue avant mission)</span></label>
                 <input type="text" id="client-restit-immat" placeholder="AB-123-CD" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase">
               </div>
             </div>
 
             <div>
-              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution</label>
+              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution <span class="field-optional-hint">(attendu avant mission)</span></label>
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
               <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
@@ -12629,7 +12629,7 @@ function construireRecap() {
       // « !commun && ... » : le formulaire et le recapitulatif pouvaient
       // donc diverger, et le client repondait a une question qui
       // n'apparaissait jamais dans son propre recapitulatif.
-      if ((sc.pc || sc.liv) && v.mode_transport) {
+      if ((sc.pc || sc.liv) && v.livraison_apres_stockage !== false && v.mode_transport) {
         corps += _recapLigne('Mode de transport',
           v.mode_transport === 'plateau' ? 'Transport sur plateau' : 'Convoyage par la route');
       }
@@ -12642,7 +12642,7 @@ function construireRecap() {
           || _recapLigne('Restitution', 'Prévue');
         // V55 — identité du véhicule à restituer, propre à CE véhicule.
         // _recapLigne masque déjà les valeurs vides : Immatriculation et
-        // VIN, facultatifs, disparaissent proprement s'ils ne sont pas
+        // VIN, non bloquants au devis, disparaissent proprement s'ils ne sont pas
         // renseignés. Concerne la relecture de la demande avant envoi,
         // jamais le devis client (PDF / snapshot contractuel).
         corps += _recapLigne('Véhicule à restituer — Type', _libelleGabarit(v.restit_type_vehicule));
@@ -20115,6 +20115,23 @@ function basculerLivraisonVehicule(i) {
   // référencée, jamais affectée.
   var blocRestitQuestion = document.getElementById('veh-restit-question-' + i);
   if (blocRestitQuestion) blocRestitQuestion.style.display = actif ? 'block' : 'none';
+
+  // Livraison après stockage = Non : aucun transport HelixCar n'est
+  // applicable à ce véhicule. La rubrique Mode disparaît, ses choix sont
+  // vidés et aucune valeur cachée ne peut bloquer ou polluer le récapitulatif.
+  var blocMode = document.getElementById('veh-' + i + '-sous-mode');
+  if (blocMode) {
+    blocMode.style.display = actif === false ? 'none' : '';
+    if (actif === false) {
+      blocMode.classList.remove('ouvert', 'termine', 'incomplet');
+      blocMode.querySelectorAll('input[name="veh-' + i + '-mode"]').forEach(function (radio) {
+        radio.checked = false;
+      });
+      blocMode.querySelectorAll('.field-error-msg').forEach(function (msg) {
+        if (msg.parentNode) msg.parentNode.removeChild(msg);
+      });
+    }
+  }
   // Rafraîchit uniquement les indicateurs (pastille véhicule, barre de
   // progression globale) — fonctions déjà existantes, réutilisées telles
   // quelles, aucune logique dupliquée.
@@ -20199,7 +20216,8 @@ function _champsRequisVehicule(i) {
   // V55 — 'restit-vtype' et 'restit-marque' suivent la MÊME condition que
   // les autres champs de restitution : exigés uniquement si la
   // restitution est réellement applicable à ce véhicule. Immatriculation
-  // et VIN restent facultatifs, comme pour l'identité principale.
+  // et VIN restent non bloquants pour le devis, mais sont suivis comme
+  // informations attendues avant le lancement de la mission.
   if (_vehiculeARestitutionSpecifique(i) && _vehiculeLivraisonApresStockage(i)) req.push('restit-rue','restit-cp','restit-ville','restit-date','restit-vtype','restit-marque');
   return req;
 }
@@ -20399,8 +20417,8 @@ function rendreFichesVehicules() {
       '<div class="veh-sep"></div><div class="veh-sstitre">Véhicule à restituer</div>'+
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
-      '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation <span class="field-optional-hint">(facultatif)</span></label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
+      '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation <span class="field-optional-hint">(attendue avant mission)</span></label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
+      '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(attendu avant mission)</span></label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
@@ -20444,7 +20462,14 @@ function rendreFichesVehicules() {
       var mode='<div class="veh-sstitre">Mode de transport <button type="button" class="hc-help-btn" data-help="Choisissez si votre véhicule est conduit jusqu’à destination ou transporté sur un plateau." aria-label="Aide sur le mode de transport">i</button> <span class="field-required">*</span></div><div style="display:flex;flex-direction:column;gap:7px">'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="standard" '+(v.mode_transport==='standard'?'checked':'')+'><span>Convoyage par la route</span></label>'+
         '<label class="radio-opt"><input type="radio" name="veh-'+i+'-mode" value="plateau" '+(v.mode_transport==='plateau'?'checked':'')+'><span>Transport sur plateau</span></label></div>';
-      html+=_hcSousVeh(i,'mode',no++,'Mode de transport',mode,false);
+      var blocModeHtml=_hcSousVeh(i,'mode',no++,'Mode de transport',mode,false);
+      if (livraisonStockVehicule && livActive===false) {
+        blocModeHtml=blocModeHtml.replace(
+          'id="veh-'+i+'-sous-mode"',
+          'id="veh-'+i+'-sous-mode" style="display:none"'
+        );
+      }
+      html+=blocModeHtml;
     }
 
     html+='<div class="veh-actions"><button type="button" class="veh-btn-effacer" onclick="effacerVehicule('+i+')">Effacer ce véhicule</button><button type="button" class="btn btn-primary veh-btn-valider" onclick="validerVehicule('+i+')" disabled aria-disabled="true">Valider ce véhicule</button></div></div></div>';
@@ -20463,7 +20488,7 @@ function _lireFichesVehicules() {
     var livActive=_vehiculeLivraisonApresStockage(i);
     function h(p,c){var t=_typeHoraire(i,p); if(c==='type')return t; if(c==='heure')return t==='precise'?g(p+'-heure'):''; if(c==='cdeb')return t==='creneau'?g(p+'-cdeb'):''; if(c==='cfin')return t==='creneau'?g(p+'-cfin'):''; return '';}
     out.push({
-      position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),mode_transport:modeEl?modeEl.value:'',consignes:g('consignes'),
+      position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),mode_transport:livActive===false?'':(modeEl?modeEl.value:''),consignes:g('consignes'),
       adresse_depart_rue:g('pc-rue'),code_postal_depart:g('pc-cp'),ville_depart:g('pc-ville'),pc_contact_nom:g('pc-contact'),pc_contact_tel:g('pc-tel'),date_prise_en_charge:g('pc-date'),heure_prise_en_charge:h('pc','heure'),pc_heure_type:h('pc','type'),pc_creneau_debut:h('pc','cdeb'),pc_creneau_fin:h('pc','cfin'),
       // LOT D1 — quand HelixCar n'intervient sur aucun trajet, aucune
       // valeur de livraison ne part en base, meme heritee d'un
@@ -23067,47 +23092,28 @@ console.log('HelixCar ' + window.HC_VERSION);
 </style>
 <script id="hc-pr6-validation-vehicules">
 (function () {
-  // Au stade du devis, seule la catégorie du véhicule est bloquante
-  // dans l'identité. Le VIN absent reste suivi comme information attendue
-  // côté mission, sans empêcher l'envoi de la demande de devis.
-
-  // Toute rubrique commence rouge. Elle ne devient verte qu'après un
-  // clic réussi sur SON bouton OK, même si ses champs étaient préremplis.
-  var sousVehOrig = window._hcSousVeh;
-  window._hcSousVeh = function () {
-    return sousVehOrig.apply(this, arguments)
-      .replace('class="veh-sous-accordeon', 'class="veh-sous-accordeon incomplet');
-  };
-
+  // La couleur, le compteur et l'état global sont dérivés des données
+  // réelles. Le bouton « OK » ne constitue jamais une seconde source de
+  // vérité et ne peut donc pas invalider une autre rubrique.
   function etapeApplicable(bloc) {
     return !!(bloc && _isVisible(bloc));
-  }
-  function toutesEtapesConfirmees(i) {
-    var contenu = document.getElementById('veh-contenu-' + i);
-    if (!contenu) return false;
-    var visibles = Array.prototype.filter.call(
-      contenu.querySelectorAll('.veh-sous-accordeon'),
-      etapeApplicable
-    );
-    return visibles.length > 0 && visibles.every(function (bloc) {
-      return bloc.dataset.hcDejaValide === '1';
-    });
   }
 
   var vehiculeCompletOrig = window._vehiculeComplet;
   function donneesVehiculeCompletes(i) {
     if (!vehiculeCompletOrig(i)) return false;
     var blocLiv = document.getElementById('veh-' + i + '-liv-active-group');
-    if (blocLiv && _isVisible(blocLiv) && !blocLiv.querySelector('input[type="radio"]:checked')) return false;
+    if (blocLiv && _isVisible(blocLiv)
+        && !blocLiv.querySelector('input[type="radio"]:checked')) return false;
     var blocRest = document.getElementById('veh-' + i + '-restit-active-group');
-    if (blocRest && _isVisible(blocRest) && !blocRest.querySelector('input[type="radio"]:checked')) return false;
+    if (blocRest && _isVisible(blocRest)
+        && !blocRest.querySelector('input[type="radio"]:checked')) return false;
     var blocMode = document.getElementById('veh-' + i + '-sous-mode');
-    if (blocMode && _isVisible(blocMode) && !blocMode.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
+    if (blocMode && _isVisible(blocMode)
+        && !blocMode.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
     return true;
   }
-  window._vehiculeComplet = function (i) {
-    return donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);
-  };
+  window._vehiculeComplet = donneesVehiculeCompletes;
 
   function etapeComplete(i, bloc) {
     if (!etapeApplicable(bloc)) return true;
@@ -23123,7 +23129,8 @@ console.log('HelixCar ' + window.HC_VERSION);
       var rest = document.getElementById('veh-' + i + '-restit-active-group');
       if (rest && _isVisible(rest) && !rest.querySelector('input[type="radio"]:checked')) return false;
     }
-    if (cle === 'mode' && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
+    if (cle === 'mode'
+        && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
     var prefixes = _prefixesHoraireRequis(i);
     for (var j = 0; j < prefixes.length; j++) {
       var probe = document.getElementById('veh-' + i + '-' + prefixes[j] + '-heure');
@@ -23141,13 +23148,13 @@ console.log('HelixCar ' + window.HC_VERSION);
         bloc.classList.remove('termine', 'incomplet');
         return;
       }
-      var confirme = bloc.dataset.hcDejaValide === '1' && etapeComplete(i, bloc);
-      bloc.classList.toggle('termine', confirme);
-      bloc.classList.toggle('incomplet', !confirme);
+      var complet = etapeComplete(i, bloc);
+      bloc.classList.toggle('termine', complet);
+      bloc.classList.toggle('incomplet', !complet);
     });
     var bouton = contenu.querySelector('.veh-btn-valider');
     if (bouton) {
-      var completVehicule = donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);
+      var completVehicule = donneesVehiculeCompletes(i);
       bouton.disabled = !completVehicule;
       bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');
     }
@@ -23161,21 +23168,9 @@ console.log('HelixCar ' + window.HC_VERSION);
 
   var okSousOrig = window._hcOkSousVeh;
   window._hcOkSousVeh = function (i, cle) {
-    var bloc = document.getElementById('veh-' + i + '-sous-' + cle);
-    if (!bloc) return;
-    if (cle === 'mode' && etapeApplicable(bloc)
-        && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) {
-      bloc.dataset.hcDejaValide = '0';
-      bloc.classList.add('incomplet');
-      bloc.classList.remove('termine');
-      majEtapes(i);
-      return;
-    }
     okSousOrig(i, cle);
-    // La fonction d'origine pose hcDejaValide=1 uniquement quand toutes
-    // les validations de cette rubrique ont réussi.
     majEtapes(i);
-    _majBarreVehicule(i);
+    _majProgressionVehicules();
   };
 
   function actualiserDepuisChamp(cible) {
@@ -23183,12 +23178,7 @@ console.log('HelixCar ' + window.HC_VERSION);
     if (!contenu) return;
     var i = parseInt(contenu.id.replace('veh-contenu-', ''), 10);
     if (isNaN(i)) return;
-    var bloc = cible.closest('.veh-sous-accordeon');
-    if (bloc && bloc.dataset.hcDejaValide === '1') {
-      bloc.dataset.hcDejaValide = '0';
-      bloc.classList.remove('termine');
-      bloc.classList.add('incomplet');
-    }
+    majEtapes(i);
     _majBarreVehicule(i);
     _majProgressionVehicules();
   }

@@ -69,20 +69,20 @@ check('Seul le type bloque l’identité au stade du devis, le transport reste r
   !index.includes("['immat', 'vin'].forEach") &&
   !index.includes("_checkRequiredText('client-marque')") &&
   index.includes("querySelector('input[name=\"veh-' + i + '-mode\"]:checked')"));
-check('Valider ce véhicule reste désactivé tant que toutes les étapes ne sont pas confirmées',
-  index.includes('disabled aria-disabled="true">Valider ce véhicule</button>') &&
-  index.includes("var completVehicule = donneesVehiculeCompletes(i) && toutesEtapesConfirmees(i);") &&
+check('Valider ce véhicule dépend des données réelles, pas des clics OK',
+  index.includes("var completVehicule = donneesVehiculeCompletes(i);") &&
   index.includes("bouton.disabled = !completVehicule;") &&
-  index.includes("bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');"));
-check('Chaque étape démarre rouge et ne passe au vert qu’après son bouton OK',
-  index.includes('class="veh-sous-accordeon incomplet') &&
-  index.includes("var confirme = bloc.dataset.hcDejaValide === '1' && etapeComplete(i, bloc);") &&
-  index.includes("bloc.classList.toggle('termine', confirme);") &&
-  index.includes("bloc.classList.toggle('incomplet', !confirme);"));
-check('Modifier une étape déjà confirmée la repasse en rouge',
-  index.includes("bloc.dataset.hcDejaValide = '0';") &&
-  index.includes("bloc.classList.remove('termine');") &&
-  index.includes("bloc.classList.add('incomplet');"));
+  index.includes("bouton.setAttribute('aria-disabled', completVehicule ? 'false' : 'true');") &&
+  !index.includes("toutesEtapesConfirmees"));
+check('Chaque étape reflète uniquement sa complétude réelle',
+  index.includes("var complet = etapeComplete(i, bloc);") &&
+  index.includes("bloc.classList.toggle('termine', complet);") &&
+  index.includes("bloc.classList.toggle('incomplet', !complet);") &&
+  !index.includes("hcDejaValide"));
+check('Une modification recalcule uniquement le véhicule concerné',
+  index.includes("var i = parseInt(contenu.id.replace('veh-contenu-', ''), 10);") &&
+  index.includes("majEtapes(i);") &&
+  index.includes("_majBarreVehicule(i);"));
 
 // Après envoi, l'ancien formulaire est détruit et les demandes réelles sont rerendues.
 check('Une demande client envoyée ne peut pas se rouvrir ni être renvoyée',
@@ -104,9 +104,11 @@ check('Le récapitulatif réutilise la maquette PDF, le logo et une couleur dist
   dashboard.includes('{recapitulatif:true}') &&
   dashboard.includes("doc.addImage(HELIXCAR_LOGO_PDF"));
 check('Le récapitulatif masque le titre de devis, le tarif et les mentions commerciales',
-  dashboard.includes("if (!estRecapitulatif) {\n    T('DEVIS N° '") &&
+  dashboard.includes("if (estRecapitulatif) {") &&
+  dashboard.includes("T('RÉCAPITULATIF DE LA DEMANDE'") &&
   dashboard.includes("if (!estRecapitulatif && HELIXCAR_MENTION_TVA)") &&
   dashboard.includes("if (!estRecapitulatif) {\n  var yFinPrestations = y;"));
+
 check('Le bandeau de brouillon propose explicitement reprendre ou recommencer',
   index.includes("titre.textContent = 'Demande en cours';") &&
   index.includes("btnReprendre.textContent = 'Reprendre';") &&
