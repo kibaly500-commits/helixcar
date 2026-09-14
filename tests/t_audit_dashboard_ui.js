@@ -11,6 +11,7 @@ const L=require('./lib');const {urlFichier}=require('./env');
   const inventaire=await page.evaluate(()=>{
    for(const m of showPage.toString().matchAll(/\b((?:load|charger|verifierAcces)\w+)\(/g))window[m[1]]=()=>{};
    document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';
+   document.getElementById('app').classList.add('visible');
    document.getElementById('mobile-bottom-nav').style.display='flex';
    window.qaLong=()=>{const d=document.createElement('div');d.className='qa-long';d.style.height='1800px';d.textContent='TEST QA — contenu long';return d;};
    return {pages:[...document.querySelectorAll('.page')].map(e=>e.id.slice(5)),modals:[...document.querySelectorAll('.modal-overlay')].map(e=>e.id.slice(6))};
