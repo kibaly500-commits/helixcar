@@ -40,6 +40,15 @@ check('Les données duplicables remplacent la cible sans copier ses plaques',
   index.includes('Les plaques restent propres à chaque véhicule et ne sont jamais copiées.'));
 check('L’ancien message de blocage de duplication a disparu',
   !index.includes("Aucune fiche véhicule vierge n'est disponible"));
+check('La duplication ne montre aucun avertissement ni message après copie',
+  !index.includes('hc-dupliquer-avertissement') &&
+  !index.includes('Confirmer la duplication ?') &&
+  !index.includes('duplique-msg') &&
+  !index.includes("Informations reprises d'un autre véhicule"));
+check('La duplication propose uniquement un nombre puis OK',
+  index.includes('id="hc-dupliquer-go"') &&
+  index.includes('>OK</button>') &&
+  !index.includes('hc-dupliquer-simple'));
 
 // L’option pro reste désactivée pour un particulier, mais sans curseur rouge.
 check('Nettoyage professionnel grisé sans symbole d’interdiction',

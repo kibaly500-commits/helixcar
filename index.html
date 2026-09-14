@@ -12143,14 +12143,6 @@ function _hcCopierVehiculeVers(source, cible) {
     ['type', 'marque', 'pc-rue', 'pc-cp', 'pc-ville', 'pc-date', 'liv-rue', 'liv-cp', 'liv-ville', 'liv-date']
       .forEach(function (s) { _clearFieldError('veh-' + cible + '-' + s); });
   }
-  // Point 10 (V52) — message discret signalant une fiche dupliquée,
-  // inséré une seule fois en tête de la carte véhicule cible.
-  var contenu = document.getElementById('veh-contenu-' + cible);
-  if (contenu && !document.getElementById('veh-' + cible + '-duplique-msg')) {
-    contenu.insertAdjacentHTML('afterbegin',
-      '<div id="veh-' + cible + '-duplique-msg" style="font-size:.76rem;color:#888;margin-bottom:10px">' +
-      '&#9432; Informations reprises d\'un autre véhicule. Vous pouvez modifier cette fiche individuellement.</div>');
-  }
   // Point 5-6 (V54) — recalcul RÉEL de la complétude de chaque sous-bloc
   // de la fiche cible après copie, en réutilisant EXACTEMENT la même
   // règle que pour une fiche remplie manuellement (sousBlocEncoreComplet,
@@ -12184,17 +12176,14 @@ function _hcConstruireDupliquerOverlay() {
   overlay.innerHTML =
     '<div style="background:#fff;border-radius:14px;padding:22px 24px;max-width:320px;width:90%;box-shadow:0 12px 32px rgba(16,24,32,.2)">' +
     '<div style="font-weight:700;font-size:.98rem;margin-bottom:6px;color:var(--ink)">Combien de véhicules supplémentaires sont identiques ?</div>' +
-    '<div style="font-size:.78rem;color:#888;margin-bottom:16px">Les informations seront reprises et resteront modifiables individuellement.</div>' +
-    '<div id="hc-dupliquer-simple" style="display:none;font-size:.9rem;color:var(--ink);margin-bottom:16px"></div>' +
     '<div id="hc-dupliquer-compteur" style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:18px">' +
     '<button type="button" id="hc-dupliquer-moins" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(16,24,32,.18);background:#fff;font-size:1.1rem;cursor:pointer">&minus;</button>' +
     '<span id="hc-dupliquer-valeur" style="font-size:1.3rem;font-weight:700;min-width:28px;text-align:center">1</span>' +
     '<button type="button" id="hc-dupliquer-plus" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(16,24,32,.18);background:#fff;font-size:1.1rem;cursor:pointer">+</button>' +
     '</div>' +
-    '<div id="hc-dupliquer-avertissement" role="status" aria-live="polite" style="display:none;margin-bottom:16px;padding:12px 14px;border-left:3px solid var(--accent,#9e3f46);border-radius:4px;background:#f5f5f3;color:var(--ink,#171c21);font-size:.84rem;line-height:1.5"></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px">' +
     '<button type="button" id="hc-dupliquer-annuler" style="padding:8px 14px;font-size:.82rem;border-radius:8px;border:1px solid rgba(16,24,32,.15);background:#fff;color:#666;cursor:pointer">Annuler</button>' +
-    '<button type="button" id="hc-dupliquer-go" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:none;background:var(--ink);color:#fff;cursor:pointer">Dupliquer</button>' +
+    '<button type="button" id="hc-dupliquer-go" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:none;background:var(--ink);color:#fff;cursor:pointer">OK</button>' +
     '</div></div>';
   document.body.appendChild(overlay);
   overlay.addEventListener('click', function (e) { if (e.target === overlay) _hcFermerDupliquer(); });
@@ -12212,24 +12201,10 @@ function _hcAjusterDupliquerQte(delta) {
   overlay.querySelector('#hc-dupliquer-valeur').textContent = _hcDupliquerQte;
   overlay.querySelector('#hc-dupliquer-moins').disabled = (_hcDupliquerQte <= 1);
   overlay.querySelector('#hc-dupliquer-plus').disabled = (_hcDupliquerQte >= max);
-  _hcActualiserAvertissementDuplication();
 }
 
 function _hcCiblesDuplication() {
   return _hcListeVehiculesDisponibles(_hcDupliquerSource).slice(0, _hcDupliquerQte);
-}
-function _hcMessageRemplacement(cibles) {
-  var numeros = cibles.map(function (i) { return i + 1; });
-  var liste = numeros.length > 1 ? numeros.slice(0, -1).join(', ') + ' et ' + numeros[numeros.length - 1] : String(numeros[0]);
-  return numeros.length === 1
-    ? 'Vous êtes sur le point de remplacer les informations déjà renseignées du véhicule ' + liste + '.'
-    : 'Vous êtes sur le point de remplacer les informations déjà renseignées des véhicules ' + liste + '.';
-}
-function _hcActualiserAvertissementDuplication() {
-  var cibles = _hcCiblesDuplication().filter(_hcVehiculeRenseigne);
-  var zone = _hcDupliquerOverlay.querySelector('#hc-dupliquer-avertissement');
-  zone.textContent = cibles.length ? _hcMessageRemplacement(cibles) : '';
-  zone.style.display = cibles.length ? 'block' : 'none';
 }
 // Point 3 du ticket — ouverture du petit modal de quantité, sans aucun
 // choix technique : uniquement combien de copies identiques.
@@ -12238,7 +12213,6 @@ function _hcOuvrirDupliquer(i) {
   _hcDupliquerSource = i;
   _hcDupliquerQte = 1;
   var overlay = _hcConstruireDupliquerOverlay();
-  var simple = overlay.querySelector('#hc-dupliquer-simple');
   var compteur = overlay.querySelector('#hc-dupliquer-compteur');
   var boutonGo = overlay.querySelector('#hc-dupliquer-go');
   // Un seul véhicule total : aucun emplacement cible, donc aucune boîte
@@ -12248,18 +12222,10 @@ function _hcOuvrirDupliquer(i) {
     return;
   }
   boutonGo.style.display = '';
-  // Point 8 — un seul emplacement disponible : interface simplifiée,
-  // sans sélecteur de quantité inutile.
-  if (disponibles.length === 1) {
-    simple.style.display = 'block';
-    simple.textContent = 'Dupliquer vers le véhicule restant.';
-    compteur.style.display = 'none';
-  } else {
-    simple.style.display = 'none';
-    compteur.style.display = 'flex';
-    _hcAjusterDupliquerQte(0);
-  }
-  _hcActualiserAvertissementDuplication();
+  // Le même sélecteur simple reste visible dans tous les cas : de 1 au
+  // nombre maximal de véhicules pouvant recevoir la copie.
+  compteur.style.display = 'flex';
+  _hcAjusterDupliquerQte(0);
   overlay.style.display = 'flex';
 }
 function _hcFermerDupliquer() {
@@ -12267,15 +12233,12 @@ function _hcFermerDupliquer() {
   _hcDupliquerSource = null;
 }
 // La quantité est bornée par le nombre total de véhicules moins la source.
-// Les fiches vides sont prioritaires. Aucun remplacement d'une fiche
-// renseignée n'a lieu sans confirmation des numéros concernés.
+// Les fiches vides sont prioritaires. Après le choix du nombre, la copie
+// est immédiate et remplace les données duplicables des fiches cibles.
 function _hcConfirmerDupliquer() {
   if (_hcDupliquerSource === null) return;
   var source = _hcDupliquerSource;
   var cibles = _hcCiblesDuplication();
-  var remplacements = cibles.filter(_hcVehiculeRenseigne);
-  _hcActualiserAvertissementDuplication();
-  if (remplacements.length && !confirm(_hcMessageRemplacement(remplacements) + '\n\nConfirmer la duplication ?')) return;
   cibles.forEach(function (cible) { _hcCopierVehiculeVers(source, cible); });
   _hcFermerDupliquer();
   _majProgressionVehicules();

@@ -4,8 +4,8 @@ const { dansNJours } = require('./env.js');
   const browser = await L.launch();
   try {
     const page = await L.newPage(browser);
-    let accepter = true, messages = [];
-    page.on('dialog', async d => { messages.push(d.message()); await (accepter ? d.accept() : d.dismiss()); });
+    let messages = [];
+    page.on('dialog', async d => { messages.push(d.message()); await d.accept(); });
     // Cette recette porte sur les fiches, sans dépendre du parcours
     // d'inscription (couvert séparément par les tests d'intégration).
     await page.evaluate(()=>{
@@ -49,64 +49,48 @@ const { dansNJours } = require('./env.js');
         rendreFichesVehicules();
         qaOuvrirCopies(1);
       },choixSeul);
-      L.check('4 fiches : une copie vers 3 sans message, choix seul='+choixSeul,
-        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2]')&&await page.locator('#hc-dupliquer-avertissement').isHidden());
+      L.check('4 fiches : une copie vise le véhicule 3, choix seul='+choixSeul,
+        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2]'));
       await page.click('#hc-dupliquer-plus');
-      L.check('4 fiches : deux copies vers 3 et 4 sans message, choix seul='+choixSeul,
-        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,3]')&&await page.locator('#hc-dupliquer-avertissement').isHidden());
-      await page.click('#hc-dupliquer-plus');
-      L.check('4 fiches : trois copies avertissent seulement pour 2, choix seul='+choixSeul,
-        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,3,1]')&&
-        (await page.locator('#hc-dupliquer-avertissement').textContent()).includes('du véhicule 2.'));
-      await page.click('#hc-dupliquer-moins');
-      L.check('Redescendre à deux masque le message, choix seul='+choixSeul,await page.locator('#hc-dupliquer-avertissement').isHidden());
+      L.check('4 fiches : deux copies visent les véhicules 3 et 4, choix seul='+choixSeul,
+        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,3]'));
       messages=[];await page.click('#hc-dupliquer-go');
-      L.check('Deux copies effectives préservent la fiche 2, sans confirmation, choix seul='+choixSeul,
+      L.check('Deux copies effectives préservent la fiche 2, sans dialogue, choix seul='+choixSeul,
         messages.length===0&&JSON.stringify(await page.evaluate(()=>qaMarquesCopies()))===JSON.stringify(['Modèle 1','Modèle 2','Modèle 1','Modèle 1']));
     }
     await page.evaluate(()=>{qaScenarioCopies(5,[0,1,2]);qaOuvrirCopies(2);});
     L.check('Deux copies visent les fiches vides 4 et 5',
       await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[3,4]'));
-    L.check('Aucun avertissement pour les seules fiches vides',
-      await page.locator('#hc-dupliquer-avertissement').isHidden());
     messages=[];await page.click('#hc-dupliquer-go');
     L.check('Copie effective vers 4 et 5, sans toucher 2 et 3',
       JSON.stringify(await page.evaluate(()=>qaMarquesCopies()))===JSON.stringify(['Modèle 1','Modèle 2','Modèle 3','Modèle 1','Modèle 1']));
     L.check('Aucune confirmation inutile pour les fiches vides',messages.length===0);
 
     await page.evaluate(()=>{qaScenarioCopies(5,[0,1,2]);qaOuvrirCopies(3);});
-    const avertissement=await page.locator('#hc-dupliquer-avertissement').textContent();
-    L.check('Trois copies : avertissement uniquement pour le véhicule 2',
-      avertissement.includes('du véhicule 2.')&&!/véhicules|4|5/.test(avertissement),avertissement);
-    const avant=await page.evaluate(()=>qaDonneesCopies());
-    accepter=false;messages=[];await page.click('#hc-dupliquer-go');
-    L.check('Annuler le remplacement ne modifie aucune fiche, même vide',
-      avant===await page.evaluate(()=>qaDonneesCopies()));
-    L.check('Confirmation nomme la fiche remplacée et garde la fenêtre ouverte si refusée',
-      messages.length===1&&messages[0].includes('du véhicule 2.')&&await page.locator('#hc-dupliquer-go').isVisible());
-    accepter=true;await page.click('#hc-dupliquer-go');
-    L.check('Confirmer copie vers 4, 5 puis 2 et conserve le véhicule 3',
-      JSON.stringify(await page.evaluate(()=>qaMarquesCopies()))===JSON.stringify(['Modèle 1','Modèle 1','Modèle 3','Modèle 1','Modèle 1']));
+    messages=[];await page.click('#hc-dupliquer-go');
+    L.check('Trois copies remplacent 4, 5 puis 2 en un seul clic et conservent 3',
+      messages.length===0&&JSON.stringify(await page.evaluate(()=>qaMarquesCopies()))===JSON.stringify(['Modèle 1','Modèle 1','Modèle 3','Modèle 1','Modèle 1']));
 
     await page.evaluate(()=>{qaScenarioCopies(5,[0,1,2,3,4]);qaOuvrirCopies(4);});
-    L.check('Toutes les fiches remplies : numéros exacts et source exclue',
-      (await page.locator('#hc-dupliquer-avertissement').textContent()).includes('des véhicules 2, 3, 4 et 5.'));
+    L.check('Toutes les fiches remplies : les quatre destinations sont proposées',
+      await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[1,2,3,4]'));
     await page.click('#hc-dupliquer-moins');await page.click('#hc-dupliquer-moins');await page.click('#hc-dupliquer-moins');
-    L.check('Le message suit la diminution de quantité et revient au singulier',
-      (await page.locator('#hc-dupliquer-avertissement').textContent()).includes('du véhicule 2.'));
+    L.check('Le compteur redescend à une seule copie',
+      await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[1]'));
     await page.click('#hc-dupliquer-annuler');
     await page.evaluate(()=>{
       qaScenarioCopies(3,[0]);
       document.getElementById('veh-1-type').value=document.getElementById('veh-1-type').options[1].value;
       qaOuvrirCopies(2);
     });
-    L.check('Une fiche partiellement remplie est protégée, même avec le seul type',
-      await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,1]')&&
-      (await page.locator('#hc-dupliquer-avertissement').textContent()).includes('du véhicule 2.'));
+    L.check('Une fiche partiellement remplie reste proposée après la fiche vide',
+      await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,1]'));
     await page.click('#hc-dupliquer-annuler');
     await page.evaluate(()=>{qaScenarioCopies(2,[0,1]);qaOuvrirCopies(1);});
-    L.check('Deux véhicules : fenêtre simplifiée avec avertissement',
-      await page.locator('#hc-dupliquer-compteur').isHidden()&&await page.locator('#hc-dupliquer-avertissement').isVisible());
+    L.check('Deux véhicules : le compteur propose simplement une copie',
+      await page.locator('#hc-dupliquer-compteur').isVisible() &&
+      await page.locator('#hc-dupliquer-valeur').textContent() === '1' &&
+      await page.locator('#hc-dupliquer-go').textContent() === 'OK');
     await page.click('#hc-dupliquer-annuler');
     await page.evaluate(()=>{qaScenarioCopies(1,[0]);_hcOuvrirDupliquer(0);});
     L.check('Un seul véhicule : aucune destination et aucune fenêtre',await page.locator('#hc-dupliquer-go').isHidden());
