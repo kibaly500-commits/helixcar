@@ -708,55 +708,33 @@ body.scroll-verrouille { overflow: hidden; }
   .stat-grid, [style*="grid-template-columns:repeat(3"] { grid-template-columns: 1fr 1fr !important; }
   [style*="grid-template-columns:repeat(4"] { grid-template-columns: 1fr 1fr !important; }
 
-  /* ── MODALES / FICHES → PANNEAU PLEIN ÉCRAN MOBILE ──────────
-     V50.5D.3F — CAUSE CONFIRMÉE PAR AUDIT : les 10 .modal du Dashboard
-     (modal-split, modal-dossier, modal-mission, modal-mission-accepted,
-     modal-info-mission, modal-frais, modal-new-mission, modal-confirm,
-     modal-fiche-demande, modal-apercu-devis) portent TOUTES un style
-     inline `position:relative`, et deux d'entre elles y ajoutent
-     `max-height:85vh`/`88vh;overflow-y:auto`. Un style inline prime
-     TOUJOURS sur une règle externe sans !important, quelle que soit sa
-     spécificité — la règle ci-dessous, écrite sans !important dans les
-     versions précédentes, n'a donc JAMAIS pris effet sur aucune des 10
-     modales. Solution retenue (la moins risquée, cf. demande) :
-     !important strictement scopé à ce bloc @media (max-width:768px) —
-     jamais actif ≥769px, donc aucun risque sur le rendu desktop, et
-     aucune des 10 balises HTML n'a besoin d'être modifiée une par une
-     (moins de surface d'erreur qu'un refactor individuel).
-     .modal EST directement l'unique élément scrollable (aucun
-     conteneur de scroll imbriqué) : position:fixed;inset:0 se cale sur
-     le viewport visuel réel, donc déjà robuste face aux barres
-     d'adresse dynamiques, sans dépendre du vh. */
-  .modal-overlay { align-items: stretch; }
+  /* Sur mobile, le fond fixe est l'unique surface de défilement.
+     La fiche garde sa hauteur naturelle : aucun panneau fixe et
+     défilant n'est imbriqué dans une couche filtrée. */
+  .modal-overlay {
+    display: none;
+    align-items: flex-start;
+    overflow-y: auto;
+    height: 100vh;
+    height: 100dvh;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    -webkit-overflow-scrolling: auto;
+  }
+  .modal-overlay.open { display: flex; }
   .modal-overlay .modal {
-    position: fixed !important;
-    inset: 0 !important;
+    position: relative !important;
+    inset: auto !important;
+    flex: 0 0 100%;
     width: 100% !important; max-width: 100% !important;
-    height: 100% !important; max-height: 100% !important;
+    height: auto !important; max-height: none !important;
+    min-height: 100%;
     border-radius: 0 !important;
-    transform: none !important; /* incompatible avec inset:0 fixed */
-    padding: 20px 16px calc(90px + env(safe-area-inset-bottom)) 16px !important;
-    padding-top: max(20px, env(safe-area-inset-top)) !important;
-    overflow-y: auto !important;
-    /* V50.5D.3H — CAUSE CONFIRMÉE PAR TEST RÉEL SUR IPHONE SAFARI :
-       -webkit-overflow-scrolling:touch combiné à overscroll-behavior:
-       contain sur ce même conteneur produit un bug WebKit documenté —
-       la descente fonctionne, mais la remontée accroche ou devient
-       impossible (la couche de composition créée par la propriété
-       -webkit-overflow-scrolling legacy ne "rend" pas correctement la
-       main au geste inverse dans ce contexte). RETIRÉ des trois
-       écrans concernés (10 modales, menu mobile) : le scroll natif
-       moderne de Safari iOS (13+) fournit déjà l'inertie tactile sur
-       tout overflow-y:auto SANS avoir besoin de cette propriété
-       héritée d'iOS 8-12 — aucune perte de confort de défilement,
-       seulement la suppression du pattern fautif.
-       overscroll-behavior:contain n'est pas non plus indispensable
-       ici : le verrouillage du body (ci-dessous) empêche déjà tout
-       scroll-chaining vers l'arrière-plan par un autre mécanisme
-       (position:fixed), donc rien ne dépend de cette propriété pour
-       la sécurité anti-chaînage — seule sa présence COMBINÉE à
-       -webkit-overflow-scrolling:touch posait problème. */
-    text-align: left; /* modal-confirm impose text-align:center inline : le panneau plein écran reste lisible en alignement gauche, seul le TEXTE interne (h3/p, non touché) garde son propre alignement inline s'il en a un */
+    transform: none !important;
+    transition: none;
+    padding: max(20px, env(safe-area-inset-top)) 16px calc(90px + env(safe-area-inset-bottom)) !important;
+    overflow: visible !important;
+    text-align: left;
   }
   .modal-overlay.open .modal { transform: none !important; }
   .modal-close {
@@ -766,25 +744,8 @@ body.scroll-verrouille { overflow: hidden; }
     z-index: 510;
   }
 
-  /* Verrouillage de scroll d'arrière-plan robuste iOS/Android (voir JS
-     _poserVerrouScroll/_retirerVerrouScroll plus bas, gestionnaire
-     réentrant par sources) :
-     position:fixed sur <body> — le simple overflow:hidden ne bloque
-     pas fiablement le scroll tactile sur Safari iOS. Scopé au mobile
-     uniquement : le comportement desktop (overflow:hidden simple, cf.
-     règle globale hors media query) reste strictement inchangé.
-     V50.5D.3H — audité spécifiquement comme cause possible du blocage
-     de remontée : par spécification CSS, position:fixed sur un ANCÊTRE
-     (body) ne modifie PAS le containing block d'un descendant qui est
-     LUI-MÊME position:fixed (seuls transform/filter/will-change sur un
-     ancêtre créent ce piège, jamais position:fixed seul) — .modal-overlay
-     reste donc positionné par rapport au viewport réel, indépendamment
-     de body. Conservé tel quel : la cause réelle identifiée et corrigée
-     ci-dessus (la combinaison -webkit-overflow-scrolling:touch +
-     overscroll-behavior:contain sur le scroller lui-même) explique
-     déjà entièrement le symptôme sans qu'il soit nécessaire de changer
-     la stratégie de verrouillage du body, qui verrouille correctement
-     l'arrière-plan (jamais signalé en défaut). */
+  /* Le verrou reste réentrant : fermer un aperçu ne déverrouille
+     pas le document tant que la fiche sous-jacente est ouverte. */
   body.scroll-verrouille {
     position: fixed;
     top: var(--scroll-lock-top, 0px);
@@ -819,6 +780,8 @@ body.scroll-verrouille { overflow: hidden; }
      visualiseur PDF du navigateur reste l'UNIQUE zone qui défile. Le
      PDF affiché n'est jamais régénéré, seul son cadre est adapté. */
   #modal-apercu-devis .modal {
+    height: 100% !important;
+    max-height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -936,6 +899,12 @@ body.scroll-verrouille { overflow: hidden; }
   .logo-badge { width: 30px; height: 30px; }
 }
 
+/* Les commandes ne doivent pas sélectionner le cadre après plusieurs clics.
+   Le document embarqué et ses champs gardent leur sélection de texte. */
+#client-cadre-titre, #client-cadre-retour, .modal button {
+  -webkit-user-select: none;
+  user-select: none;
+}
 /* PR6 — Nouvelle demande : même format compact que « Devenir client »,
    au-dessus du Dashboard conservé et flouté. */
 #page-client-nouvelle-demande.active {
@@ -966,6 +935,8 @@ body.scroll-verrouille { overflow: hidden; }
 }
 #page-client-nouvelle-demande .card-header { margin-bottom: 0; }
 #page-client-nouvelle-demande #client-demande-cadre {
+  -webkit-user-select: none;
+  user-select: none;
   min-height: min(520px, calc(100vh - 140px)) !important;
   max-height: calc(100vh - 116px);
   background: #fff;
@@ -4455,7 +4426,13 @@ function _retirerVerrouScroll(source) {
 // pose jamais qu'UN seul verrou grâce à l'idempotence de _poserVerrouScroll.
 function openModal(id) {
   const el = document.getElementById('modal-' + id);
+  const nouvelleOuverture = !el.classList.contains('open');
   el.classList.add('open');
+  if (nouvelleOuverture) {
+    el.scrollTop = 0;
+    const fiche = el.querySelector('.modal');
+    if (fiche) fiche.scrollTop = 0;
+  }
   // Toute fenêtre s'ouvre avec ses mots de passe MASQUÉS, quel que soit
   // l'état laissé lors de la fermeture précédente.
   reinitialiserAffichageMotsDePasse(el);

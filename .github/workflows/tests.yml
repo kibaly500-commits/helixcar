@@ -48,6 +48,23 @@ jobs:
           HC_VIDEO_GRANDE: '1'
         run: node tests/lancer.js --sans-sql
 
+  webkit-mobile:
+    name: Fiche mobile sur WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Vérifier la fiche longue et la sélection
+        env:
+          HC_TEST_WEBKIT: '1'
+        run: node tests/t_fiche_mobile.js
+
   sql:
     name: Politiques RLS sur PostgreSQL 16
     runs-on: ubuntu-latest
