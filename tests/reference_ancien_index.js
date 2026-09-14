@@ -202,7 +202,13 @@ const DISPARUS_EXPLIQUES = [
     'mention « facultatif » retirée explicitement : le VIN absent reste non bloquant '
     + 'mais devient une information à compléter dans les espaces client et administrateur'],
   ['N° de châssis (VIN) — véhicule restitution (facultatif)',
-    'mention « facultatif » retirée explicitement sur le véhicule de restitution']
+    'mention « facultatif » retirée explicitement sur le véhicule de restitution'],
+  ['Immatriculation (facultatif)',
+    'mention « facultatif » retirée : l’immatriculation reste non bloquante au devis '
+    + 'mais devient une information attendue avant mission'],
+  ['Plaque *',
+    'libellé remplacé par « Immatriculation — attendue avant mission » : '
+    + 'la donnée ne bloque plus le devis mais bloque le lancement de mission']
 ];
 
 module.exports = { LIBELLES_ANCIEN_INDEX, DISPARUS_EXPLIQUES };

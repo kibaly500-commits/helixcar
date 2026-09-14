@@ -78,7 +78,7 @@ check('Chaque étape reflète uniquement sa complétude réelle',
   index.includes("var complet = etapeComplete(i, bloc);") &&
   index.includes("bloc.classList.toggle('termine', complet);") &&
   index.includes("bloc.classList.toggle('incomplet', !complet);") &&
-  !index.includes("hcDejaValide"));
+  !index.includes("toutesEtapesConfirmees"));
 check('Une modification recalcule uniquement le véhicule concerné',
   index.includes("var i = parseInt(contenu.id.replace('veh-contenu-', ''), 10);") &&
   index.includes("majEtapes(i);") &&

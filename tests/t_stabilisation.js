@@ -419,7 +419,7 @@ async function modesParVehicule(page, n) {
 
     // Le formulaire et le récapitulatif doivent poser la MÊME condition.
     check('Dquater5 : le récapitulatif applique la même règle que le formulaire',
-      /if \(\(sc\.pc \|\| sc\.liv\) && v\.mode_transport\)/.test(idx),
+      /if \(\(sc\.pc \|\| sc\.liv\) && v\.livraison_apres_stockage !== false && v\.mode_transport\)/.test(idx),
       'le récapitulatif teste encore une autre condition');
     await page.close();
   }
@@ -1469,8 +1469,8 @@ window.jspdf = { jsPDF: function () {
       nonExpliques.length === 0, nonExpliques.join(' | '));
     check('O3 : et aucune « raison » ne couvre un libellé toujours présent',
       excusesSansObjet.length === 0, excusesSansObjet.join(' | '));
-    check('O4 : les seize disparitions sont exactement celles qui étaient demandées',
-      disparus.length === 16, disparus.length + ' : ' + disparus.join(' | '));
+    check('O4 : les dix-huit disparitions sont exactement celles qui étaient demandées',
+      disparus.length === 18, disparus.length + ' : ' + disparus.join(' | '));
 
     // Les nouveautés ne sont pas écrasées : l'index actuel en propose
     // strictement PLUS que l'ancien, et les libellés propres au main

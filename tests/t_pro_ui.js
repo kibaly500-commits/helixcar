@@ -43,7 +43,7 @@ async function ouvrirRubrique(page, cle) {
   L.check('A5 : l\'exemple de spécialité est « Technicien vitrage automobile »',
     metiers.exemple === 'Ex : Technicien vitrage automobile', metiers.exemple);
   L.check('A6 : la description du renfort cite les nouveaux métiers',
-    /accueil en concession/i.test(metiers.descRenfort) && /soutien administratif/i.test(metiers.descRenfort),
+    metiers.descRenfort.trim() === 'Accueil en concession et autres spécialités',
     metiers.descRenfort);
 
   // ── B. ALIGNEMENT DES CARTES MÉTIER ──

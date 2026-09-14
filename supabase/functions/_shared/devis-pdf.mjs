@@ -602,7 +602,9 @@ function _construirePdfDevis(c, d, options) {
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.setTextColor(COULEUR_ACCENT[0], COULEUR_ACCENT[1], COULEUR_ACCENT[2]);
-  if (!estRecapitulatif) {
+  if (estRecapitulatif) {
+    T('RÉCAPITULATIF DE LA DEMANDE', L, y + 3, { align: 'right' });
+  } else {
     T('DEVIS N° ' + d.reference, L, y + 3, { align: 'right' });
   }
 
@@ -2238,6 +2240,12 @@ function _construirePdfDevis(c, d, options) {
     // cette prestation doit également être nommée dans la liste finale.
     if (_stockageAutomatiqueConvoyage(c)) prestations.push('Stockage automobile');
   }
+  var livraisonDemandee = _operationAssureeParHelixCar(c, 'liv')
+    || !!(c._vehicules && c._vehicules.some(function (v) {
+      return v && v.livraison_apres_stockage !== false
+        && !!(v.adresse_arrivee_rue || v.ville_arrivee || v.date_livraison);
+    }));
+  if (livraisonDemandee && prestations.indexOf('Livraison') === -1) prestations.push('Livraison');
   if (c.plateau === 'Oui') prestations.push('Transport sur plateau');
   if (c.urgence === 'Oui') prestations.push('Transport prioritaire / urgent');
   if (aRestit) prestations.push('Restitution du véhicule');
