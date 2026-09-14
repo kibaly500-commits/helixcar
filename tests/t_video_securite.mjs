@@ -929,5 +929,5 @@ async function executerSuite() {
   if (echecs.length) echecs.forEach(e => console.log('  - ' + e));
   process.exit(fail > 0 ? 1 : 0);
 }
-if(process.argv[1]===new URL(import.meta.url).pathname)await executerSuite();
+if(process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url))await executerSuite();
 export {creerDouble,etatDeBase,appeler,ID_A,ID_B,JETON_A,ENTETE_WEBM};

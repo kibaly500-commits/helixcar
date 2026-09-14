@@ -238,6 +238,40 @@ window.fetch = function (url, options) {
         interactions.identiteMasquee && interactions.traitInitialMasque, JSON.stringify(interactions));
     }
 
+    const reprise = await cadres[0].evaluate(() => {
+      const existe = () => !!document.getElementById('notice-brouillon-restaure');
+      _formulaireClientSale = true;
+      _sauvegarderBrouillonClient();
+      _hcAfficherBrouillonIntegre();
+      const auRetour = existe();
+      document.querySelector('.brouillon-btn-principal').click();
+      for (const type of ['input', 'change', 'input']) {
+        document.getElementById('client-tel').dispatchEvent(new Event(type, { bubbles: true }));
+      }
+      const apresSaisie = existe();
+      _hcAfficherBrouillonIntegre();
+      const retourSuivant = existe();
+      window.confirm = () => true;
+      _demanderNouvelleDemandeClient();
+      const reset = { etape: _formStepState.client, notice: existe(),
+        brouillon: _lireBrouillonClientValide(), nom: document.getElementById('client-nom').value };
+      localStorage.setItem(_CLE_BROUILLON_CLIENT, JSON.stringify({ ts: Date.now(), etape: 1,
+        champs: { 'client-nom': { v: 'Ancien visiteur' }, 'client-type': { v: 'particulier' } } }));
+      _restaurerBrouillonClientSiPresent();
+      return { auRetour, apresSaisie, retourSuivant, reset, etapeRestauree: _formStepState.client,
+        nomRestaure: document.getElementById('client-nom').value,
+        typeRestaure: document.getElementById('client-type').value };
+    });
+    check('PR6 : reprise proposée au retour', reprise.auRetour);
+    check('PR6 : création de compte absente des prestations du client connecté',
+      await cadres[0].locator('input[name="type-service"][value="compte"]').isHidden());
+    check('PR6 : aucune réapparition pendant les saisies', !reprise.apresSaisie);
+    check('PR6 : proposée de nouveau au retour suivant', reprise.retourSuivant);
+    check('PR6 : recommencer supprime le brouillon et conserve le compte',
+      reprise.reset.etape === 2 && !reprise.reset.notice && !reprise.reset.brouillon && reprise.reset.nom === 'ClientA', JSON.stringify(reprise));
+    check('PR6 : ancien brouillon public sans retour à la création de compte',
+      reprise.etapeRestauree >= 2 && reprise.nomRestaure === 'ClientA' && reprise.typeRestaure === 'pro', JSON.stringify(reprise));
+
     // Retour : on revient à ses demandes, toujours sans quitter la page.
     await page.evaluate(() => fermerNouvelleDemande());
     await page.waitForTimeout(200);
