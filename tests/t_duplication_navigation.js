@@ -4,10 +4,15 @@ const { dansNJours } = require('./env.js');
   const browser = await L.launch();
   try {
     const page = await L.newPage(browser);
-    await page.setViewportSize({width:1200,height:760});
     let accepter = true, messages = [];
     page.on('dialog', async d => { messages.push(d.message()); await (accepter ? d.accept() : d.dismiss()); });
-    await L.fillStep1(page, 'particulier'); await L.chooseService(page, 'convoyage');
+    // Cette recette porte sur les fiches, sans dépendre du parcours
+    // d'inscription (couvert séparément par les tests d'intégration).
+    await page.evaluate(()=>{
+      openModal('client');
+      document.querySelector('input[name="type-service"][value="convoyage"]').click();
+    });
+    await page.setViewportSize({width:1200,height:760});
     await page.evaluate(dates => {
       window.qaScenarioCopies = (n, remplis) => {
         // Nouvelle demande de recette, sans brouillon d'un cas précédent.
@@ -32,6 +37,33 @@ const { dansNJours } = require('./env.js');
       window.qaDonneesCopies = () => JSON.stringify(_lireFichesVehicules());
       window.qaMarquesCopies = () => _lireFichesVehicules().map(v=>v.marque_modele);
     }, [dansNJours(3),dansNJours(5)]);
+    // Cas utilisateur : deux fiches renseignées sur quatre. Un simple
+    // Oui/Non sur les fiches restantes ne constitue pas une saisie.
+    for (const choixSeul of [false,true]) {
+      await page.evaluate(choixSeul=>{
+        qaScenarioCopies(4,[0,1]);
+        if(choixSeul) for(const i of [2,3]) {
+          const choix=document.querySelector('[name="veh-'+i+'-restit-active"][value="non"]');
+          choix.click();
+        }
+        rendreFichesVehicules();
+        qaOuvrirCopies(1);
+      },choixSeul);
+      L.check('4 fiches : une copie vers 3 sans message, choix seul='+choixSeul,
+        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2]')&&await page.locator('#hc-dupliquer-avertissement').isHidden());
+      await page.click('#hc-dupliquer-plus');
+      L.check('4 fiches : deux copies vers 3 et 4 sans message, choix seul='+choixSeul,
+        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,3]')&&await page.locator('#hc-dupliquer-avertissement').isHidden());
+      await page.click('#hc-dupliquer-plus');
+      L.check('4 fiches : trois copies avertissent seulement pour 2, choix seul='+choixSeul,
+        await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[2,3,1]')&&
+        (await page.locator('#hc-dupliquer-avertissement').textContent()).includes('du véhicule 2.'));
+      await page.click('#hc-dupliquer-moins');
+      L.check('Redescendre à deux masque le message, choix seul='+choixSeul,await page.locator('#hc-dupliquer-avertissement').isHidden());
+      messages=[];await page.click('#hc-dupliquer-go');
+      L.check('Deux copies effectives préservent la fiche 2, sans confirmation, choix seul='+choixSeul,
+        messages.length===0&&JSON.stringify(await page.evaluate(()=>qaMarquesCopies()))===JSON.stringify(['Modèle 1','Modèle 2','Modèle 1','Modèle 1']));
+    }
     await page.evaluate(()=>{qaScenarioCopies(5,[0,1,2]);qaOuvrirCopies(2);});
     L.check('Deux copies visent les fiches vides 4 et 5',
       await page.evaluate(()=>JSON.stringify(_hcCiblesDuplication())==='[3,4]'));

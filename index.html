@@ -12068,8 +12068,11 @@ function _hcVehiculeRenseigne(i) {
   var fiche = document.getElementById('veh-contenu-' + i);
   if (!fiche) return false;
   return Array.prototype.some.call(fiche.querySelectorAll('input,select,textarea'), function (champ) {
-    // « Heure précise » est le seul choix précoché d'une fiche neuve.
+    // Un choix Oui/Non de livraison ou restitution, sans donnée saisie,
+    // ne remplit pas une fiche (même règle que _hcVehiculeEstVierge).
+    // Les coordonnées, horaires, identité et consignes restent protégés.
     if (champ.type === 'radio' || champ.type === 'checkbox') {
+      if (/-(?:liv|restit)-active$/.test(champ.name)) return false;
       return champ.checked && !(/-htype$/.test(champ.name) && champ.value === 'precise');
     }
     return !!String(champ.value || '').trim();
@@ -12188,7 +12191,7 @@ function _hcConstruireDupliquerOverlay() {
     '<span id="hc-dupliquer-valeur" style="font-size:1.3rem;font-weight:700;min-width:28px;text-align:center">1</span>' +
     '<button type="button" id="hc-dupliquer-plus" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(16,24,32,.18);background:#fff;font-size:1.1rem;cursor:pointer">+</button>' +
     '</div>' +
-    '<div id="hc-dupliquer-avertissement" role="status" aria-live="polite" style="display:none;margin-bottom:16px;padding:12px;border-radius:8px;background:#fff3e0;color:#754818;font-size:.84rem;line-height:1.5"></div>' +
+    '<div id="hc-dupliquer-avertissement" role="status" aria-live="polite" style="display:none;margin-bottom:16px;padding:12px 14px;border-left:3px solid var(--accent,#9e3f46);border-radius:4px;background:#f5f5f3;color:var(--ink,#171c21);font-size:.84rem;line-height:1.5"></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px">' +
     '<button type="button" id="hc-dupliquer-annuler" style="padding:8px 14px;font-size:.82rem;border-radius:8px;border:1px solid rgba(16,24,32,.15);background:#fff;color:#666;cursor:pointer">Annuler</button>' +
     '<button type="button" id="hc-dupliquer-go" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:none;background:var(--ink);color:#fff;cursor:pointer">Dupliquer</button>' +
