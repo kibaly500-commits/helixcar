@@ -703,6 +703,7 @@ body.scroll-verrouille { overflow: hidden; }
 
   /* ── CARTES / STATS ── */
   .card { padding: 16px; }
+  #page-admin-archivage .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
   .card-header { flex-direction: column; gap: 10px; align-items: stretch; }
   .card-header input, .card-header select { width: 100%; min-width: 0 !important; }
   .stat-grid, [style*="grid-template-columns:repeat(3"] { grid-template-columns: 1fr 1fr !important; }
@@ -1975,6 +1976,15 @@ body.scroll-verrouille { overflow: hidden; }
 
 
 <!-- Confirmation validation -->
+<div class="modal-overlay" id="modal-quitter-espace" role="dialog" aria-modal="true" aria-labelledby="quitter-espace-titre">
+  <div class="modal" style="position:relative">
+    <h3 id="quitter-espace-titre">Quitter votre espace HelixCar ?</h3>
+    <p>Vous allez quitter le Dashboard. Votre session restera ouverte.</p>
+    <button type="button" class="btn btn-primary btn-full" onclick="closeModal('quitter-espace')">Rester sur mon espace</button>
+    <button type="button" class="btn btn-secondary btn-full" style="margin-top:12px" onclick="confirmerSortieEspace()">Quitter cet espace</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-confirm">
   <div class="modal" style="position:relative;text-align:center">
     <div style="font-size:3rem;margin-bottom:12px">✅</div>
@@ -4305,9 +4315,38 @@ const PAGE_TITLES = {
 
 var _hcNavigationRetour = false;
 var _hcNavigationRole = null;
+var _hcNavigationInitialisee = false;
+var _hcDernierePage = null;
+function confirmerSortieEspace() {
+  closeModal('quitter-espace');
+  if (history.length >= 3) history.go(-2);
+  else window.location.assign('index.html');
+}
 window.addEventListener('popstate', function (event) {
+  if (event.state && event.state.hcSortieEspace && _hcDernierePage) {
+    // Restaurer l'entrée courante permet de rester sans multiplier les entrées.
+    history.pushState({ hcPage: _hcDernierePage, hcSortieProtegee: true }, '', location.href);
+    var couches = Array.from(document.querySelectorAll('.modal-overlay.open:not(#modal-quitter-espace)'));
+    var menuOuvert = document.getElementById('mobile-menu-overlay');
+    var recapOuvert = document.querySelector('#hc-apercu-demande.ouvert');
+    if (couches.length || (menuOuvert && menuOuvert.style.display === 'block') || recapOuvert) {
+      couches.forEach(function (el) { closeModal(el.id.replace(/^modal-/, '')); });
+      if (menuOuvert && menuOuvert.style.display === 'block') _fermerMenuMobile();
+      if (recapOuvert) fermerApercuDemandeClient();
+      return;
+    }
+    openModal('quitter-espace');
+    return;
+  }
   const id = event.state && event.state.hcPage;
   if (!id || !_hcNavigationRole || !id.startsWith(_hcNavigationRole + '-') || !document.getElementById('page-' + id)) return;
+  // Une navigation ne doit jamais conserver une fenêtre de la rubrique quittée.
+  document.querySelectorAll('.modal-overlay.open').forEach(function (el) {
+    closeModal(el.id.replace(/^modal-/, ''));
+  });
+  var menu = document.getElementById('mobile-menu-overlay');
+  if (menu && menu.style.display === 'block') _fermerMenuMobile();
+  if (typeof fermerApercuDemandeClient === 'function') fermerApercuDemandeClient();
   _hcNavigationRetour = true;
   try { showPage(id); } finally { _hcNavigationRetour = false; }
 });
@@ -4315,12 +4354,24 @@ window.addEventListener('popstate', function (event) {
 function showPage(id) {
   if (!document.getElementById('page-' + id)) return;
   const roleNavigation = id.split('-')[0];
+  _hcDernierePage = id;
+  if (!_hcNavigationInitialisee) {
+    // Un rechargement conserve la garde existante, sans allonger l'historique.
+    if (history.state && history.state.hcSortieProtegee) {
+      history.replaceState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
+    } else {
+      history.replaceState({ hcSortieEspace: true }, '', location.href);
+      history.pushState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
+    }
+    _hcNavigationInitialisee = true;
+    _hcNavigationRole = roleNavigation;
+  }
   if (!_hcNavigationRetour) {
     if (_hcNavigationRole !== roleNavigation) {
       _hcNavigationRole = roleNavigation;
-      history.replaceState({ hcPage: id }, '', location.href);
+      history.replaceState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
     } else if (!history.state || history.state.hcPage !== id) {
-      history.pushState({ hcPage: id }, '', location.href);
+      history.pushState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
     }
   }
 
@@ -13977,6 +14028,7 @@ function declencherChampFichier(id) {
     document.getElementById('hc-apercu-reference').textContent=d.numero_client || '';
     contenu.innerHTML='<div style="color:#777">Chargement…</div>'; cadre.style.display='none'; bouton.disabled=true;
     fond.classList.add('ouvert');
+    _poserVerrouScroll('apercu-demande-client');
     var vs=await vehiculesDemande(id);
     contenu.innerHTML=htmlSecours(d,vs);
     documentPdf=null;
@@ -13997,6 +14049,7 @@ function declencherChampFichier(id) {
   };
   window.fermerApercuDemandeClient=function(){
     var f=document.getElementById('hc-apercu-demande');if(f)f.classList.remove('ouvert');
+    _retirerVerrouScroll('apercu-demande-client');
   };
   if (typeof HC_ACTIONS === 'object') {
     HC_ACTIONS.ouvrirApercuDemandeClient = function (id) {

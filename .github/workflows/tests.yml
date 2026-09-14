@@ -49,7 +49,7 @@ jobs:
         run: node tests/lancer.js --sans-sql
 
   webkit-mobile:
-    name: Fiche mobile sur WebKit
+    name: Dashboards mobiles sur WebKit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -63,7 +63,10 @@ jobs:
       - name: Vérifier la fiche longue et la sélection
         env:
           HC_TEST_WEBKIT: '1'
-        run: node tests/t_fiche_mobile.js
+        run: |
+          node tests/t_fiche_mobile.js
+          node tests/t_audit_dashboard_ui.js
+          node tests/t_sortie_dashboard.js
 
   sql:
     name: Politiques RLS sur PostgreSQL 16
