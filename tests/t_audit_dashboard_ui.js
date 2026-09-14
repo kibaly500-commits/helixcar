@@ -19,6 +19,9 @@ const L=require('./lib');const {urlFichier}=require('./env');
   for(const [w,h] of [[375,812],[390,844],[430,932],[844,390],[1280,900]]){
    await page.setViewportSize({width:w,height:h});
    for(const id of inventaire.pages){
+    // WebKit limite les mutations d'historique à 100 par dix secondes.
+    // Garder les mêmes actions, à un rythme de navigation humain.
+    await page.waitForTimeout(300);
     const role=id.split('-')[0];
     const menuIndex=await page.evaluate(({role,id,w})=>{
      currentRole=role;buildNav(role);showPage(role+'-dashboard');
