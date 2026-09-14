@@ -23,9 +23,18 @@ check('Type de trajet limité au service principal convoyage',
   index.includes("var servicePrincipalConvoyage = (t === 'convoyage' || t === 'convoyage_stockage');") &&
   index.includes("grpTrajet.style.display = servicePrincipalConvoyage ? 'block' : 'none';"));
 
-// Duplication : la limite dépend du total, jamais de l'état antérieur des fiches.
-check('Toutes les autres fiches sont duplicables',
-  index.includes("for (var j = 0; j < n; j++) { if (j !== source) out.push(j); }"));
+// Toutes les destinations restent accessibles, avec priorité aux fiches
+// vides. Vérifier le résultat, sans imposer le texte de l'ancienne boucle.
+const selection = index.match(/function _hcListeVehiculesDisponibles\(source\) \{[\s\S]*?\n\}/);
+function destinations(remplis) {
+  return require('vm').runInNewContext(selection[0] + '\n_hcListeVehiculesDisponibles(0)', {
+    _nbVehicules: () => 5,
+    _hcVehiculeRenseigne: i => remplis.includes(i)
+  });
+}
+check('Toutes les autres fiches restent duplicables, les vides en premier',
+  !!selection && JSON.stringify(destinations([0, 1, 2])) === '[3,4,1,2]'
+  && JSON.stringify(destinations([0, 1, 2, 3, 4])) === '[1,2,3,4]');
 check('Les données duplicables remplacent la cible sans copier ses plaques',
   index.includes("['type', 'marque', 'vin',") &&
   index.includes('Les plaques restent propres à chaque véhicule et ne sont jamais copiées.'));
