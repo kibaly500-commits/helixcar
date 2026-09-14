@@ -11532,6 +11532,19 @@ function _scrollVersVehicule(i) {
   }, 60);
 }
 
+function _hcRetourListeVehicules() {
+  // Après le repli des rubriques, replacer la liste dans le conteneur
+  // réellement défilant (modale publique ou formulaire intégré).
+  requestAnimationFrame(function () {
+    var liste = document.getElementById('bloc-vehicules-multiples');
+    if (!liste || !liste.getClientRects().length) return;
+    var barre = liste.querySelector('.veh-barre');
+    if (barre) barre.focus({ preventScroll: true });
+    liste.style.scrollMarginTop = '16px';
+    liste.scrollIntoView({ block: 'start', behavior: 'instant' });
+  });
+}
+
 // ── ACCORDÉONS ────────────────────────────────────────────
 function basculerVehicule(i) {
   var contenu = document.getElementById('veh-contenu-' + i);
@@ -11818,7 +11831,7 @@ function validerVehicule(i) {
     if (!premierInvalide) premierInvalide = document.getElementById('veh-' + i + '-liv-date');
   }
 
-  if (!ok) {
+  if (!ok || !_vehiculeComplet(i)) {
     _ouvrirVehicule(i);
     if (premierInvalide) {
       try {
@@ -11832,11 +11845,12 @@ function validerVehicule(i) {
   _majBarreVehicule(i);
   _majProgressionVehicules();
 
-  var n = _nbVehicules();
+  var n = _nbVehicules(), prochain = -1;
   for (var j = 0; j < n; j++) {
-    if (j !== i && !_vehiculeComplet(j)) { _ouvrirVehicule(j); _scrollVersVehicule(j); return; }
+    if (j !== i && !_vehiculeComplet(j)) { prochain = j; break; }
   }
-  _ouvrirVehicule(-1);
+  _ouvrirVehicule(prochain);
+  _hcRetourListeVehicules();
 }
 
 function effacerVehicule(i) {
@@ -12043,9 +12057,23 @@ function _hcVehiculeEstVierge(j) {
 // prévus dans la demande, qu'ils soient vierges ou déjà renseignés.
 // La copie confirmée devient la nouvelle source de vérité de la cible.
 function _hcListeVehiculesDisponibles(source) {
-  var n = _nbVehicules(), out = [];
-  for (var j = 0; j < n; j++) { if (j !== source) out.push(j); }
-  return out;
+  var n = _nbVehicules(), vides = [], renseignes = [];
+  for (var j = 0; j < n; j++) {
+    if (j !== source) (_hcVehiculeRenseigne(j) ? renseignes : vides).push(j);
+  }
+  return vides.concat(renseignes);
+}
+
+function _hcVehiculeRenseigne(i) {
+  var fiche = document.getElementById('veh-contenu-' + i);
+  if (!fiche) return false;
+  return Array.prototype.some.call(fiche.querySelectorAll('input,select,textarea'), function (champ) {
+    // « Heure précise » est le seul choix précoché d'une fiche neuve.
+    if (champ.type === 'radio' || champ.type === 'checkbox') {
+      return champ.checked && !(/-htype$/.test(champ.name) && champ.value === 'precise');
+    }
+    return !!String(champ.value || '').trim();
+  });
 }
 function _hcExisteVehiculeDisponible(i) {
   return _hcListeVehiculesDisponibles(i).length > 0;
@@ -12160,6 +12188,7 @@ function _hcConstruireDupliquerOverlay() {
     '<span id="hc-dupliquer-valeur" style="font-size:1.3rem;font-weight:700;min-width:28px;text-align:center">1</span>' +
     '<button type="button" id="hc-dupliquer-plus" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(16,24,32,.18);background:#fff;font-size:1.1rem;cursor:pointer">+</button>' +
     '</div>' +
+    '<div id="hc-dupliquer-avertissement" role="status" aria-live="polite" style="display:none;margin-bottom:16px;padding:12px;border-radius:8px;background:#fff3e0;color:#754818;font-size:.84rem;line-height:1.5"></div>' +
     '<div style="display:flex;justify-content:flex-end;gap:8px">' +
     '<button type="button" id="hc-dupliquer-annuler" style="padding:8px 14px;font-size:.82rem;border-radius:8px;border:1px solid rgba(16,24,32,.15);background:#fff;color:#666;cursor:pointer">Annuler</button>' +
     '<button type="button" id="hc-dupliquer-go" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:none;background:var(--ink);color:#fff;cursor:pointer">Dupliquer</button>' +
@@ -12180,6 +12209,24 @@ function _hcAjusterDupliquerQte(delta) {
   overlay.querySelector('#hc-dupliquer-valeur').textContent = _hcDupliquerQte;
   overlay.querySelector('#hc-dupliquer-moins').disabled = (_hcDupliquerQte <= 1);
   overlay.querySelector('#hc-dupliquer-plus').disabled = (_hcDupliquerQte >= max);
+  _hcActualiserAvertissementDuplication();
+}
+
+function _hcCiblesDuplication() {
+  return _hcListeVehiculesDisponibles(_hcDupliquerSource).slice(0, _hcDupliquerQte);
+}
+function _hcMessageRemplacement(cibles) {
+  var numeros = cibles.map(function (i) { return i + 1; });
+  var liste = numeros.length > 1 ? numeros.slice(0, -1).join(', ') + ' et ' + numeros[numeros.length - 1] : String(numeros[0]);
+  return numeros.length === 1
+    ? 'Vous êtes sur le point de remplacer les informations déjà renseignées du véhicule ' + liste + '.'
+    : 'Vous êtes sur le point de remplacer les informations déjà renseignées des véhicules ' + liste + '.';
+}
+function _hcActualiserAvertissementDuplication() {
+  var cibles = _hcCiblesDuplication().filter(_hcVehiculeRenseigne);
+  var zone = _hcDupliquerOverlay.querySelector('#hc-dupliquer-avertissement');
+  zone.textContent = cibles.length ? _hcMessageRemplacement(cibles) : '';
+  zone.style.display = cibles.length ? 'block' : 'none';
 }
 // Point 3 du ticket — ouverture du petit modal de quantité, sans aucun
 // choix technique : uniquement combien de copies identiques.
@@ -12209,6 +12256,7 @@ function _hcOuvrirDupliquer(i) {
     compteur.style.display = 'flex';
     _hcAjusterDupliquerQte(0);
   }
+  _hcActualiserAvertissementDuplication();
   overlay.style.display = 'flex';
 }
 function _hcFermerDupliquer() {
@@ -12216,13 +12264,16 @@ function _hcFermerDupliquer() {
   _hcDupliquerSource = null;
 }
 // La quantité est bornée par le nombre total de véhicules moins la source.
-// Les cibles déjà renseignées sont volontairement remplacées.
+// Les fiches vides sont prioritaires. Aucun remplacement d'une fiche
+// renseignée n'a lieu sans confirmation des numéros concernés.
 function _hcConfirmerDupliquer() {
   if (_hcDupliquerSource === null) return;
   var source = _hcDupliquerSource;
-  var disponibles = _hcListeVehiculesDisponibles(source);
-  var qte = disponibles.length === 1 ? 1 : _hcDupliquerQte;
-  disponibles.slice(0, qte).forEach(function (cible) { _hcCopierVehiculeVers(source, cible); });
+  var cibles = _hcCiblesDuplication();
+  var remplacements = cibles.filter(_hcVehiculeRenseigne);
+  _hcActualiserAvertissementDuplication();
+  if (remplacements.length && !confirm(_hcMessageRemplacement(remplacements) + '\n\nConfirmer la duplication ?')) return;
+  cibles.forEach(function (cible) { _hcCopierVehiculeVers(source, cible); });
   _hcFermerDupliquer();
   _majProgressionVehicules();
 }
@@ -20387,6 +20438,7 @@ function _hcOkSousVeh(i, cle) {
   // jour où l'utilisateur l'ouvrira lui-même.
   if(idx>=0 && idx+1<ordre.length){ _hcNettoyerErreursSiPasEncoreValide(ordre[idx+1]); }
   else { _majBarreVehicule(i); _majProgressionVehicules(); }
+  return true;
 }
 
 // Copie de la fonction de rendu avec deux changements métier :
@@ -23254,9 +23306,10 @@ console.log('HelixCar ' + window.HC_VERSION);
 
   var okSousOrig = window._hcOkSousVeh;
   window._hcOkSousVeh = function (i, cle) {
-    okSousOrig(i, cle);
+    var valide = okSousOrig(i, cle);
     majEtapes(i);
     _majProgressionVehicules();
+    if (valide && donneesVehiculeCompletes(i)) _hcRetourListeVehicules();
   };
 
   function actualiserDepuisChamp(cible) {
