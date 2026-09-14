@@ -2255,7 +2255,7 @@
 
     overflow-y: auto;
 
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: auto;
 
     opacity: 0; pointer-events: none;
 
@@ -9363,11 +9363,37 @@ function _hcModeIntegre() {
 
 // Hauteur reelle du formulaire, transmise a l'espace client pour qu'il
 // n'y ait jamais deux barres de defilement imbriquees.
+function _hcBornesCadreVisibles() {
+  var zone = { haut: 0, bas: window.innerHeight };
+  try {
+    if (_hcModeIntegre() && window.parent.innerWidth <= 768 && window.frameElement) {
+      var cadre = window.frameElement.getBoundingClientRect();
+      var viewport = window.parent.visualViewport;
+      var haut = viewport ? viewport.offsetTop : 0;
+      var bas = haut + (viewport ? viewport.height : window.parent.innerHeight);
+      zone.haut = Math.max(0, haut - cadre.top);
+      zone.bas = Math.max(zone.haut, Math.min(window.innerHeight, bas - cadre.top));
+    }
+  } catch (e) {}
+  return zone;
+}
+function _hcAdapterOverlaysIntegres() {
+  if (!_hcModeIntegre()) return;
+  var zone = _hcBornesCadreVisibles();
+  document.querySelectorAll('.hc-cal-overlay, .hp-overlay, #hc-dupliquer-overlay').forEach(function (overlay) {
+    var haut = zone.haut + 'px';
+    var bas = Math.max(0, window.innerHeight - zone.bas) + 'px';
+    if (overlay.style.top !== haut) overlay.style.top = haut;
+    if (overlay.style.bottom !== bas) overlay.style.bottom = bas;
+  });
+}
 var _hcHauteurTransmise = 0;
 function _hcTransmettreHauteur() {
   if (!_hcModeIntegre()) return;
   try {
-    var h = Math.ceil(document.documentElement.scrollHeight);
+    _hcAdapterOverlaysIntegres();
+    var panneau = document.querySelector('body.hc-mode-demande #modal-client .modal, body.hc-mode-completion #modal-completer .modal');
+    var h = panneau ? Math.ceil(panneau.getBoundingClientRect().height + 40) : Math.ceil(document.documentElement.scrollHeight);
     if (Math.abs(h - _hcHauteurTransmise) < 12) return;
     _hcHauteurTransmise = h;
     window.parent.postMessage({ type: 'hc-demande-hauteur', hauteur: h }, window.location.origin);
@@ -9388,6 +9414,11 @@ function _hcActiverModeIntegre() {
     obs.observe(document.body, { childList: true, subtree: true, attributes: true });
   } catch (e) {}
   window.addEventListener('resize', _hcTransmettreHauteur);
+  try {
+    window.parent.addEventListener('scroll', _hcAdapterOverlaysIntegres, { passive: true });
+    window.parent.addEventListener('resize', _hcAdapterOverlaysIntegres);
+    if (window.parent.visualViewport) window.parent.visualViewport.addEventListener('resize', _hcAdapterOverlaysIntegres);
+  } catch (e) {}
   setInterval(_hcTransmettreHauteur, 700);
   _hcTransmettreHauteur();
 }
@@ -9406,8 +9437,7 @@ function _hcPrevenirEspaceClient() {
 async function _hcDemarrerDepuisEspaceClient() {
   var params = new URLSearchParams(window.location.search || '');
   if (params.get('nouvelle-demande') !== '1') return false;
-  document.body.classList.add('hc-mode-demande');
-  document.body.classList.remove('hc-mode-completion');
+  document.body.classList.remove('hc-mode-demande', 'hc-mode-completion');
   _hcActiverModeIntegre();
   await _hcChargerSessionClient();
   if (!_hcSessionClient) {
@@ -9417,6 +9447,7 @@ async function _hcDemarrerDepuisEspaceClient() {
   }
   if (typeof openModal === 'function') openModal('client');
   _hcAppliquerModeConnecte();
+  document.body.classList.add('hc-mode-demande');
   // L'étape 1 est l'identité et la création de compte : elle n'a plus
   // lieu d'être pour un client déjà connecté. On ouvre le parcours sur
   // « Comment pouvons-nous vous accompagner ? », qui est l'étape 2.
@@ -12097,7 +12128,10 @@ function _hcCopierVehiculeVers(source, cible) {
    'restit-vtype', 'restit-marque', 'restit-vin'].forEach(function (suffixe) {
     var src = document.getElementById('veh-' + source + '-' + suffixe);
     var dst = document.getElementById('veh-' + cible + '-' + suffixe);
-    if (src && dst) dst.value = src.value;
+    if (src && dst) {
+      dst.value = src.value;
+      if (typeof dst.hcRefreshSelect === 'function') dst.hcRefreshSelect();
+    }
   });
   ['pc', 'liv', 'restit'].forEach(function (prefixe) {
     var b = 'veh-' + cible + '-' + prefixe, bs = 'veh-' + source + '-' + prefixe;
@@ -21695,6 +21729,7 @@ document.addEventListener('click', function (e) {
       });
     }
     btn.onclick=function(e){e.stopPropagation(); document.querySelectorAll('#modal-client .hc-select-wrap.open').forEach(function(w){if(w!==wrap)w.classList.remove('open')}); wrap.classList.toggle('open');};
+    sel.hcRefreshSelect = render;
     sel.addEventListener('change',render); render();
   }
   function scan(root){(root||document).querySelectorAll && (root||document).querySelectorAll('#modal-client select').forEach(enhanceSelect);}
@@ -23037,7 +23072,9 @@ console.log('HelixCar ' + window.HC_VERSION);
     var hauteur = panneau.offsetHeight || 300;
     var gauche = Math.max(8, Math.min(r.left, window.innerWidth - largeur - 8));
     var haut = r.bottom + 8;
-    if (haut + hauteur > window.innerHeight - 8) haut = Math.max(8, r.top - hauteur - 8);
+    var zone = _hcBornesCadreVisibles();
+    if (haut + hauteur > zone.bas - 8) haut = r.top - hauteur - 8;
+    haut = Math.max(zone.haut + 8, Math.min(haut, zone.bas - hauteur - 8));
     panneau.style.position = 'fixed';
     panneau.style.left = gauche + 'px';
     panneau.style.top = haut + 'px';

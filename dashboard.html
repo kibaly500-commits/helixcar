@@ -980,6 +980,17 @@ body.scroll-verrouille { overflow: hidden; }
   #page-client-nouvelle-demande > .card:nth-child(2),
   #page-client-nouvelle-demande #client-demande-cadre { max-height: calc(100vh - 82px); }
 }
+/* Mobile : une seule surface de défilement pour la demande intégrée. */
+@media (max-width: 768px) {
+  #page-client-nouvelle-demande.active {
+    position: static; overflow: visible; padding: 0;
+    background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  #page-client-nouvelle-demande > .card,
+  #page-client-nouvelle-demande #client-demande-cadre {
+    width: 100%; max-height: none; overflow: visible !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -2656,7 +2667,9 @@ window.addEventListener('message', function (ev) {
     if (!m || typeof m !== 'object') return;
 
     if (m.type === 'hc-demande-hauteur' && typeof m.hauteur === 'number') {
-      if (window._hcCadreMode === 'demande') {
+      if (window.innerWidth <= 768) {
+        cadre.style.height = Math.max(320, m.hauteur) + 'px';
+      } else if (window._hcCadreMode === 'demande') {
         // La nouvelle demande reste une fenêtre compacte ; son contenu
         // défile dans le cadre comme la modale publique.
         cadre.style.height = Math.max(420, Math.min(window.innerHeight - 130, m.hauteur)) + 'px';
@@ -4319,7 +4332,27 @@ const PAGE_TITLES = {
   'client-profil':       ['Mon profil', 'Vos informations de compte'],
 };
 
+var _hcNavigationRetour = false;
+var _hcNavigationRole = null;
+window.addEventListener('popstate', function (event) {
+  const id = event.state && event.state.hcPage;
+  if (!id || !_hcNavigationRole || !id.startsWith(_hcNavigationRole + '-') || !document.getElementById('page-' + id)) return;
+  _hcNavigationRetour = true;
+  try { showPage(id); } finally { _hcNavigationRetour = false; }
+});
+
 function showPage(id) {
+  if (!document.getElementById('page-' + id)) return;
+  const roleNavigation = id.split('-')[0];
+  if (!_hcNavigationRetour) {
+    if (_hcNavigationRole !== roleNavigation) {
+      _hcNavigationRole = roleNavigation;
+      history.replaceState({ hcPage: id }, '', location.href);
+    } else if (!history.state || history.state.hcPage !== id) {
+      history.pushState({ hcPage: id }, '', location.href);
+    }
+  }
+
   // Une session partenaire déjà ouverte est revérifiée à chaque
   // navigation : un blocage décidé entre-temps prend effet sans
   // attendre une reconnexion. Vérification asynchrone, contre la

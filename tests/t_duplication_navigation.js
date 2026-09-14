@@ -134,6 +134,22 @@ const { dansNJours } = require('./env.js');
       L.check('Une erreur de saisie garde le focus sur le champ à corriger, intégré='+integre,
         await page.evaluate(()=>document.activeElement.id==='veh-4-type'&&document.activeElement.getAttribute('aria-invalid')==='true'));
     }
+    await page.evaluate(() => { qaScenarioCopies(3,[0,1,2]); });
+    await page.waitForTimeout(80);
+    await page.evaluate(() => {
+      const src = document.getElementById('veh-0-type');
+      src.selectedIndex = 2;
+      src.dispatchEvent(new Event('change', {bubbles:true}));
+      _hcCopierVehiculeVers(0,1);
+      _hcCopierVehiculeVers(0,2);
+    });
+    L.check('Type : les deux boutons visibles reflètent la source après écrasement', await page.evaluate(() => {
+      const src = document.getElementById('veh-0-type');
+      return [1,2].every(i => {
+        const dst = document.getElementById('veh-'+i+'-type');
+        return dst.value === src.value && dst.parentElement.querySelector('.hc-select-btn').textContent === src.options[src.selectedIndex].textContent;
+      });
+    }));
     L.check('Aucune exception JavaScript',page.jsErrors.length===0,page.jsErrors.join(' | '));
   } finally {await browser.close();}
   process.exitCode=L.results()?1:0;
