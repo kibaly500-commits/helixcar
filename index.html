@@ -11891,7 +11891,11 @@ function _attr(v) {
 }
 
 function _optionsTypeVehicule(selection) {
-  return TYPES_VEHICULE.map(function (t) {
+  // Aucun gabarit n'est choisi à la place du client. Sans cette option
+  // neutre, le navigateur sélectionnait automatiquement « Citadine » et
+  // une fiche totalement vide pouvait être déclarée complète.
+  var vide = '<option value="" disabled' + (!selection ? ' selected' : '') + '>Sélectionner le type</option>';
+  return vide + TYPES_VEHICULE.map(function (t) {
     return '<option value="' + t[0] + '"' + (t[0] === selection ? ' selected' : '') + '>' + t[1] + '</option>';
   }).join('');
 }
@@ -14353,14 +14357,31 @@ function _masquerNoticeBrouillonDesReprise() {
   var notice = document.getElementById('notice-brouillon-restaure');
   if (notice && notice.parentNode) notice.parentNode.removeChild(notice);
 }
+function _actualiserNoticeBrouillonIntegre() {
+  if (!_hcModeIntegre() || !_formulaireClientSale || _demandeSoumise) return;
+  _afficherNoticeBrouillonRestaure();
+}
 document.addEventListener('input', function (e) {
   var ov = document.getElementById('modal-client');
-  if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) { _masquerNoticeBrouillonDesReprise(); _planifierSauvegardeBrouillonClient(); }
+  if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) {
+    if (_hcModeIntegre()) _actualiserNoticeBrouillonIntegre();
+    else _masquerNoticeBrouillonDesReprise();
+    _planifierSauvegardeBrouillonClient();
+  }
 }, true);
 document.addEventListener('change', function (e) {
   var ov = document.getElementById('modal-client');
-  if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) { _masquerNoticeBrouillonDesReprise(); _planifierSauvegardeBrouillonClient(); }
+  if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) {
+    if (_hcModeIntegre()) _actualiserNoticeBrouillonIntegre();
+    else _masquerNoticeBrouillonDesReprise();
+    _planifierSauvegardeBrouillonClient();
+  }
 }, true);
+// Appelée par le Dashboard lorsque le client revient dans le formulaire
+// déjà chargé : le bandeau ne dépend plus d'un rechargement de l'iframe.
+window._hcAfficherBrouillonIntegre = function () {
+  if (_lireBrouillonClientValide() || _formulaireClientSale) _afficherNoticeBrouillonRestaure();
+};
 
 function _supprimerBrouillonClient() {
   try { localStorage.removeItem(_CLE_BROUILLON_CLIENT); } catch (e) {}
@@ -14404,6 +14425,9 @@ function _lireBrouillonClientValide() {
 
 // Bandeau discret, non bloquant — jamais de popup.
 function _afficherNoticeBrouillonRestaure() {
+  // Une seule carte, même si plusieurs événements (restauration, retour
+  // Dashboard, saisie) demandent son affichage.
+  if (document.getElementById('notice-brouillon-restaure')) return;
   var conteneur = document.getElementById('modal-client-form');
   var ancre = document.getElementById('client-step-indicator');
   if (!conteneur || !ancre) return;

@@ -2618,6 +2618,13 @@ function ouvrirNouvelleDemande() {
   if (titre) titre.textContent = 'Nouvelle demande';
   if (retour) retour.textContent = '← Retour à mes demandes';
   showPage('client-nouvelle-demande');
+  // Si l'iframe est déjà chargée, réaffiche immédiatement la carte du
+  // brouillon. Au premier chargement, index.html l'affiche lui-même.
+  try {
+    if (cadre.contentWindow && typeof cadre.contentWindow._hcAfficherBrouillonIntegre === 'function') {
+      cadre.contentWindow._hcAfficherBrouillonIntegre();
+    }
+  } catch (e) {}
 }
 
 function fermerNouvelleDemande() {
@@ -13988,6 +13995,7 @@ function declencherChampFichier(id) {
 <style id="hc-pr6-logo-icones">
 .hc-logo-officiel{display:flex;align-items:center}
 .hc-logo-officiel img{display:block;width:172px;max-width:100%;height:auto;object-fit:contain}
+.sidebar .hc-logo-officiel img{filter:brightness(0) invert(1)}
 .login-logo.hc-logo-officiel img{width:220px}
 .hc-ui-icon{display:inline-flex;align-items:center;justify-content:center;width:1.05em;height:1.05em;vertical-align:-.14em;margin-right:.25em;flex:0 0 auto}
 .hc-ui-icon svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -13998,6 +14006,12 @@ function declencherChampFichier(id) {
 (function(){
   var chemins={
     dashboard:'<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
+    pressePapiers:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M8 10h8M8 14h8M8 18h5"/>',
+    fichier:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h5M10 17h4"/>',
+    edition:'<path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20zM13.5 7l3.5 3.5"/>',
+    etoile:'<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3z"/>',
+    cadeau:'<rect x="3" y="9" width="18" height="12" rx="1"/><path d="M12 9v12M3 13h18M12 9H7.5a2.5 2.5 0 1 1 2.2-3.7L12 9zm0 0h4.5a2.5 2.5 0 1 0-2.2-3.7L12 9z"/>',
+    coeur:'<path d="M20.8 5.8a5.2 5.2 0 0 0-7.4 0L12 7.2l-1.4-1.4a5.2 5.2 0 0 0-7.4 7.4L12 22l8.8-8.8a5.2 5.2 0 0 0 0-7.4z"/>',
     voiture:'<path d="M5 17h14l1-5-2-5H6l-2 5 1 5z"/><path d="M7 17v2M17 17v2M4 12h16M8 14h.01M16 14h.01"/>',
     document:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h5M10 17h5"/>',
     dossier:'<path d="M3 7h7l2 2h9v10H3z"/>',
@@ -14021,13 +14035,13 @@ function declencherChampFichier(id) {
   };
   var correspondance={
     '📊':'dashboard','📈':'graphique','🚗':'voiture','🚛':'voiture','📁':'dossier','📦':'archive',
-    '👤':'utilisateur','👥':'utilisateurs','🚪':'sortie','📋':'document','📄':'document','📝':'document',
+    '👤':'utilisateur','👥':'utilisateurs','🚪':'sortie','📋':'pressePapiers','📄':'fichier','📝':'edition',
     '🔎':'recherche','🔍':'recherche','📬':'courrier','✉':'courrier','🧾':'facture','💰':'facture','💸':'facture',
     '📣':'annonce','⚙':'reglages','ℹ':'info','✅':'validation','⚠':'alerte','❌':'alerte','🚫':'alerte',
     '👁':'oeil','📅':'calendrier','📍':'lieu','📌':'lieu','📸':'camera','📷':'camera','🎥':'camera',
-    '⏳':'calendrier','🔄':'reglages','🔓':'reglages','📎':'document','⭐':'validation','🎁':'validation',
+    '⏳':'calendrier','🔄':'reglages','🔓':'reglages','📎':'document','⭐':'etoile','🎁':'cadeau',
     '💡':'info','✨':'validation','🔵':'info','🧼':'reglages','📏':'reglages','🗜':'reglages',
-    '⚡':'alerte','👉':'info','↩':'sortie','🏦':'facture','⛽':'voiture','🔋':'voiture','💚':'validation','☰':'reglages','⬇':'document'
+    '⚡':'alerte','👉':'info','↩':'sortie','🏦':'facture','⛽':'voiture','🔋':'voiture','💚':'coeur','☰':'reglages','⬇':'document'
   };
   function creer(cle){
     var span=document.createElement('span');
