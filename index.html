@@ -7527,13 +7527,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
                 <input type="text" id="client-restit-marque" placeholder="Ex : BMW 320d" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
               </div>
               <div>
-                <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">Immatriculation <span class="field-optional-hint">(attendue avant mission)</span></label>
+                <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">Immatriculation</label>
                 <input type="text" id="client-restit-immat" placeholder="AB-123-CD" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase">
               </div>
             </div>
 
             <div>
-              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution <span class="field-optional-hint">(attendu avant mission)</span></label>
+              <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution</label>
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
               <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
@@ -20481,8 +20481,8 @@ function rendreFichesVehicules() {
       '<div class="veh-sep"></div><div class="veh-sstitre">Véhicule à restituer</div>'+
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
-      '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation <span class="field-optional-hint">(attendue avant mission)</span></label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN <span class="field-optional-hint">(attendu avant mission)</span></label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
+      '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
+      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
@@ -21941,6 +21941,9 @@ document.addEventListener('click', function (e) {
   };
 
   function sousBlocEncoreComplet(bloc){
+    // Tous les anciens points d'entrée (duplication, saisie, OK)
+    // consultent désormais la même règle que le compteur.
+    if (window._hcEtapeVehiculeComplete) return window._hcEtapeVehiculeComplete(bloc);
     var id=bloc.id||'', m=/^veh-(\d+)-sous-(.+)$/.exec(id); if(!m)return true;
     var i=parseInt(m[1],10), cle=m[2], requis=_champsRequisVehicule(i);
     for(var k=0;k<requis.length;k++){
@@ -23160,22 +23163,31 @@ console.log('HelixCar ' + window.HC_VERSION);
   // réelles. Le bouton « OK » ne constitue jamais une seconde source de
   // vérité et ne peut donc pas invalider une autre rubrique.
   function etapeApplicable(bloc) {
-    return !!(bloc && _isVisible(bloc));
+    if (!bloc) return false;
+    // Les conteneurs métier sont masqués explicitement. Un accordéon
+    // replié, une fiche fermée ou une étape inactive ne changent pas
+    // les obligations du véhicule.
+    for (var el = bloc; el && !/^veh-contenu-/.test(el.id || ''); el = el.parentElement) {
+      if (el.hidden || el.style.display === 'none') return false;
+    }
+    return true;
   }
 
   var vehiculeCompletOrig = window._vehiculeComplet;
   function donneesVehiculeCompletes(i) {
     if (!vehiculeCompletOrig(i)) return false;
     var blocLiv = document.getElementById('veh-' + i + '-liv-active-group');
-    if (blocLiv && _isVisible(blocLiv)
+    if (etapeApplicable(blocLiv)
         && !blocLiv.querySelector('input[type="radio"]:checked')) return false;
     var blocRest = document.getElementById('veh-' + i + '-restit-active-group');
-    if (blocRest && _isVisible(blocRest)
+    if (etapeApplicable(blocRest)
         && !blocRest.querySelector('input[type="radio"]:checked')) return false;
     var blocMode = document.getElementById('veh-' + i + '-sous-mode');
-    if (blocMode && _isVisible(blocMode)
+    if (etapeApplicable(blocMode)
         && !blocMode.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
-    return true;
+    var contenu = document.getElementById('veh-contenu-' + i);
+    return !!contenu && Array.prototype.every.call(
+      contenu.querySelectorAll('.veh-sous-accordeon'), function (bloc) { return etapeComplete(i, bloc); });
   }
   window._vehiculeComplet = donneesVehiculeCompletes;
 
@@ -23189,9 +23201,9 @@ console.log('HelixCar ' + window.HC_VERSION);
     }
     if (cle === 'livraison') {
       var liv = document.getElementById('veh-' + i + '-liv-active-group');
-      if (liv && _isVisible(liv) && !liv.querySelector('input[type="radio"]:checked')) return false;
+      if (etapeApplicable(liv) && !liv.querySelector('input[type="radio"]:checked')) return false;
       var rest = document.getElementById('veh-' + i + '-restit-active-group');
-      if (rest && _isVisible(rest) && !rest.querySelector('input[type="radio"]:checked')) return false;
+      if (etapeApplicable(rest) && !rest.querySelector('input[type="radio"]:checked')) return false;
     }
     if (cle === 'mode'
         && !bloc.querySelector('input[name="veh-' + i + '-mode"]:checked')) return false;
@@ -23204,9 +23216,19 @@ console.log('HelixCar ' + window.HC_VERSION);
     return true;
   }
 
+  window._hcEtapeVehiculeComplete = function (bloc) {
+    var m = /^veh-(\d+)-sous-/.exec(bloc && bloc.id || '');
+    return !!m && etapeComplete(parseInt(m[1], 10), bloc);
+  };
+
   function majEtapes(i) {
     var contenu = document.getElementById('veh-contenu-' + i);
     if (!contenu) return;
+    contenu.querySelectorAll('.veh-binary-choice.hc-group-error').forEach(function (groupe) {
+      if (!etapeApplicable(groupe) || groupe.querySelector('input[type="radio"]:checked')) {
+        groupe.classList.remove('hc-group-error');
+      }
+    });
     contenu.querySelectorAll('.veh-sous-accordeon').forEach(function (bloc) {
       if (!etapeApplicable(bloc)) {
         bloc.classList.remove('termine', 'incomplet');
@@ -23246,8 +23268,10 @@ console.log('HelixCar ' + window.HC_VERSION);
     _majBarreVehicule(i);
     _majProgressionVehicules();
   }
-  document.addEventListener('input', function (e) { actualiserDepuisChamp(e.target); }, true);
-  document.addEventListener('change', function (e) { actualiserDepuisChamp(e.target); }, true);
+  // Après les gestionnaires des champs : les choix dépendants et leur
+  // affichage doivent déjà être actualisés au moment du calcul final.
+  document.addEventListener('input', function (e) { actualiserDepuisChamp(e.target); });
+  document.addEventListener('change', function (e) { actualiserDepuisChamp(e.target); });
 })();
 </script>
 

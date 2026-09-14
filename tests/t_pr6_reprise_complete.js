@@ -13,10 +13,10 @@ function check(libelle, condition) {
 }
 
 // Véhicules et restitution.
-check('La plaque du véhicule à restituer n’est plus facultative',
+check('Les libellés de restitution ne portent plus la parenthèse avant mission',
   index.includes("id=\"client-restit-immat\"") &&
   index.includes("id=\"veh-'+i+'-restit-immat\"") &&
-  index.includes("(attendue avant mission)") &&
+  !index.includes("(attendue avant mission)") && !index.includes("(attendu avant mission)") &&
   !index.includes("Plaque *</label>"));
 check('Livraison Non masque aussi le mode de transport',
   index.includes("var blocMode = document.getElementById('veh-' + i + '-sous-mode');") &&
