@@ -29,11 +29,14 @@ function check(l, c, e) {
 //   false -> confirmation ACTIVE : un utilisateur, aucune session, et
 //            signInWithPassword refuse tant que l'adresse n'est pas
 //            confirmée.
-function init(avecSession) {
+function init(avecSession, refusInscription, sessionAmbiante) {
   return `
 window.__journal = [];
-window.__session = null;
+window.__session = ${sessionAmbiante
+  ? "{ access_token: 'jwt-admin', user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'admin@helixcar.test' } }"
+  : 'null'};
 window.__avecSession = ${avecSession ? 'true' : 'false'};
+window.__refusInscription = ${refusInscription ? 'true' : 'false'};
 window.__emails = [];
 // L'e-mail de confirmation au client est un comportement PRODUIT. Il
 // est intercepte ici : rien ne part reellement. Ce qui compte est son
@@ -48,7 +51,16 @@ window.supabase = { createClient: function () { return {
     onAuthStateChange() { return { data: { subscription: { unsubscribe(){} } } }; },
     async getSession() { return { data: { session: window.__session } }; },
     async signUp(ident) {
-      window.__journal.push({ op: 'signUp', email: ident && ident.email });
+      window.__journal.push({
+        op: 'signUp',
+        email: ident && ident.email,
+        retour: ident && ident.options && ident.options.emailRedirectTo,
+        data: ident && ident.options && JSON.parse(JSON.stringify(ident.options.data || {}))
+      });
+      if (window.__refusInscription) {
+        return { data: { user: null, session: null },
+          error: { message: 'redirect URL not allowed' } };
+      }
       if (window.__avecSession) {
         window.__session = { access_token: 'jwt-client', user: UTILISATEUR };
         return { data: { user: UTILISATEUR, session: window.__session }, error: null };
@@ -64,7 +76,7 @@ window.supabase = { createClient: function () { return {
       }
       return { data: null, error: { message: 'Email not confirmed' } };
     },
-    async signOut() { window.__session = null; return {}; }
+    async signOut() { window.__journal.push({ op: 'signOut' }); window.__session = null; return {}; }
   },
   from() { return { select(){return this;}, eq(){return this;}, order(){return this;},
                     limit(){return this;},
@@ -73,7 +85,8 @@ window.supabase = { createClient: function () { return {
   // LE DOUBLE SE COMPORTE COMME LE SERVEUR : il ne rattache que s'il y
   // a une session au moment de l'appel, exactement comme auth.uid().
   async rpc(nom, params) {
-    window.__journal.push({ op: 'rpc', nom, params: JSON.parse(JSON.stringify(params || {})) });
+    window.__journal.push({ op: 'rpc', nom, params: JSON.parse(JSON.stringify(params || {})),
+      session: window.__session && window.__session.user && window.__session.user.id });
     if (nom !== 'creer_demande_avec_vehicules') return { data: null, error: null };
     const rattachee = !!window.__session;
     return { data: {
@@ -88,12 +101,12 @@ window.supabase = { createClient: function () { return {
 `;
 }
 
-async function deposerCompteSeul(browser, avecSession) {
+async function deposerCompteSeul(browser, avecSession, refusInscription, sessionAmbiante) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.addInitScript(init(avecSession));
+  await page.addInitScript(init(avecSession, refusInscription, sessionAmbiante));
   await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
 
@@ -104,11 +117,15 @@ async function deposerCompteSeul(browser, avecSession) {
   // On avance jusqu'au bout du parcours « compte seul ». Le mot de
   // passe vit sur une étape ultérieure : on le renseigne dès qu'il
   // apparaît, comme le ferait un client.
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 16; i++) {
+    // Le contrôle préalable de l'adresse et le nettoyage éventuel d'une
+    // session ambiante sont asynchrones : la recette attend le vrai résultat.
     // La fin, c'est l'ECRITURE reellement partie — pas un balisage de
     // succes qui existe deja dans le document, masque.
     const fini = await page.evaluate(() =>
-      window.__journal.some(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules'));
+      window.__journal.some(j => j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules')
+      || /compte et votre demande n'ont pas pu être enregistrés/i.test(
+           (document.getElementById('supabase-debug') || {}).textContent || ''));
     if (fini) break;
     await page.evaluate(() => {
       const mdp = document.getElementById('client-password');
@@ -134,8 +151,16 @@ async function deposerCompteSeul(browser, avecSession) {
       && j.nom === 'creer_demande_avec_vehicules');
     return {
       journal: window.__journal.map(j => j.op),
+      journalDetail: window.__journal.map(j => ({
+        op: j.op, nom: j.nom || null, session: j.session || null
+      })),
+      appelInscription: window.__journal.find(j => j.op === 'signUp') || null,
       appels: appels,
       succesTexte: zone ? zone.textContent : '',
+      succesVisible: !!document.getElementById('modal-client-success')
+        && getComputedStyle(document.getElementById('modal-client-success')).display !== 'none',
+      erreurTexte: (document.getElementById('supabase-debug') || {}).textContent || '',
+      prenomConserve: (document.getElementById('client-prenom') || {}).value || '',
       emails: window.__journal.filter(j => j.op === 'email').length,
       emailAvantEcriture: (function () {
         const iMail = window.__journal.findIndex(j => j.op === 'email');
@@ -150,6 +175,7 @@ async function deposerCompteSeul(browser, avecSession) {
 (async () => {
   const browser = await L.lancerNavigateur();
   const idx = fs.readFileSync(fichier('index.html'), 'utf8');
+  const dashRattachement = fs.readFileSync(fichier('dashboard.html'), 'utf8');
 
   // ══ A. LE NAVIGATEUR NE DÉCIDE PLUS DU PROPRIÉTAIRE ══
   check('A1 : le code n\'envoie plus d\'auth_user_id dans la demande',
@@ -173,16 +199,70 @@ async function deposerCompteSeul(browser, avecSession) {
       && b.etat.appels[0].params.p_demande.auth_user_id === undefined,
     JSON.stringify(b.etat.appels[0] && b.etat.appels[0].params.p_demande
       && b.etat.appels[0].params.p_demande.auth_user_id));
-  check('B4 : le serveur la rattache, puisqu\'il y a une session',
-    /visible dans votre espace client/i.test(b.etat.succesTexte),
-    b.etat.succesTexte.slice(0, 200));
+  check('B4 : le serveur la rattache à la session créée, sans petit texte supplémentaire',
+    !!(b.etat.appels[0] && b.etat.appels[0].session)
+      && !/visible dans votre espace client/i.test(b.etat.succesTexte),
+    JSON.stringify({ appel: b.etat.appels[0], texte: b.etat.succesTexte.slice(0, 200) }));
   check('B5 : aucune erreur JavaScript', b.erreurs.length === 0, b.erreurs.slice(0, 2).join(' | '));
   await b.page.close();
+
+  // Régression observée en recette : Auth refuse l'inscription (par
+  // exemple une Redirect URL de Preview non autorisée). Le parcours ne
+  // doit ni continuer vers l'écriture, ni fabriquer un faux succès.
+  const refus = await deposerCompteSeul(browser, true, true);
+  check('B6 : un refus de création de compte arrête la demande avant toute écriture',
+    refus.etat.appels.length === 0, JSON.stringify(refus.etat.journal));
+  check('B7 : aucun écran de réussite ni faux numéro client n\'est affiché',
+    refus.etat.succesVisible === false && !/HC-/.test(refus.etat.succesTexte),
+    refus.etat.succesTexte.slice(0, 200));
+  check('B8 : le client reçoit une erreur claire et ses informations restent saisies',
+    /compte et votre demande n'ont pas pu être enregistrés/i.test(refus.etat.erreurTexte)
+      && refus.etat.prenomConserve === 'TEST-QA',
+    JSON.stringify({ erreur: refus.etat.erreurTexte, prenom: refus.etat.prenomConserve }));
+  check('B9 : le refus ne déclenche aucun e-mail de succès',
+    refus.etat.emails === 0, String(refus.etat.emails));
+  check('B10 : aucune erreur JavaScript dans ce cas réel',
+    refus.erreurs.length === 0, refus.erreurs.slice(0, 2).join(' | '));
+  await refus.page.close();
+
+  // Régression réelle : une session ADMIN était déjà ouverte dans le
+  // navigateur avant la création d'un nouveau compte client.
+  const ambiante = await deposerCompteSeul(browser, false, false, true);
+  const iSortie = ambiante.etat.journalDetail.findIndex(j => j.op === 'signOut');
+  const iInscription = ambiante.etat.journalDetail.findIndex(j => j.op === 'signUp');
+  const iEcriture = ambiante.etat.journalDetail.findIndex(j =>
+    j.op === 'rpc' && j.nom === 'creer_demande_avec_vehicules');
+  check('B11 : la session admin ambiante est fermée avant la nouvelle inscription',
+    iSortie !== -1 && iSortie < iInscription && iInscription < iEcriture,
+    JSON.stringify(ambiante.etat.journalDetail));
+  check('B12 : la demande en attente de confirmation ne part jamais sous le compte admin',
+    ambiante.etat.appels.length === 1 && !ambiante.etat.appels[0].session,
+    JSON.stringify(ambiante.etat.appels[0]));
+  check('B13 : la validation du compte par e-mail reste explicitement obligatoire',
+    /Pour activer votre espace HelixCar, cliquez sur le lien reçu par e-mail/i.test(ambiante.etat.succesTexte),
+    ambiante.etat.succesTexte.slice(0, 260));
+  await ambiante.page.close();
 
   // ══ C. signUp NE DONNE PAS DE SESSION (confirmation d'e-mail) ══
   const c = await deposerCompteSeul(browser, false);
   check('C1 : un compte est créé', c.etat.journal.indexOf('signUp') !== -1,
     JSON.stringify(c.etat.journal));
+  const appelCreation = c.etat.appels[0] && c.etat.appels[0].params;
+  const metaInscription = (c.etat.appelInscription && c.etat.appelInscription.data) || {};
+  check('C1 bis : une Preview ne force plus une Redirect URL refusée par Supabase',
+    !!c.etat.appelInscription && !c.etat.appelInscription.retour,
+    JSON.stringify(c.etat.appelInscription));
+  check('C1 ter : le compte Auth transporte la demande et sa preuve à usage unique',
+    metaInscription.hc_activation === 'client'
+      && metaInscription.hc_client_dossier === (appelCreation && appelCreation.p_demande && appelCreation.p_demande.id)
+      && metaInscription.hc_client_reclamation === (appelCreation && appelCreation.p_cle_reclamation),
+    JSON.stringify(metaInscription));
+  check('C1 quater : le Dashboard consomme cette preuve avant de lire les rôles',
+    /async function _hcRattacherClientApresConfirmation\(\)/.test(dashRattachement)
+      && /sbAuth\.auth\.getUser\(\)/.test(dashRattachement)
+      && /sbAuth\.rpc\('reclamer_demande'/.test(dashRattachement)
+      && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dashRattachement),
+    'rattachement client absent ou appelé trop tard');
   check('C2 : une session est RÉELLEMENT tentée avant d\'écrire',
     c.etat.journal.indexOf('signIn') !== -1
       && c.etat.journal.indexOf('signIn') < c.etat.journal.lastIndexOf('rpc'),
@@ -199,11 +279,12 @@ async function deposerCompteSeul(browser, avecSession) {
   check('C5 : l\'écran NE promet PAS un espace client utilisable',
     !/visible dans votre espace client/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
-  check('C6 : il demande la confirmation de l\'adresse e-mail',
-    /Confirmez votre adresse e-mail/i.test(c.etat.succesTexte),
+  check('C6 : il demande la confirmation du compte par e-mail',
+    /Pour activer votre espace HelixCar, cliquez sur le lien reçu par e-mail/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
-  check('C7 : et il rassure sur le sort de la demande',
-    /demande est bien enregistr/i.test(c.etat.succesTexte),
+  check('C7 : le parcours compte seul ne prétend pas avoir enregistré un devis',
+    !/demande de devis a bien été enregistrée/i.test(c.etat.succesTexte)
+      && /compte HelixCar est maintenant créé/i.test(c.etat.succesTexte),
     c.etat.succesTexte.slice(0, 260));
   // L'e-mail de confirmation existait avant ce lot : ce qui doit etre
   // vrai, c'est qu'il ne parte JAMAIS avant que la demande soit ecrite.
@@ -525,10 +606,18 @@ async function deposerCompteSeul(browser, avecSession) {
     || (/_hcMemoriserReclamation\(/.test(idx) && /_hcReclamerDemandesEnAttente\(/.test(idx)),
     'phrase présente sans mécanisme de réclamation');
   const mig99 = fs.readFileSync(fichier('migrations/99_reclamation_demande.sql'), 'utf8');
+  const mig129 = fs.readFileSync(fichier('migrations/129_reparation_session_admin_client.sql'), 'utf8');
   check('D5 : le serveur exige une adresse RÉELLEMENT confirmée',
     /email_confirmed_at/.test(mig99) && /ADRESSE_NON_CONFIRMEE/.test(mig99));
   check('D6 : il exige que l\'adresse du compte soit celle de la demande',
     /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig99));
+  check('D6 bis : la réparation conserve l\'obligation d\'adresse confirmée',
+    /email_confirmed_at/.test(mig129) && /ADRESSE_NON_CONFIRMEE/.test(mig129));
+  check('D6 ter : seul un dossier capturé par un administrateur actif est transférable',
+    /exists \([\s\S]*public\.admins[\s\S]*a\.actif is true/.test(mig129)
+    && /if not v_depuis_admin[\s\S]*RECLAMATION_REFUSEE/.test(mig129));
+  check('D6 quater : l\'adresse confirmée doit rester celle de la demande',
+    /lower\(btrim\(v_email\)\) <> lower\(btrim\(v_ligne\.email\)\)/.test(mig129));
   // Le calcul de l'empreinte a été déplacé dans public.empreinte_secret
   // (migration 92) pour que la séparation des usages soit faite en UN
   // seul endroit. Ce qui doit rester vrai : aucune colonne ne garde le
@@ -551,6 +640,8 @@ async function deposerCompteSeul(browser, avecSession) {
     /_hcReclamerDemandesEnAttente\(sbAuth\)/.test(dash));
   check('D12 : et le site public aussi, au retour de confirmation',
     /_hcReclamerDemandesEnAttente\(_sb\)/.test(idx));
+  check('D12 bis : le retour de confirmation est construit depuis l\'origine réellement servie',
+    /var HELIXCAR_URL_DASHBOARD = \(function \(\) \{[\s\S]*window\.location\.origin[\s\S]*return o \+ '\/dashboard\.html'/.test(idx));
 
   // ── D bis. LES DEUX SECRETS, VUS DEPUIS LES FICHIERS ──
   const mig92 = fs.readFileSync(fichier('migrations/92_creation_demande_atomique.sql'), 'utf8');
@@ -584,6 +675,22 @@ async function deposerCompteSeul(browser, avecSession) {
     check('D22 (' + nom + ') : et l\'adresse est normalisée des deux côtés',
       /function _hcNormaliserAdresse\(x\)/.test(src) && /toLowerCase\(\)/.test(src));
   });
+
+  // ── D quater. LE SYMPTÔME RAPPORTÉ NE PEUT PAS REVENIR ──
+  // Après confirmation sur téléphone, une ancienne page affichait le
+  // profil et les statistiques de démonstration « Marc Dupont ». Même
+  // si la session ne possède encore aucune demande, l'interface doit
+  // rester vide et se remplir uniquement avec les réponses serveur.
+  check('D23 : aucun prénom ou nom Marc Dupont n\'est prérempli dans le profil client',
+    !/id="profil-client-prenom"[^>]*value="Marc"/.test(dash)
+    && !/id="profil-client-nom"[^>]*value="Dupont"/.test(dash));
+  check('D24 : le titre client ne souhaite jamais la bienvenue à Marc par défaut',
+    !/'client-dashboard'\s*:\s*\[\s*'Tableau de bord'\s*,\s*'Bienvenue Marc'\s*\]/.test(dash));
+  check('D25 : missions et fidélité attendent leurs données serveur, sans statistiques de démonstration',
+    /id="client-missions-resume"[^>]*>[\s\S]{0,120}Chargement/.test(dash)
+    && /id="client-fidelite-carte"[^>]*>[\s\S]{0,120}Chargement/.test(dash)
+    && /loadMissionsResumeClient\(\)/.test(dash)
+    && /loadFideliteCarte\(\)/.test(dash));
 
   await browser.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

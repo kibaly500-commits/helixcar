@@ -142,7 +142,7 @@ async function moisOuvert(page, champId) {
   }));
   L.check('C1 : même jour détecté', h.memeJour === true);
   L.check('C2 : même jour + fin antérieure -> rubrique incomplète', h.complete === false);
-  L.check('C3 : erreur horaire réellement affichée', /postérieure/i.test(h.erreur), h.erreur);
+  L.check('C3 : erreur horaire réellement affichée', /au moins 15 minutes/i.test(h.erreur), h.erreur);
 
   await setVal(page2, 'pro-horaire-cfin', '18:00');
   h = await page2.evaluate(() => ({ complete: _proRubriqueComplete('periode'), duree: _proDureeJours() }));

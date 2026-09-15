@@ -130,6 +130,12 @@
   .statut-final.accepte { background: #E3F2E8; color: #1E5734; }
   .statut-final.refuse { background: #F5E3E3; color: #7A2B2B; }
   .statut-final strong { display: block; font-size: 1rem; margin-bottom: 2px; }
+  .paiement-recette { margin-top:12px; padding:16px 18px; background:#fff; border:1px solid var(--ligne); border-left:4px solid var(--rouge); }
+  .paiement-recette h2 { margin:0 0 6px; font-size:1rem; }
+  .paiement-recette p { margin:0 0 12px; color:var(--anthracite-clair); font-size:.88rem; }
+  .paiement-recette-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .bouton-simulation { background:var(--anthracite); color:#fff; }
+  .paiement-recette-resultat { margin-top:10px; font-size:.88rem; min-height:1.3em; }
 
   footer.pied { text-align: center; padding: 24px; font-size: 0.76rem; color: var(--gris); }
 
@@ -274,7 +280,7 @@
 <body>
 <div class="voile">
   <header class="entete">
-    <div class="logo">HELIX<span>CAR</span></div>
+    <div class="logo">HELI<span>X</span>CAR</div>
     <div class="entete-sous">Consultation de devis</div>
   </header>
 
@@ -285,7 +291,7 @@
     </div>
   </main>
 
-  <footer class="pied">HelixCar — Convoyage &amp; stockage automobile</footer>
+  <footer class="pied">HelixCar — Services automobiles</footer>
 </div>
 
 <!-- Modal générique, réutilisé pour la confirmation d'acceptation ET la saisie du motif de refus. -->
@@ -294,7 +300,7 @@
     <div class="modal-titre" id="modal-titre"></div>
     <div class="modal-texte" id="modal-texte"></div>
     <div id="modal-zone-champ"></div>
-    <div class="modal-erreur" id="modal-erreur"></div>
+    <div class="modal-erreur" id="modal-erreur" role="alert"></div>
     <div class="modal-actions">
       <button class="bouton bouton-annuler" id="modal-bouton-annuler">Annuler</button>
       <button class="bouton" id="modal-bouton-confirmer">Confirmer</button>
@@ -302,12 +308,19 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function () {
   "use strict";
 
-  var URL_FONCTION = "https://zsetmqnmmupqbkgqbjbo.supabase.co/functions/v1/devis-secure";
-  var HOSTNAME_SUPABASE_ATTENDU = "zsetmqnmmupqbkgqbjbo.supabase.co";
+  // Une seule constante de projet : l'URL de la fonction et l'hôte
+  // attendu des PDF signés en dérivent (lot A01-036).
+  var SUPABASE_URL = "https://zsetmqnmmupqbkgqbjbo.supabase.co";
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
+  var authDevis = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  var URL_FONCTION = SUPABASE_URL + "/functions/v1/devis-secure";
+  var URL_PAIEMENT_RECETTE = SUPABASE_URL + "/functions/v1/paiement-recette";
+  var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
 
@@ -318,10 +331,16 @@
   // ────────────────────────────────────────────────────────────
   var token = null;
   try {
-    token = new URLSearchParams(window.location.search).get('token');
+    token = new URLSearchParams(window.location.hash.slice(1)).get('token') || new URLSearchParams(window.location.search).get('token');
+    if (token) window.history.replaceState(null, '', window.location.pathname + '#token=' + encodeURIComponent(token));
   } catch (e) { token = null; }
 
+  var devisId = new URLSearchParams(window.location.search).get('id');
+  if (!/^[0-9a-f-]{36}$/i.test(devisId || '')) devisId = null;
+
+  var numeroChargement = 0;
   var enCoursTraitement = false; // protection double-clic partagée accept/refuse
+  var hoteProduction = window.location.hostname === 'helixcar.vercel.app';
 
   // ── Échappement HTML (V50.5C.1A, conservé à l'identique) ──
   function echapperHtml(valeur) {
@@ -369,9 +388,12 @@
       '</div>';
   }
 
-  function badgeStatut(statut) {
+  function badgeStatut(statut, devis) {
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Accepté — payé</span>';
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'en_attente') return '<span class="badge accepte">Accepté — paiement en attente</span>';
     if (statut === 'accepte') return '<span class="badge accepte">Accepté</span>';
     if (statut === 'refuse') return '<span class="badge refuse">Refusé</span>';
+    if (devis && devis.version_obsolete) return '<span class="badge attente">Devis mis à jour</span>';
     return '<span class="badge attente">En attente de réponse</span>';
   }
 
@@ -386,6 +408,16 @@
   var modalErreur = document.getElementById('modal-erreur');
   var modalBoutonAnnuler = document.getElementById('modal-bouton-annuler');
   var modalBoutonConfirmer = document.getElementById('modal-bouton-confirmer');
+  var focusAvantModal = null;
+  voileModal.addEventListener('keydown', function(e) {
+    if(e.key === 'Escape' && !enCoursTraitement){ e.preventDefault(); fermerModal(); return; }
+    if(e.key !== 'Tab') return;
+    var champs = Array.from(voileModal.querySelectorAll('button:not(:disabled),textarea:not(:disabled)'));
+    if(!champs.length){e.preventDefault();return;}
+    var premier=champs[0], dernier=champs[champs.length-1];
+    if(e.shiftKey && document.activeElement===premier){e.preventDefault();dernier.focus();}
+    else if(!e.shiftKey && document.activeElement===dernier){e.preventDefault();premier.focus();}
+  });
 
   function fermerModal() {
     voileModal.hidden = true;
@@ -400,6 +432,7 @@
     // modifiées) n'intervient qu'une fois definirEtatTraitement(false)
     // déjà exécuté.
     _deverrouillerScrollArrierePlan();
+    if(focusAvantModal && focusAvantModal.isConnected)focusAvantModal.focus({preventScroll:true});
   }
   modalBoutonAnnuler.addEventListener('click', function () {
     if (enCoursTraitement) return; // ne pas fermer pendant un appel réseau en cours
@@ -427,6 +460,7 @@
   }
 
   function ouvrirModalAccepter(devis) {
+    focusAvantModal = document.activeElement;
     modalTitre.textContent = 'Confirmer l\'acceptation';
     modalTexte.textContent = 'Confirmez-vous l\'acceptation du devis ' + (devis.reference || '') + ' pour ' + formaterMontant(devis.prix) + ' ?';
     modalZoneChamp.innerHTML = '';
@@ -435,13 +469,15 @@
     modalBoutonConfirmer.onclick = function () { lancerAccept(); };
     _verrouillerScrollArrierePlan();
     voileModal.hidden = false;
+    modalBoutonAnnuler.focus({preventScroll:true});
   }
 
   function ouvrirModalRefuser(devis) {
+    focusAvantModal = document.activeElement;
     modalTitre.textContent = 'Refuser le devis';
     modalTexte.textContent = 'Souhaitez-vous indiquer la raison de votre refus ? (facultatif)';
     modalZoneChamp.innerHTML =
-      '<textarea class="modal-champ" id="modal-champ-motif" maxlength="' + MOTIF_LONGUEUR_MAX + '" placeholder="Raison de votre refus (facultatif)"></textarea>' +
+      '<label for="modal-champ-motif">Raison de votre refus (facultatif)</label><textarea class="modal-champ" id="modal-champ-motif" maxlength="' + MOTIF_LONGUEUR_MAX + '"></textarea>' +
       '<div class="modal-compteur"><span id="modal-compteur-valeur">0</span>/' + MOTIF_LONGUEUR_MAX + '</div>';
     var champ = document.getElementById('modal-champ-motif');
     var compteur = document.getElementById('modal-compteur-valeur');
@@ -451,6 +487,7 @@
     modalBoutonConfirmer.onclick = function () { lancerRefuse(); };
     _verrouillerScrollArrierePlan();
     voileModal.hidden = false;
+    champ.focus({preventScroll:true});
   }
 
   function afficherErreurModal(message) {
@@ -477,13 +514,13 @@
   }
 
   // ────────────────────────────────────────────────────────────
-  // Appel générique vers l'Edge Function pour accept/refuse — jamais
-  // d'en-tête Authorization Supabase, la seule preuve est le token.
+  // Appel vers le serveur : identité Auth et propriété requises.
+  // Le token identifie une version, il ne remplace pas la connexion.
   // ────────────────────────────────────────────────────────────
   function appellerAction(action, motif) {
-    var corps = { action: action, token: token };
+    var corps = { action: action, token: token, devis_id: devisId };
     if (action === 'refuse') corps.motif = motif || undefined;
-    return fetch(URL_FONCTION, {
+    return requeteAuthentifiee({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corps)
@@ -498,7 +535,7 @@
 
   function lancerAccept() {
     if (enCoursTraitement) return; // protection double-clic
-    if (!token) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
+    if (!token && !devisId) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
     definirEtatTraitement(true);
     appellerAction('accept', null)
       .then(function (resultat) {
@@ -506,6 +543,7 @@
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           afficherErreurModal((corps && corps.message) || 'Une erreur est survenue. Merci de réessayer.');
+          if (corps && corps.code === 'VERSION_OBSOLETE') { fermerModal(); chargerEtAfficherDevis(); }
           return;
         }
         fermerModal();
@@ -522,7 +560,7 @@
 
   function lancerRefuse() {
     if (enCoursTraitement) return; // protection double-clic
-    if (!token) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
+    if (!token && !devisId) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
     var champ = document.getElementById('modal-champ-motif');
     var motif = champ ? champ.value.slice(0, MOTIF_LONGUEUR_MAX) : null;
     definirEtatTraitement(true);
@@ -564,10 +602,26 @@
   }
 
   function blocActions(devis) {
+    // LOT Q01 — une version modifiée après envoi ne peut plus être
+    // acceptée ni refusée : le client le lit, sans bouton trompeur.
+    if (devis.version_obsolete) {
+      return '<div class="statut-final refuse" style="background:#FDF0D5;color:#5C4200"><div><strong>Ce devis a été mis à jour</strong>' +
+        'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.</div></div>';
+    }
     if (devis.statut === 'accepte') {
+      var suite = devis.paiement_statut === 'en_attente'
+        ? ' Le paiement vous sera proposé prochainement.'
+        : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
+      var simulation = (!hoteProduction && devis.paiement_statut === 'en_attente') ?
+        '<section class="paiement-recette" aria-labelledby="titre-paiement-recette"><h2 id="titre-paiement-recette">Simulation de paiement — recette</h2>'+
+        '<p>Aucun paiement réel et aucun débit. Choisissez le résultat à vérifier.</p><div class="paiement-recette-actions">'+
+        '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
+        '<button class="bouton bouton-simulation" data-scenario="refused">Paiement refusé</button><button class="bouton bouton-simulation" data-scenario="abandoned">Paiement abandonné</button></div>'+
+        '<div id="paiement-recette-resultat" class="paiement-recette-resultat" role="status" aria-live="polite"></div></section>' : '';
       return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
         (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
-        '</div></div>';
+        echapperHtml(suite) +
+        '</div></div>'+simulation;
     }
     if (devis.statut === 'refuse') {
       // Le motif de refus n'est pas exposé par la réponse GET actuelle
@@ -590,7 +644,7 @@
     html += '<div class="entete-devis">';
     html += '<div><div class="titre-devis">Votre devis</div><div class="reference">' + echapperHtml(devis.reference || '—') + '</div></div>';
     html += '</div>';
-    html += '<div>' + badgeStatut(devis.statut) + '</div>';
+    html += '<div>' + badgeStatut(devis.statut, devis) + '</div>';
     html += blocPdf(devis);
     html += blocActions(devis);
 
@@ -600,6 +654,22 @@
     var boutonRefuser = document.getElementById('bouton-refuser-devis');
     if (boutonAccepter) boutonAccepter.addEventListener('click', function () { ouvrirModalAccepter(devis); });
     if (boutonRefuser) boutonRefuser.addEventListener('click', function () { ouvrirModalRefuser(devis); });
+    Array.from(document.querySelectorAll('[data-scenario]')).forEach(function(b){b.addEventListener('click',function(){simulerPaiement(devis,b.getAttribute('data-scenario'));});});
+  }
+
+  async function simulerPaiement(devis,scenario){
+    if(enCoursTraitement)return; enCoursTraitement=true;
+    var boutons=Array.from(document.querySelectorAll('[data-scenario]'));boutons.forEach(function(b){b.disabled=true;});
+    var sortie=document.getElementById('paiement-recette-resultat');if(sortie)sortie.textContent='Simulation en cours…';
+    try{
+      var session=(await authDevis.auth.getSession()).data.session;
+      if(!session)throw new Error('UNAUTHORIZED');
+      var rep=await fetch(URL_PAIEMENT_RECETTE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({devis_id:devisId,scenario:scenario})});
+      var corps=await rep.json();if(!rep.ok||!corps.ok)throw new Error(corps.message||'Simulation impossible.');
+      if(sortie)sortie.textContent=corps.message;
+      if(corps.paiement_statut==='paye')setTimeout(chargerEtAfficherDevis,500);
+    }catch(e){if(sortie)sortie.textContent=e&&e.message&&e.message!=='UNAUTHORIZED'?e.message:'Reconnectez-vous puis réessayez.';}
+    finally{enCoursTraitement=false;boutons.forEach(function(b){b.disabled=false;});}
   }
 
   // ────────────────────────────────────────────────────────────
@@ -607,15 +677,16 @@
   // après un accept/refuse réussi (objectif 4 : refresh cohérent).
   // ────────────────────────────────────────────────────────────
   function chargerEtAfficherDevis() {
-    if (!token) {
+    var chargement = ++numeroChargement;
+    if (!token && !devisId) {
       afficherEtatSimple('⚠️', 'Lien de devis invalide.', 'Le lien que vous avez utilisé ne contient pas les informations nécessaires. Vérifiez qu\'il a été copié en entier depuis votre email.');
       return;
     }
 
-    fetch(URL_FONCTION, {
+    requeteAuthentifiee({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get', token: token })
+      body: JSON.stringify({ action: 'get', token: token, devis_id: devisId })
     })
       .then(function (reponse) {
         return reponse.json().then(function (corps) {
@@ -625,11 +696,15 @@
         });
       })
       .then(function (resultat) {
+        if (chargement !== numeroChargement) return;
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           var code = corps && corps.code;
-          if (code === 'INVALID_OR_EXPIRED_LINK') {
+          if (code === 'UNAUTHORIZED') { afficherConnexionRequise();
+          } else if (code === 'INVALID_OR_EXPIRED_LINK') {
             afficherEtatSimple('🔒', 'Lien invalide ou expiré.', 'Ce lien de devis est invalide ou a expiré. Contactez HelixCar si vous pensez qu\'il s\'agit d\'une erreur.');
+          } else if (code === 'VERSION_OBSOLETE') {
+            afficherEtatSimple('🔄', 'Ce devis a été mis à jour.', 'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.');
           } else {
             afficherEtatSimple('⚠️', 'Impossible d\'afficher ce devis.', 'Une erreur est survenue. Merci de réessayer dans quelques instants.');
           }
@@ -638,10 +713,35 @@
         afficherDevis(corps.devis);
       })
       .catch(function () {
+        if (chargement !== numeroChargement) return;
         afficherEtatSimple('📡', 'Problème de connexion.', 'Impossible de contacter HelixCar pour le moment. Vérifiez votre connexion internet et réessayez.');
       });
   }
 
+  function afficherConnexionRequise() {
+    numeroChargement++;
+    fermerModal();
+    afficherEtatSimple('', 'Connectez-vous à votre espace client', 'Utilisez le compte auquel ce devis est destiné.');
+    var lien = document.createElement('a');
+    lien.className = 'bouton'; lien.textContent = 'Se connecter';
+    lien.href = 'index.html?connexion=1' + (devisId ? '&devis_id=' + encodeURIComponent(devisId) : '#devis=' + encodeURIComponent(token || ''));
+    zone.querySelector('.etat-simple').appendChild(lien);
+  }
+  async function requeteAuthentifiee(options) {
+    var session = null;
+    try { var res = authDevis && await authDevis.auth.getSession(); session = res && res.data && res.data.session; } catch (e) {}
+    if (!session || !session.access_token) {
+      return new Response(JSON.stringify({ok:false,code:'UNAUTHORIZED'}), {status:401,headers:{'Content-Type':'application/json'}});
+    }
+    options.headers.Authorization = 'Bearer ' + session.access_token;
+    return fetch(URL_FONCTION, options);
+  }
+  if (authDevis) authDevis.auth.onAuthStateChange(function (event) {
+    if (event === 'SIGNED_OUT') afficherConnexionRequise();
+  });
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) { zone.textContent = 'Vérification de votre accès…'; chargerEtAfficherDevis(); }
+  });
   chargerEtAfficherDevis();
 })();
 </script>

@@ -115,10 +115,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
 
@@ -192,7 +193,84 @@ window.fetch = function (url, options) {
         memeCode.services.length === 4, JSON.stringify(memeCode.services));
       check('A13 : et ce sont les mêmes règles métier, pas une copie',
         memeCode.fonctions.length === 5, JSON.stringify(memeCode.fonctions));
+
+      // Régression constatée en recette réelle : le mode intégré masquait
+      // les couches ajoutées directement dans <body>. Les clics existaient,
+      // mais calendriers et bulles d'aide restaient invisibles.
+      const interactions = await cadres[0].evaluate(() => {
+        const aide = Array.from(document.querySelectorAll('.hc-help-btn'))
+          .find(el => el.offsetParent !== null);
+        if (aide) aide.click();
+        const pop = document.querySelector('.hc-help-popover');
+        const aideVisible = !!pop && getComputedStyle(pop).display !== 'none'
+          && getComputedStyle(pop).visibility !== 'hidden';
+
+        const stockage = document.querySelector('input[name="type-service"][value="stockage"]');
+        if (stockage) stockage.click();
+        const date = document.getElementById('stock-debut');
+        if (date) date.click();
+        const calendrier = document.querySelector('.hc-cal-overlay');
+        const calendrierVisible = !!calendrier
+          && calendrier.classList.contains('open')
+          && getComputedStyle(calendrier).display !== 'none';
+
+        const modale = document.getElementById('modal-client');
+        const item1 = document.querySelector(
+          '#client-step-indicator .step-indicator-item[data-step-item="1"]');
+        const ligneAvantPremiereEtape = item1 && item1.nextElementSibling;
+        return {
+          gardeRetiree: !document.documentElement.classList.contains('hc-integre-tot'),
+          modaleCliquable: getComputedStyle(modale).pointerEvents !== 'none',
+          aideVisible,
+          calendrierVisible,
+          identiteMasquee: !!item1 && getComputedStyle(item1).display === 'none',
+          traitInitialMasque: !!ligneAvantPremiereEtape
+            && getComputedStyle(ligneAvantPremiereEtape).display === 'none'
+        };
+      });
+      check('A13a : le formulaire intégré accepte réellement les clics',
+        interactions.gardeRetiree && interactions.modaleCliquable, JSON.stringify(interactions));
+      check('A13b : les aides contextuelles sont visibles au clic',
+        interactions.aideVisible, JSON.stringify(interactions));
+      check('A13c : le calendrier de début de stockage s’ouvre au clic',
+        interactions.calendrierVisible, JSON.stringify(interactions));
+      check('A13d : identité et trait initial sont retirés pour le compte connecté',
+        interactions.identiteMasquee && interactions.traitInitialMasque, JSON.stringify(interactions));
     }
+
+    const reprise = await cadres[0].evaluate(() => {
+      const existe = () => !!document.getElementById('notice-brouillon-restaure');
+      _formulaireClientSale = true;
+      _sauvegarderBrouillonClient();
+      _hcAfficherBrouillonIntegre();
+      const auRetour = existe();
+      document.querySelector('.brouillon-btn-principal').click();
+      for (const type of ['input', 'change', 'input']) {
+        document.getElementById('client-tel').dispatchEvent(new Event(type, { bubbles: true }));
+      }
+      const apresSaisie = existe();
+      _hcAfficherBrouillonIntegre();
+      const retourSuivant = existe();
+      window.confirm = () => true;
+      _demanderNouvelleDemandeClient();
+      const reset = { etape: _formStepState.client, notice: existe(),
+        brouillon: _lireBrouillonClientValide(), nom: document.getElementById('client-nom').value };
+      localStorage.setItem(_CLE_BROUILLON_CLIENT, JSON.stringify({ ts: Date.now(), etape: 1,
+        champs: { 'client-nom': { v: 'Ancien visiteur' }, 'client-type': { v: 'particulier' } } }));
+      _restaurerBrouillonClientSiPresent();
+      return { auRetour, apresSaisie, retourSuivant, reset, etapeRestauree: _formStepState.client,
+        nomRestaure: document.getElementById('client-nom').value,
+        typeRestaure: document.getElementById('client-type').value };
+    });
+    check('PR6 : reprise proposée au retour', reprise.auRetour);
+    check('PR6 : création de compte absente des prestations du client connecté',
+      await cadres[0].locator('input[name="type-service"][value="compte"]').isHidden());
+    check('PR6 : aucune réapparition pendant les saisies', !reprise.apresSaisie);
+    check('PR6 : proposée de nouveau au retour suivant', reprise.retourSuivant);
+    check('PR6 : recommencer supprime le brouillon et conserve le compte',
+      reprise.reset.etape === 2 && !reprise.reset.notice && !reprise.reset.brouillon && reprise.reset.nom === 'ClientA', JSON.stringify(reprise));
+    check('PR6 : ancien brouillon public sans retour à la création de compte',
+      reprise.etapeRestauree >= 2 && reprise.nomRestaure === 'ClientA' && reprise.typeRestaure === 'pro', JSON.stringify(reprise));
 
     // Retour : on revient à ses demandes, toujours sans quitter la page.
     await page.evaluate(() => fermerNouvelleDemande());
@@ -215,10 +293,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
     await page.evaluate(() => ouvrirNouvelleDemande());
@@ -260,10 +339,11 @@ window.fetch = function (url, options) {
     await page.addInitScript(INIT);
     await page.goto(BASE + '/dashboard.html', { waitUntil: 'load' });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'clientA@helixcar.test';
-      document.getElementById('login-pw').value = 'x';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     });
     await page.waitForTimeout(250);
     const usurpation = await page.evaluate(async () => {
@@ -285,15 +365,35 @@ window.fetch = function (url, options) {
     /if \(ev\.origin !== window\.location\.origin\) return;/.test(dash));
   check('D3 : et que de notre propre cadre',
     /if \(!cadre \|\| ev\.source !== cadre\.contentWindow\) return;/.test(dash));
-  check('D4 : la liste est rechargée depuis la base, jamais depuis le message',
-    /chargerDemandesClient\(\);/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
-                                                 dash.indexOf('hc-demande-enregistree') + 900)));
+  check('D4 : la liste est rechargée et rerendue depuis la base, jamais depuis le message',
+    /loadDemandesClient\(\)/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
+                                               dash.indexOf('hc-demande-enregistree') + 1400))
+      && /removeAttribute\('src'\)/.test(dash.slice(dash.indexOf('hc-demande-enregistree'),
+                                                     dash.indexOf('hc-demande-enregistree') + 1400)));
   check('D5 : le mode intégré exige d\'être réellement encadré',
     /p\.get\('integre'\) === '1' && window\.parent !== window/.test(idx));
   check('D6 : le parcours public reste séparé et intact',
     /params\.get\('nouvelle-demande'\) !== '1'\) return false;/.test(idx));
   check('D7 : l\'écran de succès public ne s\'affiche pas dans l\'espace client',
     /if \(type === 'client' && typeof _hcModeIntegre === 'function' && _hcModeIntegre\(\)\)/.test(idx));
+  check('D8 : nouvelle demande et complétion sont deux modes exclusifs',
+    /hc-mode-demande/.test(idx) && /hc-mode-completion/.test(idx)
+      && /#modal-client\.modal-overlay \{ display: none !important; \}/.test(idx)
+      && /#modal-completer\.modal-overlay \{ display: none !important; \}/.test(idx));
+  check('D9 : la nouvelle demande garde un format compact',
+    /max-width: 760px/.test(idx) && /width: min\(780px/.test(dash));
+  check('D10 : le Dashboard reste visible et flouté derrière la demande',
+    /#page-client-nouvelle-demande\.active[\s\S]{0,300}backdrop-filter: blur\(7px\)/.test(dash));
+  check('D11 : la fin du parcours intégré crée une nouvelle demande',
+    /Créer une nouvelle demande →/.test(idx));
+  check('D12 : la prise en charge liée au stockage est vraiment verrouillée',
+    /champ\.disabled = !!actif/.test(idx) && /hc-date-verrouillee/.test(idx)
+      && /if \(!champ \|\| champ\.disabled\) return;/.test(idx));
+  check('D13 : le créneau impose quinze minutes minimum',
+    /_hcCreneauRespecte15Minutes/.test(idx)
+      && /f = Math\.max\(d \+ 15/.test(idx));
+  check('D14 : le VIN n\'est plus présenté comme facultatif',
+    !/VIN <span class="field-optional-hint">\(facultatif\)<\/span>/.test(idx));
 
   await navigateur.close();
   await new Promise(r => serveur.close(r));

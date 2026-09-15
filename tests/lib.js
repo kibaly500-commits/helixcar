@@ -65,6 +65,16 @@ async function chooseService(page, value) {
   await page.waitForTimeout(60);
 }
 
+// LOT F01 (F01-023..029) — « Trouver un professionnel automobile » : les
+// quatre rubriques métier vivent dans une ÉTAPE 3 dédiée. Depuis
+// l'étape 2, le seul choix du service active « Continuer », qui ouvre
+// cette étape. À appeler juste après chooseService(page, 'professionnel').
+async function ouvrirEtapeProfessionnel(page) {
+  await page.click('#client-step-next-btn');
+  await page.waitForTimeout(120);
+  return page.evaluate(() => _formStepState.client);
+}
+
 // Étape 2 nettoyage complète et valide
 async function fillNettoyageStep2(page, total, repartition, prestation) {
   await page.click('#nett-elig-emplacement');
@@ -140,4 +150,4 @@ async function step(page) { return page.evaluate(() => _formStepState.client); }
 module.exports = {
   // Réexportés depuis env.js : une suite qui charge lib.js dispose des
   // mêmes helpers de chemin, sans second require.
-  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
+  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, ouvrirEtapeProfessionnel, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };

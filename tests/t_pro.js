@@ -42,21 +42,37 @@ async function ouvrirRubrique(page, cle) {
       btnDisabled: document.getElementById('client-step-next-btn').disabled
     };
   });
-  L.check('A1 : bloc professionnel affiché après sélection du service', etat.visible);
+  L.check('A1 : les questions restent masquées sur l’étape du choix du service',
+    !(await page.locator('#bloc-socle-professionnel').isVisible()));
   L.check('A2 : AUCUN accordéon ouvert automatiquement', etat.ouverts === 0, 'ouverts=' + etat.ouverts);
   L.check('A3 : aucun message socle « en préparation »', etat.socleMsg === 'none');
   // Le bouton n'est plus jamais grisé (§6) : c'est le CLIC qui bloque et
   // signale les manques. On vérifie donc la garantie utile — on ne
   // franchit pas l'étape — et non plus l'état visuel du bouton.
   L.check('A4 : le bouton Continuer reste actif et cliquable', etat.btnDisabled === false);
+  // LOT F01 (F01-024/025) — ANCIEN COMPORTEMENT ADAPTÉ : les quatre
+  // rubriques vivaient sous le choix du service, à l'étape 2, et
+  // « Continuer » y bloquait tant qu'elles étaient vides. Elles vivent
+  // désormais dans une étape 3 dédiée : depuis l'étape 2, le seul choix
+  // du service suffit à ouvrir l'étape 3 ; c'est LÀ que le clic bloque
+  // et signale les manques, avec les mêmes validateurs qu'avant.
+  const ouverture = await page.evaluate(() => {
+    const avant = _formStepState.client;
+    clientStepNext();
+    return { avant, apres: _formStepState.client,
+             erreurs: document.querySelectorAll('#modal-client .field-error-msg.visible').length };
+  });
+  L.check('A4b : depuis l\'étape 2, le seul choix du service ouvre l\'étape 3 sans erreur',
+    ouverture.avant === 2 && ouverture.apres === 3 && ouverture.erreurs === 0, JSON.stringify(ouverture));
+  await page.waitForTimeout(80);
   const blocage = await page.evaluate(() => {
     const avant = _formStepState.client;
     clientStepNext();
     return { avant, apres: _formStepState.client,
              erreurs: document.querySelectorAll('#modal-client .field-error-msg.visible').length };
   });
-  L.check('A4b : mais cliquer ne franchit PAS l\'étape tant que rien n\'est saisi',
-    blocage.apres === blocage.avant && blocage.erreurs > 0, JSON.stringify(blocage));
+  L.check('A4c : à l\'étape 3, cliquer ne franchit PAS l\'étape tant que rien n\'est saisi',
+    blocage.avant === 3 && blocage.apres === 3 && blocage.erreurs > 0, JSON.stringify(blocage));
 
   // Aucun message intermédiaire interdit
   const texte = await page.evaluate(() => (document.getElementById('bloc-socle-professionnel') || {}).textContent || '');
@@ -158,7 +174,9 @@ async function ouvrirRubrique(page, cle) {
   await page.click('#client-step-next-btn');
   await page.waitForTimeout(250);
   let st = await L.step(page);
-  L.check('E1 : Continuer mène directement au récapitulatif (2 -> 5)', st === 5, 'étape=' + st);
+  // LOT F01 (F01-027) — les rubriques sont à l'étape 3 : « Continuer »
+  // mène de l'étape 3 au récapitulatif, sans traverser l'étape 4.
+  L.check('E1 : Continuer mène directement au récapitulatif (3 -> 5)', st === 5, 'étape=' + st);
 
   let recap = await page.evaluate(() => (document.getElementById('recap-demande') || {}).textContent.replace(/\s+/g, ' '));
   L.check('E2 : récap contient le besoin', /Technicien automobile/.test(recap), recap.slice(0, 300));
@@ -187,7 +205,8 @@ async function ouvrirRubrique(page, cle) {
   L.check('F7 : payload informations complémentaires nulles si vides', d.informations_complementaires === null);
 
   // ── G. Changement de catégorie : remise à zéro RÉELLE ──
-  await page.evaluate(() => { _formStepState.client = 2; _renderFormStep('client'); });
+  // LOT F01 — les rubriques sont à l'étape 3, on y revient.
+  await page.evaluate(() => { _formStepState.client = 3; _renderFormStep('client'); });
   await page.waitForTimeout(80);
   await ouvrirRubrique(page, 'besoin');
   await page.click('input[name="pro-categorie"][value="renfort"]');
