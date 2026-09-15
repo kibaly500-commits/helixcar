@@ -14071,6 +14071,13 @@ function declencherChampFichier(id) {
 .nav-icon .hc-ui-icon{width:18px;height:18px;margin:0}
 .sidebar-footer .nav-icon{display:inline-flex;align-items:center;justify-content:center}
 </style>
+<style id="hc-pr6-double-tap-mobile">
+/* Mobile uniquement : garde les gestes de défilement et de pincement,
+   sans le zoom involontaire provoqué par un double toucher. */
+@media (max-width: 900px), (pointer: coarse) {
+  html, body, body * { touch-action: manipulation; }
+}
+</style>
 <script id="hc-pr6-icones-professionnelles">
 (function(){
   var chemins={

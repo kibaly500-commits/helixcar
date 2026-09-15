@@ -61,6 +61,12 @@ check('La migration suit chaque plaque de restitution',
 check('La migration suit chaque VIN de restitution',
   migration.includes("_restit_vin") &&
   migration.includes("VIN du véhicule à restituer"));
+check('La restitution réclame aussi le nom du contact manquant',
+  migration.includes("_restit_contact_nom") &&
+  migration.includes("Nom du contact à la restitution"));
+check('La restitution réclame aussi le téléphone du contact manquant',
+  migration.includes("_restit_contact_tel") &&
+  migration.includes("Téléphone du contact à la restitution"));
 check('La fonction reste accessible au contrôle serveur de mission',
   migration.includes("current_setting('hc.creation_mission_serveur', true)"));
 check('Les absences deviennent des informations attendues',

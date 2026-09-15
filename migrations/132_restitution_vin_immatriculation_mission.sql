@@ -254,7 +254,15 @@ begin
             jsonb_build_object(
               'cle','vehicule_' || rang::text || '_restit_date',
               'libelle', prefixe || case when n_veh > 1 then 'date de restitution' else 'Date de restitution' end,
-              'fournie', v.restit_date is not null));
+              'fournie', v.restit_date is not null),
+            jsonb_build_object(
+              'cle','vehicule_' || rang::text || '_restit_contact_nom',
+              'libelle', prefixe || case when n_veh > 1 then 'nom du contact à la restitution' else 'Nom du contact à la restitution' end,
+              'fournie', nullif(btrim(coalesce(v.restit_contact_nom,'')),'') is not null),
+            jsonb_build_object(
+              'cle','vehicule_' || rang::text || '_restit_contact_tel',
+              'libelle', prefixe || case when n_veh > 1 then 'téléphone du contact à la restitution' else 'Téléphone du contact à la restitution' end,
+              'fournie', nullif(btrim(coalesce(v.restit_contact_tel,'')),'') is not null));
         end if;
       end loop;
 
@@ -303,7 +311,20 @@ begin
                              'fournie', public.hc_texte(dj,'restit_immatriculation') is not null),
           jsonb_build_object('cle','restit_vin',
                              'libelle','VIN du véhicule à restituer',
-                             'fournie', public.hc_texte(dj,'restit_vin') is not null));
+                             'fournie', public.hc_texte(dj,'restit_vin') is not null),
+          jsonb_build_object('cle','restit_adresse',
+                             'libelle','Adresse de restitution',
+                             'fournie', coalesce(public.hc_texte(dj,'adresse_restit_rue'),
+                                                 public.hc_texte(dj,'adresse_restitution')) is not null),
+          jsonb_build_object('cle','restit_date',
+                             'libelle','Date de restitution',
+                             'fournie', public.hc_texte(dj,'date_restitution') is not null),
+          jsonb_build_object('cle','restit_contact_nom',
+                             'libelle','Nom du contact à la restitution',
+                             'fournie', public.hc_texte(dj,'restit_contact_nom') is not null),
+          jsonb_build_object('cle','restit_contact_tel',
+                             'libelle','Téléphone du contact à la restitution',
+                             'fournie', public.hc_texte(dj,'restit_contact_tel') is not null));
       end if;
     end if;
   end if;
