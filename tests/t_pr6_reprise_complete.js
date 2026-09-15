@@ -4,7 +4,9 @@ const path = require('path');
 const RACINE = path.resolve(__dirname, '..');
 const index = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
 const dashboard = fs.readFileSync(path.join(RACINE, 'dashboard.html'), 'utf8');
-const migration = fs.readFileSync(path.join(RACINE, 'migrations/132_restitution_vin_immatriculation_mission.sql'), 'utf8');
+const migration132 = fs.readFileSync(path.join(RACINE, 'migrations/132_restitution_vin_immatriculation_mission.sql'), 'utf8');
+const migration134 = fs.readFileSync(path.join(RACINE, 'migrations/134_restitution_contacts_mission.sql'), 'utf8');
+const migration = migration132 + '\n' + migration134;
 
 let pass = 0, fail = 0;
 function check(libelle, condition) {
@@ -62,11 +64,14 @@ check('La migration suit chaque VIN de restitution',
   migration.includes("_restit_vin") &&
   migration.includes("VIN du véhicule à restituer"));
 check('La restitution réclame aussi le nom du contact manquant',
-  migration.includes("_restit_contact_nom") &&
-  migration.includes("Nom du contact à la restitution"));
+  migration134.includes("_restit_contact_nom") &&
+  migration134.includes("Nom du contact à la restitution"));
 check('La restitution réclame aussi le téléphone du contact manquant',
-  migration.includes("_restit_contact_tel") &&
-  migration.includes("Téléphone du contact à la restitution"));
+  migration134.includes("_restit_contact_tel") &&
+  migration134.includes("Téléphone du contact à la restitution"));
+check('La correction des contacts vit dans une migration nouvelle réellement déployable',
+  !migration132.includes("_restit_contact_nom") &&
+  migration134.includes("_restit_contact_nom"));
 check('La fonction reste accessible au contrôle serveur de mission',
   migration.includes("current_setting('hc.creation_mission_serveur', true)"));
 check('Les absences deviennent des informations attendues',

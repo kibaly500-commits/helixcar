@@ -1,7 +1,9 @@
 echo "── R02. RESTITUTION : CONTACT OBLIGATOIRE AVANT MISSION ──"
 
-errR02=$(appliquer migrations/132_restitution_vin_immatriculation_mission.sql)
-check "R02-1 : la règle de restitution s'applique sans erreur" "" "$errR02"
+errR02Base=$(appliquer migrations/132_restitution_vin_immatriculation_mission.sql)
+check "R02-1a : la migration 132 historique s'applique sans erreur" "" "$errR02Base"
+errR02=$(appliquer migrations/134_restitution_contacts_mission.sql)
+check "R02-1b : la migration corrective 134 s'applique sans erreur" "" "$errR02"
 
 # Toutes les informations du convoyage et de la restitution sont fournies,
 # sauf le nom et le téléphone du contact à la restitution. Cela prouve que
@@ -45,4 +47,3 @@ check "R02-5 : les deux informations complétées deviennent fournies" "fournie|
 check "R02-6 : aucune autre information ne reste manquante" "0" \
   "$(sqlAdmin "select count(*) from public.informations_demande('eeeeeeee-0000-0000-0000-00000000f132')
       where statut='attendue';" | tail -1)"
-

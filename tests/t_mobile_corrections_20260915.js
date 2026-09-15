@@ -49,6 +49,7 @@ function check(libelle, condition, detail) {
       dot1Fond: getComputedStyle(dot1).backgroundColor,
       dot1Bord: getComputedStyle(dot1).borderTopColor,
       dot1Halo: getComputedStyle(dot1).boxShadow,
+      dot1Largeur: dot1.getBoundingClientRect().width,
       animationDot2: getComputedStyle(dot2).animationName,
       animationDot3: getComputedStyle(dot3).animationName,
       datePrevented: evt.defaultPrevented,
@@ -70,7 +71,8 @@ function check(libelle, condition, detail) {
     /hc-mobile-route-dot-3/.test(renduMobile.animationDot3), JSON.stringify(renduMobile));
   check('M5b : le premier jalon reprend le rendu lumineux Paris-Lyon',
     renduMobile.dot1Fond === 'rgb(245, 242, 234)' &&
-    renduMobile.dot1Bord === 'rgb(181, 68, 75)' && renduMobile.dot1Halo !== 'none', JSON.stringify(renduMobile));
+    renduMobile.dot1Bord === 'rgb(181, 68, 75)' && renduMobile.dot1Halo !== 'none' &&
+    renduMobile.dot1Largeur >= 8.9 && renduMobile.dot1Largeur <= 9.1, JSON.stringify(renduMobile));
   check('M5c : les traits utilisent aussi la surbrillance lumineuse',
     renduMobile.ligneEffet !== 'none', JSON.stringify(renduMobile));
   check('M5d : traits et jalons partagent exactement les seuils de synchronisation',
