@@ -4056,7 +4056,9 @@ async function _hcRattacherClientApresConfirmation() {
       url.searchParams.delete('activation');
       url.searchParams.delete('dossier');
       url.searchParams.delete('reclamation');
-      history.replaceState(null, '', url.pathname + url.search + url.hash);
+      // Conserver la sentinelle de sortie du Dashboard : remplacer l'état
+      // par null supprimait la confirmation au prochain geste Retour.
+      history.replaceState(history.state || {}, '', url.pathname + url.search + url.hash);
     }
     if (typeof _hcOublierReclamation === 'function') _hcOublierReclamation(dossier);
     try {
@@ -4106,7 +4108,9 @@ async function _hcRattacherPartenaireApresConfirmation() {
     // est conservé jusqu'à ce que la bibliothèque l'ait consommé.
     url.searchParams.delete('activation');
     url.searchParams.delete('dossier');
-    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    // Même règle pour l'activation partenaire : l'URL est nettoyée sans
+    // effacer l'état de navigation qui protège la sortie du Dashboard.
+    history.replaceState(history.state || {}, '', url.pathname + url.search + url.hash);
     return true;
   } catch (e) {
     console.warn('Activation partenaire :', e);
@@ -4261,6 +4265,7 @@ function buildNav(role) {
 // précédente ne peut réapparaître à la connexion suivante dans le même
 // onglet.
 async function doLogout() {
+  window._hcSortieConfirmee = true;
   window._currentConvoyeur = null;
   window._currentAdmin = null;
   window._currentClient = null;
@@ -4317,13 +4322,22 @@ var _hcNavigationRetour = false;
 var _hcNavigationRole = null;
 var _hcNavigationInitialisee = false;
 var _hcDernierePage = null;
+window._hcSortieConfirmee = false;
 function confirmerSortieEspace() {
+  window._hcSortieConfirmee = true;
   closeModal('quitter-espace');
-  if (history.length >= 3) history.go(-2);
-  else window.location.assign('index.html');
+  // Ne jamais deviner combien d'entrées internes le navigateur mobile a
+  // conservées : après confirmation, revenir explicitement au site public.
+  window.location.assign('index.html');
 }
 window.addEventListener('popstate', function (event) {
-  if (event.state && event.state.hcSortieEspace && _hcDernierePage) {
+  // Une ancienne entrée sans état peut subsister après une activation ou
+  // une restauration mobile. Dès qu'un espace est affiché, elle représente
+  // elle aussi une tentative de sortie et doit être interceptée.
+  var etatRetour = event.state || {};
+  var retourVersSortie = etatRetour.hcSortieEspace ||
+    (!etatRetour.hcPage && !etatRetour.hcSortieProtegee);
+  if (retourVersSortie && _hcDernierePage) {
     // Restaurer l'entrée courante permet de rester sans multiplier les entrées.
     history.pushState({ hcPage: _hcDernierePage, hcSortieProtegee: true }, '', location.href);
     var couches = Array.from(document.querySelectorAll('.modal-overlay.open:not(#modal-quitter-espace)'));
@@ -4351,6 +4365,15 @@ window.addEventListener('popstate', function (event) {
   try { showPage(id); } finally { _hcNavigationRetour = false; }
 });
 
+// Filet de sécurité pour les navigateurs mobiles qui sautent toutes les
+// entrées du même document lors d'un geste Retour rapide. Le navigateur
+// affiche alors sa confirmation native avant toute sortie réelle.
+window.addEventListener('beforeunload', function (event) {
+  if (!_hcDernierePage || window._hcSortieConfirmee) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
 function showPage(id) {
   if (!document.getElementById('page-' + id)) return;
   const roleNavigation = id.split('-')[0];
@@ -4367,7 +4390,12 @@ function showPage(id) {
     _hcNavigationRole = roleNavigation;
   }
   if (!_hcNavigationRetour) {
-    if (_hcNavigationRole !== roleNavigation) {
+    // Auto-réparation : si un autre code a effacé history.state, recréer
+    // immédiatement la sentinelle AVANT la page courante.
+    if (!history.state || (!history.state.hcPage && !history.state.hcSortieProtegee && !history.state.hcSortieEspace)) {
+      history.replaceState({ hcSortieEspace: true }, '', location.href);
+      history.pushState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
+    } else if (_hcNavigationRole !== roleNavigation) {
       _hcNavigationRole = roleNavigation;
       history.replaceState({ hcPage: id, hcSortieProtegee: true }, '', location.href);
     } else if (!history.state || history.state.hcPage !== id) {
@@ -8141,6 +8169,7 @@ const CONV_MISSION_ACTIONS = {
 };
 
 function allerVersEdl(reference, phase) {
+  window._hcSortieConfirmee = true;
   window.location.href = 'edl.html?mission=' + encodeURIComponent(reference) + '&phase=' + phase;
 }
 

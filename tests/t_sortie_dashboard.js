@@ -19,8 +19,15 @@ const L=require('./lib');const {urlFichier}=require('./env');
     document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';
     showPage(role+'-dashboard');
    },role);
-   L.check(role+' : actualiser ne multiplie pas les étapes de sortie',await page.evaluate(()=>history.length)===longueur);
-   await page.evaluate(role=>showPage(role==='admin'?'admin-parametres':role+'-profil'),role);
+	   L.check(role+' : actualiser ne multiplie pas les étapes de sortie',await page.evaluate(()=>history.length)===longueur);
+	   await page.evaluate(role=>{
+	    history.replaceState(null,'',location.href);
+	    showPage(role+'-dashboard');
+	   },role);
+	   await page.goBack();
+	   L.check(role+' : un état effacé est réparé avant de pouvoir quitter',await page.locator('#modal-quitter-espace').evaluate(e=>e.classList.contains('open')));
+	   await page.getByRole('button',{name:'Rester sur mon espace'}).click();
+	   await page.evaluate(role=>showPage(role==='admin'?'admin-parametres':role+'-profil'),role);
    await page.goBack();
    L.check(role+' : retour interne sans confirmation',await page.locator('#modal-quitter-espace').evaluate(e=>!e.classList.contains('open')));
    await page.evaluate(()=>openModal('fiche-demande'));
