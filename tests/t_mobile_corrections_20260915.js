@@ -30,6 +30,7 @@ function check(libelle, condition, detail) {
     const bouton = note.querySelector('.btn');
     const tag = document.querySelector('.renfort-tag');
     const ligne = document.querySelector('.hero2-panel .hero2-route-line');
+    const dot1 = document.querySelector('.hero2-panel .hero2-route-point:first-child .hero2-route-dot');
     const dot2 = document.querySelector('.hero2-panel .hero2-route-point:nth-child(3) .hero2-route-dot');
     const dot3 = document.querySelector('.hero2-panel .hero2-route-point:nth-child(5) .hero2-route-dot');
     const evt = new Event('touchstart', { bubbles: true, cancelable: true });
@@ -44,6 +45,10 @@ function check(libelle, condition, detail) {
       decoration: getComputedStyle(tag).textDecorationLine,
       bordBas: getComputedStyle(tag).borderBottomWidth,
       ligneLargeur: ligne.getBoundingClientRect().width,
+      ligneEffet: getComputedStyle(ligne, '::after').filter,
+      dot1Fond: getComputedStyle(dot1).backgroundColor,
+      dot1Bord: getComputedStyle(dot1).borderTopColor,
+      dot1Halo: getComputedStyle(dot1).boxShadow,
       animationDot2: getComputedStyle(dot2).animationName,
       animationDot3: getComputedStyle(dot3).animationName,
       datePrevented: evt.defaultPrevented,
@@ -63,6 +68,16 @@ function check(libelle, condition, detail) {
   check('M5 : les deuxième et troisième étapes s’allument successivement',
     /hc-mobile-route-dot-2/.test(renduMobile.animationDot2) &&
     /hc-mobile-route-dot-3/.test(renduMobile.animationDot3), JSON.stringify(renduMobile));
+  check('M5b : le premier jalon reprend le rendu lumineux Paris-Lyon',
+    renduMobile.dot1Fond === 'rgb(245, 242, 234)' &&
+    renduMobile.dot1Bord === 'rgb(181, 68, 75)' && renduMobile.dot1Halo !== 'none', JSON.stringify(renduMobile));
+  check('M5c : les traits utilisent aussi la surbrillance lumineuse',
+    renduMobile.ligneEffet !== 'none', JSON.stringify(renduMobile));
+  check('M5d : traits et jalons partagent exactement les seuils de synchronisation',
+    /hc-mobile-route-line-1[\s\S]*30%,94%/.test(source) &&
+    /hc-mobile-route-dot-2[\s\S]*30%,94%/.test(source) &&
+    /hc-mobile-route-line-2[\s\S]*60%,94%/.test(source) &&
+    /hc-mobile-route-dot-3[\s\S]*60%,94%/.test(source));
   check('M6 : le calendrier HelixCar remplace le calendrier natif au toucher',
     renduMobile.datePrevented && renduMobile.calendrierOuvert, JSON.stringify(renduMobile));
   check('M7 : aucun débordement horizontal mobile', !renduMobile.debordement, JSON.stringify(renduMobile));

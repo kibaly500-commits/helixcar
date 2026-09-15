@@ -22902,7 +22902,7 @@ document.addEventListener('animationstart', function (e) {
 // version est RÉELLEMENT chargée dans le navigateur (console : tapez
 // HC_VERSION), et d'écarter un cache navigateur ou un déploiement
 // incomplet lors d'une vérification.
-window.HC_VERSION = 'V77.4 — ergonomie mobile et restitution complète';
+window.HC_VERSION = 'V77.5 — progression mobile synchronisée';
 console.log('HelixCar ' + window.HC_VERSION);
 </script>
 <script id="hc-v50-45-lock-behavior">
@@ -23201,22 +23201,34 @@ console.log('HelixCar ' + window.HC_VERSION);
 }
 
 @keyframes hc-mobile-route-dot-2 {
-  0%,30%,100% { background:var(--silver); opacity:.5; box-shadow:none; }
-  35%,94% { background:var(--accent); opacity:1; box-shadow:0 0 0 5px rgba(181,68,75,.12); }
+  0%,29.9%,100% {
+    background:#202a33; border-color:rgba(245,242,234,.52);
+    opacity:.5; box-shadow:0 0 0 4px rgba(245,242,234,.04);
+  }
+  30%,94% {
+    background:var(--paper); border-color:var(--accent); opacity:1;
+    box-shadow:0 0 0 5px rgba(229,72,77,.16),0 0 12px rgba(229,72,77,.55);
+  }
 }
 @keyframes hc-mobile-route-dot-3 {
-  0%,63%,100% { background:var(--silver); opacity:.5; box-shadow:none; }
-  68%,94% { background:var(--accent); opacity:1; box-shadow:0 0 0 5px rgba(181,68,75,.12); }
+  0%,59.9%,100% {
+    background:#202a33; border-color:rgba(245,242,234,.52);
+    opacity:.5; box-shadow:0 0 0 4px rgba(245,242,234,.04);
+  }
+  60%,94% {
+    background:var(--paper); border-color:var(--accent); opacity:1;
+    box-shadow:0 0 0 5px rgba(229,72,77,.16),0 0 12px rgba(229,72,77,.55);
+  }
 }
 @keyframes hc-mobile-route-line-1 {
-  0%,8% { transform:scaleX(0); }
-  30%,94% { transform:scaleX(1); }
-  100% { transform:scaleX(0); }
+  0%,6% { transform:scaleX(0); opacity:.65; }
+  30%,94% { transform:scaleX(1); opacity:1; }
+  96%,100% { transform:scaleX(0); opacity:0; }
 }
 @keyframes hc-mobile-route-line-2 {
-  0%,41% { transform:scaleX(0); }
-  63%,94% { transform:scaleX(1); }
-  100% { transform:scaleX(0); }
+  0%,30% { transform:scaleX(0); opacity:.65; }
+  60%,94% { transform:scaleX(1); opacity:1; }
+  96%,100% { transform:scaleX(0); opacity:0; }
 }
 
 @media (max-width: 900px) {
@@ -23224,9 +23236,11 @@ console.log('HelixCar ' + window.HC_VERSION);
     min-width:34px;
     margin-left:6px;
     margin-right:6px;
+    overflow:visible;
   }
   .hero2-panel .hero2-route-line::after {
-    background:var(--accent);
+    background:linear-gradient(90deg,var(--accent) 0%,var(--accent) 68%,rgba(255,255,255,.98) 86%,var(--accent) 100%);
+    filter:drop-shadow(0 0 5px rgba(229,72,77,.7));
     transform:scaleX(0);
     transform-origin:left center;
     animation:hc-mobile-route-line-1 8.5s linear infinite;
@@ -23239,6 +23253,17 @@ console.log('HelixCar ' + window.HC_VERSION);
   }
   .hero2-panel .hero2-route-point:nth-child(5) .hero2-route-dot {
     animation:hc-mobile-route-dot-3 8.5s linear infinite;
+  }
+  .hero2-panel .hero2-route-dot {
+    box-sizing:border-box;
+    width:13px;
+    height:13px;
+    border:2px solid var(--accent);
+  }
+  .hero2-panel .hero2-route-point:first-child .hero2-route-dot {
+    background:var(--paper);
+    opacity:1;
+    box-shadow:0 0 0 5px rgba(229,72,77,.16),0 0 12px rgba(229,72,77,.55);
   }
 }
 
@@ -23280,8 +23305,10 @@ console.log('HelixCar ' + window.HC_VERSION);
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) {
   .hero2-panel .hero2-route-dot.is-muted {
     animation:none;
-    background:var(--accent);
+    background:var(--paper);
+    border-color:var(--accent);
     opacity:1;
+    box-shadow:0 0 0 5px rgba(229,72,77,.16),0 0 12px rgba(229,72,77,.55);
   }
   .hero2-panel .hero2-route-line::after {
     animation:none;
