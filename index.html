@@ -7992,9 +7992,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <div id="completer-rubriques"></div>
     </form>
 
-    <button type="button" id="completer-envoyer" class="btn btn-primary"
+    <p id="completer-guide" role="status" aria-live="polite" style="font-size:.85rem;line-height:1.5;margin:16px 0;color:#4B5563"></p>
+    <style>#completer-envoyer:disabled{background:#e5e7eb!important;color:#606772!important;border-color:#e5e7eb!important;cursor:not-allowed;opacity:1}</style>
+    <button type="button" id="completer-envoyer" class="btn btn-primary" disabled aria-describedby="completer-guide"
             style="width:100%;justify-content:center;font-size:.92rem"
-            onclick="envoyerInformationsCompletees()">Envoyer mes informations</button>
+            onclick="envoyerInformationsCompletees()">Valider les informations</button>
     <button type="button" id="completer-retour" class="btn"
             style="width:100%;justify-content:center;font-size:.92rem;margin-top:10px"
             onclick="_hcFermerCompletion()">← Retour à mes informations</button>
@@ -9632,12 +9634,41 @@ function _completerSection(l) {
   return 'Votre véhicule';
 }
 function _completerBrouillonCle() { return 'hc-completion-brouillon:' + _completerDemandeId; }
+var _completerToutesLignes = [];
+function _completerChampPret(l) {
+  var el = document.getElementById(_completerChampId(l.cle));
+  if (!el || !el.value.trim() || !el.checkValidity()) return false;
+  if (/(_tel|telephone)$/.test(l.cle)) {
+    var v=el.value.trim(), n=v.replace(/[^0-9]/g,'').length;
+    return n>=7 && n<=15 && /^\+?[0-9 ()./-]+$/.test(v);
+  }
+  return true;
+}
 function _completerEtatBouton() {
   var bouton = document.getElementById('completer-envoyer');
-  if (bouton) bouton.disabled = _completerEnvoiEnCours || !_completerRubriques.length || _completerRubriques.some(function(l) {
-    var el = document.getElementById(_completerChampId(l.cle));
-    return !el || !el.value.trim() || !el.checkValidity();
+  var manquantes = _completerRubriques.filter(function(l){return !_completerChampPret(l);});
+  if (bouton) bouton.disabled = _completerEnvoiEnCours || !_completerRubriques.length || manquantes.length>0;
+  var groupes = _completerGrouper(_completerToutesLignes), incomplets=[], vehicules=0, complets=0;
+  groupes.forEach(function(g){
+    var restantes=g.lignes.filter(function(l){return _completerEstRestante(l) && !_completerChampPret(l);});
+    if(g.rang){vehicules++;if(!restantes.length)complets++;}
+    if(restantes.length)incomplets.push(g.titre);
+    var badge=document.querySelector('#completer-rubriques [data-groupe="'+g.cle+'"] .completer-etat');
+    if(badge && g.lignes.some(_completerEstRestante)){
+      badge.textContent=restantes.length ? restantes.length+' à compléter' : 'Complet — prêt à envoyer';
+      badge.className='completer-etat'+(restantes.length?'':' completer-etat--complet');
+    }
   });
+  var prog=document.getElementById('completer-progression');
+  if(prog && _completerRubriques.length){
+    var total=_completerToutesLignes.length, remplis=total-manquantes.length;
+    var titre=prog.querySelector('strong'), detail=prog.querySelector('span'), barre=prog.querySelector('progress');
+    if(titre)titre.textContent=vehicules ? complets+' / '+vehicules+' véhicules complets' : remplis+' / '+total+' informations renseignées';
+    if(detail)detail.textContent=manquantes.length ? manquantes.length+' information(s) à compléter ou à vérifier' : 'Toutes les informations sont renseignées.';
+    if(barre)barre.value=remplis;
+  }
+  var guide=document.getElementById('completer-guide');
+  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Tous les blocs sont complets. Cliquez sur « Valider les informations » pour transmettre l’ensemble à notre équipe.';
 }
 function _completerConserverSaisies() {
   var brouillon = {};
@@ -9649,6 +9680,7 @@ function _completerConserverSaisies() {
   _completerEtatBouton();
 }
 function _completerRendre(lignes) {
+  _completerToutesLignes = lignes;
   var zone = document.getElementById('completer-rubriques');
   var prog = document.getElementById('completer-progression');
   if (!zone) return;
@@ -9676,10 +9708,11 @@ function _completerRendre(lignes) {
       + (lignes.some(function(l){return l.statut === 'transmise';}) ? 'Informations transmises — en attente de validation par notre équipe.' : 'Votre dossier est complet. Toutes les informations ont été reçues et traitées.') + '</p>';
     var b = document.getElementById('completer-envoyer');
     if (b) b.style.display = 'none';
+    _completerEtatBouton();
     return;
   }
   var bouton = document.getElementById('completer-envoyer');
-  if (bouton) { bouton.style.display = ''; bouton.textContent = 'Soumettre mes informations'; }
+  if (bouton) { bouton.style.display = ''; bouton.textContent = 'Valider les informations'; }
   var brouillon = {};
   try { brouillon = JSON.parse(sessionStorage.getItem(_completerBrouillonCle()) || '{}') || {}; } catch(e) {}
 
@@ -9773,6 +9806,8 @@ async function ouvrirCompleterInformations(demandeId) {
   var generation = ++_completerGeneration;
   _completerDemandeId = demandeId;
   _completerRubriques = [];
+  _completerToutesLignes = [];
+  _completerEtatBouton();
   _completerVehicules = [];
   var envoyer = document.getElementById('completer-envoyer');
   if (envoyer) envoyer.style.display = 'none';
@@ -9843,7 +9878,7 @@ async function envoyerInformationsCompletees() {
     if(champ){var carte=champ.closest('details.completion-card');if(carte)carte.open=true;champ.setAttribute('aria-invalid','true');champ.focus();}
     _completerAfficherMessage('Indiquez un numéro de téléphone complet, avec indicatif pour un numéro international.');return;
   }
-  if (!window.confirm('Soumettre toutes les informations de cette demande à notre équipe pour validation ?')) return;
+  if (!window.confirm('Transmettre toutes les informations de cette demande à notre équipe pour vérification ?')) return;
   _completerEnvoiEnCours = true;
   var bouton = document.getElementById('completer-envoyer');
   var libelleBouton = bouton ? bouton.textContent : '';
@@ -9887,7 +9922,7 @@ async function envoyerInformationsCompletees() {
     _completerAfficherMessage('L\'enregistrement n\'a pas abouti. Vos saisies sont conservées : réessayez.');
   } finally {
     _completerEnvoiEnCours = false;
-    if (bouton) { bouton.textContent = libelleBouton || 'Soumettre mes informations'; }
+    if (bouton) { bouton.textContent = libelleBouton || 'Valider les informations'; }
     if (generation === _completerGeneration) Object.keys(reponses).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.disabled = false; });
     _completerEtatBouton();
   }

@@ -43,12 +43,17 @@ window.supabase={createClient(){return {
    check(n+' véhicules : première fiche ouverte et un seul envoi',await page.locator('.completion-card[open]').count()===1 && await page.locator('[data-enregistrer-groupe]').count()===0 && await page.locator('#completer-envoyer').isVisible());
    check(n+' véhicules : seules les immatriculations manquantes sont éditables',await page.locator('#completer-rubriques input').count()===n);
    await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA plaque1');
+   check(n+' véhicules : libellé de validation clair',(await page.locator('#completer-envoyer').textContent())==='Valider les informations');
+   check(n+' véhicules : progression actualisée',(await page.locator('#completer-progression strong').textContent())==='1 / '+n+' véhicules complets');
+   check(n+' véhicules : premier bloc prêt',(await page.locator('[data-groupe="vehicule_1"] .completer-etat').textContent())==='Complet — prêt à envoyer');
    if(n>1){
     check(n+' véhicules : envoi partiel désactivé',await page.locator('#completer-envoyer').isDisabled());
+    check(n+' véhicules : autres blocs signalés',(await page.locator('#completer-guide').textContent()).includes('Véhicule 2'));
     await page.evaluate(()=>envoyerInformationsCompletees());
     check(n+' véhicules : appel direct partiel refusé',await page.evaluate(()=>__appels.length===0));
     for(let i=2;i<=n;i++){await page.locator('summary[data-groupe="vehicule_'+i+'"]').click();await page.locator('#completer-champ-vehicule_'+i+'_immatriculation').fill('TEST-QA plaque'+i);}
    }
+   check(n+' véhicules : validation active seulement après complétion',await page.locator('#completer-envoyer').isEnabled() && (await page.locator('#completer-guide').textContent()).includes('Tous les blocs sont complets'));
    confirmer=false;await page.locator('#completer-envoyer').click();
    check(n+' véhicules : confirmation annulée sans envoi',await page.evaluate(()=>__appels.length===0));
    confirmer=true;
