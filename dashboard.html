@@ -1025,6 +1025,19 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-info-orange{background:#fff1e3!important;color:#974600!important}
 .hc-info-bleu{background:#eaf2ff!important;color:#245a99!important}
 .hc-info-vert{background:#eaf5ed!important;color:#276640!important}
+.hc-info-violet{background:#f0eafa!important;color:#673da6!important}
+.hc-btn-devis{background:#7044b5;color:#fff;border:1px solid #7044b5}
+.hc-btn-devis:hover{background:#59358f;color:#fff}
+.hc-demande-montant{font-size:1.1rem;font-weight:700;margin:0 0 12px}
+.hc-demande-complement{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0 0}
+[data-groupe-demandes="devis"] .hc-demande-card{border-left:3px solid #7044b5}
+[data-groupe-demandes="informations"] .hc-demande-card{border-left:3px solid #d17a29}
+[data-groupe-demandes="verification"] .hc-demande-card{border-left:3px solid #397bc4}
+[data-groupe-demandes="preparation"] .hc-demande-card{border-left:3px solid #378452}
+[data-groupe-demandes="devis"] h3{color:#673da6}
+[data-groupe-demandes="informations"] h3{color:#974600}
+[data-groupe-demandes="verification"] h3{color:#245a99}
+[data-groupe-demandes="preparation"] h3{color:#276640}
 .hc-info-etat{display:inline-block;border-radius:5px;padding:5px 9px;font-size:.82rem;font-weight:600}
 .hc-demandes-conseil{margin:0 0 20px;padding:12px 15px;border-left:3px solid var(--red);background:#fff;font-size:.85rem;line-height:1.5;color:#444}
 @media(max-width:600px){.hc-demande-card{padding:16px}.hc-demande-summary .detail-val{min-width:0;overflow-wrap:anywhere}}
@@ -2959,21 +2972,21 @@ var LIB_STATUT_DEMANDE_CLIENT = {
 
 // Présentation seulement : informations et paiement conservent leurs états serveur.
 function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
-  const etat = (texte, couleur, message, action) => ({texte, couleur, message, action:action || null, groupe:action ? 'action' : 'suivi'});
+  const etat = (texte, couleur, message, action, groupe) => ({texte, couleur, message, action:action || null, groupe:groupe || 'cloture'});
   if (['annule','annulee'].includes(d.statut)) return etat('Demande annulée','neutre','Cette demande est clôturée.');
   if (['termine','terminee'].includes(d.statut)) return etat('Prestation terminée','vert','Retrouvez vos documents dans le détail de la demande.');
-  if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange','Complétez votre dossier pour préparer la prestation.','completer');
   const paye = dv && dv.paiement_statut === 'paye';
   if (!erreurDevis && !paye && dv && ['envoye','accepte'].includes(dv.statut)) {
-    return etat(dv.statut === 'accepte' ? 'Devis à régler' : 'Devis à consulter','orange',
-      !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis');
+    return etat(dv.statut === 'accepte' ? 'Devis à régler' : 'Devis à consulter','violet',
+      !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis','devis');
   }
-  if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.');
-  if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.');
-  if (paye) return etat(d.statut === 'en_cours' ? 'Prestation en cours' : 'Prestation en préparation','bleu',
-    d.statut === 'en_cours' ? 'Retrouvez le suivi dans « Mes missions ».' : 'Votre dossier est complet et votre devis est payé. Notre équipe organise votre prestation.');
+  if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
+  if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
+  if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.',null,'verification');
+  if (paye) return etat(d.statut === 'en_cours' ? 'Prestation en cours' : 'Prestation en préparation','vert',
+    d.statut === 'en_cours' ? 'Retrouvez le suivi dans « Mes missions ».' : 'Votre dossier est complet et votre devis est payé. Notre équipe organise votre prestation.',null,d.statut === 'en_cours' ? 'en-cours' : 'preparation');
   if (dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Retrouvez votre devis dans les détails de la demande.');
-  return etat('Devis en préparation','bleu','Nous avons les informations nécessaires pour préparer votre devis.');
+  return etat('Devis en préparation','neutre','Nous avons les informations nécessaires pour préparer votre devis.',null,'devis-preparation');
 }
 var _demandesClientGeneration = 0;
 async function loadDemandesClient() {
@@ -3002,8 +3015,14 @@ async function loadDemandesClient() {
   }));
   if(generation!==_demandesClientGeneration)return;
   const groupes=[
-    {cle:'action',titre:'À faire de votre côté',description:'Ces demandes attendent une action de votre part.'},
-    {cle:'suivi',titre:'Suivi de vos demandes',description:'Retrouvez l’avancement de vos demandes et les prochaines étapes.'}
+    {cle:'devis',titre:'Devis à consulter ou à régler',description:'Retrouvez les devis qui attendent votre réponse ou votre règlement.'},
+    {cle:'informations',titre:'Informations à compléter',description:'Complétez les informations nécessaires à votre prestation.'},
+    {cle:'verification',titre:'Informations en vérification',description:'Vous avez transmis vos informations. Notre équipe vérifie votre dossier.'},
+    {cle:'preparation',titre:'Prestations en préparation',description:'Votre devis est payé et votre dossier est complet. Nous organisons votre prestation.'},
+    {cle:'devis-preparation',titre:'Devis en préparation',description:'Notre équipe prépare votre devis.'},
+    {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes missions ».'},
+    {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
+    {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'}
   ];
   zone.innerHTML=groupes.map(function(g){
     const selection=resultats.filter(r=>r.presentation.groupe===g.cle);
@@ -3016,9 +3035,11 @@ async function loadDemandesClient() {
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
-      if(p.action==='devis')bouton='<a class="btn btn-sm btn-primary" href="'+lienDevis+'">Consulter mon devis →</a>';
+      if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">'+(dv.statut==='accepte'?'Consulter et régler mon devis':'Consulter mon devis')+' →</a>';
+      const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
+      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><span class="hc-info-etat hc-info-orange">Informations également à compléter</span> <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
-        +'<div class="hc-completion-note" data-completion-note><span class="hc-info-etat hc-info-'+p.couleur+'">'+escapeHtml(p.texte)+'</span></div><p class="hc-demande-message">'+escapeHtml(p.message)+'</p>'+bouton
+        +'<div class="hc-completion-note" data-completion-note><span class="hc-info-etat hc-info-'+p.couleur+'">'+escapeHtml(p.texte)+'</span>'+(paiement==='paye'?'<span class="hc-info-etat hc-info-vert" data-devis-paye>Devis payé</span>':'')+'</div><p class="hc-demande-message">'+escapeHtml(p.message)+'</p>'+montant+bouton+complement
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Devis payé':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
         +'<div class="hc-demande-documents"><button class="btn btn-sm btn-outline hc-demande-apercu-btn" '+actionHtml('ouvrirApercuDemandeClient',[d.id])+'>Récapitulatif de la demande</button>'

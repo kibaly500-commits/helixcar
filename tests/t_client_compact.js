@@ -45,18 +45,22 @@ const {lancerNavigateur} = require('./env');
         {id:'d2',numero_client:'HC-2026-8594',type_service:'stockage',statut:'nouveau'},
         {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau'},
         {id:'d4',numero_client:'HC-2026-4479',type_service:'stockage',statut:'nouveau'}];
-      window.chargerDevisClient = async () => [{id:'q4',client_id:'d4',statut:'accepte',paiement_statut:'en_attente'}];
+      window.chargerDevisClient = async () => [{id:'q4',client_id:'d4',statut:'accepte',paiement_statut:'en_attente',prix:120},{id:'q3',client_id:'d3',statut:'accepte',paiement_statut:'paye'},{id:'q2',client_id:'d2',statut:'accepte',paiement_statut:'paye'}];
       window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
       await loadDemandesClient();
     });
-    assert.equal(await p.locator('[data-groupe-demandes="action"] .hc-demande-card').count(),2);
-    assert.equal(await p.locator('[data-groupe-demandes="suivi"] .hc-demande-card').count(),2);
+    for(const groupe of ['devis','informations','verification','preparation']) assert.equal(await p.locator('[data-groupe-demandes="'+groupe+'"] .hc-demande-card').count(),1);
+    assert.equal(await p.locator('#client-demandes-liste .hc-demande-card').count(),4);
+    assert(await p.locator('[data-demande="d2"] [data-devis-paye]').isVisible());
+    assert.match(await p.locator('[data-demande="d2"] .hc-demande-message').first().textContent(),/Votre paiement est reçu/);
     assert.match(await p.locator('[data-demande="d1"] [data-completion-note]').textContent(),/Informations en vérification/);
     assert.match(await p.locator('[data-demande="d2"] [data-completion-note]').textContent(),/Informations à compléter/);
-    assert.match(await p.locator('[data-demande="d3"] .hc-info-vert').textContent(),/Demande validée/);
-    assert.match(await p.locator('[data-demande="d3"] [data-completion-note]').textContent(),/Devis en préparation/);
+    assert.match(await p.locator('[data-demande="d3"] .hc-demande-meta').textContent(),/Demande validée/);
+    assert.match(await p.locator('[data-demande="d3"] [data-completion-note]').textContent(),/Prestation en préparation/);
     assert.match(await p.locator('[data-demande="d4"] [data-completion-note]').textContent(),/Devis à régler/);
     assert.equal(await p.locator('[data-demande="d4"] > a').getAttribute('href'),'devis.html?id=q4');
+    assert.match(await p.locator('[data-demande="d4"] > a').textContent(),/Consulter et régler/);
+    assert.match(await p.locator('[data-demande="d4"] .hc-demande-montant').textContent(),/120,00/);
     assert.equal(await p.getByText('Reçue',{exact:true}).count(),0);
     for (const width of [390,1440]) {
       await p.setViewportSize({width,height:950});
@@ -69,6 +73,11 @@ const {lancerNavigateur} = require('./env');
       assert(await p.locator('.hc-demande-details summary').first().evaluate(el=>{const c=getComputedStyle(el,'::marker').color.match(/\d+/g).map(Number);return c[0]>c[1]+50 && c[0]>c[2]+50;}));
       await p.screenshot({path:'/tmp/hc-demandes-compactes-'+width+'.png',fullPage:true});
     }
+    await p.evaluate(async()=>{window.chargerInformationsDemande=async()=>[{cle:'vehicule_1_vin',statut:'attendue'}];await loadDemandesClient();});
+    assert.equal(await p.locator('[data-groupe-demandes="devis"] [data-demande="d4"]').count(),1);
+    assert.equal(await p.locator('#client-demandes-liste [data-demande="d4"]').count(),1);
+    assert(await p.locator('[data-demande="d4"] .hc-demande-complement button').isVisible());
+    assert.equal(await p.locator('[data-groupe-demandes="preparation"]').count(),0);
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'HC-DEMO-001',type_service:'convoyage',statut:'nouveau'}];
       window.chargerDevisClient = async () => [{id:'q1',client_id:'d1',statut:'accepte',paiement_statut:'paye'}];
