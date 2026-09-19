@@ -27,4 +27,4 @@ for(const width of [320,390,768,1280]){
  if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Débordement '+width);
  console.log('PASS '+width+'px : 70 dossiers, ouverture visible, motif obligatoire, correction, retour');
 }
-await b.close();})();
+await b.close();console.log('=== 5 PASS / 0 FAIL ===');})();
