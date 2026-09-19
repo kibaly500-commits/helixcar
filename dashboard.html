@@ -16,6 +16,23 @@ html, body { background:#f8f9fa; }
 .ai-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.ai-heading h1{font:700 29px Arial,sans-serif;letter-spacing:-.8px;margin:0 0 8px}.ai-muted{font-size:13px;color:#778087;line-height:1.6}.ai-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}.ai-stat{padding:20px;background:#fff;border:1px solid #e2e4e3;border-radius:12px;font-size:13px;color:#677079}.ai-stat strong{display:block;font-size:30px;color:#273139;margin-bottom:6px}.ai-stat.review{background:#edf4f0;border-color:#d1e2d7}.ai-toolbar{display:flex;gap:12px;margin-bottom:20px}.ai-toolbar input,.ai-toolbar select{padding:12px;border:1px solid #d7dcdd;border-radius:8px;background:#fff;font:14px Arial;min-width:0}.ai-toolbar input{flex:1}.ai-layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px}.ai-client{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:9px;text-align:left;background:#fff;border:1px solid #e0e3e3;border-radius:12px;padding:18px;margin-bottom:10px;color:#253139;cursor:pointer}.ai-client strong{font-size:14px}.ai-client small{color:#758087;font-size:12px}.ai-client.selected{border:1.5px solid #a63b40;box-shadow:0 0 0 2px #a63b400a}.ai-status{font-size:11px;padding:5px 9px;background:#fff3e7;color:#98622d;border-radius:5px;display:inline-block;white-space:nowrap}.ai-status.transmitted{background:#e8f2ec;color:#286748}.ai-detail{background:#fff;border:1px solid #e0e3e3;border-radius:14px;padding:26px}.ai-detail h2{margin:0;font:700 22px Arial}.ai-detail h3{font:700 12px Arial;text-transform:uppercase;letter-spacing:1px;margin:28px 0 4px;color:#667780}.ai-notice{font-size:12px;line-height:1.6;background:#f5f6f5;padding:13px;border-radius:8px;color:#657178;margin:18px 0}.ai-field{display:flex;gap:16px;justify-content:space-between;border-bottom:1px solid #eceeee;padding:19px 0}.ai-field>div:first-child{min-width:0;overflow-wrap:anywhere}.ai-field strong{font-size:13px}.ai-field p{font-size:14px;margin:8px 0 0;color:#515f67}.ai-field-actions{display:flex;align-items:flex-end;gap:8px;flex-direction:column;flex-shrink:0}.ai-validate,.ai-correct,.ai-heading button{font:600 12px Arial;border:1px solid #d9dfe0;padding:9px 13px;border-radius:6px;background:white;color:#39474e;cursor:pointer}.ai-validate{background:#263b31;color:#fff;border-color:#263b31}.ai-correct{font-size:11px}.ai-correction{color:#985627!important;font-size:12px!important}.ai-heading button{padding:12px 18px}.ai-live{font-size:11px;color:#7b8589;margin:16px 0}
 @media(max-width:800px){.ai-layout{grid-template-columns:1fr}.ai-stats{gap:8px}.ai-stat{padding:12px;font-size:11px}.ai-stat strong{font-size:24px}.ai-heading h1{font-size:24px}.ai-detail{padding:18px}.ai-field{flex-direction:column}.ai-field-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.ai-toolbar{flex-direction:column}.ai-client{padding:14px}}
 
+
+/* Navigation des dossiers : une fiche visible immédiatement après sélection. */
+#admin-infos-detail{scroll-margin-top:90px;min-width:0;outline:none}
+#admin-infos-liste{min-width:0;max-height:70vh;overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 2px 2px}
+.ai-open{font-size:12px;color:#934046;margin-top:4px}.ai-client{min-height:44px;overflow-wrap:anywhere}.ai-client:focus-visible{outline:3px solid #ad4449;outline-offset:2px}
+.ai-back{display:none;border:1px solid #d9dfe0;border-radius:8px;background:#f5f6f5;padding:12px;color:#29373d;margin-bottom:18px;font:600 14px Arial;cursor:pointer}
+.ai-field-actions button{min-height:44px}.ai-correction-form{padding:16px;background:#fff8ed;border:1px solid #ebd8bb;border-radius:9px;display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.ai-correction-form label{width:100%;font-size:13px;font-weight:600}.ai-correction-form textarea{box-sizing:border-box;width:100%;font:16px Arial;padding:12px;border:1px solid #a6afb4;border-radius:6px;resize:vertical}.ai-correction-form button{min-height:44px}
+@media(max-width:800px){
+#page-admin-infos:not(.ai-mobile-detail) #admin-infos-detail{display:none}
+#page-admin-infos.ai-mobile-detail #admin-infos-liste,#page-admin-infos.ai-mobile-detail .ai-stats,#page-admin-infos.ai-mobile-detail .ai-toolbar{display:none}
+#page-admin-infos.ai-mobile-detail .ai-back{display:block}
+#admin-infos-liste{max-height:none;overflow:visible}
+#admin-infos-detail{margin-bottom:100px;scroll-margin-top:76px}
+#page-admin-infos .ai-heading{align-items:flex-start}#page-admin-infos .ai-heading h1{overflow-wrap:anywhere}
+}
+
 </style>
 <!-- Mêmes familles que le site public (index.html) : Fraunces pour les
      titres, Instrument Sans pour le texte courant. -->
@@ -2476,9 +2493,9 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
 // ne le simule.
 
 // Informations manquantes : les valeurs et décisions viennent des RPC autorisées.
-var _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false;
+var _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false, _adminInfosMobileDetail = false, _adminInfosCorrection = null;
 async function chargerCentreInformationsAdmin(silencieux) {
-  if (currentRole !== 'admin' || !_sbAuthPret() || _adminInfosBusy) return;
+  if (currentRole !== 'admin' || !_sbAuthPret() || _adminInfosBusy || (silencieux && _adminInfosCorrection)) return;
   var generation = ++_adminInfosGeneration;
   var statut = document.getElementById('admin-infos-statut');
   if (!silencieux) statut.textContent = 'Chargement des dossiers…';
@@ -2509,6 +2526,7 @@ function rendreCentreInformationsAdmin(){
  _adminInfosDossiers.forEach(function(d){d.lignes.forEach(function(l){if(l.statut in compte)compte[l.statut]++;});});
  ['attendue','transmise','a_corriger'].forEach(function(s){document.getElementById('admin-infos-total-'+s).textContent=compte[s];});
  var dossiers=_adminInfosDossiers.filter(function(d){return (!recherche || [d.client.nom,d.client.prenom,d.client.numero_client,d.client.email].join(' ').toLowerCase().includes(recherche)) && (filtre==='tous'||d.erreur||d.lignes.some(function(l){return filtre==='a_traiter'?['attendue','transmise','a_corriger'].includes(l.statut):l.statut===filtre;}));});
+ var scrollListe=liste.scrollTop;
  liste.replaceChildren();
  dossiers.forEach(function(d){
   var b=document.createElement('button');b.className='ai-client'+(d.client.id===_adminInfosSelection?' selected':'');b.type='button';b.setAttribute('aria-pressed',String(d.client.id===_adminInfosSelection));
@@ -2516,12 +2534,21 @@ function rendreCentreInformationsAdmin(){
   var ref=document.createElement('small');ref.textContent=d.client.numero_client||'Demande';
   var badge=document.createElement('span'),nb=d.lignes.filter(function(l){return l.statut==='transmise';}).length,manque=d.lignes.filter(function(l){return l.statut==='attendue'||l.statut==='a_corriger';}).length;
   badge.textContent=d.erreur?'Lecture indisponible':nb?nb+' à vérifier':manque?manque+' à compléter':'Dossier complet';badge.className=nb?'ai-status transmitted':'ai-status';
-  b.append(nom,ref,badge);b.onclick=function(){_adminInfosSelection=d.client.id;rendreCentreInformationsAdmin();};liste.appendChild(b);
+  var ouvrir=document.createElement('span');ouvrir.className='ai-open';ouvrir.textContent='Ouvrir le dossier →';
+  b.setAttribute('aria-controls','admin-infos-detail');
+  b.append(nom,ref,badge,ouvrir);b.onclick=function(){
+   _adminInfosSelection=d.client.id;_adminInfosMobileDetail=true;_adminInfosCorrection=null;rendreCentreInformationsAdmin();
+   requestAnimationFrame(function(){detail.scrollIntoView({block:'start',behavior:'instant'});detail.focus({preventScroll:true});});
+  };liste.appendChild(b);
  });
+ liste.scrollTop=scrollListe;
  if(!dossiers.length)liste.textContent='Aucun dossier pour ce filtre.';
  var dossier=dossiers.find(function(d){return d.client.id===_adminInfosSelection;});
  if(!dossier && dossiers.length){_adminInfosSelection=dossiers[0].client.id;rendreCentreInformationsAdmin();return;}
- detail.replaceChildren();if(!dossier){detail.textContent='Sélectionnez un dossier client.';return;}
+ document.getElementById('page-admin-infos').classList.toggle('ai-mobile-detail',_adminInfosMobileDetail && !!dossier);
+ detail.tabIndex=-1;detail.replaceChildren();if(!dossier){detail.textContent='Sélectionnez un dossier client.';return;}
+ var retour=document.createElement('button');retour.type='button';retour.className='ai-back';retour.textContent='← Retour aux dossiers';
+ retour.onclick=function(){_adminInfosMobileDetail=false;_adminInfosCorrection=null;rendreCentreInformationsAdmin();requestAnimationFrame(function(){var choisi=liste.querySelector('.selected');if(choisi){choisi.scrollIntoView({block:'center',behavior:'instant'});choisi.focus({preventScroll:true});}});};detail.appendChild(retour);
  var titre=document.createElement('h2');titre.textContent=[dossier.client.prenom,dossier.client.nom].filter(Boolean).join(' ')||'Dossier client';
  var ref=document.createElement('p');ref.className='ai-muted';ref.textContent=(dossier.client.numero_client||'Demande')+' · Informations nécessaires à la mission';detail.append(titre,ref);
  if(dossier.erreur){var erreur=document.createElement('p');erreur.textContent='Les informations de ce dossier ne sont pas disponibles. Réessayez avant toute décision.';detail.appendChild(erreur);return;}
@@ -2537,19 +2564,33 @@ function rendreCentreInformationsAdmin(){
    if(l.commentaire){var motif=document.createElement('p');motif.className='ai-correction';motif.textContent='Correction demandée : '+l.commentaire;text.appendChild(motif);}
    var actions=document.createElement('div');actions.className='ai-field-actions';var badge=document.createElement('span');badge.className='ai-status '+(l.statut==='transmise'?'transmitted':'');badge.textContent=LIB_STATUT_INFO[l.statut]||l.statut;actions.appendChild(badge);
    if(l.statut==='transmise'){
-    [['validee','Valider'],['a_corriger','Demander une correction']].forEach(function(a){var b=document.createElement('button');b.type='button';b.textContent=a[1];b.className=a[0]==='validee'?'ai-validate':'ai-correct';b.disabled=_adminInfosBusy;b.onclick=function(){deciderCentreInformation(dossier.client.id,l.cle,a[0]);};actions.appendChild(b);});
+    [['validee','Valider'],['a_corriger','Demander une correction']].forEach(function(a){var b=document.createElement('button');b.type='button';b.textContent=a[1];b.className=a[0]==='validee'?'ai-validate':'ai-correct';b.disabled=_adminInfosBusy;b.onclick=function(){
+     if(a[0]==='a_corriger'){_adminInfosCorrection={id:dossier.client.id,cle:l.cle,motif:''};++_adminInfosGeneration;rendreCentreInformationsAdmin();document.getElementById('ai-correction-motif').focus();}
+     else deciderCentreInformation(dossier.client.id,l.cle,a[0]);
+    };actions.appendChild(b);});
    }
    row.append(text,actions);detail.appendChild(row);
+   if(_adminInfosCorrection && _adminInfosCorrection.id===dossier.client.id && _adminInfosCorrection.cle===l.cle){
+    var form=document.createElement('form');form.className='ai-correction-form';
+    var labelMotif=document.createElement('label');labelMotif.htmlFor='ai-correction-motif';labelMotif.textContent='Motif de correction (visible par le client)';
+    var saisie=document.createElement('textarea');saisie.id='ai-correction-motif';saisie.required=true;saisie.maxLength=1000;saisie.rows=3;saisie.value=_adminInfosCorrection.motif;saisie.disabled=_adminInfosBusy;
+    saisie.oninput=function(){_adminInfosCorrection.motif=saisie.value;saisie.setCustomValidity('');};
+    var envoyer=document.createElement('button');envoyer.type='submit';envoyer.className='ai-validate';envoyer.textContent='Enregistrer la correction';envoyer.disabled=_adminInfosBusy;
+    var annuler=document.createElement('button');annuler.type='button';annuler.className='ai-correct';annuler.textContent='Annuler';annuler.disabled=_adminInfosBusy;annuler.onclick=function(){_adminInfosCorrection=null;rendreCentreInformationsAdmin();};
+    form.onsubmit=function(ev){ev.preventDefault();if(!saisie.value.trim()){saisie.setCustomValidity('Indiquez le motif de la correction.');saisie.reportValidity();return;}deciderCentreInformation(dossier.client.id,l.cle,'a_corriger',saisie.value.trim());};
+    form.append(labelMotif,saisie,envoyer,annuler);detail.appendChild(form);
+   }
   });
  });
 }
-async function deciderCentreInformation(id,cle,decision){
+async function deciderCentreInformation(id,cle,decision,motif){
  if(_adminInfosBusy)return;_adminInfosBusy=true;++_adminInfosGeneration;rendreCentreInformationsAdmin();
  try{
-  var fait=await deciderInformation(id,cle,decision);if(!fait)return;
+  var fait=await deciderInformation(id,cle,decision,motif);if(!fait)return;
   var lignes=await chargerInfosDemandeAdmin(id);
   if(!lignes.some(function(l){return l.cle===cle&&l.statut===decision;}))throw new Error('La décision n’a pas été confirmée par le serveur.');
   var dossier=_adminInfosDossiers.find(function(d){return d.client.id===id;});if(dossier)dossier.lignes=lignes;
+  _adminInfosCorrection=null;
   document.getElementById('admin-infos-statut').textContent=decision==='validee'?'Information validée.':'Correction enregistrée : le motif est visible par le client.';
  }catch(e){document.getElementById('admin-infos-statut').textContent='Décision non confirmée : '+e.message;}
  finally{_adminInfosBusy=false;rendreCentreInformationsAdmin();}
@@ -2565,13 +2606,13 @@ async function chargerInfosDemandeAdmin(demandeId) {
   return data || [];
 }
 
-async function deciderInformation(demandeId, cle, decision) {
+async function deciderInformation(demandeId, cle, decision, motifFourni) {
   if (!_sbAuthPret()) throw new Error('Session administrateur requise.');
   const valeurs = { statut: decision };
   if (decision === 'a_corriger') {
     // Motif court OBLIGATOIRE : sans lui, le client ne saurait pas quoi
     // corriger. On n'écrit rien tant qu'il n'est pas saisi.
-    const motif = (prompt('Motif de la correction (obligatoire, visible par le client) :') || '').trim();
+    const motif = (typeof motifFourni === 'string' ? motifFourni : (prompt('Motif de la correction (obligatoire, visible par le client) :') || '')).trim();
     if (!motif) { alert('Aucun motif saisi : rien n\'a été enregistré.'); return false; }
     valeurs.commentaire = motif;
   } else {
@@ -4584,7 +4625,7 @@ function showPage(id, options) {
   if (id === 'convoyeur-opportunites') { loadOpportunitesPartenaire(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
-  if (id === 'admin-infos') { chargerCentreInformationsAdmin(); }
+  if (id === 'admin-infos') { _adminInfosMobileDetail=false;_adminInfosCorrection=null;rendreCentreInformationsAdmin();chargerCentreInformationsAdmin(); }
   if (id === 'admin-acquisition') { loadAcquisition(); }
   // V50.5D.3F — mobile uniquement : ouvre chaque nouvelle section en
   // haut de page plutôt qu'à l'ancienne position de scroll laissée par
