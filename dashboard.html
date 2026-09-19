@@ -1061,9 +1061,22 @@ body.scroll-verrouille { overflow: hidden; }
  .hc-demande-card>.hc-demande-montant{grid-column:1 / -1;margin:8px 0 0}
  .hc-demande-card>.hc-demande-complement,.hc-demande-card>.hc-demande-details{grid-column:1 / -1}
  .hc-demande-details{margin-top:4px}
- [data-groupe-demandes="verification"] .hc-demandes-grille,[data-groupe-demandes="preparation"] .hc-demandes-grille{grid-template-columns:repeat(2,minmax(0,1fr))}
- [data-groupe-demandes="verification"] .hc-demande-card,[data-groupe-demandes="preparation"] .hc-demande-card{display:block}
- [data-groupe-demandes="verification"] .hc-completion-note,[data-groupe-demandes="preparation"] .hc-completion-note{margin-top:10px}
+}
+.hc-demandes-accordeon>summary{cursor:pointer;list-style:none;min-height:44px;padding:4px 0}
+.hc-demandes-accordeon>summary::-webkit-details-marker{display:none}
+.hc-demandes-accordeon>summary h3::after{content:'⌄';margin-left:auto;color:#626973;transition:transform .15s}
+.hc-demandes-accordeon[open]>summary h3::after{transform:rotate(180deg)}
+.hc-demandes-accordeon>summary:focus-visible{outline:2px solid var(--hc-groupe);outline-offset:4px;border-radius:4px}
+.hc-demandes-vide{padding:16px 18px;border:1px solid #e8eaed;border-left:3px solid #d17a29;border-radius:10px;color:#626973;font-size:.85rem;margin:0}
+@media(min-width:1101px){
+ .hc-demandes-grille[data-plusieurs="true"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .hc-demande-card:not(:has(>.btn)){grid-template-columns:minmax(0,1fr) auto}
+ .hc-demande-card>.hc-completion-note{justify-self:end;justify-content:flex-end;text-align:right}
+ .hc-demandes-grille[data-plusieurs="true"] .hc-demande-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;min-width:0}
+ .hc-demandes-grille[data-plusieurs="true"] .hc-demande-summary{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;overflow-wrap:anywhere}
+ .hc-demandes-grille[data-plusieurs="true"] .hc-demande-summary .detail-val{border:0;padding:0;flex-basis:auto}
+ .hc-demandes-grille[data-plusieurs="true"] .hc-completion-note{align-self:start;max-width:100%;overflow-wrap:anywhere}
+ .hc-demandes-grille[data-plusieurs="true"] .hc-demande-card>.btn{grid-column:1 / -1;grid-row:auto;margin-top:12px}
 }
 .hc-info-etat{display:inline-block;border-radius:5px;padding:5px 9px;font-size:.82rem;font-weight:600}
 .hc-demandes-conseil{margin:0 0 20px;padding:12px 15px;border-left:3px solid var(--red);background:#fff;font-size:.85rem;line-height:1.5;color:#444}
@@ -3031,7 +3044,6 @@ async function loadDemandesClient() {
   }
   if(generation!==_demandesClientGeneration) return;
   if(window._currentClient) window._currentClient.demandes=demandes;
-  if(!demandes.length){zone.textContent='Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».';return;}
   const devisParDemande={};
   devis.forEach(function(dv){if(dv.client_id && !devisParDemande[dv.client_id])devisParDemande[dv.client_id]=dv;});
   const resultats=await Promise.all(demandes.map(async function(d){
@@ -3051,10 +3063,15 @@ async function loadDemandesClient() {
     {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
     {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'}
   ];
-  zone.innerHTML=groupes.map(function(g){
-    const selection=resultats.filter(r=>r.presentation.groupe===g.cle);
-    if(!selection.length)return '';
-    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'"><h3>'+g.titre+' <span class="hc-demandes-compteur">'+selection.length+'</span></h3><p class="hc-demandes-description">'+g.description+'</p><div class="hc-demandes-grille">'+selection.map(function(r){
+  zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
+    const selection=resultats.filter(r=>r.presentation.groupe===g.cle).sort(function(a,b){
+      return (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0) || String(a.d.id).localeCompare(String(b.d.id));
+    });
+    if(!selection.length && g.cle!=='informations')return '';
+    const accordeon=selection.length>=4 && ['devis','informations','verification','preparation'].includes(g.cle);
+    const titre='<h3>'+g.titre+' <span class="hc-demandes-compteur">'+selection.length+'</span></h3>';
+    const vide=!selection.length?'<p class="hc-demandes-vide">'+(devisIndisponibles || resultats.some(r=>r.erreurInfos)?'Impossible de confirmer les informations restantes pour le moment.': 'Aucune information à compléter.')+'</p>':'';
+    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p>'+vide+'<div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
       const {d,dv,lignes,erreurInfos,presentation:p}=r;
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
@@ -3073,7 +3090,7 @@ async function loadDemandesClient() {
         +(devisAccessible?'<a class="btn btn-sm btn-outline" href="'+lienDevis+'">Consulter mon devis</a>':'')
         +(paiement==='paye' && /\+qa-final01@/i.test((window._currentClient||{}).email||'')?'<button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[dv.id,false])+'>Document de paiement TEST</button>':'')
         +'</div></details></article>';
-    }).join('')+'</div></section>';
+    }).join('')+'</div>'+(accordeon?'</details>':'')+'</section>';
   }).join('');
 }
 
