@@ -4072,7 +4072,7 @@ function _infoLibelleEtat(l) {
 function _estRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
 function _couleurInformationsClient(lignes) {
   if (lignes.some(_estRestante)) return 'orange';
-  if (lignes.length && lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'vert';
+  if (lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'vert';
   return 'bleu';
 }
 function _etatInformationsClient(lignes) {
@@ -4081,6 +4081,7 @@ function _etatInformationsClient(lignes) {
   if (lignes.some(_estRestante)) return 'À compléter';
   if (lignes.some(l => l.statut === 'transmise')) return 'Demande en attente de validation';
   if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Demande validée';
+  if (lignes.every(l => l.statut === 'fournie')) return 'Informations renseignées';
   return 'Demande en attente de validation';
 }
 

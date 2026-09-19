@@ -9697,7 +9697,7 @@ function _completerRendre(lignes) {
       var titre = document.createElement('strong');
       titre.textContent = g.titre + (g.identite ? ' · ' + g.identite : '');
       var etat = document.createElement('span');
-      etat.className = 'completer-etat' + (restantes.length ? '' : g.lignes.some(function(l){return l.statut==='transmise';}) || !g.lignes.some(function(l){return l.statut==='validee';}) ? ' completer-etat--attente' : ' completer-etat--complet');
+      etat.className = 'completer-etat' + (restantes.length ? '' : g.lignes.some(function(l){return l.statut==='transmise';}) ? ' completer-etat--attente' : ' completer-etat--complet');
       etat.textContent = restantes.length ? restantes.length + ' à compléter' : (g.lignes.some(function(l){return l.statut === 'transmise';}) ? 'En vérification' : 'Complet');
       entete.appendChild(titre); entete.appendChild(etat);
       carte.appendChild(entete); carte.appendChild(contenu);
