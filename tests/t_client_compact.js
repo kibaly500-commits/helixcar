@@ -37,12 +37,34 @@ const {lancerNavigateur} = require('./env');
     assert(await p.getByText('Consulter mon devis', {exact:true}).isVisible());
     assert(await p.getByText('Document de paiement TEST', {exact:true}).isVisible());
     await details.locator('summary').click();
+    await p.evaluate(async () => {
+      window.chargerDemandesClient = async () => [
+        {id:'d1',numero_client:'HC-2026-6320',type_service:'professionnel',statut:'nouveau'},
+        {id:'d2',numero_client:'HC-2026-8594',type_service:'stockage',statut:'nouveau'},
+        {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau'}];
+      window.chargerDevisClient = async () => [];
+      window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
+      await loadDemandesClient();
+    });
+    assert.equal(await p.locator('.hc-demandes-conseil').count(),1);
+    assert.match(await p.locator('[data-demande="d1"] .hc-info-bleu').textContent(),/attente de validation/);
+    assert.match(await p.locator('[data-demande="d2"] .hc-info-orange').textContent(),/À compléter/);
+    assert.match(await p.locator('[data-demande="d3"] .hc-info-vert').textContent(),/Demande validée/);
+    assert.equal(await p.getByText('Reçue',{exact:true}).count(),0);
     for (const width of [390,1440]) {
       await p.setViewportSize({width,height:950});
       assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      assert(await p.locator('.hc-demande-card').evaluateAll(cards=>cards.every((card,i)=>{
+        const s=getComputedStyle(card),r=card.getBoundingClientRect();
+        return s.backgroundColor==='rgb(255, 255, 255)' && parseFloat(s.borderTopWidth)>=1 && (!i || r.top-cards[i-1].getBoundingClientRect().bottom>=19);
+      })));
+      assert(await p.locator('.hc-demande-details summary').first().evaluate(el=>{const c=getComputedStyle(el,'::marker').color.match(/\d+/g).map(Number);return c[0]>c[1]+50 && c[0]>c[2]+50;}));
       await p.screenshot({path:'/tmp/hc-demandes-compactes-'+width+'.png',fullPage:true});
     }
     await p.evaluate(async () => {
+      window.chargerDemandesClient = async () => [{id:'d1',numero_client:'HC-DEMO-001',type_service:'convoyage',statut:'nouveau'}];
+      window.chargerDevisClient = async () => [{id:'q1',client_id:'d1',statut:'accepte',paiement_statut:'paye'}];
+      window.chargerInformationsDemande = async () => [{cle:'vehicule_1_vin',libelle:'VIN',statut:'attendue'}];
       window.__vehicules = [{position:1,marque_modele:'Peugeot 308',immatriculation:'AB-123-CD',ville_depart:'Paris',ville_arrivee:'Lyon'}];
       await loadInfosClient();
     });
@@ -100,6 +122,6 @@ const {lancerNavigateur} = require('./env');
     vm.runInContext(index.slice(index.indexOf('function _completerSection'),index.indexOf('function _completerRendre')),ctx);
     assert.equal(ctx._completerSection({cle:'vehicule_1_contact_liv_nom'}),'Livraison');
     assert.equal(ctx._completerSection({cle:'vehicule_1_restit_immatriculation'}),'Restitution');
-    console.log('=== 27 PASS / 0 FAIL ===');
+    console.log('PASS cartes séparées, trois couleurs, flèches rouges, message unique, documents repliés, mobile et ordinateur');
   } finally {await b.close();}
 })().catch(e => {console.error(e);process.exitCode=1;});

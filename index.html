@@ -3960,6 +3960,7 @@
 #modal-completer details[open]>.completer-groupe::after{content:'Réduire −'}
 #modal-completer .completer-etat{text-transform:none;letter-spacing:0;background:#fff1e7;color:#97551f;font-size:11px;padding:4px 9px}
 #modal-completer .completer-etat--complet{background:#edf5ef;color:#28774e}
+#modal-completer .completer-etat--attente{background:#eaf2ff;color:#245a99}
 #modal-completer .completion-fields{padding:0 18px 18px}
 #modal-completer .completion-known{font-size:12px;color:#6f787d;padding:10px 0;border-bottom:1px solid #eee}
 #modal-completer .completion-known summary{cursor:pointer}
@@ -9696,7 +9697,7 @@ function _completerRendre(lignes) {
       var titre = document.createElement('strong');
       titre.textContent = g.titre + (g.identite ? ' · ' + g.identite : '');
       var etat = document.createElement('span');
-      etat.className = 'completer-etat' + (restantes.length ? '' : ' completer-etat--complet');
+      etat.className = 'completer-etat' + (restantes.length ? '' : g.lignes.some(function(l){return l.statut==='transmise';}) || !g.lignes.some(function(l){return l.statut==='validee';}) ? ' completer-etat--attente' : ' completer-etat--complet');
       etat.textContent = restantes.length ? restantes.length + ' à compléter' : (g.lignes.some(function(l){return l.statut === 'transmise';}) ? 'En vérification' : 'Complet');
       entete.appendChild(titre); entete.appendChild(etat);
       carte.appendChild(entete); carte.appendChild(contenu);

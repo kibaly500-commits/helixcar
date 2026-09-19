@@ -999,13 +999,23 @@ body.scroll-verrouille { overflow: hidden; }
 </style>
 <style id="hc-demandes-compactes">
 #page-client-nouvelle-demande.active{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
-.hc-demandes-groupe{margin:12px 0 24px;padding:16px;border:1px solid var(--gray-light);border-radius:10px;background:#fff}
-.hc-demandes-groupe h3{font-size:1rem;margin:0 0 12px}.hc-demandes-groupe[data-paiement="paye"]{border-left:3px solid #438061}
-.hc-demande-card{padding:16px 0;border-bottom:1px solid var(--gray-light)}
+.hc-demandes-groupe{margin:12px 0 28px;background:#fff}
+.hc-demandes-groupe h3{font-size:1rem;margin:0 0 14px}
+.hc-demande-card{padding:20px;margin:0 0 20px;border:1px solid #d4d8dc;border-radius:10px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.035)}
+.hc-demande-card .detail-label{flex-basis:100%;font-weight:700;color:#333}
 .hc-demande-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .hc-demande-details{margin-top:12px}.hc-demande-details>summary{cursor:pointer;font-weight:600;padding:10px 0;min-height:44px}
+.hc-demande-details>summary::marker{color:var(--red)}
+.hc-demande-details>summary::-webkit-details-marker{color:var(--red)}
+.hc-demande-summary [data-etat-devis]{background:#f0f1f3;color:#454b53}
 .hc-demande-documents{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
-.hc-completion-note{margin-top:12px;padding:12px;border:1px solid var(--gray-light);border-radius:8px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.hc-completion-note{margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.hc-info-orange{background:#fff1e3!important;color:#974600!important}
+.hc-info-bleu{background:#eaf2ff!important;color:#245a99!important}
+.hc-info-vert{background:#eaf5ed!important;color:#276640!important}
+.hc-info-etat{display:inline-block;border-radius:5px;padding:5px 9px;font-size:.82rem;font-weight:600}
+.hc-demandes-conseil{margin:0 0 20px;padding:12px 15px;border-left:3px solid var(--red);background:#fff;font-size:.85rem;line-height:1.5;color:#444}
+@media(max-width:600px){.hc-demande-card{padding:16px}.hc-demande-summary .detail-val{min-width:0;overflow-wrap:anywhere}}
 .hc-info-vehicle{margin-top:12px;border-top:1px solid var(--gray-light);padding:12px 0}.hc-info-vehicle>summary{cursor:pointer;min-height:44px;overflow-wrap:anywhere}
 </style>
 </head>
@@ -2966,7 +2976,7 @@ async function loadDemandesClient() {
     return '<div class="hc-demande-card" data-demande="' + escapeHtml(d.id) + '"><div class="hc-demande-summary">'
       + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
       + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
-      + ' · <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—') + '</span>'
+      + (['annule','annulee','termine','terminee'].includes(d.statut) ? ' <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut]) + '</span>' : '')
       + (etat ? ' <span class="badge ' + etat.cls + '" data-etat-devis>' + escapeHtml(etat.texte) + '</span>' : '')
       + '</span></div><details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-documents">'
       + ' <button class="btn btn-sm btn-outline hc-demande-apercu-btn" '
@@ -2998,8 +3008,7 @@ async function loadDemandesClient() {
     try {
       const lignes = await chargerInformationsDemande(d.id);
       const restantes = lignes.filter(_estRestante);
-      note.innerHTML = '<span><strong>' + escapeHtml(_etatInformationsClient(lignes)) + '</strong>'
-        + (restantes.length ? ' · ' + restantes.length + ' information' + (restantes.length > 1 ? 's' : '') + ' à compléter' : '')
+      note.innerHTML = '<span class="hc-info-etat hc-info-' + _couleurInformationsClient(lignes) + '">' + escapeHtml(_etatInformationsClient(lignes))
         + '</span>' + (restantes.length ? '<button class="btn btn-sm btn-primary" '
         + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>' : '');
     } catch(e) {
@@ -3007,6 +3016,11 @@ async function loadDemandesClient() {
         + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Vérifier mes informations</button>';
     }
   }));
+  if (zone.querySelector('.hc-completion-note .hc-info-orange')) {
+    const conseil = document.createElement('p'); conseil.className = 'hc-demandes-conseil';
+    conseil.textContent = 'Complétez vos informations dès que possible pour nous permettre de préparer votre prestation et de la lancer après validation du dossier et paiement.';
+    zone.prepend(conseil);
+  }
 }
 
 // ── LOT D01 — MES MISSIONS, MON PROFIL, MES ÉVALUATIONS ──────
@@ -4056,13 +4070,18 @@ function _infoLibelleEtat(l) {
   return base;
 }
 function _estRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+function _couleurInformationsClient(lignes) {
+  if (lignes.some(_estRestante)) return 'orange';
+  if (lignes.length && lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'vert';
+  return 'bleu';
+}
 function _etatInformationsClient(lignes) {
   if (!lignes.length) return 'Aucune information complémentaire demandée';
   if (lignes.some(l => l.statut === 'a_corriger')) return 'À corriger';
   if (lignes.some(_estRestante)) return 'À compléter';
-  if (lignes.some(l => l.statut === 'transmise')) return 'Informations transmises — en attente de validation';
-  if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Dossier validé';
-  return 'Informations complètes';
+  if (lignes.some(l => l.statut === 'transmise')) return 'Demande en attente de validation';
+  if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Demande validée';
+  return 'Demande en attente de validation';
 }
 
 async function loadInfosClient() {
@@ -4124,7 +4143,7 @@ async function loadInfosClient() {
     let corps = '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
       + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '') + ' sur ' + lignes.length + '</strong> déjà '
       + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
-    corps += '<p class="hc-info-etat">' + escapeHtml(_etatInformationsClient(lignes)) + '</p>';
+    corps += '<p class="hc-info-etat hc-info-' + _couleurInformationsClient(lignes) + '">' + escapeHtml(_etatInformationsClient(lignes)) + '</p>';
     if (!complet) corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
     groupes.forEach(function (g) {
       const v = (r.vehicules || []).find(function(v) { return Number(v.position) === g.rang; });
@@ -4134,7 +4153,7 @@ async function loadInfosClient() {
       const gComplet = gRestantes.length === 0;
       corps += '<details class="hc-info-vehicle" data-groupe="' + escapeHtml(g.cle) + '"><summary>'
         + escapeHtml(g.titre) + (g.identite ? ' · ' + escapeHtml(g.identite) : '')
-        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? escapeHtml(_etatInformationsClient(g.lignes)) : gRestantes.length + ' à compléter') + '</span></summary>'
+        + ' <span class="badge hc-info-' + _couleurInformationsClient(g.lignes) + '">' + (gComplet ? (g.lignes.some(l=>l.statut==='transmise') ? 'En attente de validation' : g.lignes.some(l=>l.statut==='validee') ? 'Informations validées' : 'Informations renseignées') : gRestantes.length + ' à compléter') + '</span></summary>'
         + '<span class="detail-val">'
         + (gRestantes.length
             ? gRestantes.map(function (l) {
