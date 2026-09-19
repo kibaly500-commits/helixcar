@@ -317,6 +317,16 @@ input::-ms-reveal, input::-ms-clear { display: none; }
 
 .card-title { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 1rem; }
 .card-sub { font-size: 0.8rem; color: var(--gray); margin-top: 2px; }
+.filtre-client-devis {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin: -4px 0 18px; padding: 12px 14px; border: 1px solid #d9e6f4;
+  border-radius: 9px; background: #f5f9fd;
+}
+.filtre-client-devis[hidden] { display: none; }
+.filtre-client-devis-label {
+  display: block; margin-bottom: 2px; color: var(--gray); font-size: .72rem;
+  font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+}
 
 /* ── TABLE ── */
 .table-wrap { overflow-x: auto; }
@@ -706,6 +716,9 @@ body.scroll-verrouille { overflow: hidden; }
   #page-admin-archivage .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
   .card-header { flex-direction: column; gap: 10px; align-items: stretch; }
   .card-header input, .card-header select { width: 100%; min-width: 0 !important; }
+  .filtre-client-devis { align-items: stretch; flex-direction: column; }
+  .filtre-client-devis strong { overflow-wrap: anywhere; }
+  .filtre-client-devis .btn { width: 100%; white-space: normal; }
   .stat-grid, [style*="grid-template-columns:repeat(3"] { grid-template-columns: 1fr 1fr !important; }
   [style*="grid-template-columns:repeat(4"] { grid-template-columns: 1fr 1fr !important; }
 
@@ -1283,6 +1296,13 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header">
             <div><div class="card-title">Demandes de devis</div><div class="card-sub">Demandes de convoyage reçues depuis le formulaire client</div></div>
             <input type="text" id="recherche-devis" placeholder="Rechercher (nom, email, ville…)" oninput="filtrerDemandesDevis(this.value)" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:.85rem;min-width:240px">
+          </div>
+          <div id="filtre-client-devis" class="filtre-client-devis" hidden>
+            <div>
+              <span class="filtre-client-devis-label">Demandes du client</span>
+              <strong id="filtre-client-devis-identite"></strong>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" onclick="afficherToutesDemandesAdmin()">Afficher toutes les demandes</button>
           </div>
           <div style="overflow-x:auto">
             <table class="table" id="table-demandes-devis">
@@ -4374,7 +4394,14 @@ window.addEventListener('beforeunload', function (event) {
   event.returnValue = '';
 });
 
-function showPage(id) {
+function showPage(id, options) {
+  options = options || {};
+  // Une ouverture normale depuis le menu ou l'alerte affiche la liste
+  // complète. Seul le bouton « Voir ses demandes » conserve le compte
+  // explicitement choisi par l'administrateur.
+  if (id === 'admin-devis' && !options.conserverFiltreClient) {
+    _filtreDemandesCompteAdmin = null;
+  }
   if (!document.getElementById('page-' + id)) return;
   const roleNavigation = id.split('-')[0];
   _hcDernierePage = id;
@@ -7567,7 +7594,9 @@ function afficherClientsAdmin(rows) {
       + '<td>' + escapeHtml(c.telephone || '—') + '</td>'
       + '<td>' + parCompte[cle].demandes + '</td>'
       + '<td>' + (_dvDate ? _dvDate(c.created_at) : '—') + '</td>'
-      + '<td><button class="btn btn-sm btn-outline" onclick="showPage(\'admin-devis\')">Voir ses demandes →</button></td>'
+      + '<td><button class="btn btn-sm btn-outline" '
+        + actionHtml('voirDemandesClientAdmin', [c.auth_user_id || '', c.email || '', nom])
+        + '>Voir ses demandes →</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -9102,6 +9131,61 @@ function debloquerConvoyeur(id) {
 var _demandesDevisListe = [];
 var _devisParClient = {};
 var _envoiDevisEnCours = false;
+var _filtreDemandesCompteAdmin = null;
+
+function _normaliserEmailCompte(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+function _demandesDuCompteAdmin(liste) {
+  var source = liste || [];
+  var filtre = _filtreDemandesCompteAdmin;
+  if (!filtre) return source;
+  if (filtre.authUserId) {
+    return source.filter(function (c) {
+      return String(c.auth_user_id || '') === filtre.authUserId;
+    });
+  }
+  // Repli uniquement pour d'anciens dossiers dépourvus d'auth_user_id.
+  // L'égalité stricte sur l'adresse complète évite tout rapprochement
+  // approximatif entre deux comptes.
+  return source.filter(function (c) {
+    return _normaliserEmailCompte(c.email) === filtre.email;
+  });
+}
+
+function _mettreAJourFiltreDemandesCompte() {
+  var bloc = document.getElementById('filtre-client-devis');
+  var identite = document.getElementById('filtre-client-devis-identite');
+  if (!bloc || !identite) return;
+  if (!_filtreDemandesCompteAdmin) {
+    bloc.hidden = true;
+    identite.textContent = '';
+    return;
+  }
+  identite.textContent = _filtreDemandesCompteAdmin.libelle ||
+    _filtreDemandesCompteAdmin.email || 'Compte sélectionné';
+  bloc.hidden = false;
+}
+
+function voirDemandesClientAdmin(authUserId, email, libelle) {
+  _filtreDemandesCompteAdmin = {
+    authUserId: String(authUserId || ''),
+    email: _normaliserEmailCompte(email),
+    libelle: String(libelle || '')
+  };
+  var champ = document.getElementById('recherche-devis');
+  if (champ) champ.value = '';
+  showPage('admin-devis', { conserverFiltreClient: true });
+}
+
+function afficherToutesDemandesAdmin() {
+  _filtreDemandesCompteAdmin = null;
+  var champ = document.getElementById('recherche-devis');
+  if (champ) champ.value = '';
+  _mettreAJourFiltreDemandesCompte();
+  _rendreTableDemandesDevis(_demandesDevisListe);
+}
 
 function _dv(v) { return (v === null || v === undefined || v === '') ? '—' : String(v); }
 
@@ -9742,7 +9826,8 @@ function loadDemandesDevis() {
     // Une "demande de devis" = un client qui a renseigné un convoyage
     _demandesDevisListe = clients.filter(_estDemandeDeDevis);
 
-    _rendreTableDemandesDevis(_demandesDevisListe);
+    _mettreAJourFiltreDemandesCompte();
+    _rendreTableDemandesDevis(_demandesDuCompteAdmin(_demandesDevisListe));
 
     // CREATION AUTOMATIQUE des missions de nettoyage pretes. Silencieuse
     // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
@@ -9750,7 +9835,7 @@ function loadDemandesDevis() {
     try {
       _tenterMissionsNettoyageAuto().then(function (creees) {
         if (creees) {
-          _rendreTableDemandesDevis(_demandesDevisListe);
+          _rendreTableDemandesDevis(_demandesDuCompteAdmin(_demandesDevisListe));
           if (typeof loadMissions === 'function') loadMissions();
         }
       }).catch(function () {});
@@ -9847,8 +9932,9 @@ function _rendreTableDemandesDevis(liste) {
 
 function filtrerDemandesDevis(texte) {
   var q = (texte || '').toLowerCase().trim();
-  if (!q) { _rendreTableDemandesDevis(_demandesDevisListe); return; }
-  var filtre = _demandesDevisListe.filter(function(c) {
+  var demandesDuCompte = _demandesDuCompteAdmin(_demandesDevisListe);
+  if (!q) { _rendreTableDemandesDevis(demandesDuCompte); return; }
+  var filtre = demandesDuCompte.filter(function(c) {
     var blob = [c.numero_client, c.prenom, c.nom, c.societe, c.email, c.telephone, c.ville_depart, c.ville_arrivee, c.marque_modele]
       .map(function(x) { return (x || '').toString().toLowerCase(); }).join(' ');
     return blob.indexOf(q) !== -1;
@@ -13846,7 +13932,7 @@ function _rafraichirEtatLecture() {
   if (filtre) {
     filtrerDemandesDevis(champ.value);       // conserve le filtre en cours
   } else {
-    _rendreTableDemandesDevis(_demandesDevisListe);
+    _rendreTableDemandesDevis(_demandesDuCompteAdmin(_demandesDevisListe));
   }
   _appliquerCompteurDemandes(_compterNonLues());
 }
@@ -13987,7 +14073,7 @@ function declencherChampFichier(id) {
   'refuserConvoyeur', 'renvoyerLienCreationPartenaire', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',
   'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',
-  'voirPhotosMission'
+  'voirDemandesClientAdmin', 'voirPhotosMission'
 ].forEach(function (nom) {
   var fn = window[nom];
   if (typeof fn === 'function') HC_ACTIONS[nom] = fn;

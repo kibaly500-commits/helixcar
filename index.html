@@ -11565,15 +11565,37 @@ function _scrollVersVehicule(i) {
 
 function _hcRetourListeVehicules() {
   // Après le repli des rubriques, replacer la liste dans le conteneur
-  // réellement défilant (modale publique ou formulaire intégré).
-  requestAnimationFrame(function () {
-    var liste = document.getElementById('bloc-vehicules-multiples');
-    if (!liste || !liste.getClientRects().length) return;
-    var barre = liste.querySelector('.veh-barre');
-    if (barre) barre.focus({ preventScroll: true });
-    liste.style.scrollMarginTop = '16px';
-    liste.scrollIntoView({ block: 'start', behavior: 'instant' });
-  });
+  // réellement défilant (overlay public ou document intégré).
+  // scrollIntoView() laissait le navigateur choisir cette surface :
+  // sur le formulaire public long, Chrome pouvait déplacer le document
+  // verrouillé plutôt que #modal-client. La liste restait alors hors
+  // écran malgré une validation réussie.
+  var liste = document.getElementById('bloc-vehicules-multiples');
+  if (!liste || !liste.getClientRects().length) return;
+  try {
+    if (document.body.classList.contains('hc-integre')) {
+      // Dans l'iframe intégré, le document est l'unique surface de
+      // défilement. Attendre le prochain rendu laisse au parent le temps
+      // d'ajuster la hauteur du cadre avant le déplacement natif.
+      requestAnimationFrame(function () {
+        liste.style.scrollMarginTop = '16px';
+        liste.scrollIntoView({ block: 'start', behavior: 'instant' });
+      });
+      return;
+    }
+    // La position via offsetTop est indépendante de l'ancien scroll.
+    // C'est important juste après le repli d'une grande fiche : le
+    // navigateur peut avoir recalé scrollTop avant d'avoir repeint les
+    // nouvelles coordonnées de getBoundingClientRect().
+    var position = 0, noeud = liste;
+    while (noeud) {
+      position += noeud.offsetTop || 0;
+      noeud = noeud.offsetParent;
+    }
+    var overlay = document.getElementById('modal-client');
+    if (!overlay) return;
+    overlay.scrollTop = Math.max(0, position - 16);
+  } catch (e) {}
 }
 
 // ── ACCORDÉONS ────────────────────────────────────────────
