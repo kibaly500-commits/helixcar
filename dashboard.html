@@ -3124,16 +3124,24 @@ function _oppCarteHtml(o, options) {
     + '<div class="detail-row"><span class="detail-label">Métiers requis</span><span class="detail-val">' + (badges || '—') + '</span></div>'
     + '<div class="detail-row"><span class="detail-label">Cadre</span><span class="detail-val">' + tags + '</span></div>'
     + '<div style="font-size:.85rem;color:#333;margin-top:10px;white-space:pre-line">' + escapeHtml(o.description_publique || '') + '</div>';
+  if(o.acceptation_directe){
+    html+='<div class="detail-row"><span class="detail-label">Rémunération</span><span class="detail-val">'+escapeHtml(Number(o.remuneration_prevue).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</span></div>';
+    html+='<div class="detail-row"><span class="detail-label">Prise en charge</span><span class="detail-val">'+escapeHtml(o.depart_prevu?new Date(o.depart_prevu).toLocaleString('fr-FR'):'À préciser')+'</span></div>';
+    html+='<div class="detail-row"><span class="detail-label">Livraison</span><span class="detail-val">'+escapeHtml(o.livraison_prevue?new Date(o.livraison_prevue).toLocaleString('fr-FR'):'À préciser')+'</span></div>';
+    html+='<p style="font-size:.85rem">'+(o.transport_plateau?'Transport sur plateau':'Convoyage par la route')+(o.restitution_prevue?' · Restitution prévue':'')+'</p><p class="fid-note">Les adresses exactes et contacts seront disponibles après attribution. Mission de TEST : aucun déplacement réel.</p>';
+  }
   if (options.partenaire) {
     html += '<div id="opp-msg-' + escapeHtml(o.id) + '" class="hc-note" role="status"></div>';
-    if (o.ma_candidature_etat) {
+    if(o.acceptation_directe && o.statut==='a_pourvoir'){
+      html+='<button class="btn btn-primary" style="margin-top:12px" id="opp-accepter-'+escapeHtml(o.id)+'" '+actionHtml('accepterOpportuniteTest',[o.id])+'>Accepter la mission</button>';
+    } else if (o.ma_candidature_etat) {
       html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
         + 'Votre candidature : ' + escapeHtml(_libEtatCandidature(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
         + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
         + '</div>';
     } else if (o.statut === 'a_pourvoir') {
       html += '<button class="btn btn-primary" style="margin-top:12px" id="opp-postuler-' + escapeHtml(o.id) + '" '
-        + actionHtml('postulerOpportunite', [o.id]) + '>Postuler</button>';
+        + actionHtml('accepterOpportuniteTest', 'postulerOpportunite', [o.id]) + '>Postuler</button>';
     }
   }
   return html + '</div>';
@@ -3422,6 +3430,21 @@ async function deciderCandidature(candidatureId, etat) {
 }
 
 // ── Partenaire ──
+var acceptationsOpportunitesEnCours = new Set();
+async function accepterOpportuniteTest(id) {
+ if(acceptationsOpportunitesEnCours.has(id))return;
+ if(!confirm('Accepter cette mission de test et sa rémunération ?'))return;
+ acceptationsOpportunitesEnCours.add(id);
+ const bouton=document.getElementById('opp-accepter-'+id);if(bouton)bouton.disabled=true;
+ try {
+   const session=(await sbAuth.auth.getSession()).data.session;
+   const r=await fetch(SUPABASE_URL+'/functions/v1/mission-accepter-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({opportunite_id:id})});
+   const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.message||'Attribution indisponible');
+   alert(d.message);await loadOpportunitesPartenaire();
+   if(typeof loadHistoriqueConvoyeur==='function')loadHistoriqueConvoyeur();
+ } catch(e){_hcNote('opp-msg-'+id,e.message||'Impossible de confirmer. Rechargez les missions.','erreur');}
+ finally {acceptationsOpportunitesEnCours.delete(id);if(bouton)bouton.disabled=false;}
+}
 async function chargerOpportunitesPartenaire() {
   if (!_sbAuthPret()) return [];
   const { data, error } = await sbAuth.from('v_opportunites_partenaire').select('*').order('publiee_le', { ascending: false });
@@ -7812,6 +7835,39 @@ function chargerMissionsAccueil() {
   });
 }
 
+async function notifierMissionTest(id){
+ if(!window._missionsTest?.has(id))return;
+ try{
+  const session=(await sbAuth.auth.getSession()).data.session;
+  const r=await fetch(SUPABASE_URL+'/functions/v1/mission-accepter-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({action:'notifications',mission_id:id})});
+  const d=await r.json();if(!r.ok||!d.ok)throw Error();
+ }catch{alert('La décision est enregistrée. Les notifications restent à envoyer ; utilisez « Relancer les notifications ».');}
+}
+async function voirEtatsDesLieuxTest(id){
+ const dialog=document.createElement('dialog');dialog.style.cssText='width:min(960px,94vw);max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:24px';
+ const close=document.createElement('button');close.className='btn btn-outline';close.textContent='Fermer';close.onclick=()=>dialog.close();
+ const content=document.createElement('div');content.textContent='Chargement des états des lieux…';dialog.append(close,content);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+ try{
+  const {data,error}=await sbAuth.from('etats_des_lieux').select('*').eq('mission_id',id).order('created_at');if(error)throw error;
+  content.replaceChildren();
+  if(!data.length){content.textContent='Aucun état des lieux enregistré pour cette mission.';return;}
+  const paths=[...new Set(data.flatMap(r=>[r.signature_url,...Object.values(r.photos||{})]).filter(x=>typeof x==='string'&&x.startsWith('edl-test/')).map(x=>x.slice(9)))];
+  const urls={};if(paths.length){const signed=await sbAuth.storage.from('edl-test').createSignedUrls(paths,300);if(signed.error)throw signed.error;for(const x of signed.data||[])if(x.signedUrl)urls['edl-test/'+x.path]=x.signedUrl;}
+  for(const report of data){
+    const section=document.createElement('section');section.style.cssText='border-top:1px solid #ddd;margin-top:18px;padding-top:18px';
+    const title=document.createElement('h2');title.textContent=({depart:'Départ',arrivee:'Arrivée',restitution_depart:'Restitution — départ',restitution_arrivee:'Restitution — arrivée'}[report.phase]||report.phase)+' · '+new Date(report.created_at).toLocaleString('fr-FR');
+    const details=document.createElement('p');details.style.whiteSpace='pre-line';details.textContent='Kilométrage : '+report.km+' km\nCarburant / charge : '+report.carburant+'\nÉtat : '+report.etat_general+'\nDommages : '+(report.dommages||'Aucun signalé')+'\nObservations : '+(report.observations||'Aucune');
+    section.append(title,details);const gallery=document.createElement('div');gallery.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px';
+    for(const [label,path] of Object.entries({...report.photos,signature:report.signature_url})){
+      const url=urls[path]||urlSure(path);if(!url)continue;
+      const figure=document.createElement('figure');figure.style.margin='0';const img=document.createElement('img');img.src=url;img.alt=label;img.loading='lazy';img.style.cssText='width:100%;height:150px;object-fit:contain;background:#f5f5f5;border-radius:8px';
+      const caption=document.createElement('figcaption');caption.textContent=label;figure.append(img,caption);gallery.append(figure);
+    }
+    section.append(gallery);content.append(section);
+  }
+ }catch{content.textContent='Impossible de charger les rapports. Fermez puis réessayez.';}
+}
+
 async function ouvrirDocumentPaiementTest(id, preparer) {
   try {
     const session = (await sbAuth.auth.getSession()).data.session;
@@ -7847,6 +7903,7 @@ function loadMissions() {
     sbFetchToutePage('clients?select=id,prenom,nom')
   ]).then(function(results) {
     const missions = results[0] || [];
+    window._missionsTest=new Set(missions.filter(m=>m.devis_source_id).map(m=>m.id));
     const convoyeurs = {};
     (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
     const clients = {};
@@ -7892,9 +7949,14 @@ function loadMissions() {
       } else {
         actions = '—';
       }
+      if(m.devis_source_id && !['brouillon','fini','terminee','annulee'].includes(m.statut)) actions='<span class="badge badge-pending">En attente du rapport convoyeur</span>';
       if(m.statut==='brouillon') {
         actions='<button class="btn btn-sm btn-outline" '+actionHtml('ouvrirFicheDemande',[m.client_id])+'>Contrôler le dossier</button> <button class="btn btn-sm btn-outline" '+actionHtml('reglerTarifBrouillon',[m.id])+'>Tarif convoyeur'+(m.remuneration_prevue==null?' à définir':' : '+escapeHtml(String(m.remuneration_prevue))+' €')+'</button>';
         if(m.devis_source_id) actions+=' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[m.devis_source_id,true])+'>Document de paiement TEST</button>';
+      }
+      if(m.devis_source_id){
+        actions='<button class="btn btn-sm btn-outline" '+actionHtml('voirEtatsDesLieuxTest',[m.id])+'>États des lieux</button> '+actions;
+        if(m.convoyeur_id)actions+=' <button class="btn btn-sm btn-outline" '+actionHtml('notifierMissionTest',[m.id])+'>Relancer les notifications</button>';
       }
       // LOT O01 — chaque mission non annulée peut être proposée aux
       // partenaires : le bouton ouvre (ou crée) le brouillon d'opportunité.
@@ -7956,7 +8018,7 @@ function terminerMission(id) {
     method: 'PATCH',
     headers: { 'Prefer': 'return=minimal' },
     body: JSON.stringify({ statut: 'terminee' })
-  }).then(function() { loadMissions(); })
+  }).then(async function() { await notifierMissionTest(id); loadMissions(); })
     .catch(function(e) { alert('❌ Erreur lors de la mise à jour (voir la console).'); });
 }
 
@@ -7966,7 +8028,7 @@ function confirmerMissionTerminee(id) {
     method: 'PATCH',
     headers: { 'Prefer': 'return=minimal' },
     body: JSON.stringify({ statut: 'terminee' })
-  }).then(function() { loadMissions(); })
+  }).then(async function() { await notifierMissionTest(id); loadMissions(); })
     .catch(function(e) { alert('❌ Erreur lors de la confirmation (voir la console).'); });
 }
 
@@ -7976,7 +8038,7 @@ function validerMissionPourPaiement(id) {
     method: 'PATCH',
     headers: { 'Prefer': 'return=minimal' },
     body: JSON.stringify({ validee_paiement: true, date_validation_paiement: new Date().toISOString() })
-  }).then(function() { loadMissions(); })
+  }).then(async function() { await notifierMissionTest(id); loadMissions(); })
     .catch(function(e) { alert('❌ Erreur lors de la validation (voir la console).'); });
 }
 
@@ -14089,7 +14151,7 @@ function declencherChampFichier(id) {
 }
 
 [
-  'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
+  'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
   'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',

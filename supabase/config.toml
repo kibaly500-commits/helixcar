@@ -66,3 +66,6 @@ verify_jwt = false
 
 [functions.document-paiement-test]
 verify_jwt = false
+
+[functions.mission-accepter-test]
+verify_jwt = false
