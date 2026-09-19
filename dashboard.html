@@ -13,6 +13,9 @@ html, body { background:#f8f9fa; }
 .sidebar .hc-logo-officiel img{filter:brightness(0) invert(1)}
 .sidebar-logo.hc-logo-officiel{justify-content:center}
 .login-logo.hc-logo-officiel img{width:220px}
+.ai-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.ai-heading h1{font:700 29px Arial,sans-serif;letter-spacing:-.8px;margin:0 0 8px}.ai-muted{font-size:13px;color:#778087;line-height:1.6}.ai-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}.ai-stat{padding:20px;background:#fff;border:1px solid #e2e4e3;border-radius:12px;font-size:13px;color:#677079}.ai-stat strong{display:block;font-size:30px;color:#273139;margin-bottom:6px}.ai-stat.review{background:#edf4f0;border-color:#d1e2d7}.ai-toolbar{display:flex;gap:12px;margin-bottom:20px}.ai-toolbar input,.ai-toolbar select{padding:12px;border:1px solid #d7dcdd;border-radius:8px;background:#fff;font:14px Arial;min-width:0}.ai-toolbar input{flex:1}.ai-layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px}.ai-client{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:9px;text-align:left;background:#fff;border:1px solid #e0e3e3;border-radius:12px;padding:18px;margin-bottom:10px;color:#253139;cursor:pointer}.ai-client strong{font-size:14px}.ai-client small{color:#758087;font-size:12px}.ai-client.selected{border:1.5px solid #a63b40;box-shadow:0 0 0 2px #a63b400a}.ai-status{font-size:11px;padding:5px 9px;background:#fff3e7;color:#98622d;border-radius:5px;display:inline-block;white-space:nowrap}.ai-status.transmitted{background:#e8f2ec;color:#286748}.ai-detail{background:#fff;border:1px solid #e0e3e3;border-radius:14px;padding:26px}.ai-detail h2{margin:0;font:700 22px Arial}.ai-detail h3{font:700 12px Arial;text-transform:uppercase;letter-spacing:1px;margin:28px 0 4px;color:#667780}.ai-notice{font-size:12px;line-height:1.6;background:#f5f6f5;padding:13px;border-radius:8px;color:#657178;margin:18px 0}.ai-field{display:flex;gap:16px;justify-content:space-between;border-bottom:1px solid #eceeee;padding:19px 0}.ai-field>div:first-child{min-width:0;overflow-wrap:anywhere}.ai-field strong{font-size:13px}.ai-field p{font-size:14px;margin:8px 0 0;color:#515f67}.ai-field-actions{display:flex;align-items:flex-end;gap:8px;flex-direction:column;flex-shrink:0}.ai-validate,.ai-correct,.ai-heading button{font:600 12px Arial;border:1px solid #d9dfe0;padding:9px 13px;border-radius:6px;background:white;color:#39474e;cursor:pointer}.ai-validate{background:#263b31;color:#fff;border-color:#263b31}.ai-correct{font-size:11px}.ai-correction{color:#985627!important;font-size:12px!important}.ai-heading button{padding:12px 18px}.ai-live{font-size:11px;color:#7b8589;margin:16px 0}
+@media(max-width:800px){.ai-layout{grid-template-columns:1fr}.ai-stats{gap:8px}.ai-stat{padding:12px;font-size:11px}.ai-stat strong{font-size:24px}.ai-heading h1{font-size:24px}.ai-detail{padding:18px}.ai-field{flex-direction:column}.ai-field-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.ai-toolbar{flex-direction:column}.ai-client{padding:14px}}
+
 </style>
 <!-- Mêmes familles que le site public (index.html) : Fraunces pour les
      titres, Instrument Sans pour le texte courant. -->
@@ -1289,6 +1292,13 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
 
+<div class="page" id="page-admin-infos">
+<div class="ai-heading"><div><h1>Informations manquantes</h1><div class="ai-muted">Tous les dossiers clients, les éléments attendus et les informations à vérifier.</div></div><button type="button" onclick="chargerCentreInformationsAdmin()">Actualiser ↻</button></div>
+<div class="ai-stats"><div class="ai-stat review"><strong id="admin-infos-total-transmise">—</strong>Informations à vérifier</div><div class="ai-stat"><strong id="admin-infos-total-attendue">—</strong>Informations manquantes</div><div class="ai-stat"><strong id="admin-infos-total-a_corriger">—</strong>Corrections attendues</div></div>
+<div class="ai-toolbar"><input id="admin-infos-recherche" type="search" placeholder="Rechercher un client ou une référence…" aria-label="Rechercher un dossier" oninput="rendreCentreInformationsAdmin()"><select id="admin-infos-filtre" aria-label="Filtrer les dossiers" onchange="rendreCentreInformationsAdmin()"><option value="a_traiter">Dossiers à compléter ou vérifier</option><option value="transmise">Informations transmises</option><option value="attendue">Informations manquantes</option><option value="a_corriger">Corrections attendues</option><option value="tous">Tous les dossiers</option></select></div>
+<div class="ai-layout"><div id="admin-infos-liste" aria-label="Dossiers clients"></div><div id="admin-infos-detail" class="ai-detail"></div></div><p id="admin-infos-statut" class="ai-live" role="status"></p>
+</div>
+
       <!-- ADMIN: Demandes de devis -->
       <div class="page" id="page-admin-devis">
         <div id="devis-alerte-table" class="alert alert-warning" style="margin-bottom:14px;display:none"></div>
@@ -2110,6 +2120,7 @@ const NAVS = {
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
     { id: 'admin-missions',     icon: '🚗', label: 'Missions' },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
+    { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
     { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
     { id: 'admin-recontact',    icon: '📬', label: 'Demandes recontact' },
@@ -2463,6 +2474,87 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
 // AUCUNE de ces décisions n'envoie d'e-mail, ne crée de mission, ni ne
 // fait avancer un statut de paiement : Stripe n'existe pas et rien ici
 // ne le simule.
+
+// Informations manquantes : les valeurs et décisions viennent des RPC autorisées.
+var _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false;
+async function chargerCentreInformationsAdmin(silencieux) {
+  if (currentRole !== 'admin' || !_sbAuthPret() || _adminInfosBusy) return;
+  var generation = ++_adminInfosGeneration;
+  var statut = document.getElementById('admin-infos-statut');
+  if (!silencieux) statut.textContent = 'Chargement des dossiers…';
+  try {
+    var clients = await sbFetchToutePage('clients?select=id,prenom,nom,numero_client,email&type_service=not.is.null&order=created_at.desc');
+    var dossiers = [];
+    for (var i=0;i<clients.length;i+=4) {
+      var lot = await Promise.all(clients.slice(i,i+4).map(async function(c){
+        try {return {client:c,lignes:await chargerInfosDemandeAdmin(c.id)};}
+        catch(e){return {client:c,lignes:[],erreur:true};}
+      }));
+      dossiers = dossiers.concat(lot);
+      if(generation !== _adminInfosGeneration) return;
+    }
+    _adminInfosDossiers = dossiers.filter(function(d){return d.erreur || d.lignes.length;});
+    _adminInfosDossiers.sort(function(a,b){return Number(b.lignes.some(function(l){return l.statut==='transmise';}))-Number(a.lignes.some(function(l){return l.statut==='transmise';}));});
+    if(!_adminInfosSelection && _adminInfosDossiers.length) _adminInfosSelection=_adminInfosDossiers[0].client.id;
+    statut.textContent = 'Actualisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' · actualisation automatique';
+    rendreCentreInformationsAdmin();
+  } catch(e){if(generation===_adminInfosGeneration)statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}
+}
+function rendreCentreInformationsAdmin(){
+ var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
+ if(!liste||!detail)return;
+ var filtre=document.getElementById('admin-infos-filtre').value;
+ var recherche=document.getElementById('admin-infos-recherche').value.toLowerCase().trim();
+ var compte={attendue:0,transmise:0,a_corriger:0};
+ _adminInfosDossiers.forEach(function(d){d.lignes.forEach(function(l){if(l.statut in compte)compte[l.statut]++;});});
+ ['attendue','transmise','a_corriger'].forEach(function(s){document.getElementById('admin-infos-total-'+s).textContent=compte[s];});
+ var dossiers=_adminInfosDossiers.filter(function(d){return (!recherche || [d.client.nom,d.client.prenom,d.client.numero_client,d.client.email].join(' ').toLowerCase().includes(recherche)) && (filtre==='tous'||d.erreur||d.lignes.some(function(l){return filtre==='a_traiter'?['attendue','transmise','a_corriger'].includes(l.statut):l.statut===filtre;}));});
+ liste.replaceChildren();
+ dossiers.forEach(function(d){
+  var b=document.createElement('button');b.className='ai-client'+(d.client.id===_adminInfosSelection?' selected':'');b.type='button';b.setAttribute('aria-pressed',String(d.client.id===_adminInfosSelection));
+  var nom=document.createElement('strong');nom.textContent=[d.client.prenom,d.client.nom].filter(Boolean).join(' ')||d.client.email||'Client';
+  var ref=document.createElement('small');ref.textContent=d.client.numero_client||'Demande';
+  var badge=document.createElement('span'),nb=d.lignes.filter(function(l){return l.statut==='transmise';}).length,manque=d.lignes.filter(function(l){return l.statut==='attendue'||l.statut==='a_corriger';}).length;
+  badge.textContent=d.erreur?'Lecture indisponible':nb?nb+' à vérifier':manque?manque+' à compléter':'Dossier complet';badge.className=nb?'ai-status transmitted':'ai-status';
+  b.append(nom,ref,badge);b.onclick=function(){_adminInfosSelection=d.client.id;rendreCentreInformationsAdmin();};liste.appendChild(b);
+ });
+ if(!dossiers.length)liste.textContent='Aucun dossier pour ce filtre.';
+ var dossier=dossiers.find(function(d){return d.client.id===_adminInfosSelection;});
+ if(!dossier && dossiers.length){_adminInfosSelection=dossiers[0].client.id;rendreCentreInformationsAdmin();return;}
+ detail.replaceChildren();if(!dossier){detail.textContent='Sélectionnez un dossier client.';return;}
+ var titre=document.createElement('h2');titre.textContent=[dossier.client.prenom,dossier.client.nom].filter(Boolean).join(' ')||'Dossier client';
+ var ref=document.createElement('p');ref.className='ai-muted';ref.textContent=(dossier.client.numero_client||'Demande')+' · Informations nécessaires à la mission';detail.append(titre,ref);
+ if(dossier.erreur){var erreur=document.createElement('p');erreur.textContent='Les informations de ce dossier ne sont pas disponibles. Réessayez avant toute décision.';detail.appendChild(erreur);return;}
+ var restantes=dossier.lignes.filter(function(l){return ['attendue','transmise','a_corriger'].includes(l.statut);});
+ var note=document.createElement('div');note.className='ai-notice';note.textContent=restantes.length?'Les informations déjà reçues et validées sont masquées. Vérifiez chaque élément transmis par le client.':'Dossier complet : toutes les informations ont été reçues et traitées.';detail.appendChild(note);
+ var groupes={};restantes.forEach(function(l){var m=/^vehicule_(\d+)_/.exec(l.cle||'');var k=m?'Véhicule '+m[1]:'Informations générales';(groupes[k]=groupes[k]||[]).push(l);});
+ Object.keys(groupes).forEach(function(k){
+  var h=document.createElement('h3');h.textContent=k;detail.appendChild(h);
+  groupes[k].sort(function(a,b){return Number(b.statut==='transmise')-Number(a.statut==='transmise');}).forEach(function(l){
+   var row=document.createElement('div');row.className='ai-field';
+   var text=document.createElement('div'),label=document.createElement('strong');label.textContent=String(l.libelle||l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/,'');
+   var value=document.createElement('p');value.textContent=l.valeur||'Non renseigné';text.append(label,value);
+   if(l.commentaire){var motif=document.createElement('p');motif.className='ai-correction';motif.textContent='Correction demandée : '+l.commentaire;text.appendChild(motif);}
+   var actions=document.createElement('div');actions.className='ai-field-actions';var badge=document.createElement('span');badge.className='ai-status '+(l.statut==='transmise'?'transmitted':'');badge.textContent=LIB_STATUT_INFO[l.statut]||l.statut;actions.appendChild(badge);
+   if(l.statut==='transmise'){
+    [['validee','Valider'],['a_corriger','Demander une correction']].forEach(function(a){var b=document.createElement('button');b.type='button';b.textContent=a[1];b.className=a[0]==='validee'?'ai-validate':'ai-correct';b.disabled=_adminInfosBusy;b.onclick=function(){deciderCentreInformation(dossier.client.id,l.cle,a[0]);};actions.appendChild(b);});
+   }
+   row.append(text,actions);detail.appendChild(row);
+  });
+ });
+}
+async function deciderCentreInformation(id,cle,decision){
+ if(_adminInfosBusy)return;_adminInfosBusy=true;++_adminInfosGeneration;rendreCentreInformationsAdmin();
+ try{
+  var fait=await deciderInformation(id,cle,decision);if(!fait)return;
+  var lignes=await chargerInfosDemandeAdmin(id);
+  if(!lignes.some(function(l){return l.cle===cle&&l.statut===decision;}))throw new Error('La décision n’a pas été confirmée par le serveur.');
+  var dossier=_adminInfosDossiers.find(function(d){return d.client.id===id;});if(dossier)dossier.lignes=lignes;
+  document.getElementById('admin-infos-statut').textContent=decision==='validee'?'Information validée.':'Correction enregistrée : le motif est visible par le client.';
+ }catch(e){document.getElementById('admin-infos-statut').textContent='Décision non confirmée : '+e.message;}
+ finally{_adminInfosBusy=false;rendreCentreInformationsAdmin();}
+}
+setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&p.classList.contains('active')&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
 
 var _infosDemandeEnCours = null;
 
@@ -4340,6 +4432,7 @@ const PAGE_TITLES = {
   'admin-candidatures':  ['Candidatures', 'Gérez les demandes convoyeurs'],
   'admin-missions':      ['Missions', 'Toutes les missions HelixCar'],
   'admin-clients':       ['Clients', 'Base clients HelixCar'],
+  'admin-infos': ['Informations manquantes', 'Suivez les dossiers et vérifiez les informations transmises'],
   'admin-devis':         ['Demandes de devis', 'Traitez les demandes de convoyage et envoyez vos devis'],
   'admin-acquisition':   ['Acquisition', 'D\'où viennent vos demandes de convoyage'],
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
@@ -4491,6 +4584,7 @@ function showPage(id, options) {
   if (id === 'convoyeur-opportunites') { loadOpportunitesPartenaire(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
+  if (id === 'admin-infos') { chargerCentreInformationsAdmin(); }
   if (id === 'admin-acquisition') { loadAcquisition(); }
   // V50.5D.3F — mobile uniquement : ouvre chaque nouvelle section en
   // haut de page plutôt qu'à l'ancienne position de scroll laissée par

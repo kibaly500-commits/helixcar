@@ -3936,6 +3936,52 @@
   }
   @media (max-width:600px) { .hc-help-popover { max-width:calc(100vw - 24px);font-size:.8rem; } }
 
+
+/* Proposition de l'interface de complétion : cartes accessibles par véhicule. */
+#modal-completer .modal {background:#f6f5f2;padding:28px 22px!important;border-radius:20px;max-width:620px!important;color:#20262b}
+#modal-completer .completion-brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;gap:16px}
+#modal-completer .completion-brand img{width:132px;height:auto;mix-blend-mode:multiply}
+#modal-completer .completion-brand span{font-size:9px;letter-spacing:1.8px;color:#687078;font-weight:700}
+#modal-completer .completion-eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:#ae3439;margin-bottom:10px}
+#modal-completer h2{font-family:Arial,sans-serif;font-size:28px;line-height:1.12;letter-spacing:-1px;text-transform:none;margin:0 0 12px}
+#completer-sous-titre{font-size:14px!important;line-height:1.6;color:#677079!important;margin-bottom:22px}
+#completer-progression{padding:17px;background:#fff;border:1px solid #e5e5e1;border-radius:12px;margin-bottom:22px!important}
+#completer-progression strong{display:block;color:#252d32;font-size:15px;margin-bottom:5px}
+#completer-progression span{font-size:12px;color:#70777b}
+#completer-progression progress{display:block;appearance:none;width:100%;height:5px;border:0;border-radius:4px;margin-top:14px}
+#completer-progression progress::-webkit-progress-bar{background:#eee;border-radius:4px}
+#completer-progression progress::-webkit-progress-value{background:#a6343a;border-radius:4px}
+#completer-progression progress::-moz-progress-bar{background:#a6343a}
+#modal-completer .completion-card{background:white;border:1px solid #dedfdd;border-radius:14px;margin:0 0 12px;overflow:hidden}
+#modal-completer .completer-groupe{cursor:pointer;list-style:none;border:0;margin:0;padding:18px;display:flex;align-items:flex-start;gap:10px;flex-direction:column}
+#modal-completer .completer-groupe::-webkit-details-marker{display:none}
+#modal-completer .completer-groupe strong{font-size:15px;line-height:1.5;max-width:100%;overflow-wrap:anywhere}
+#modal-completer .completer-groupe::after{content:'Ouvrir +';font-size:11px;color:#6f777c;align-self:flex-end;margin-top:-26px}
+#modal-completer details[open]>.completer-groupe::after{content:'Réduire −'}
+#modal-completer .completer-etat{text-transform:none;letter-spacing:0;background:#fff1e7;color:#97551f;font-size:11px;padding:4px 9px}
+#modal-completer .completer-etat--complet{background:#edf5ef;color:#28774e}
+#modal-completer .completion-fields{padding:0 18px 18px}
+#modal-completer .completion-known{font-size:12px;color:#6f787d;padding:10px 0;border-bottom:1px solid #eee}
+#modal-completer .completion-known summary{cursor:pointer}
+#modal-completer .completion-section{font:700 11px Arial,sans-serif;letter-spacing:1.3px;text-transform:uppercase;margin:23px 0 15px;color:#67737a}
+#modal-completer .modal-form-group{margin-bottom:17px}
+#modal-completer .modal-form-group label{display:block;font-size:13px;line-height:1.5;font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:7px;color:#293237}
+#modal-completer input{box-sizing:border-box;width:100%;background:#fff;border:1px solid #ccd1d3;border-radius:8px;min-height:48px;padding:12px;font-size:16px;color:#263039}
+#modal-completer input:focus{outline:2px solid #a6343a;outline-offset:2px}
+#modal-completer input[aria-invalid=true]{border-color:#c88736;background:#fffcf5}
+#modal-completer .completion-correction{background:#fff6e6;color:#8a531b;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin-bottom:8px}
+#modal-completer [data-enregistrer-groupe]{background:#f1f3f3;color:#303a41;width:100%;white-space:normal;border-radius:8px;font-size:12px}
+#modal-completer #completer-envoyer{background:#202a30;color:#fff;border:0;border-radius:9px;min-height:52px;margin-top:12px;text-transform:none;letter-spacing:0}
+#modal-completer .completion-help{font-size:11px;color:#788085;line-height:1.6;text-align:center;margin:12px 8px}
+#modal-completer #completer-retour{font-size:12px!important;background:none;color:#5d686e;text-transform:none;letter-spacing:0}
+
+@media(min-width:900px){
+#modal-completer .modal{max-width:960px!important;padding:36px!important}
+#modal-completer #completer-rubriques{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+#modal-completer h2{font-size:34px}
+#modal-completer #completer-envoyer{width:auto!important;min-width:300px;display:flex;margin:20px auto 0}
+}
+
 </style>
 
 
@@ -7931,8 +7977,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 <div class="modal-overlay" id="modal-completer">
   <div class="modal" style="position:relative;max-width:560px">
     <button type="button" class="modal-close" onclick="closeModal('completer')" aria-label="Fermer">&times;</button>
-    <h2>Compléter mes informations</h2>
-    <p id="completer-sous-titre">Ces éléments nous manquent pour organiser votre prestation.</p>
+    <div class="completion-brand"><img src="logo-helixcar.png" alt="HelixCar"><span>ESPACE CLIENT</span></div>
+    <div class="completion-eyebrow">VOTRE DOSSIER</div>
+    <h2>Finalisons votre dossier</h2>
+    <p id="completer-sous-titre">Complétez les éléments ci-dessous. Notre équipe les vérifiera avant de préparer vos missions.</p>
 
     <div id="completer-message" class="hc-note" role="status"></div>
 
@@ -7945,7 +7993,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
     <button type="button" id="completer-envoyer" class="btn btn-primary"
             style="width:100%;justify-content:center;font-size:.92rem"
-            onclick="envoyerInformationsCompletees()">Enregistrer mes informations</button>
+            onclick="envoyerInformationsCompletees()">Envoyer mes informations</button>
+    <p class="completion-help">Vous pouvez envoyer les informations disponibles et compléter le reste plus tard.</p>
     <button type="button" id="completer-retour" class="btn"
             style="width:100%;justify-content:center;font-size:.92rem;margin-top:10px"
             onclick="_hcFermerCompletion()">← Retour à mes informations</button>
@@ -9553,7 +9602,7 @@ function _completerGrouper(lignes) {
       ordre.push(cle);
     }
     groupes[cle].lignes.push(l);
-    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && !groupes[cle].identite) groupes[cle].identite = l.valeur;
+    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && (!groupes[cle].identite || /_marque_modele$/.test(l.cle))) groupes[cle].identite = l.valeur;
   });
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
 }
@@ -9579,8 +9628,14 @@ function _completerRendre(lignes) {
   var fournies = lignes.filter(function (l) { return !_completerEstRestante(l); }).length;
   if (prog) {
     prog.style.display = 'block';
-    prog.textContent = fournies + ' information' + (fournies > 1 ? 's' : '')
-      + ' sur ' + total + ' déjà ' + (fournies > 1 ? 'renseignées' : 'renseignée') + '.';
+    prog.replaceChildren();
+    var compteur = document.createElement('strong');
+    compteur.textContent = (total - fournies) + ' information' + (total - fournies > 1 ? 's' : '') + ' à compléter';
+    var detail = document.createElement('span');
+    detail.textContent = fournies + ' sur ' + total + ' déjà renseignées';
+    var barre = document.createElement('progress'); barre.max = total || 1; barre.value = fournies;
+    barre.setAttribute('aria-label', 'Informations renseignées');
+    prog.append(compteur, detail, barre);
   }
 
   var aCompleter = lignes.filter(_completerEstRestante);
@@ -9588,7 +9643,7 @@ function _completerRendre(lignes) {
 
   if (!aCompleter.length) {
     zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563" id="completer-complet">'
-      + 'Aucune information ne manque pour cette demande. Merci !</p>';
+      + (lignes.some(function(l){return l.statut === 'transmise';}) ? 'Informations transmises — en attente de validation par notre équipe.' : 'Votre dossier est complet. Toutes les informations ont été reçues et traitées.') + '</p>';
     var b = document.getElementById('completer-envoyer');
     if (b) b.style.display = 'none';
     return;
@@ -9597,35 +9652,46 @@ function _completerRendre(lignes) {
   if (bouton) bouton.style.display = '';
 
   var groupes = _completerGrouper(lignes);
+  var premierOuvert = false;
   groupes.forEach(function (g) {
+    var carte = document.createElement('details'); carte.className = 'completion-card';
+    var contenu = document.createElement('div'); contenu.className = 'completion-fields';
+    zone.appendChild(carte);
     var restantes = g.lignes.filter(_completerEstRestante);
     {
-      var entete = document.createElement('div');
+      var entete = document.createElement('summary');
       entete.className = 'completer-groupe';
       entete.setAttribute('data-groupe', g.cle);
       var titre = document.createElement('strong');
       titre.textContent = g.titre + (g.identite ? ' · ' + g.identite : '');
       var etat = document.createElement('span');
       etat.className = 'completer-etat' + (restantes.length ? '' : ' completer-etat--complet');
-      etat.textContent = restantes.length ? restantes.length + ' à compléter' : 'Complet';
+      etat.textContent = restantes.length ? restantes.length + ' à compléter' : (g.lignes.some(function(l){return l.statut === 'transmise';}) ? 'En vérification' : 'Complet');
       entete.appendChild(titre); entete.appendChild(etat);
-      zone.appendChild(entete);
+      carte.appendChild(entete); carte.appendChild(contenu);
+      if(restantes.length){carte.open = true; premierOuvert = true;}
     }
     var connues = g.lignes.filter(function (l) { return !_completerEstRestante(l); });
     if (connues.length) {
       var recap = document.createElement('p');
       recap.style.cssText = 'font-size:.82rem;color:#555;overflow-wrap:anywhere';
       recap.textContent = connues.map(function (l) { return String(l.libelle || l.cle) + (l.valeur ? ' : ' + l.valeur : ' — renseigné'); }).join(' · ');
-      zone.appendChild(recap);
+      var connus = document.createElement('details'); connus.className = 'completion-known';
+      var resume = document.createElement('summary'); resume.textContent = connues.length + ' informations déjà reçues';
+      connus.append(resume, recap); contenu.appendChild(connus);
     }
+    var derniereSection = '';
     restantes.forEach(function (l) {
+      var section = /restitution/.test(l.cle) ? 'Restitution' : /arrivee|livraison/.test(l.cle) ? 'Livraison' : /contact_pc|depart|prise_en_charge/.test(l.cle) ? 'Prise en charge' : 'Votre véhicule';
+      if(section !== derniereSection){var heading = document.createElement('h3'); heading.className = 'completion-section'; heading.textContent = section; contenu.appendChild(heading); derniereSection = section;}
       var groupe = document.createElement('div');
       groupe.className = 'modal-form-group';
       groupe.setAttribute('data-cle', l.cle);
 
       var label = document.createElement('label');
       label.htmlFor = _completerChampId(l.cle);
-      label.textContent = _completerLibelle(l);
+      label.textContent = String(l.libelle || l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/, '');
+      label.title = _completerLibelle(l);
       var etoile = document.createElement('span');
       etoile.className = 'field-required';
       etoile.textContent = '*';
@@ -9635,8 +9701,8 @@ function _completerRendre(lignes) {
 
       if (l.statut === 'a_corriger' && l.commentaire) {
         var motif = document.createElement('div');
-        motif.style.cssText = 'background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:2px;'
-          + 'padding:8px 10px;margin-bottom:8px;font-size:.78rem;color:#92400E';
+        motif.className = 'completion-correction';
+        motif.id = _completerChampId(l.cle) + '-motif';
         motif.textContent = 'À corriger : ' + l.commentaire;
         groupe.appendChild(motif);
       }
@@ -9646,19 +9712,12 @@ function _completerRendre(lignes) {
                  : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
       champ.id = _completerChampId(l.cle);
       champ.value = l.valeur || '';
+      if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
+      champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
-      zone.appendChild(groupe);
+      contenu.appendChild(groupe);
     });
-    if (restantes.length) {
-      var enregistrer = document.createElement('button');
-      enregistrer.type = 'button';
-      enregistrer.className = 'btn';
-      enregistrer.style.cssText = 'margin:4px 0 12px;min-height:44px';
-      enregistrer.setAttribute('data-enregistrer-groupe', g.cle);
-      enregistrer.textContent = 'Enregistrer — ' + g.titre;
-      enregistrer.addEventListener('click', function () { envoyerInformationsCompletees(g.cle); });
-      zone.appendChild(enregistrer);
-    }
+
   });
 }
 
@@ -9730,6 +9789,16 @@ async function envoyerInformationsCompletees(groupeCle) {
     return;
   }
 
+  var invalide = Object.keys(reponses).find(function(cle){
+    if(!/(_tel|telephone)$/.test(cle))return false;
+    var valeur=reponses[cle], n=valeur.replace(/[^0-9]/g,'').length;
+    return n<7 || n>15 || !/^\+?[0-9 ()./-]+$/.test(valeur);
+  });
+  if(invalide){
+    var champ=document.getElementById(_completerChampId(invalide));
+    if(champ){var carte=champ.closest('details.completion-card');if(carte)carte.open=true;champ.setAttribute('aria-invalid','true');champ.focus();}
+    _completerAfficherMessage('Indiquez un numéro de téléphone complet, avec indicatif pour un numéro international.');return;
+  }
   _completerEnvoiEnCours = true;
   var bouton = document.getElementById('completer-envoyer');
   var libelleBouton = bouton ? bouton.textContent : '';

@@ -205,9 +205,17 @@ window.emailjs = { init: function () {},
   check('B5 : la valeur existante est préremplie',
     ecran.valeurs.includes('06'), JSON.stringify(ecran.valeurs));
   check('B6 : le motif de correction est rappelé', /Numéro incomplet/.test(ecran.html));
-  check('B7 : la progression est rappelée', /4 information/.test(ecran.progression), ecran.progression);
+  check('B7 : la progression est rappelée', /4 sur 6 déjà renseignées/.test(ecran.progression), ecran.progression);
   check('B8 : les composants du formulaire sont réutilisés',
     /modal-form-group/.test(ecran.html) && /field-required/.test(ecran.html));
+
+  const refusTelephone = await page.evaluate(async () => {
+    window.__journal = [];
+    document.getElementById('completer-champ-contact_pc_tel').value = '06';
+    await envoyerInformationsCompletees();
+    return { appels: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'repondre_informations_demande').length, texte: document.getElementById('completer-message').textContent };
+  });
+  check('B8a : numéro incomplet refusé avant envoi', refusTelephone.appels === 0 && /numéro de téléphone complet/.test(refusTelephone.texte));
 
   // Enregistrement + double clic
   const envoi = await page.evaluate(async () => {
@@ -237,7 +245,7 @@ window.emailjs = { init: function () {},
     texte: (document.getElementById('completer-rubriques') || {}).textContent || ''
   }));
   check('B12 : après F5, les réponses transmises ne sont plus redemandées',
-    apresF5.champs.length === 0 && /Aucune information ne manque/.test(apresF5.texte),
+    apresF5.champs.length === 0 && /Informations transmises — en attente de validation/.test(apresF5.texte),
     JSON.stringify(apresF5.champs));
 
   // Coupure réseau : rien n'est perdu, aucun faux succès

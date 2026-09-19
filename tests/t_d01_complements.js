@@ -38,34 +38,33 @@ window.supabase={createClient(){return {
   },n);}
   for(const n of [1,2,3,5]){
    await ouvrir(n);
-   check(n+' véhicules : un bouton et une identité par fiche',await page.locator('[data-enregistrer-groupe]').count()===n && await page.locator('.completer-groupe').count()===n);
-   check(n+' véhicules : seules les immatriculations manquantes sont éditables',await page.locator('#completer-rubriques input').count()===n && await page.locator('label[for="completer-champ-vehicule_1_immatriculation"]').textContent()==='Véhicule 1 — immatriculation manquante *');
-   await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA-CLAUDE-HELIXCAR plaque1');
-   if(n>1)await page.locator('#completer-champ-vehicule_2_immatriculation').fill('TEST-QA-CLAUDE-HELIXCAR pas encore envoyé');
-   await page.locator('[data-enregistrer-groupe="vehicule_1"]').click();
+   check(n+' véhicules : toutes les fiches ouvertes et un seul envoi',await page.locator('.completion-card[open]').count()===n && await page.locator('[data-enregistrer-groupe]').count()===0 && await page.locator('#completer-envoyer').isVisible());
+   check(n+' véhicules : seules les immatriculations manquantes sont éditables',await page.locator('#completer-rubriques input').count()===n);
+   await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA plaque1');
+   if(n>1)await page.locator('#completer-champ-vehicule_2_immatriculation').fill('TEST-QA plaque2');
+   await page.locator('#completer-envoyer').click();
    await page.waitForFunction(()=>!_completerEnvoiEnCours);
-   check(n+' véhicules : seule la bonne fiche est transmise',await page.evaluate(()=>__appels.length===1 && Object.keys(__appels[0].p_reponses).join()==='vehicule_1_immatriculation'));
-   if(n>1){
-    check(n+' véhicules : autre saisie conservée sans être annoncée enregistrée',await page.locator('#completer-champ-vehicule_2_immatriculation').inputValue()==='TEST-QA-CLAUDE-HELIXCAR pas encore envoyé' && await page.evaluate(()=>__lignes.find(l=>l.cle==='vehicule_2_immatriculation').valeur===null));
-    check(n+' véhicules : état Complet de la fiche enregistrée',await page.locator('[data-groupe="vehicule_1"] .completer-etat').textContent()==='Complet');
-    if(n===2)await capturerQA(page,'d01-complements-mobile','#modal-completer .modal');
-   }else check('1 véhicule : dossier complet seulement après relecture',(await page.locator('#completer-complet').textContent()).includes('Aucune information ne manque'));
+   check(n+' véhicules : toutes les saisies transmises ensemble',await page.evaluate(n=>__appels.length===1 && Object.keys(__appels[0].p_reponses).length===Math.min(n,2),n));
+   check(n+' véhicules : aucun champ transmis redemandé',await page.locator('#completer-rubriques input').count()===Math.max(0,n-2));
+   if(n>2){
+    check(n+' véhicules : en attente de vérification, jamais faussement complet',await page.locator('[data-groupe="vehicule_1"] .completer-etat').textContent()==='En vérification');
+   }else check(n+' véhicules : confirmation après relecture',(await page.locator('#completer-complet').textContent()).includes('en attente de validation'));
   }
   await ouvrir(2);
   await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA-CLAUDE-HELIXCAR plaque');
-  await page.evaluate(async()=>{__panne=true;await envoyerInformationsCompletees('vehicule_1');__panne=false;});
-  check('Panne : saisie conservée, bouton réactivé, aucun faux succès',await page.locator('#completer-champ-vehicule_1_immatriculation').inputValue()==='TEST-QA-CLAUDE-HELIXCAR plaque' && await page.locator('[data-enregistrer-groupe="vehicule_1"]').isEnabled() && (await page.locator('#completer-message').textContent()).includes("n'a pas abouti"));
-  await page.evaluate(async()=>{__zero=true;await envoyerInformationsCompletees('vehicule_1');__zero=false;});
+  await page.evaluate(async()=>{__panne=true;await envoyerInformationsCompletees();__panne=false;});
+  check('Panne : saisie conservée, bouton réactivé, aucun faux succès',await page.locator('#completer-champ-vehicule_1_immatriculation').inputValue()==='TEST-QA-CLAUDE-HELIXCAR plaque' && await page.locator('#completer-envoyer').isEnabled() && (await page.locator('#completer-message').textContent()).includes("n'a pas abouti"));
+  await page.evaluate(async()=>{__zero=true;await envoyerInformationsCompletees();__zero=false;});
   check('Zéro écriture : jamais un succès malgré HTTP 200',(await page.locator('#completer-message').textContent()).includes('Aucune nouvelle information enregistrée'));
-  await page.evaluate(async()=>{__panneRelecture=true;await envoyerInformationsCompletees('vehicule_1');__panneRelecture=false;});
+  await page.evaluate(async()=>{__panneRelecture=true;await envoyerInformationsCompletees();__panneRelecture=false;});
   check('Relecture impossible : confirmation limitée, pas de dossier Complet',(await page.locator('#completer-message').textContent()).includes('ne peut pas être relu') && await page.locator('#completer-complet').count()===0);
   await page.evaluate(()=>ouvrirCompleterInformations('TEST-QA-CLAUDE-HELIXCAR-D2'));
   check('Réouverture : champ réellement transmis non redemandé',await page.locator('#completer-champ-vehicule_1_immatriculation').count()===0 && await page.locator('#completer-champ-vehicule_2_immatriculation').count()===1);
   await ouvrir(2);
   await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA-CLAUDE-HELIXCAR plaque');
-  await page.evaluate(async()=>{await Promise.all([envoyerInformationsCompletees('vehicule_1'),envoyerInformationsCompletees('vehicule_1')]);});
+  await page.evaluate(async()=>{await Promise.all([envoyerInformationsCompletees(),envoyerInformationsCompletees()]);});
   check('Double clic : une seule demande de sauvegarde',await page.evaluate(()=>__appels.length===1));
-  check('Mobile : libellés et actions restent dans la largeur visible',await page.locator('[data-enregistrer-groupe]').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().right<=window.innerWidth+1)));
+  check('Mobile : libellés et actions restent dans la largeur visible',await page.locator('#completer-envoyer').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().right<=window.innerWidth+1)));
   check('Aucune exception JavaScript',errors.length===0);
  }finally{await browser.close();}
  console.log('=== '+pass+' PASS / '+fail+' FAIL ===');process.exitCode=fail?1:0;
