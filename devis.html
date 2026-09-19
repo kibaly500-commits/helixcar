@@ -320,6 +320,9 @@
   var authDevis = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
   var URL_FONCTION = SUPABASE_URL + "/functions/v1/devis-secure";
   var URL_PAIEMENT_RECETTE = SUPABASE_URL + "/functions/v1/paiement-recette";
+  var stripeQa = false;
+  var retourStripe = new URLSearchParams(window.location.search).get('paiement') === 'retour';
+  var lecturesStripe = 0;
   var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
@@ -610,9 +613,9 @@
     }
     if (devis.statut === 'accepte') {
       var suite = devis.paiement_statut === 'en_attente'
-        ? ' Le paiement vous sera proposé prochainement.'
+        ? (stripeQa ? ' Vous pouvez effectuer le paiement de test.' : ' Le paiement vous sera proposé prochainement.')
         : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
-      var simulation = (!hoteProduction && devis.paiement_statut === 'en_attente') ?
+      var simulation = (!stripeQa && !hoteProduction && devis.paiement_statut === 'en_attente') ?
         '<section class="paiement-recette" aria-labelledby="titre-paiement-recette"><h2 id="titre-paiement-recette">Simulation de paiement — recette</h2>'+
         '<p>Aucun paiement réel et aucun débit. Choisissez le résultat à vérifier.</p><div class="paiement-recette-actions">'+
         '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
@@ -621,7 +624,10 @@
       return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
         (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
         echapperHtml(suite) +
-        '</div></div>'+simulation;
+        '</div></div>'+simulation+(stripeQa && devis.paiement_statut !== 'paye' ?
+        '<section class="paiement-recette"><h2>Paiement Stripe — test</h2><p>Aucun débit réel. Utilisez uniquement une carte de test Stripe.</p>'+
+        '<button class="bouton bouton-accepter" id="bouton-payer-stripe">Payer en mode test</button>'+
+        '<div id="stripe-resultat" role="status" aria-live="polite">'+(retourStripe?'Confirmation du paiement en cours…':'')+'</div></section>' : '');
     }
     if (devis.statut === 'refuse') {
       // Le motif de refus n'est pas exposé par la réponse GET actuelle
@@ -655,6 +661,27 @@
     if (boutonAccepter) boutonAccepter.addEventListener('click', function () { ouvrirModalAccepter(devis); });
     if (boutonRefuser) boutonRefuser.addEventListener('click', function () { ouvrirModalRefuser(devis); });
     Array.from(document.querySelectorAll('[data-scenario]')).forEach(function(b){b.addEventListener('click',function(){simulerPaiement(devis,b.getAttribute('data-scenario'));});});
+    var payer = document.getElementById('bouton-payer-stripe');
+    if(payer) payer.addEventListener('click',payerStripe);
+    if(stripeQa && retourStripe && devis.paiement_statut !== 'paye' && lecturesStripe++ < 12) setTimeout(chargerEtAfficherDevis,2500);
+  }
+
+  async function payerStripe(){
+    if(enCoursTraitement)return;
+    enCoursTraitement=true;
+    var bouton=document.getElementById('bouton-payer-stripe'),sortie=document.getElementById('stripe-resultat');
+    if(bouton)bouton.disabled=true;
+    if(sortie)sortie.textContent='Ouverture du paiement sécurisé…';
+    try{
+      var session=(await authDevis.auth.getSession()).data.session;
+      if(!session)throw new Error('Reconnectez-vous à votre espace client.');
+      var rep=await fetch(SUPABASE_URL+'/functions/v1/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({devis_id:devisId,token:token})});
+      var corps=await rep.json();
+      if(!rep.ok||!corps.ok)throw new Error(corps.message||'Paiement indisponible.');
+      if(new URL(corps.url).origin!=='https://checkout.stripe.com')throw new Error('Lien de paiement invalide.');
+      window.location.assign(corps.url);
+    }catch(e){if(sortie)sortie.textContent=e.message||'Paiement indisponible.';}
+    finally{enCoursTraitement=false;if(bouton)bouton.disabled=false;}
   }
 
   async function simulerPaiement(devis,scenario){
@@ -734,6 +761,10 @@
       return new Response(JSON.stringify({ok:false,code:'UNAUTHORIZED'}), {status:401,headers:{'Content-Type':'application/json'}});
     }
     options.headers.Authorization = 'Bearer ' + session.access_token;
+    stripeQa = /\+qa-final01@/i.test(session.user && session.user.email || '') && [
+      'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
+      'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
+    ].indexOf(window.location.hostname)!==-1;
     return fetch(URL_FONCTION, options);
   }
   if (authDevis) authDevis.auth.onAuthStateChange(function (event) {

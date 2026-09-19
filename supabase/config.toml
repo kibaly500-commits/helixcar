@@ -55,3 +55,11 @@ verify_jwt = false
 # le JWT, puis la fonction confirme elle-même que l'utilisateur possède
 # une ligne active dans public.admins avant toute décision ou tout envoi.
 verify_jwt = true
+
+[functions.stripe-checkout]
+# JWT vérifié par auth.getUser, puis propriété du dossier côté serveur.
+verify_jwt = false
+
+[functions.stripe-webhook]
+# Authentification par signature Stripe sur le corps brut, test seulement.
+verify_jwt = false
