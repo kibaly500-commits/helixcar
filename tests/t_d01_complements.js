@@ -66,6 +66,15 @@ window.supabase={createClient(){return {
   check('Double clic : une seule demande de sauvegarde',await page.evaluate(()=>__appels.length===1));
   check('Mobile : libellés et actions restent dans la largeur visible',await page.locator('#completer-envoyer').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().right<=window.innerWidth+1)));
   check('Aucune exception JavaScript',errors.length===0);
+  await page.evaluate(()=>document.body.classList.add('hc-integre','hc-mode-completion'));
+  for(const width of [390,780,1280]){
+   await page.setViewportSize({width,height:900});
+   check('Complétion intégrée '+width+'px : fond blanc et largeur complète',await page.locator('#modal-completer .modal').evaluate(el=>{
+    const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+    return s.backgroundColor==='rgb(255, 255, 255)' && r.width>=innerWidth-2 && r.right<=innerWidth+1;
+   }));
+   await page.screenshot({path:'/tmp/hc-completion-blanche-'+width+'.png'});
+  }
  }finally{await browser.close();}
  console.log('=== '+pass+' PASS / '+fail+' FAIL ===');process.exitCode=fail?1:0;
 })().catch(e=>{console.error(e);process.exitCode=1;});

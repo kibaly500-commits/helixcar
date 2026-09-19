@@ -998,6 +998,9 @@ body.scroll-verrouille { overflow: hidden; }
 }
 </style>
 <style id="hc-demandes-compactes">
+#page-client-nouvelle-demande.active{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+.hc-demandes-groupe{margin:12px 0 24px;padding:16px;border:1px solid var(--gray-light);border-radius:10px;background:#fff}
+.hc-demandes-groupe h3{font-size:1rem;margin:0 0 12px}.hc-demandes-groupe[data-paiement="paye"]{border-left:3px solid #438061}
 .hc-demande-card{padding:16px 0;border-bottom:1px solid var(--gray-light)}
 .hc-demande-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .hc-demande-details{margin-top:12px}.hc-demande-details>summary{cursor:pointer;font-weight:600;padding:10px 0;min-height:44px}
@@ -2933,8 +2936,9 @@ async function loadDemandesClient() {
   if (!zone) return;
   let demandes = [];
   let devis = [];
+  let devisIndisponibles = false;
   try {
-    const r = await Promise.all([chargerDemandesClient(), chargerDevisClient().catch(function () { return []; })]);
+    const r = await Promise.all([chargerDemandesClient(), chargerDevisClient().catch(function () { devisIndisponibles = true; return []; })]);
     demandes = r[0]; devis = r[1];
   } catch (e) {
     zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
@@ -2967,6 +2971,22 @@ async function loadDemandesClient() {
       + (dv && dv.paiement_statut==='paye' && /\+qa-final01@/i.test((window._currentClient||{}).email||'') ? ' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[dv.id,false])+'>Document de paiement TEST</button>' : '')
       + '</div></details><div class="hc-completion-note" data-completion-note>Vérification des informations…</div></div>';
   }).join('');
+  const cartes = Array.from(zone.children);
+  const groupesDemandes = [
+    {cle:'non-paye', titre:'Demandes non payées'},
+    {cle:'paye', titre:'Demandes payées'},
+    {cle:'inconnu', titre:'Paiement à vérifier'}
+  ];
+  groupesDemandes.forEach(function(g) {
+    const selection = cartes.filter(function(card) {
+      const dv = devisParDemande[card.dataset.demande];
+      return (devisIndisponibles ? 'inconnu' : dv && dv.paiement_statut === 'paye' ? 'paye' : 'non-paye') === g.cle;
+    });
+    if (!selection.length) return;
+    const section = document.createElement('section'); section.className = 'hc-demandes-groupe'; section.dataset.paiement = g.cle;
+    const titre = document.createElement('h3'); titre.textContent = g.titre + ' (' + selection.length + ')';
+    section.appendChild(titre); selection.forEach(card => section.appendChild(card)); zone.appendChild(section);
+  });
   await Promise.all(demandes.map(async function(d) {
     const card = Array.from(zone.querySelectorAll('[data-demande]')).find(el => el.dataset.demande === String(d.id));
     const note = card && card.querySelector('[data-completion-note]');
@@ -2974,9 +2994,10 @@ async function loadDemandesClient() {
     try {
       const lignes = await chargerInformationsDemande(d.id);
       const restantes = lignes.filter(_estRestante);
-      if (!restantes.length) { note.remove(); return; }
-      note.innerHTML = '<span>' + restantes.length + ' information' + (restantes.length > 1 ? 's' : '') + ' à compléter</span><button class="btn btn-sm btn-primary" '
-        + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>';
+      note.innerHTML = '<span><strong>' + escapeHtml(_etatInformationsClient(lignes)) + '</strong>'
+        + (restantes.length ? ' · ' + restantes.length + ' information' + (restantes.length > 1 ? 's' : '') + ' à compléter' : '')
+        + '</span>' + (restantes.length ? '<button class="btn btn-sm btn-primary" '
+        + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>' : '');
     } catch(e) {
       note.innerHTML = '<span>Informations momentanément indisponibles.</span><button class="btn btn-sm btn-outline" '
         + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Vérifier mes informations</button>';
@@ -3007,7 +3028,32 @@ function _missionPrestationClient(m) {
   return 'Convoyage';
 }
 function _missionStatutClient(m) {
+  if (m.statut === 'brouillon') return 'En préparation';
+  if (m.statut === 'acceptee') return 'Planifiée';
   return LIB_STATUT_MISSION[m.statut] || m.statut || '—';
+}
+async function chargerMissionsSuiviClient() {
+  const resultats = await Promise.all([chargerMissionsClient(), chargerDevisClient().catch(() => null)]);
+  const devis = resultats[1], parClient = {};
+  (devis || []).forEach(d => {if (!parClient[d.client_id]) parClient[d.client_id] = d;});
+  return resultats[0].map(m => {
+    const d = parClient[m.client_id];
+    return Object.assign({}, m, {_paiement: !devis ? 'inconnu' : d && d.paiement_statut === 'paye' ? 'paye' : 'non-paye'});
+  });
+}
+function _phaseMissionClient(m) {
+  if (m.statut === 'annulee') return 'Annulée';
+  if (m._paiement === 'inconnu') return 'Paiement à vérifier';
+  if (m._paiement !== 'paye') return 'En attente de paiement';
+  if (m.statut === 'terminee') return 'Terminée';
+  if (m.statut === 'fini') return 'Réalisation terminée — à valider';
+  if (['en_cours','restitution_requise','restitution_en_cours'].includes(m.statut)) return 'En cours';
+  if (m.statut === 'acceptee') return 'Planifiée';
+  return 'En préparation';
+}
+function _partenaireMissionClient(m) {
+  const confirmee = ['acceptee','en_cours','restitution_requise','restitution_en_cours','fini','terminee'].includes(m.statut);
+  return confirmee && m.convoyeur_prenom ? m.convoyeur_prenom : 'En attente d’attribution';
 }
 
 async function loadMissionsClient() {
@@ -3016,7 +3062,7 @@ async function loadMissionsClient() {
   const sub = document.getElementById('client-missions-sub');
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
   let missions = [];
-  try { missions = await chargerMissionsClient(); }
+  try { missions = await chargerMissionsSuiviClient(); }
   catch (e) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
     return;
@@ -3036,9 +3082,9 @@ async function loadMissionsClient() {
       + '<td>' + escapeHtml(_missionPrestationClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
-      + '<td>' + escapeHtml(m.convoyeur_prenom || '—') + '</td>'
+      + '<td>' + escapeHtml(_partenaireMissionClient(m)) + '</td>'
       + '<td>' + (m.prix_ttc != null ? escapeHtml(m.prix_ttc) + ' €' : '—') + '</td>'
-      + '<td><span class="badge badge-progress">' + escapeHtml(_missionStatutClient(m)) + '</span></td>'
+      + '<td><span class="badge badge-progress">' + escapeHtml(_phaseMissionClient(m)) + '</span><br><small>' + (m._paiement === 'paye' ? 'Devis payé' : m._paiement === 'inconnu' ? 'Paiement à vérifier' : 'Devis non payé') + '</small></td>'
       + '<td>' + evaluation + '</td></tr>';
   }).join('');
 }
@@ -3049,17 +3095,19 @@ async function loadMissionsResumeClient() {
   const zone = document.getElementById('client-missions-resume');
   if (!zone) return;
   let missions = [];
-  try { missions = await chargerMissionsClient(); }
+  try { missions = await chargerMissionsSuiviClient(); }
   catch (e) { zone.innerHTML = '<div class="fid-note">Impossible de charger vos missions pour le moment.</div>'; return; }
   if (!missions.length) {
     zone.innerHTML = '<div class="fid-note" id="client-missions-resume-vide">Aucune mission pour le moment.</div>';
     _majBadgeEvaluations(0);
     return;
   }
-  const enCours = missions.filter(function (m) { return m.statut !== 'terminee' && m.statut !== 'annulee'; }).length;
-  const terminees = missions.filter(function (m) { return m.statut === 'terminee'; }).length;
+  const compter = phase => missions.filter(m => _phaseMissionClient(m) === phase).length;
+  const enCours = compter('En cours');
+  const terminees = compter('Terminée');
   const aEvaluer = missions.filter(function (m) { return m.statut === 'terminee' && !m.evaluee; }).length;
-  zone.innerHTML = '<div class="detail-row"><span class="detail-label">En cours</span><span class="detail-val" id="client-resume-en-cours">' + enCours + '</span></div>'
+  zone.innerHTML = ['En attente de paiement','Paiement à vérifier','En préparation','Planifiée','Réalisation terminée — à valider'].filter(phase => compter(phase) > 0).map(phase => '<div class="detail-row"><span class="detail-label">' + phase + '</span><span class="detail-val">' + compter(phase) + '</span></div>').join('')
+    + '<div class="detail-row"><span class="detail-label">En cours</span><span class="detail-val" id="client-resume-en-cours">' + enCours + '</span></div>'
     + '<div class="detail-row"><span class="detail-label">Terminées</span><span class="detail-val" id="client-resume-terminees">' + terminees + '</span></div>'
     + (aEvaluer ? '<div class="detail-row"><span class="detail-label">À évaluer</span><span class="detail-val">'
         + '<button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">' + aEvaluer + ' mission(s) à évaluer</button></span></div>' : '');
@@ -4004,6 +4052,14 @@ function _infoLibelleEtat(l) {
   return base;
 }
 function _estRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+function _etatInformationsClient(lignes) {
+  if (!lignes.length) return 'Aucune information complémentaire demandée';
+  if (lignes.some(l => l.statut === 'a_corriger')) return 'À corriger';
+  if (lignes.some(_estRestante)) return 'À compléter';
+  if (lignes.some(l => l.statut === 'transmise')) return 'Informations transmises — en attente de validation';
+  if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Dossier validé';
+  return 'Informations complètes';
+}
 
 async function loadInfosClient() {
   const zone = document.getElementById('client-infos-liste');
@@ -4059,12 +4115,13 @@ async function loadInfosClient() {
     // Cet onglet est une liste d'actions. Une demande sans information
     // restante n'y est plus affichée ; les états « Complet » restent
     // visibles par véhicule lorsqu'une autre rubrique de la demande manque.
-    if (complet) return;
+    if (complet && !lignes.some(l => l.statut === 'transmise')) return;
     const groupes = _infosGrouper(lignes);
     let corps = '<div style="font-size:.85rem;color:#333;margin-bottom:10px">'
       + '<strong>' + fournies + ' information' + (fournies > 1 ? 's' : '') + ' sur ' + lignes.length + '</strong> déjà '
       + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
-    corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
+    corps += '<p class="hc-info-etat">' + escapeHtml(_etatInformationsClient(lignes)) + '</p>';
+    if (!complet) corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
     groupes.forEach(function (g) {
       const v = (r.vehicules || []).find(function(v) { return Number(v.position) === g.rang; });
       if (v) g.identite = [v.marque_modele, v.immatriculation, [v.ville_depart, v.ville_arrivee].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
@@ -4073,7 +4130,7 @@ async function loadInfosClient() {
       const gComplet = gRestantes.length === 0;
       corps += '<details class="hc-info-vehicle" data-groupe="' + escapeHtml(g.cle) + '"><summary>'
         + escapeHtml(g.titre) + (g.identite ? ' · ' + escapeHtml(g.identite) : '')
-        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? 'Complet' : gRestantes.length + ' à compléter') + '</span></summary>'
+        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? escapeHtml(_etatInformationsClient(g.lignes)) : gRestantes.length + ' à compléter') + '</span></summary>'
         + '<span class="detail-val">'
         + (gRestantes.length
             ? gRestantes.map(function (l) {
@@ -4086,7 +4143,7 @@ async function loadInfosClient() {
     blocs.push(
       '<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '" data-complet="' + (complet ? '1' : '0') + '">'
       + '<div class="card-header"><div>' + entete + '</div>'
-      + '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>'
+      + (!complet ? '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>' : '')
       + '</div>' + corps + '</div>');
   });
 
@@ -4095,9 +4152,7 @@ async function loadInfosClient() {
       + 'Aucune information ne manque actuellement. Merci !</div>';
     return;
   }
-  zone.innerHTML = (restantesTotal === 0 && !erreurs
-      ? '<div class="hc-note hc-note--succes visible" style="margin-bottom:12px">Toutes vos demandes sont complètes.</div>' : '')
-    + blocs.join('');
+  zone.innerHTML = blocs.join('');
 }
 
 // Vérifie qu'une session Supabase Auth valide correspond bien à un
@@ -14360,6 +14415,11 @@ function declencherChampFichier(id) {
 </script>
 
 <style id="hc-pr6-apercu-demande">
+.hc-apercu-fond .hc-apercu-carte{display:flex;flex-direction:column;overflow:hidden;max-height:calc(100dvh - 40px);box-sizing:border-box}
+.hc-apercu-carte .hc-apercu-entete{flex-shrink:0}
+.hc-apercu-carte #hc-apercu-pdf{flex:1 1 auto;min-height:100px}
+.hc-apercu-carte #hc-apercu-contenu{overflow:auto;min-height:0}
+.hc-apercu-carte .hc-apercu-actions{flex-shrink:0;flex-wrap:wrap;padding:16px 0 24px;margin-top:0;background:#fff}
 .hc-apercu-fond{position:fixed;inset:0;z-index:10020;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(16,24,32,.58);backdrop-filter:blur(7px)}
 .hc-apercu-fond.ouvert{display:flex}.hc-apercu-carte{width:min(650px,100%);max-height:86vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:22px}
 .hc-apercu-entete{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.hc-apercu-entete h2{margin:0;font-size:1.35rem}.hc-apercu-fermer{border:0;background:#f1f1f1;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.2rem}

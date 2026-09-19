@@ -9,7 +9,7 @@ window.__etat=JSON.parse(localStorage.getItem('TEST-QA-CLAUDE-HELIXCAR-eval')||'
  missions:[{id:'TEST-QA-CLAUDE-HELIXCAR-M1',reference:'TEST-QA-CLAUDE-HELIXCAR-M1',statut:'terminee',type_mission:'nettoyage',ville_intervention:'Lyon',prestation:'Préparation complète',convoyeur_prenom:'TEST-QA-CLAUDE-HELIXCAR Partenaire',evaluee:false},{id:'TEST-QA-CLAUDE-HELIXCAR-M2',reference:'TEST-QA-CLAUDE-HELIXCAR-M2',statut:'en_cours',type_mission:'convoyage',ville_depart:'Lyon',ville_arrivee:'Paris',evaluee:false}],evaluations:[]};
 window.supabase={createClient(){return {
  auth:{onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};},getSession:async()=>({data:{session:null}})},
- from(nom){const q={select(){return q;},eq(){return q;},order(){return q;},limit(){return q;},then(r){return Promise.resolve(__erreur?{error:{message:'SQL 23514 details secrets'}}:{data:nom==='v_mes_missions'?__etat.missions:nom==='evaluations'?__etat.evaluations:[],error:null}).then(r);}};return q;},
+ from(nom){const q={select(){return q;},eq(){return q;},order(){return q;},limit(){return q;},then(r){return Promise.resolve(__erreur?{error:{message:'SQL 23514 details secrets'}}:{data:nom==='v_mes_missions'?__etat.missions.map(m=>({...m,client_id:'qa-client'})):nom==='v_mes_devis'?[{id:'qa-devis',client_id:'qa-client',statut:'accepte',paiement_statut:'paye'}]:nom==='evaluations'?__etat.evaluations:[],error:null}).then(r);}};return q;},
  rpc:async function(nom,p){__appels.push({nom,p});await new Promise(r=>setTimeout(r,20));if(__erreur)return {error:{message:'SQL 23514 details secrets'}};
  const m=__etat.missions.find(m=>m.id===p.p_mission_id);
  if(!m||m.statut!=='terminee')return {data:{ok:false,code:'MISSION_NON_TERMINEE'}};

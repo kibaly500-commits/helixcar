@@ -3150,7 +3150,7 @@
     pointer-events: auto;
   }
   body.hc-integre #modal-completer .modal {
-    max-width: 100%; width: 100%; min-height: 0; margin: 0;
+    max-width: 100% !important; width: 100%; min-height: 0; margin: 0;
     border-radius: 0; border: 0; box-shadow: none; padding: 26px 30px 34px;
   }
   body.hc-integre #modal-completer .modal::before { display: none; }
@@ -3938,7 +3938,7 @@
 
 
 /* Proposition de l'interface de complétion : cartes accessibles par véhicule. */
-#modal-completer .modal {background:#f6f5f2;padding:28px 22px!important;border-radius:20px;max-width:620px!important;color:#20262b}
+#modal-completer .modal {background:#fff;padding:28px 22px!important;border-radius:20px;max-width:620px!important;color:#20262b}
 #modal-completer .completion-brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;gap:16px}
 #modal-completer .completion-brand img{width:132px;height:auto;mix-blend-mode:multiply}
 #modal-completer .completion-brand span{font-size:9px;letter-spacing:1.8px;color:#687078;font-weight:700}
@@ -5527,8 +5527,8 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     </div>
 
     <div style="border-left:2px solid var(--accent);padding:12px 0 12px 18px;max-width:440px;margin-top:32px">
-        <div style="font-family:var(--font-body);font-weight:600;font-size:.88rem;margin-bottom:3px;color:var(--paper)">Tout est défini avant le départ.</div>
-        <div style="font-family:var(--font-body);font-size:.78rem;color:rgba(245,242,234,.6);line-height:1.6">Prestation, conditions et montant : chaque élément est confirmé avant votre validation. Vous gardez une vision claire, du devis à la livraison.</div>
+        <div style="font-family:var(--font-body);font-weight:600;font-size:.88rem;margin-bottom:3px;color:var(--paper)">Tout est défini à l’avance.</div>
+        <div style="font-family:var(--font-body);font-size:.78rem;color:rgba(245,242,234,.6);line-height:1.6">Prestation, conditions et montant : chaque élément est confirmé avant votre validation. Vous gardez une vision claire, du devis à la réalisation de votre prestation.</div>
     </div>
 
   </div>
@@ -7994,7 +7994,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
     <button type="button" id="completer-envoyer" class="btn btn-primary"
             style="width:100%;justify-content:center;font-size:.92rem"
             onclick="envoyerInformationsCompletees()">Envoyer mes informations</button>
-    <p class="completion-help">Vous pouvez envoyer les informations disponibles et compléter le reste plus tard.</p>
     <button type="button" id="completer-retour" class="btn"
             style="width:100%;justify-content:center;font-size:.92rem;margin-top:10px"
             onclick="_hcFermerCompletion()">← Retour à mes informations</button>
@@ -9624,6 +9623,13 @@ function _completerLibelle(l) {
 // ont un champ, avec les mêmes composants que le formulaire
 // (.modal-form-group, label, champ). Une rubrique validée n'apparaît
 // jamais comme champ ; son groupe la compte comme renseignée.
+function _completerSection(l) {
+  var cle = String(l.cle || '');
+  if (/restit/.test(cle)) return 'Restitution';
+  if (/arrivee|livraison|contact_liv|liv_/.test(cle)) return 'Livraison';
+  if (/contact_pc|depart|prise_en_charge/.test(cle)) return 'Prise en charge';
+  return 'Votre véhicule';
+}
 function _completerRendre(lignes) {
   var zone = document.getElementById('completer-rubriques');
   var prog = document.getElementById('completer-progression');
@@ -9687,8 +9693,9 @@ function _completerRendre(lignes) {
       connus.append(resume, recap); contenu.appendChild(connus);
     }
     var derniereSection = '';
-    restantes.forEach(function (l) {
-      var section = /restitution/.test(l.cle) ? 'Restitution' : /arrivee|livraison/.test(l.cle) ? 'Livraison' : /contact_pc|depart|prise_en_charge/.test(l.cle) ? 'Prise en charge' : 'Votre véhicule';
+    var ordreSections = ['Votre véhicule', 'Prise en charge', 'Livraison', 'Restitution'];
+    restantes.slice().sort(function(a,b){return ordreSections.indexOf(_completerSection(a))-ordreSections.indexOf(_completerSection(b));}).forEach(function (l) {
+      var section = _completerSection(l);
       if(section !== derniereSection){var heading = document.createElement('h3'); heading.className = 'completion-section'; heading.textContent = section; contenu.appendChild(heading); derniereSection = section;}
       var groupe = document.createElement('div');
       groupe.className = 'modal-form-group';
