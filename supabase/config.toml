@@ -63,3 +63,6 @@ verify_jwt = false
 [functions.stripe-webhook]
 # Authentification par signature Stripe sur le corps brut, test seulement.
 verify_jwt = false
+
+[functions.document-paiement-test]
+verify_jwt = false

@@ -76,7 +76,7 @@ export async function checkout(req, {sb, stripe, configured}) {
     return json({ok:true,url:session.url},200,headers);
   } catch {return fail('Paiement indisponible pour le moment. Réessayez dans quelques instants.',503,headers);}
 }
-export async function webhook(req,{sb,stripe,secret,cryptoProvider}) {
+export async function webhook(req,{sb,stripe,secret,cryptoProvider,afterPayment}) {
   if(req.method!=='POST') return fail('Méthode refusée.',405);
   if(!secret) return fail('Webhook non configuré.',503);
   let event;
@@ -97,6 +97,7 @@ export async function webhook(req,{sb,stripe,secret,cryptoProvider}) {
       p_session_id:session.id,p_evenement_id:event.id,p_montant_centimes:session.amount_total,
       p_devise:session.currency,p_payment_intent:session.payment_intent});
     if(rpcError||!result?.ok) return fail('Confirmation à retraiter.',503);
+    if(afterPayment) await afterPayment(row.devis_id);
     return json({ok:true});
   } catch {return fail('Confirmation à retraiter.',503);}
 }

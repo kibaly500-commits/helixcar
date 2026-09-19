@@ -120,8 +120,8 @@
   .decision-groupe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .bouton-accepter { background: var(--ok); color: var(--blanc); }
   .bouton-accepter:hover:not(:disabled) { background: #256640; }
-  .bouton-refuser { background: var(--blanc); color: var(--refus); border: 1.5px solid var(--refus); }
-  .bouton-refuser:hover:not(:disabled) { background: #FBF1F1; }
+  .bouton-refuser { background: var(--refus); color: var(--blanc); border: 1.5px solid var(--refus); }
+  .bouton-refuser:hover:not(:disabled) { background: #8A2B2B; }
 
   .statut-final {
     display: flex; align-items: center; gap: 12px;
@@ -275,12 +275,24 @@
     .pdf-cadre iframe { height: 78vh; height: 78dvh; min-height: 240px; }
     .modal-carte { max-height: min(80vh, 80dvh); }
   }
+  .logo-image{width:190px;max-width:55vw;height:auto;display:block;background:white;padding:8px 12px;border-radius:8px}
+  .bouton{border-radius:12px;min-height:52px}
+  .pdf-cadre,.statut-final,.paiement-recette{border-radius:16px;overflow:hidden}
+  .reference{font-family:inherit;font-weight:600;border:0;padding:0;font-size:1.05rem}
+  .resume-mobile{display:none}
+  @media(max-width:640px){
+    main{padding:24px 16px 40px}.resume-mobile + .pdf-cadre{display:none}
+    .resume-mobile{display:block;background:white;border:1px solid var(--ligne);border-radius:16px;padding:20px;margin:20px 0;overflow-wrap:anywhere}
+    .resume-mobile h2{font-size:1.15rem;margin:0 0 16px}.resume-mobile h3{font-size:1rem;margin:0 0 10px}
+    .resume-vehicule{border-top:1px solid var(--ligne);padding:18px 0}.resume-vehicule p{margin:7px 0;font-size:.9rem}
+    .resume-total{background:var(--anthracite);color:white;padding:18px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}
+  }
 </style>
 </head>
 <body>
 <div class="voile">
   <header class="entete">
-    <div class="logo">HELI<span>X</span>CAR</div>
+    <img class="logo-image" src="logo-helixcar.png" alt="HelixCar — Services automobiles">
     <div class="entete-sous">Consultation de devis</div>
   </header>
 
@@ -588,6 +600,25 @@
   // Affichage principal : le VRAI PDF officiel en grand, jamais une
   // reconstruction du contenu du devis en HTML.
   // ────────────────────────────────────────────────────────────
+  function resumeMobile(devis) {
+    var s=devis.snapshot;if(!s)return '';
+    var e=echapperHtml;
+    var dateCourte=function(v){return /^\d{4}-\d{2}-\d{2}$/.test(v||'')?v.split('-').reverse().join('/'):v;};
+    var lieu=function(t,p){return [t['adresse_'+p+'_rue'],t['code_postal_'+p],t['ville_'+p]].filter(Boolean).join(' ');};
+    var html='<section class="resume-mobile"><h2>Récapitulatif du devis</h2><p>'+e(s.client?.nom_complet||'')+'</p>';
+    (s.vehicules||[]).forEach(function(v,i){
+      var t=v.trajet||s.trajet||{},r=v.restitution||s.restitution;
+      html+='<article class="resume-vehicule"><h3>Véhicule '+(i+1)+'</h3><p><strong>'+e(v.marque_modele||v.type_vehicule||'Véhicule')+'</strong></p>';
+      if(lieu(t,'depart'))html+='<p><strong>Prise en charge</strong><br>'+e(lieu(t,'depart'))+'<br>'+e([dateCourte(t.date_prise_en_charge),t.horaire_prise_en_charge].filter(Boolean).join(' · '))+'</p>';
+      if(lieu(t,'arrivee'))html+='<p><strong>Livraison</strong><br>'+e(lieu(t,'arrivee'))+'<br>'+e([dateCourte(t.date_livraison),t.horaire_livraison].filter(Boolean).join(' · '))+'</p>';
+      if(t.mode_transport)html+='<p>Transport : '+e(t.mode_transport)+'</p>';
+      if(r)html+='<p><strong>Restitution prévue</strong><br>'+e(r.adresse||'')+'<br>'+e([dateCourte(r.date),r.horaire].filter(Boolean).join(' · '))+'</p>';
+      html+='</article>';
+    });
+    if(s.stockage)html+='<p><strong>Stockage</strong><br>'+e([s.stockage.date_debut,s.stockage.date_fin_prevue].filter(Boolean).join(' au '))+'</p>';
+    html+='<div class="resume-total"><span>Montant du devis</span><strong>'+e(Number(s.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</strong></div><p>Le document complet et ses conditions sont disponibles ci-dessous.</p></section>';
+    return html;
+  }
   function blocPdf(devis) {
     var urlPdf = urlPdfValideOuNull(devis.pdf_url);
     if (!devis.pdf_disponible || !urlPdf) {
@@ -599,7 +630,7 @@
     // qu'il s'ajuste à la largeur disponible.
     var urlPdfAffichage = urlPdf + '#view=FitH';
     return (
-      '<div class="pdf-cadre"><iframe src="' + echapperHtml(urlPdfAffichage) + '" title="Devis PDF HelixCar"></iframe></div>' +
+      resumeMobile(devis) + '<div class="pdf-cadre"><iframe src="' + echapperHtml(urlPdfAffichage) + '" title="Devis PDF HelixCar"></iframe></div>' +
       '<a class="bouton bouton-pdf" href="' + echapperHtml(urlPdf) + '" target="_blank" rel="noopener">Ouvrir / télécharger le PDF</a>'
     );
   }
@@ -653,6 +684,7 @@
     html += '<div>' + badgeStatut(devis.statut, devis) + '</div>';
     html += blocPdf(devis);
     html += blocActions(devis);
+    if(stripeQa && devis.paiement_statut==='paye') html+='<section class="paiement-recette"><h2>Votre document de paiement</h2><p>Document TEST sans valeur fiscale.</p><button class="bouton bouton-pdf" id="document-paiement-test">Ouvrir le document TEST</button><p id="document-message" role="status"></p></section>';
 
     zone.innerHTML = html;
 
@@ -661,6 +693,17 @@
     if (boutonAccepter) boutonAccepter.addEventListener('click', function () { ouvrirModalAccepter(devis); });
     if (boutonRefuser) boutonRefuser.addEventListener('click', function () { ouvrirModalRefuser(devis); });
     Array.from(document.querySelectorAll('[data-scenario]')).forEach(function(b){b.addEventListener('click',function(){simulerPaiement(devis,b.getAttribute('data-scenario'));});});
+    var documentBouton=document.getElementById('document-paiement-test');
+    if(documentBouton)documentBouton.addEventListener('click',async function(){
+      documentBouton.disabled=true;
+      try{
+        var session=(await authDevis.auth.getSession()).data.session;
+        var r=await fetch(SUPABASE_URL+'/functions/v1/document-paiement-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({devis_id:devis.id})});
+        var d=await r.json();if(!r.ok||!d.ok)throw new Error(d.message||'Document indisponible');
+        var u=urlPdfValideOuNull(d.url);if(!u)throw new Error('Lien invalide');
+        window.location.assign(u);
+      }catch(e){document.getElementById('document-message').textContent=e.message;}finally{documentBouton.disabled=false;}
+    });
     var payer = document.getElementById('bouton-payer-stripe');
     if(payer) payer.addEventListener('click',payerStripe);
     if(stripeQa && retourStripe && devis.paiement_statut !== 'paye' && lecturesStripe++ < 12) setTimeout(chargerEtAfficherDevis,2500);

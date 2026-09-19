@@ -2805,6 +2805,7 @@ async function loadDemandesClient() {
       + ' <button class="btn btn-sm btn-outline hc-demande-apercu-btn" aria-label="Afficher le récapitulatif" title="Afficher le récapitulatif" '
       + actionHtml('ouvrirApercuDemandeClient', [d.id]) + '>👁</button>'
       + (dv && ['envoye','accepte','refuse'].indexOf(dv.statut) !== -1 ? ' <a class="btn btn-sm btn-outline" href="devis.html?id=' + encodeURIComponent(dv.id) + '">Consulter mon devis</a>' : '')
+      + (dv && dv.paiement_statut==='paye' && /\+qa-final01@/i.test((window._currentClient||{}).email||'') ? ' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[dv.id,false])+'>Document de paiement TEST</button>' : '')
       + '</span></div>';
   }).join('');
 }
@@ -3390,7 +3391,7 @@ async function publierOpportunite(id) {
     loadOpportunitesAdmin();
   } catch (e) {
     console.error('publier_opportunite :', e && e.message);
-    _hcNote('opportunite-message', 'L\'envoi n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
+    _hcNote('opportunite-message', /Informations manquantes|Paiement non confirme|tarif convoyeur/.test(e.message||'') ? e.message : 'L\'envoi n\'a pas abouti. Réessayez.', 'erreur');
   }
 }
 
@@ -7511,6 +7512,7 @@ function envoyerEmailReservationConfirmee(clientId, reference, depart, arrivee, 
 
 // ── MISSIONS ADMIN (Supabase) ────────────────────────────────
 const MISSION_STATUT_BADGE = {
+  brouillon: '<span class="badge badge-pending">Brouillon — dossier à contrôler</span>',
   en_attente: '<span class="badge badge-pending">Sans convoyeur</span>',
   proposee:   '<span class="badge badge-pending">Proposée</span>',
   acceptee:   '<span class="badge badge-progress">Acceptée</span>',
@@ -7810,6 +7812,30 @@ function chargerMissionsAccueil() {
   });
 }
 
+async function ouvrirDocumentPaiementTest(id, preparer) {
+  try {
+    const session = (await sbAuth.auth.getSession()).data.session;
+    const r = await fetch(SUPABASE_URL + '/functions/v1/document-paiement-test', {
+      method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},
+      body:JSON.stringify({devis_id:id,action:preparer?'preparer':'consulter'})
+    });
+    const d=await r.json();
+    if(!r.ok||!d.ok) throw new Error(d.message||'Document indisponible');
+    const u=new URL(d.url);
+    if(u.origin!==new URL(SUPABASE_URL).origin)throw new Error('Lien invalide');
+    window.location.assign(u.href);
+  } catch(e) { alert(e.message||'Document indisponible'); }
+}
+async function reglerTarifBrouillon(id) {
+  const v=prompt('Rémunération prévue pour ce véhicule, en euros :');
+  if(v===null)return;
+  const montant=Number(v.replace(',','.'));
+  if(!v.trim()||!Number.isFinite(montant)||montant<0){alert('Montant invalide');return;}
+  const {error}=await sbAuth.from('missions').update({remuneration_prevue:Math.round(montant*100)/100}).eq('id',id).eq('statut','brouillon');
+  if(error){alert(error.message);return;}
+  loadMissions();
+}
+
 function loadMissions() {
   const tbody = document.getElementById('missions-table');
   if (!tbody) return;
@@ -7865,6 +7891,10 @@ function loadMissions() {
         actions = '<span class="badge badge-active" style="font-size:.72rem">✅ Validée</span>';
       } else {
         actions = '—';
+      }
+      if(m.statut==='brouillon') {
+        actions='<button class="btn btn-sm btn-outline" '+actionHtml('ouvrirFicheDemande',[m.client_id])+'>Contrôler le dossier</button> <button class="btn btn-sm btn-outline" '+actionHtml('reglerTarifBrouillon',[m.id])+'>Tarif convoyeur'+(m.remuneration_prevue==null?' à définir':' : '+escapeHtml(String(m.remuneration_prevue))+' €')+'</button>';
+        if(m.devis_source_id) actions+=' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[m.devis_source_id,true])+'>Document de paiement TEST</button>';
       }
       // LOT O01 — chaque mission non annulée peut être proposée aux
       // partenaires : le bouton ouvre (ou crée) le brouillon d'opportunité.
@@ -14059,7 +14089,7 @@ function declencherChampFichier(id) {
 }
 
 [
-  'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
+  'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
   'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',
