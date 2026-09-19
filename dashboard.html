@@ -1006,13 +1006,15 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demandes-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .hc-demandes-grille .hc-demande-card{margin:0;min-width:0}
 .hc-demande-message{font-size:.85rem;color:#626973;margin:10px 0 15px}
-.hc-demande-card>.btn{width:100%;justify-content:center;white-space:normal}
+.hc-demande-card>.btn{width:auto;max-width:100%;min-height:40px;padding:9px 16px;justify-content:center;white-space:normal}
+.hc-demande-date{font-size:.78rem;color:#626973;font-weight:400}
 .hc-demande-meta{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;font-size:.8rem;border-top:1px solid #e1e4e8;padding-top:12px}
 .hc-demande-meta>span:nth-child(even){justify-self:end;text-align:right}
 .hc-info-neutre{background:#f1f2f4!important;color:#555e68!important}
 @media(max-width:1100px){.hc-demandes-grille{grid-template-columns:1fr}}
 .hc-demande-card{padding:20px;margin:0 0 20px;border:1px solid #d4d8dc;border-radius:10px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.035)}
-.hc-demande-card .detail-label{flex-basis:100%;font-weight:700;color:#333}
+.hc-demande-card .detail-label{font-weight:700;color:#333}
+.hc-demande-summary .detail-val{flex-basis:100%}
 .hc-demande-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .hc-demande-details{margin-top:12px}.hc-demande-details>summary{cursor:pointer;font-weight:600;padding:10px 0;min-height:44px}
 .hc-demande-details>summary::marker{color:var(--red)}
@@ -3015,7 +3017,7 @@ async function loadDemandesClient() {
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
       if(p.action==='devis')bouton='<a class="btn btn-sm btn-primary" href="'+lienDevis+'">Consulter mon devis →</a>';
-      return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span><span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
+      return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note><span class="hc-info-etat hc-info-'+p.couleur+'">'+escapeHtml(p.texte)+'</span></div><p class="hc-demande-message">'+escapeHtml(p.message)+'</p>'+bouton
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Devis payé':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')

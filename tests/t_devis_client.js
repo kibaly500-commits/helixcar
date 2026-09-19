@@ -12,6 +12,18 @@ try{
    const page=await browser.newPage({viewport:{width,height:900}});await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);
    await page.waitForSelector('#bouton-accepter-devis',{timeout:2000});const a=await page.evaluate(()=>window.__appels[0]);assert.equal(a.body.devis_id,ID);assert.equal(a.authorization,'Bearer TEST-QA-CLAUDE-HELIXCAR-jwt');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.close();
  });
+ await cas('Devis visible sur mobile avec snapshot et logo blanc',async()=>{
+   const page=await browser.newPage({viewport:{width:390,height:844}});
+   await page.addInitScript(INIT+`window.__devis.pdf_disponible=true;window.__devis.pdf_url='https://zsetmqnmmupqbkgqbjbo.supabase.co/storage/v1/object/sign/devis/test.pdf';window.__devis.snapshot={client:{nom_complet:'Client test'}};`);
+   await page.goto(urlFichier('devis.html')+'?id='+ID);
+   await page.waitForSelector('.pdf-cadre iframe');
+   assert.ok(await page.locator('.pdf-cadre iframe').isVisible());
+   assert.ok(await page.locator('.bouton-pdf').isVisible());
+   assert.equal(await page.locator('.logo-image').getAttribute('src'),'assets/logo-helixcar-blanc.png');
+   assert.equal(await page.locator('.logo-image').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
+   await page.screenshot({path:'/tmp/hc-devis-mobile-fix.png',fullPage:true});
+   await page.close();
+ });
  await cas('Refus depuis Dashboard sans token : décision persistée puis relue',async()=>{
    const page=await browser.newPage();await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);await page.click('#bouton-refuser-devis',{timeout:2000});await page.click('#modal-bouton-confirmer');await page.waitForFunction(()=>document.getElementById('zone-contenu').textContent.includes('Devis refusé'),{timeout:2000});assert.equal(await page.evaluate(()=>window.__appels.filter(a=>a.body.action==='refuse').length),1);await page.close();
  });
