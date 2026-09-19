@@ -58,10 +58,12 @@ function paletteDuSite() {
   // ── A. LA PALETTE EST CELLE DU SITE, À LA VIRGULE PRÈS ──
   check('A1 : --accent est le rouge HelixCar du site',
     vars.accent.toUpperCase() === (REF.accent || '').toUpperCase(), vars.accent + ' vs ' + REF.accent);
-  // Refonte premium approuvée : neutres plus lisibles, accent conservé.
-  check('A2 : texte anthracite premium', vars.ink === '#242424', vars.ink);
-  check('A3 : anthracite secondaire premium', vars.charcoal === '#363636', vars.charcoal);
-  check('A4 : gris secondaire lisible sur blanc', vars.silver === '#737373', vars.silver);
+  check('A2 : --ink est le bleu nuit du site',
+    vars.ink.toUpperCase() === (REF.ink || '').toUpperCase(), vars.ink + ' vs ' + REF.ink);
+  check('A3 : --charcoal est l\'anthracite du site',
+    vars.charcoal.toUpperCase() === (REF.charcoal || '').toUpperCase(), vars.charcoal + ' vs ' + REF.charcoal);
+  check('A4 : --silver est le gris argent du site',
+    vars.silver.toUpperCase() === (REF.silver || '').toUpperCase(), vars.silver + ' vs ' + REF.silver);
   check('A5 : --accent-light suit', vars.accentLight.toUpperCase() === (REF.accentLight || '').toUpperCase(),
     vars.accentLight + ' vs ' + REF.accentLight);
 
@@ -104,8 +106,8 @@ function paletteDuSite() {
   check('C3 : les cartes de chiffres aussi',
     composants.statFond === 'rgb(255, 255, 255)' && parseFloat(composants.statBordure) > 0,
     JSON.stringify(composants));
-  check('C4 : barre latérale blanche conforme à la maquette premium',
-    composants.barreFond === 'rgb(255, 255, 255)', composants.barreFond);
+  check('C4 : la barre latérale prend le bleu nuit HelixCar, plus le marine #0A1628',
+    composants.barreFond === 'rgb(16, 24, 32)', composants.barreFond);
 
   // ── D. TYPOGRAPHIE DU SITE ──
   const polices = await page.evaluate(() => ({
@@ -115,8 +117,8 @@ function paletteDuSite() {
   }));
   check('D1 : le texte courant est en Instrument Sans, comme le site',
     /Instrument Sans/.test(polices.corps), polices.corps);
-  check('D2 : titres sobres en Instrument Sans',
-    /Instrument Sans/.test(polices.titre), polices.titre);
+  check('D2 : les titres sont en Fraunces, comme le site',
+    /Fraunces/.test(polices.titre), polices.titre);
   check('D3 : les commandes restent en sans-serif (libellés compacts)',
     /Instrument Sans/.test(polices.bouton) && !/Fraunces/.test(polices.bouton), polices.bouton);
 

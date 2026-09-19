@@ -997,68 +997,13 @@ body.scroll-verrouille { overflow: hidden; }
   }
 }
 </style>
-<style id="hc-dashboard-premium">
-/* Direction commune aux trois espaces. Aucun changement de navigation. */
-:root{--ink:#242424;--paper:#fff;--silver:#737373;--gray-light:#e8e8e8;--charcoal:#363636;--accent:#b5444b;--radius:2px;--shadow:none}
-html,body{background:#fff;font-size:16px}
-.sidebar{background:#fff;color:var(--ink);border-right:1px solid var(--gray-light)}
-.sidebar-logo{border-bottom:0;padding:32px 24px}
-.sidebar .hc-logo-officiel img{filter:none}
-.sidebar-user{background:#fafafa;border-radius:0;margin:12px 20px}
-.user-avatar{background:#eee;color:#333;border-radius:2px}
-.user-role,.role-admin,.role-client,.role-convoyeur{background:transparent;color:#666;padding-left:0}
-.nav-section-label{color:#777;font-size:.75rem}
-.nav-item{color:#555;border-radius:0;padding:14px 12px;border-bottom:1px solid #f0f0f0;font-size:.875rem}
-.nav-item:hover{background:#fafafa;color:#222}
-.nav-item.active{background:#f7f7f7;color:#222;box-shadow:inset 2px 0 var(--red)}
-.sidebar-footer{border-top:1px solid #eee}
-.sidebar-footer .nav-item{color:#666!important}
-.sb-roles button{color:#555;border-color:#ddd;border-radius:0}
-.topbar{padding:24px 32px}.topbar-title{font-family:inherit;font-weight:500;font-size:1.25rem}
-.topbar-sub,.card-sub{color:#737373;font-size:.875rem}
-.content{padding:32px}
-.card{border:0;border-top:1px solid #aaa;border-radius:0;padding:24px 0;box-shadow:none;margin-bottom:24px}
-.card-title,.mission-route,.stat-value,.hstat-val{font-family:inherit;font-weight:500}
-.card-title{font-size:1.125rem}
-.stat-card{border:0!important;border-top:1px solid #aaa!important;border-radius:0;padding:20px 0;box-shadow:none}
-.stat-label{color:#737373;font-size:.8rem;letter-spacing:.02em;text-transform:none}
-.stat-value{font-size:2rem}.stat-sub{font-size:.8rem}
-.btn{border-radius:1px;min-height:44px;letter-spacing:0;font-size:.875rem}
-.btn-primary{background:#252525;color:#fff}.btn-primary:hover{background:#444;transform:none}
-.btn-outline{border:1px solid #ccc}.btn-sm{font-size:.8125rem}
-.table-wrap{border-radius:0}thead th{font-size:.75rem;font-weight:500;color:#737373;border-bottom:1px solid #aaa}
-tbody tr:hover{background:#fafafa}.badge{border-radius:2px;font-weight:500}
-.mission-card{border:1px solid #ddd;border-radius:2px;box-shadow:none}
-.mission-card:hover{transform:none;border-color:#888}
-.ai-heading{padding-bottom:22px;border-bottom:1px solid #888}
-.ai-heading h1{font-family:inherit;font-weight:500;letter-spacing:-.025em}
-.ai-stats{gap:24px;border-bottom:1px solid #e5e5e5}
-.ai-stat,.ai-stat.review{padding:0 0 24px;border:0;border-radius:0;background:transparent}
-.ai-stat strong{font-weight:400}.ai-stat.review strong{color:var(--red)}
-.ai-toolbar input,.ai-toolbar select{border:0;border-bottom:1px solid #bbb;border-radius:0;padding:12px 0}
-.ai-layout{grid-template-columns:240px minmax(0,1fr);gap:40px}
-.ai-client{border:0;border-bottom:1px solid #ddd;border-radius:0;padding:18px 12px;margin:0;gap:7px}
-.ai-client.selected{border:0;border-bottom:1px solid #666;box-shadow:none;background:#f6f6f6}
-.ai-client strong{font-weight:500}.ai-open{color:#777}
-.ai-detail{border:0;border-radius:0;padding:12px 0;min-width:0}
-.ai-detail h2{font-family:inherit;font-weight:500}
-.ai-detail h3{font-size:.75rem;letter-spacing:.14em;border-bottom:1px solid #888;padding-bottom:12px;margin-top:32px}
-.ai-notice{background:none;padding:0;margin:28px 0;color:#737373;font-size:.875rem}
-.ai-field{padding:24px 0}.ai-field strong{font-weight:500;font-size:.875rem}
-.ai-status{background:none;color:#996629;padding:0;font-size:.8125rem;white-space:normal}
-.ai-status.transmitted{background:none;color:#48735b}
-.ai-validate{background:#252525;border-color:#252525;border-radius:0;font-size:.875rem}
-.ai-correct,.ai-heading button{border:0;border-bottom:1px solid #aaa;border-radius:0;padding:10px 0;font-size:.8125rem}
-.ai-heading button{white-space:nowrap}.ai-vehicle{font-size:.875rem;margin:12px 0 6px;color:#333}
-.ai-muted{font-size:.8125rem}.ai-live{border-top:1px solid #eee;padding-top:18px;font-size:.75rem}
-#mobile-bottom-nav{background:#fff;border-top:1px solid #ddd}
-.mbn-item{color:#666;font-size:.75rem;min-height:44px}
-#mobile-menu-overlay{background:#fff!important;color:#242424}
-#mobile-menu-overlay>div:first-child>div,#mobile-menu-overlay>div:first-child>button{color:#242424!important;font-family:inherit!important}
-#mobile-menu-items button{color:#333!important;background:#fff!important;border-radius:0!important;border-bottom:1px solid #ddd!important;font-family:inherit!important}
-#mobile-menu-roles button[aria-current="true"]{background:#f2f2f2!important;border-left:2px solid var(--red)!important}
-@media(max-width:800px){.ai-layout{grid-template-columns:1fr;gap:16px}.ai-stats{gap:12px}.ai-stat{font-size:.75rem}.ai-heading{gap:12px}.ai-heading h1{font-size:1.4rem}}
-@media(max-width:768px){.content{padding:20px 16px calc(120px + env(safe-area-inset-bottom))}.topbar{padding:18px 16px}.card{padding:20px 0}.table-wrap table tr,table.table tr{border-radius:1px;box-shadow:none}.stats-row{gap:16px}.ai-field{gap:14px}.ai-field-actions{justify-content:flex-end}.ai-detail{padding:8px 0}.btn{white-space:normal}.ai-correct{min-height:44px}}
+<style id="hc-demandes-compactes">
+.hc-demande-card{padding:16px 0;border-bottom:1px solid var(--gray-light)}
+.hc-demande-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.hc-demande-details{margin-top:12px}.hc-demande-details>summary{cursor:pointer;font-weight:600;padding:10px 0;min-height:44px}
+.hc-demande-documents{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.hc-completion-note{margin-top:12px;padding:12px;border:1px solid var(--gray-light);border-radius:8px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.hc-info-vehicle{margin-top:12px;border-top:1px solid var(--gray-light);padding:12px 0}.hc-info-vehicle>summary{cursor:pointer;min-height:44px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -1162,7 +1107,7 @@ tbody tr:hover{background:#fafafa}.badge{border-radius:2px;font-weight:500}
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo hc-logo-officiel">
-      <img src="logo-helixcar.png" alt="HelixCar — Services automobiles">
+      <img src="assets/logo-helixcar-blanc.png" alt="HelixCar — Services automobiles">
     </div>
     <div class="sidebar-user">
       <div class="user-avatar" id="sb-avatar"></div>
@@ -3010,17 +2955,33 @@ async function loadDemandesClient() {
   zone.innerHTML = demandes.map(function (d) {
     const dv = devisParDemande[d.id];
     const etat = _etatDevisClient(dv);
-    return '<div class="detail-row" data-demande="' + escapeHtml(d.id) + '">'
+    return '<div class="hc-demande-card" data-demande="' + escapeHtml(d.id) + '"><div class="hc-demande-summary">'
       + '<span class="detail-label">' + escapeHtml(d.numero_client || '—') + '</span>'
       + '<span class="detail-val">' + escapeHtml(_libelleServiceClient(d.type_service))
       + ' · <span class="badge badge-progress">' + escapeHtml(LIB_STATUT_DEMANDE_CLIENT[d.statut] || d.statut || '—') + '</span>'
       + (etat ? ' <span class="badge ' + etat.cls + '" data-etat-devis>' + escapeHtml(etat.texte) + '</span>' : '')
-      + ' <button class="btn btn-sm btn-outline hc-demande-apercu-btn" aria-label="Afficher le récapitulatif" title="Afficher le récapitulatif" '
-      + actionHtml('ouvrirApercuDemandeClient', [d.id]) + '>👁</button>'
+      + '</span></div><details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-documents">'
+      + ' <button class="btn btn-sm btn-outline hc-demande-apercu-btn" '
+      + actionHtml('ouvrirApercuDemandeClient', [d.id]) + '>Récapitulatif de la demande</button>'
       + (dv && ['envoye','accepte','refuse'].indexOf(dv.statut) !== -1 ? ' <a class="btn btn-sm btn-outline" href="devis.html?id=' + encodeURIComponent(dv.id) + '">Consulter mon devis</a>' : '')
       + (dv && dv.paiement_statut==='paye' && /\+qa-final01@/i.test((window._currentClient||{}).email||'') ? ' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[dv.id,false])+'>Document de paiement TEST</button>' : '')
-      + '</span></div>';
+      + '</div></details><div class="hc-completion-note" data-completion-note>Vérification des informations…</div></div>';
   }).join('');
+  await Promise.all(demandes.map(async function(d) {
+    const card = Array.from(zone.querySelectorAll('[data-demande]')).find(el => el.dataset.demande === String(d.id));
+    const note = card && card.querySelector('[data-completion-note]');
+    if (!note) return;
+    try {
+      const lignes = await chargerInformationsDemande(d.id);
+      const restantes = lignes.filter(_estRestante);
+      if (!restantes.length) { note.remove(); return; }
+      note.innerHTML = '<span>' + restantes.length + ' information' + (restantes.length > 1 ? 's' : '') + ' à compléter</span><button class="btn btn-sm btn-primary" '
+        + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>';
+    } catch(e) {
+      note.innerHTML = '<span>Informations momentanément indisponibles.</span><button class="btn btn-sm btn-outline" '
+        + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Vérifier mes informations</button>';
+    }
+  }));
 }
 
 // ── LOT D01 — MES MISSIONS, MON PROFIL, MES ÉVALUATIONS ──────
@@ -4028,8 +3989,8 @@ function _infosGrouper(lignes) {
       ordre.push(cle);
     }
     groupes[cle].lignes.push(l);
-    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && !groupes[cle].identite) {
-      groupes[cle].identite = l.valeur;
+    if (m && /^vehicule_\d+_(marque_modele|immatriculation|ville_depart|ville_arrivee)$/.test(l.cle) && l.valeur) {
+      groupes[cle].identite += (groupes[cle].identite ? ' · ' : '') + l.valeur;
     }
   });
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
@@ -4064,7 +4025,14 @@ async function loadInfosClient() {
   // compléter ».
   const resultats = await Promise.all(demandes.map(function (d) {
     return chargerInformationsDemande(d.id)
-      .then(function (lignes) { return { d: d, lignes: lignes }; })
+      .then(async function (lignes) {
+        let vehicules = [];
+        try {
+          const v = await sbAuth.from('vehicules').select('position,marque_modele,immatriculation,ville_depart,ville_arrivee').eq('dossier_id', d.id).order('position', {ascending:true});
+          if (!v.error) vehicules = v.data || [];
+        } catch(e) { /* Les rubriques restent accessibles si l’identité est indisponible. */ }
+        return { d: d, lignes: lignes, vehicules: vehicules };
+      })
       .catch(function () { return { d: d, erreur: true }; });
   }));
 
@@ -4098,11 +4066,14 @@ async function loadInfosClient() {
       + (fournies > 1 ? 'renseignées' : 'renseignée') + '.</div>';
     corps += '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore attendues</div>';
     groupes.forEach(function (g) {
+      const v = (r.vehicules || []).find(function(v) { return Number(v.position) === g.rang; });
+      if (v) g.identite = [v.marque_modele, v.immatriculation, [v.ville_depart, v.ville_arrivee].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
+      if (g.rang && !g.identite) g.identite = 'Identité non renseignée';
       const gRestantes = g.lignes.filter(_estRestante);
       const gComplet = gRestantes.length === 0;
-      corps += '<div class="detail-row" data-groupe="' + escapeHtml(g.cle) + '"><span class="detail-label">'
+      corps += '<details class="hc-info-vehicle" data-groupe="' + escapeHtml(g.cle) + '"><summary>'
         + escapeHtml(g.titre) + (g.identite ? ' · ' + escapeHtml(g.identite) : '')
-        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? 'Complet' : gRestantes.length + ' à compléter') + '</span></span>'
+        + ' <span class="badge ' + (gComplet ? 'badge-done' : 'badge-pending') + '">' + (gComplet ? 'Complet' : gRestantes.length + ' à compléter') + '</span></summary>'
         + '<span class="detail-val">'
         + (gRestantes.length
             ? gRestantes.map(function (l) {
@@ -4110,7 +4081,7 @@ async function loadInfosClient() {
                 return '<span class="info-ligne" data-cle="' + escapeHtml(l.cle) + '">' + escapeHtml(_infoLibelleEtat(l)) + '</span>' + motif;
               }).join('<br>')
             : 'Toutes les informations sont renseignées.')
-        + '</span></div>';
+        + '</span></details>';
     });
     blocs.push(
       '<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '" data-complet="' + (complet ? '1' : '0') + '">'

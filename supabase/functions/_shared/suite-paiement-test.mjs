@@ -20,11 +20,10 @@ export async function suitePaiementTest(devisId,{sb,jsPDF,env,fetchFn=fetch,now=
  }
  if(!f.pdf_path) await checked(sb.from('documents_paiement_test').update({pdf_path:path}).eq('id',f.id));
  if(!env.RESEND_API_KEY||!env.RESEND_FROM) throw new Error('EMAIL_CONFIGURATION_MISSING');
- const link=PREVIEW+'/devis.html?id='+encodeURIComponent(f.devis_id);
  const pending=f.informations_attendues.filter(i=>['attendue','a_corriger'].includes(i.statut));
- const needed=pending.length?'<h2>Informations à compléter</h2><ul>'+pending.map(i=>'<li>'+esc(i.libelle)+(i.commentaire?' : '+esc(i.commentaire):'')+'</li>').join('')+'</ul><p>Complétez ces informations dans votre espace client. La mission reste en brouillon jusqu’à validation.</p>':'<p>Votre dossier sera contrôlé par HelixCar avant publication de la mission.</p>';
+ const needed=pending.length?'<p>Il reste quelques informations à compléter pour organiser votre convoyage. Retrouvez-les dans votre espace client.</p>':'<p>Votre dossier sera contrôlé par HelixCar avant publication de la mission.</p>';
  const clientPayload={from:env.RESEND_FROM,to:[f.snapshot.email],subject:'[TEST] Votre paiement a bien été accepté — '+f.snapshot.reference,
- html:'<h1>Votre paiement de test a bien été accepté</h1><p>Devis '+esc(f.snapshot.reference)+' — '+(f.montant_centimes/100).toFixed(2)+' €.</p><p>Aucun débit réel. Le document joint est sans valeur fiscale.</p>'+needed+'<p><a href="'+esc(link)+'">Consulter mon devis et mon document</a></p><p><a href="'+PREVIEW+'/dashboard.html">Compléter mes informations</a></p>',
+ html:'<h2>Paiement de test confirmé</h2><p>Devis '+esc(f.snapshot.reference)+' — '+(f.montant_centimes/100).toFixed(2)+' €.</p>'+needed+'<p><a href="'+PREVIEW+'/dashboard.html" style="display:inline-block;padding:12px 18px;background:#101820;color:#fff;text-decoration:none;border-radius:6px">'+(pending.length?'Compléter mes informations':'Voir ma demande')+'</a></p><p style="font-size:12px;color:#666">Aucun débit réel. Le document joint est sans valeur fiscale. La mission reste soumise à validation.</p>',
  attachments:[{filename:f.numero+'.pdf',content:base64(bytes)}]};
  const adminPayload={from:env.RESEND_FROM,to:['helixcarpro@gmail.com'],subject:'[TEST] Paiement confirmé — '+f.snapshot.reference,
  html:'<h1>Paiement Stripe de test confirmé</h1><p>'+esc(f.snapshot.reference)+' : '+(f.montant_centimes/100).toFixed(2)+' €.</p><p>Les missions sont en brouillon. '+pending.length+' information(s) restent à compléter. Publication soumise au contrôle du dossier et au tarif convoyeur.</p><p><a href="'+PREVIEW+'/dashboard.html">Ouvrir l’administration</a></p>'};

@@ -38,10 +38,10 @@ window.supabase={createClient(){return {
   },n);}
   for(const n of [1,2,3,5]){
    await ouvrir(n);
-   check(n+' véhicules : toutes les fiches ouvertes et un seul envoi',await page.locator('.completion-card[open]').count()===n && await page.locator('[data-enregistrer-groupe]').count()===0 && await page.locator('#completer-envoyer').isVisible());
+   check(n+' véhicules : première fiche ouverte et un seul envoi',await page.locator('.completion-card[open]').count()===1 && await page.locator('[data-enregistrer-groupe]').count()===0 && await page.locator('#completer-envoyer').isVisible());
    check(n+' véhicules : seules les immatriculations manquantes sont éditables',await page.locator('#completer-rubriques input').count()===n);
    await page.locator('#completer-champ-vehicule_1_immatriculation').fill('TEST-QA plaque1');
-   if(n>1)await page.locator('#completer-champ-vehicule_2_immatriculation').fill('TEST-QA plaque2');
+   if(n>1){await page.locator('summary[data-groupe="vehicule_2"]').click();await page.locator('#completer-champ-vehicule_2_immatriculation').fill('TEST-QA plaque2');}
    await page.locator('#completer-envoyer').click();
    await page.waitForFunction(()=>!_completerEnvoiEnCours);
    check(n+' véhicules : toutes les saisies transmises ensemble',await page.evaluate(n=>__appels.length===1 && Object.keys(__appels[0].p_reponses).length===Math.min(n,2),n));

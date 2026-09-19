@@ -9592,6 +9592,7 @@ function _completerChampId(cle) { return 'completer-champ-' + cle; }
 // LOT D01 — regroupement par véhicule (D01-012/013) et états « Complet »
 // (D01-016). Les clés vehicule_<n>_… viennent du serveur (migration 101) ;
 // l'identité disponible (marque/modèle, immatriculation) titre le groupe.
+var _completerVehicules = [];
 function _completerGrouper(lignes) {
   var groupes = {}, ordre = [];
   lignes.forEach(function (l) {
@@ -9602,7 +9603,12 @@ function _completerGrouper(lignes) {
       ordre.push(cle);
     }
     groupes[cle].lignes.push(l);
-    if (m && /_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur && (!groupes[cle].identite || /_marque_modele$/.test(l.cle))) groupes[cle].identite = l.valeur;
+    if (m && /^vehicule_\d+_(marque_modele|immatriculation)$/.test(l.cle) && l.valeur) groupes[cle].identite += (groupes[cle].identite ? ' · ' : '') + l.valeur;
+  });
+  ordre.forEach(function(k) {
+    var g = groupes[k], v = _completerVehicules.find(function(v){return Number(v.position) === g.rang;});
+    if (v) g.identite = [v.marque_modele, v.immatriculation, [v.ville_depart, v.ville_arrivee].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
+    if (g.rang && !g.identite) g.identite = 'Identité non renseignée';
   });
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
 }
@@ -9669,7 +9675,7 @@ function _completerRendre(lignes) {
       etat.textContent = restantes.length ? restantes.length + ' à compléter' : (g.lignes.some(function(l){return l.statut === 'transmise';}) ? 'En vérification' : 'Complet');
       entete.appendChild(titre); entete.appendChild(etat);
       carte.appendChild(entete); carte.appendChild(contenu);
-      if(restantes.length){carte.open = true; premierOuvert = true;}
+      if(restantes.length && !premierOuvert){carte.open = true; premierOuvert = true;}
     }
     var connues = g.lignes.filter(function (l) { return !_completerEstRestante(l); });
     if (connues.length) {
@@ -9735,6 +9741,7 @@ async function ouvrirCompleterInformations(demandeId) {
   var generation = ++_completerGeneration;
   _completerDemandeId = demandeId;
   _completerRubriques = [];
+  _completerVehicules = [];
   var envoyer = document.getElementById('completer-envoyer');
   if (envoyer) envoyer.style.display = 'none';
   var contexte = document.getElementById('completer-sous-titre');
@@ -9755,6 +9762,12 @@ async function ouvrirCompleterInformations(demandeId) {
     var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
     if (generation !== _completerGeneration) return;
     if (r && r.error) throw new Error(r.error.message);
+    try {
+      var identites = await _sb.from('vehicules').select('position,marque_modele,immatriculation,ville_depart,ville_arrivee').eq('dossier_id', demandeId).order('position', {ascending:true});
+      if (generation !== _completerGeneration) return;
+      if (!identites.error) _completerVehicules = identites.data || [];
+    } catch(e) { /* Garder la complétion disponible même sans identité. */ }
+    if (generation !== _completerGeneration) return;
     _completerRendre((r && r.data) || []);
   } catch (e) {
     if (generation !== _completerGeneration) return;
