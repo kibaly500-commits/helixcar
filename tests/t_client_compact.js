@@ -41,22 +41,28 @@ const {lancerNavigateur} = require('./env');
       window.chargerDemandesClient = async () => [
         {id:'d1',numero_client:'HC-2026-6320',type_service:'professionnel',statut:'nouveau'},
         {id:'d2',numero_client:'HC-2026-8594',type_service:'stockage',statut:'nouveau'},
-        {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau'}];
-      window.chargerDevisClient = async () => [];
+        {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau'},
+        {id:'d4',numero_client:'HC-2026-4479',type_service:'stockage',statut:'nouveau'}];
+      window.chargerDevisClient = async () => [{id:'q4',client_id:'d4',statut:'accepte',paiement_statut:'en_attente'}];
       window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
       await loadDemandesClient();
     });
-    assert.equal(await p.locator('.hc-demandes-conseil').count(),1);
-    assert.match(await p.locator('[data-demande="d1"] .hc-info-bleu').textContent(),/attente de validation/);
-    assert.match(await p.locator('[data-demande="d2"] .hc-info-orange').textContent(),/À compléter/);
+    assert.equal(await p.locator('[data-groupe-demandes="action"] .hc-demande-card').count(),2);
+    assert.equal(await p.locator('[data-groupe-demandes="suivi"] .hc-demande-card').count(),2);
+    assert.match(await p.locator('[data-demande="d1"] [data-completion-note]').textContent(),/Informations en vérification/);
+    assert.match(await p.locator('[data-demande="d2"] [data-completion-note]').textContent(),/Informations à compléter/);
     assert.match(await p.locator('[data-demande="d3"] .hc-info-vert').textContent(),/Demande validée/);
+    assert.match(await p.locator('[data-demande="d3"] [data-completion-note]').textContent(),/Devis en préparation/);
+    assert.match(await p.locator('[data-demande="d4"] [data-completion-note]').textContent(),/Devis à régler/);
+    assert.equal(await p.locator('[data-demande="d4"] > a').getAttribute('href'),'devis.html?id=q4');
     assert.equal(await p.getByText('Reçue',{exact:true}).count(),0);
     for (const width of [390,1440]) {
       await p.setViewportSize({width,height:950});
       assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert(await p.locator('.hc-demande-card').evaluateAll(cards=>cards.every((card,i)=>{
         const s=getComputedStyle(card),r=card.getBoundingClientRect();
-        return s.backgroundColor==='rgb(255, 255, 255)' && parseFloat(s.borderTopWidth)>=1 && (!i || r.top-cards[i-1].getBoundingClientRect().bottom>=19);
+        const prev=i?cards[i-1].getBoundingClientRect():null;
+        return s.backgroundColor==='rgb(255, 255, 255)' && parseFloat(s.borderTopWidth)>=1 && (!prev || r.top-prev.bottom>=15 || r.left-prev.right>=15);
       })));
       assert(await p.locator('.hc-demande-details summary').first().evaluate(el=>{const c=getComputedStyle(el,'::marker').color.match(/\d+/g).map(Number);return c[0]>c[1]+50 && c[0]>c[2]+50;}));
       await p.screenshot({path:'/tmp/hc-demandes-compactes-'+width+'.png',fullPage:true});
@@ -72,15 +78,15 @@ const {lancerNavigateur} = require('./env');
     assert.match(await vehicle.textContent(), /Peugeot 308 · AB-123-CD · Paris → Lyon/);
     assert.equal(await p.locator('.hc-info-vehicle').getAttribute('open'), null);
     await p.evaluate(async () => {window.chargerInformationsDemande = async () => [];await loadDemandesClient();});
-    assert.match(await p.locator('[data-completion-note]').textContent(), /Aucune information complémentaire demandée/);
+    assert.match(await p.locator('[data-completion-note]').textContent(), /Prestation en préparation/);
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'PAYÉ',type_service:'convoyage'},{id:'d2',numero_client:'NON PAYÉ',type_service:'stockage'}];
       window.chargerInformationsDemande = async () => [{cle:'vehicule_1_vin',statut:'transmise'}];
       await loadDemandesClient(); await loadInfosClient();
     });
-    assert.equal(await p.locator('[data-paiement="paye"] [data-demande="d1"]').count(),1);
-    assert.equal(await p.locator('[data-paiement="non-paye"] [data-demande="d2"]').count(),1);
-    assert.match(await p.locator('[data-paiement="paye"] [data-completion-note]').textContent(),/en attente de validation/);
+    assert.equal(await p.locator('[data-paiement="paye"][data-demande="d1"]').count(),1);
+    assert.equal(await p.locator('[data-paiement="non-paye"][data-demande="d2"]').count(),1);
+    assert.match(await p.locator('[data-paiement="paye"] [data-completion-note]').textContent(),/Informations en vérification/);
     assert.equal(await p.locator('#client-infos-liste [data-demande]').count(),2);
     assert.equal(await p.locator('#client-infos-liste button').count(),0);
     await p.evaluate(async () => {
@@ -97,7 +103,7 @@ const {lancerNavigateur} = require('./env');
     assert.match(await p.locator('[data-mission="m4"]').textContent(),/En attente de paiement/);
     await p.evaluate(async () => {window.chargerDemandesClient = async () => [{id:'d1'}];});
     await p.evaluate(async () => {window.chargerInformationsDemande = async () => {throw Error('offline')};await loadDemandesClient();});
-    assert.match(await p.locator('[data-completion-note]').textContent(), /indisponibles/);
+    assert.match(await p.locator('[data-completion-note]').textContent(), /indisponible/);
     await p.evaluate(async () => {
       _construirePdfDevis = () => ({output:() => new Blob(['layout fixture'],{type:'application/pdf'})});
       await ouvrirApercuDemandeClient('d1');
