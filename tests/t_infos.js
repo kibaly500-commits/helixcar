@@ -211,6 +211,7 @@ window.emailjs = { init: function () {},
 
   const refusTelephone = await page.evaluate(async () => {
     window.__journal = [];
+    document.getElementById('completer-champ-contact_pc_nom').value = 'TEST-QA Contact';
     document.getElementById('completer-champ-contact_pc_tel').value = '06';
     await envoyerInformationsCompletees();
     return { appels: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'repondre_informations_demande').length, texte: document.getElementById('completer-message').textContent };
@@ -233,7 +234,7 @@ window.emailjs = { init: function () {},
   });
   check('B9 : un double clic n\'envoie qu\'UNE fois', envoi.appels === 1, 'appels=' + envoi.appels);
   check('B10 : une confirmation simple est affichée',
-    /bien été enregistrées/.test(envoi.message), envoi.message);
+    /Toutes vos informations ont été soumises/.test(envoi.message), envoi.message);
   check('B11 : l\'écran est relu depuis le serveur après enregistrement',
     envoi.champsRestants.length === 0, JSON.stringify(envoi.champsRestants));
 

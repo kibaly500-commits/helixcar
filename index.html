@@ -9630,6 +9630,23 @@ function _completerSection(l) {
   if (/contact_pc|depart|prise_en_charge/.test(cle)) return 'Prise en charge';
   return 'Votre véhicule';
 }
+function _completerBrouillonCle() { return 'hc-completion-brouillon:' + _completerDemandeId; }
+function _completerEtatBouton() {
+  var bouton = document.getElementById('completer-envoyer');
+  if (bouton) bouton.disabled = _completerEnvoiEnCours || !_completerRubriques.length || _completerRubriques.some(function(l) {
+    var el = document.getElementById(_completerChampId(l.cle));
+    return !el || !el.value.trim() || !el.checkValidity();
+  });
+}
+function _completerConserverSaisies() {
+  var brouillon = {};
+  _completerRubriques.forEach(function(l) {
+    var el = document.getElementById(_completerChampId(l.cle));
+    if (el) brouillon[l.cle] = { base: l.valeur || '', valeur: el.value };
+  });
+  try { sessionStorage.setItem(_completerBrouillonCle(), JSON.stringify(brouillon)); } catch(e) {}
+  _completerEtatBouton();
+}
 function _completerRendre(lignes) {
   var zone = document.getElementById('completer-rubriques');
   var prog = document.getElementById('completer-progression');
@@ -9661,7 +9678,9 @@ function _completerRendre(lignes) {
     return;
   }
   var bouton = document.getElementById('completer-envoyer');
-  if (bouton) bouton.style.display = '';
+  if (bouton) { bouton.style.display = ''; bouton.textContent = 'Soumettre mes informations'; }
+  var brouillon = {};
+  try { brouillon = JSON.parse(sessionStorage.getItem(_completerBrouillonCle()) || '{}') || {}; } catch(e) {}
 
   var groupes = _completerGrouper(lignes);
   var premierOuvert = false;
@@ -9725,6 +9744,10 @@ function _completerRendre(lignes) {
                  : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
       champ.id = _completerChampId(l.cle);
       champ.value = l.valeur || '';
+      if (brouillon[l.cle] && brouillon[l.cle].base === (l.valeur || '')) champ.value = brouillon[l.cle].valeur;
+      champ.required = true;
+      champ.maxLength = 2000;
+      champ.addEventListener('input', _completerConserverSaisies);
       if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
       champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
@@ -9732,6 +9755,7 @@ function _completerRendre(lignes) {
     });
 
   });
+  _completerEtatBouton();
 }
 
 // Fermeture : dans l'espace client, on prévient le cadre parent ; sur
@@ -9783,31 +9807,30 @@ async function ouvrirCompleterInformations(demandeId) {
   }
 }
 
-async function envoyerInformationsCompletees(groupeCle) {
+async function envoyerInformationsCompletees() {
   // Double clic : le second appel est ignoré tant que le premier n'a
   // pas répondu. Rien n'est envoyé deux fois.
   if (_completerEnvoiEnCours) return;
   if (!_completerDemandeId) return;
   var demandeId = _completerDemandeId, generation = _completerGeneration;
 
-  // LOT D01 — enregistrement PROGRESSIF (D01-016) : ce qui est saisi
-  // part maintenant, le reste peut attendre. Le serveur ignore les
-  // rubriques absentes et n'écrase jamais une rubrique validée.
+  // Une seule soumission pour tous les blocs de la demande.
   var reponses = {};
   var nbSaisies = 0;
   _completerRubriques.forEach(function (l) {
-    var m = /^vehicule_(\d+)_/.exec(l.cle || '');
-    if (groupeCle && groupeCle !== (m ? 'vehicule_' + m[1] : 'general')) return;
     var el = document.getElementById(_completerChampId(l.cle));
     var v = el ? String(el.value || '').trim() : '';
     if (!v) return;
     reponses[l.cle] = v;
     nbSaisies++;
   });
-  if (!nbSaisies) {
-    _completerAfficherMessage('Renseignez au moins une information avant d\'enregistrer.');
+  _completerConserverSaisies();
+  if (!nbSaisies || nbSaisies !== _completerRubriques.length) {
+    _completerAfficherMessage('Complétez tous les champs obligatoires de tous les blocs avant de soumettre votre demande.');
     return;
   }
+  var champInvalide = _completerRubriques.map(function(l){return document.getElementById(_completerChampId(l.cle));}).find(function(el){return !el.checkValidity();});
+  if (champInvalide) { champInvalide.closest('details.completion-card').open = true; champInvalide.reportValidity(); return; }
 
   var invalide = Object.keys(reponses).find(function(cle){
     if(!/(_tel|telephone)$/.test(cle))return false;
@@ -9819,14 +9842,12 @@ async function envoyerInformationsCompletees(groupeCle) {
     if(champ){var carte=champ.closest('details.completion-card');if(carte)carte.open=true;champ.setAttribute('aria-invalid','true');champ.focus();}
     _completerAfficherMessage('Indiquez un numéro de téléphone complet, avec indicatif pour un numéro international.');return;
   }
+  if (!window.confirm('Soumettre toutes les informations de cette demande à notre équipe pour validation ?')) return;
   _completerEnvoiEnCours = true;
   var bouton = document.getElementById('completer-envoyer');
   var libelleBouton = bouton ? bouton.textContent : '';
   if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement…'; }
-  var boutonsGroupes = document.querySelectorAll('[data-enregistrer-groupe]');
-  boutonsGroupes.forEach(function (b) { b.disabled = true; });
-  // Les autres fiches restent éditables pendant cette requête. Seuls
-  // les champs envoyés sont figés pour ne pas masquer une modification.
+  // Tous les champs soumis sont figés pendant la requête.
   Object.keys(reponses).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.disabled = true; });
   _completerAfficherMessage('');
 
@@ -9841,6 +9862,7 @@ async function envoyerInformationsCompletees(groupeCle) {
       _completerAfficherMessage('Aucune nouvelle information enregistrée. Rechargez ce dossier pour vérifier son état avant de réessayer.');
       return;
     }
+    try { sessionStorage.removeItem(_completerBrouillonCle()); } catch(e) {}
     // On relit l'état RÉEL depuis le serveur : après un F5 ou une
     // reprise, l'écran montre toujours ce que la base contient.
     var relu = await _sb.rpc('informations_demande', { p_client_id: demandeId });
@@ -9850,16 +9872,9 @@ async function envoyerInformationsCompletees(groupeCle) {
       _completerAfficherMessage('Le serveur a reçu votre enregistrement, mais son état ne peut pas être relu. Vos saisies sont conservées ; vérifiez le dossier avant de renvoyer.');
       return;
     }
-    var nonEnvoyees = {};
-    _completerRubriques.forEach(function (l) {
-      var el = document.getElementById(_completerChampId(l.cle));
-      if (el && !Object.prototype.hasOwnProperty.call(reponses, l.cle)) nonEnvoyees[l.cle] = el.value;
-    });
     _completerRendre(lignesRelues);
-    Object.keys(nonEnvoyees).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.value = nonEnvoyees[cle]; });
-    var restantes = lignesRelues ? lignesRelues.filter(_completerEstRestante).length : null;
-    _completerAfficherMessage('Vos informations ont bien été enregistrées.'
-      + (restantes ? ' Il reste ' + restantes + ' information' + (restantes > 1 ? 's' : '') + ' à renseigner : maintenant ou plus tard, rien n\'est perdu.' : ''), 'ok');
+    var restantes = lignesRelues.filter(_completerEstRestante).length;
+    _completerAfficherMessage(restantes ? 'La demande a évolué. Vérifiez les informations encore à compléter.' : 'Toutes vos informations ont été soumises. Votre demande est en attente de validation par notre équipe.', restantes ? '' : 'ok');
     // L'espace client relit son onglet depuis le serveur, jamais depuis ce message.
     if (_hcModeIntegre()) {
       try { window.parent.postMessage({ type: 'hc-completion-enregistree' }, window.location.origin); } catch (e) {}
@@ -9871,9 +9886,9 @@ async function envoyerInformationsCompletees(groupeCle) {
     _completerAfficherMessage('L\'enregistrement n\'a pas abouti. Vos saisies sont conservées : réessayez.');
   } finally {
     _completerEnvoiEnCours = false;
-    if (bouton) { bouton.disabled = false; bouton.textContent = libelleBouton || 'Enregistrer mes informations'; }
-    boutonsGroupes.forEach(function (b) { b.disabled = false; });
+    if (bouton) { bouton.textContent = libelleBouton || 'Soumettre mes informations'; }
     if (generation === _completerGeneration) Object.keys(reponses).forEach(function (cle) { var el = document.getElementById(_completerChampId(cle)); if (el) el.disabled = false; });
+    _completerEtatBouton();
   }
 }
 

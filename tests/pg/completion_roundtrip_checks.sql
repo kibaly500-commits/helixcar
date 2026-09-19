@@ -17,10 +17,17 @@ begin
  bad:=false;begin perform public.repondre_informations_demande(d,'{"vehicule_1_contact_pc_nom":"Ne doit pas rester","vehicule_1_contact_pc_tel":"06"}');exception when invalid_parameter_value then bad:=true;end;
  if not bad then raise exception 'Telephone court accepte'; end if;
  if exists(select 1 from public.informations_demande(d) where cle='vehicule_1_contact_pc_nom' and statut='transmise') then raise exception 'Envoi invalide partiellement persiste'; end if;
- n:=public.repondre_informations_demande(d,'{"vehicule_1_contact_pc_tel":"+44 20 7946 0958","vehicule_1_contact_pc_nom":"Mauvais contact fictif","vehicule_1_immatriculation":"AB-123-CD","cle_inconnue":"ignoree"}');
- if n<>3 then raise exception 'Envoi international / partiel incorrect'; end if;
+ bad:=false;begin perform public.repondre_informations_demande(d,'{"vehicule_1_contact_pc_tel":"+44 20 7946 0958","vehicule_1_contact_pc_nom":"Mauvais contact fictif","vehicule_1_immatriculation":"AB-123-CD"}');exception when invalid_parameter_value then bad:=true;end;
+ if not bad then raise exception 'Envoi partiel accepté'; end if;
+ if exists(select 1 from public.informations_demande(d) where statut='transmise') then raise exception 'Envoi partiel persisté';end if;
+ select jsonb_object_agg(cle,case when cle ~ '(_tel|telephone)$' then '+44 20 7946 0958' when cle ~ 'vin$' then 'VF3ABCDEF12345678' when cle ~ 'immatriculation$' then 'CD-456-EF' when cle ~ 'date' then '2026-10-01' else 'TEST QA information complete' end) into reponses from public.informations_demande(d) where statut in ('attendue','a_corriger');
+ bad:=false;begin perform public.repondre_informations_demande(d,reponses || '{"vehicule_2_contact_pc_tel":"06"}'::jsonb);exception when invalid_parameter_value then bad:=true;end;
+ if not bad then raise exception 'Téléphone court accepté dans un envoi complet';end if;
+ if exists(select 1 from public.informations_demande(d) where statut='transmise') then raise exception 'Échec de validation non atomique';end if;
+ n:=public.repondre_informations_demande(d,reponses || '{"cle_inconnue":"ignoree"}'::jsonb);
+ if n<>(select count(*) from jsonb_object_keys(reponses)) then raise exception 'Envoi global incomplet';end if;
  n:=public.repondre_informations_demande(d,'{"vehicule_1_contact_pc_tel":"+44 20 7946 0958"}');if n<>0 then raise exception 'Rejeu non idempotent'; end if;
- select statut into etat from public.informations_demande(d) where cle='vehicule_2_immatriculation';if etat<>'attendue' then raise exception 'Autre vehicule modifie'; end if;
+ select statut into etat from public.informations_demande(d) where cle='vehicule_2_immatriculation';if etat<>'transmise' then raise exception 'Deuxième véhicule non soumis'; end if;
  -- Le client ne peut pas valider lui-même ses réponses.
  bad:=false;begin update public.demande_informations_manquantes set statut='validee' where client_id=d and cle='vehicule_1_contact_pc_nom';exception when insufficient_privilege then bad:=true;end;
  if exists(select 1 from public.informations_demande(d) where cle='vehicule_1_contact_pc_nom' and statut='validee') then raise exception 'Auto-validation client';end if;
@@ -43,7 +50,7 @@ begin
  n:=public.repondre_informations_demande(d,'{"vehicule_1_contact_pc_nom":"Ecrasement interdit"}');if n<>0 then raise exception 'Valeur validee ecrasee';end if;
  -- Terminer toutes les rubriques en un seul envoi, puis valider côté admin.
  select jsonb_object_agg(cle,case when cle ~ '(_tel|telephone)$' then '+33 6 12 34 56 78' when cle ~ 'vin$' then 'VF3ABCDEF12345678' when cle ~ 'immatriculation$' then 'CD-456-EF' when cle ~ 'date' then '2026-10-01' else 'TEST QA information complete' end) into reponses from public.informations_demande(d) where statut in ('attendue','a_corriger');
- perform public.repondre_informations_demande(d,reponses);
+ if reponses is not null then perform public.repondre_informations_demande(d,reponses); end if;
  if exists(select 1 from public.informations_demande(d) where statut in ('attendue','a_corriger')) then raise exception 'Envoi global incomplet';end if;
  if not exists(select 1 from public.informations_demande(d) where statut='transmise') then raise exception 'Dossier annonce complet avant controle';end if;
  reset role;perform set_config('request.jwt.claim.sub',a::text,true);set local role authenticated;

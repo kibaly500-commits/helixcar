@@ -2663,7 +2663,11 @@ async function changerDecisionInformation(demandeId, cle, decision) {
     alert('La décision n\'a pas pu être enregistrée.\n\n' + e.message);
     return;
   }
-  await rendreInfosDemandeAdmin({ id: demandeId });
+  if (String(_ficheDemandeActive) === String(demandeId)) {
+    await ouvrirFicheDemande(demandeId);
+  } else {
+    await rendreInfosDemandeAdmin({ id: demandeId });
+  }
 }
 
 function _dateHeureFr(iso) {
@@ -4810,6 +4814,7 @@ function openModal(id) {
   _poserVerrouScroll('modal:' + id);
 }
 function closeModal(id) {
+  if (id === 'fiche-demande') { _ficheDemandeActive = null; ++_ficheDemandeGeneration; }
   const el = document.getElementById('modal-' + id);
   reinitialiserAffichageMotsDePasse(el);
   el.classList.remove('open');
@@ -10554,9 +10559,40 @@ function _afficherJournalEnvois() {
   });
 }
 
-function ouvrirFicheDemande(clientId) {
-  var c = _demandesDevisListe.filter(function(x) { return String(x.id) === String(clientId); })[0];
-  if (!c) { alert('Demande introuvable.'); return; }
+var _ficheDemandeActive = null, _ficheDemandeGeneration = 0;
+async function ouvrirFicheDemande(clientId) {
+  var generation = ++_ficheDemandeGeneration;
+  _ficheDemandeActive = clientId;
+  var corps = document.getElementById('fiche-demande-corps');
+  var titre = document.getElementById('fiche-demande-titre');
+  if (titre) titre.textContent = 'Demande';
+  if (corps) corps.textContent = 'Chargement du récapitulatif actualisé…';
+  openModal('fiche-demande');
+  try {
+    var donnees = await Promise.all([
+      sbFetch('clients?id=eq.' + encodeURIComponent(clientId) + '&select=*'),
+      sbFetchToutePage('vehicules?dossier_id=eq.' + encodeURIComponent(clientId) + '&order=position.asc'),
+      chargerInfosDemandeAdmin(clientId)
+    ]);
+    if (generation !== _ficheDemandeGeneration) return;
+    if (!donnees[0] || !donnees[0][0]) throw new Error('Demande introuvable.');
+    // Copie réservée à la fiche écrite : les sources des devis/PDF restent inchangées.
+    var c = Object.assign({}, donnees[0][0], { _vehicules: donnees[1] || [] });
+    c._informationsValidees = (donnees[2] || []).filter(function(l){return l.statut === 'validee';});
+    var correspondances = {restit_adresse:'adresse_restit_rue', restit_date:'date_restitution'};
+    c._informationsValidees.forEach(function(l) {
+      if (!/^vehicule_/.test(l.cle) && Object.prototype.hasOwnProperty.call(c, correspondances[l.cle] || l.cle)) c[correspondances[l.cle] || l.cle] = l.valeur;
+    });
+    _rendreFicheDemande(c);
+    var complements = c._informationsValidees.filter(function(l){return !/^vehicule_/.test(l.cle);});
+    if (corps && complements.length) corps.insertAdjacentHTML('beforeend', _blocFiche('Compléments validés', complements.map(function(l){return _ligneFiche(l.libelle || l.cle, l.valeur);}).join('')));
+  } catch(e) {
+    if (generation !== _ficheDemandeGeneration) return;
+    if (corps) corps.textContent = 'Impossible de charger le récapitulatif actualisé. Fermez puis réouvrez cette demande pour réessayer.';
+  }
+}
+function _rendreFicheDemande(c) {
+  var clientId = c.id;
   _marquerDemandeVue(clientId);
   var d = _devisParClient[String(c.id)];
 
@@ -11025,6 +11061,7 @@ function ouvrirFicheDemande(clientId) {
       _ligneFiche('Type de véhicule', _libelleTypeVehicule(_vMono.type_vehicule)) +
       _ligneFiche('Marque / modèle', _vMono.marque_modele) +
       (_vMono.immatriculation ? _ligneFiche('Immatriculation', _vMono.immatriculation) : '') +
+      (_vMono.vin ? _ligneFiche('VIN', _vMono.vin) : '') +
       (_modeTransportMonoOk ? _ligneFiche('Mode de transport', _libelleModeTransport(c.mode_transport)) : '') +
       _ligneFiche('Services additionnels', servicesArr.length ? servicesArr.join(', ') : 'Aucun'));
   }
