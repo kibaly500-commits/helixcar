@@ -37,6 +37,7 @@ const {lancerNavigateur} = require('./env');
     }
     assert.equal(await p.evaluate(() => _presentationDemandeClient({}, {paiement_statut:'paye'}, [], true, false).groupe),'preparation');
     assert.notEqual(await p.evaluate(() => _presentationDemandeClient({}, {paiement_statut:'paye'}, [], false, true).groupe),'preparation');
+    assert(await p.locator('.btn-primary').evaluateAll(nodes => nodes.every(el => getComputedStyle(el).color === 'rgb(255, 255, 255)')));
     const details = p.locator('.hc-demande-details');
     assert.equal(await p.locator('.hc-demande-date').textContent(),'19/09/2026 à 16:35');
     assert(await p.locator('.hc-demande-card>.btn').evaluate(el=>el.getBoundingClientRect().width<el.parentElement.getBoundingClientRect().width-50));

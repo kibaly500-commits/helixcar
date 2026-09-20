@@ -75,7 +75,7 @@ const fs=require('fs');
    const v={position:1,marque_modele:'Peugeot',immatriculation:'QA-001',restitution_concernee:true,restit_contraintes:'OHHHH <img src=x onerror=alert(1)>'};
    const c={id:'qa',type_service:'convoyage',nb_vehicules:1,_vehicules:[v]};
    const devis={reference:'DEV-QA',prix:100};
-   _construirePdfDevis(c,devis,{recapitulatif:true});const pdf=__pdfTextes.join(' ').includes('OHHHH');
+   _construirePdfDevis(c,devis,{recapitulatif:true});const pdf=!__pdfTextes.join(' ').includes('OHHHH')&&!__pdfTextes.join(' ').includes('Consignes de restitution');
    _construirePdfDevis(c,devis);const quoteUnchanged=!__pdfTextes.join(' ').includes('OHHHH');
    const admin=_detailVehicule(c,v,0);const box=document.createElement('div');box.innerHTML=admin;
    window._currentClient={demandes:[c]};_sbAuthPret=()=>true;
