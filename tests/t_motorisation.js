@@ -1,0 +1,24 @@
+const L=require('./lib'),fs=require('fs'),{urlFichier}=require('./env');const plan=require('../assets/preparation-missions.js');
+(async()=>{const browser=await L.launch();try{
+ const page=await L.newPage(browser);const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await L.fillStep1(page,'particulier');await L.chooseService(page,'convoyage');
+ await page.evaluate(()=>{document.getElementById('nb-vehicules').value='2';onNbVehiculesChange();rendreFichesVehicules();});
+ L.check('Motorisation proposée pour chaque véhicule',await page.locator('select[id^="veh-"][id$="-motorisation"]').count()===4);
+ L.check('Motorisation facultative pour établir le devis',await page.locator('#veh-0-motorisation').evaluate(e=>!e.required));
+ await page.evaluate(()=>{document.getElementById('veh-0-motorisation').value='Électrique';document.getElementById('veh-1-motorisation').value='Diesel';document.querySelector('input[name="veh-0-restit-active"][value="oui"]').checked=true;basculerRestitVehicule(0);document.getElementById('veh-0-restit-motorisation').value='Hybride';});
+ const vs=await page.evaluate(()=>_lireFichesVehicules());
+ L.check('Valeurs indépendantes par véhicule',vs[0].motorisation==='Électrique'&&vs[1].motorisation==='Diesel');
+ L.check('Restitution indépendante',vs[0].restit_motorisation==='Hybride');
+ L.check('Valeurs autorisées dans la charge envoyée',await page.evaluate(()=>CHAMPS_VEHICULE.includes('motorisation')&&CHAMPS_VEHICULE.includes('restit_motorisation')));
+ await page.evaluate(()=>rendreFichesVehicules());L.check('Valeurs conservées après reconstruction',await page.locator('#veh-0-motorisation').inputValue()==='Électrique');
+ await page.evaluate(()=>_completerRendre([{cle:'vehicule_1_motorisation',libelle:'Motorisation',statut:'attendue',valeur:null}]));
+ L.check('Complément sous forme de liste obligatoire',await page.locator('#completer-champ-vehicule_1_motorisation').evaluate(e=>e.tagName==='SELECT'&&e.required));
+ await page.locator('#completer-champ-vehicule_1_motorisation').evaluate(e=>{e.value='Électrique';e.dispatchEvent(new Event('input',{bubbles:true}));});
+ L.check('Complément sélectionnable',await page.locator('#completer-champ-vehicule_1_motorisation').inputValue()==='Électrique');
+ const p=plan.build({type_service:'convoyage'},[{...vs[0],ville_depart:'Paris',ville_arrivee:'Lyon',date_prise_en_charge:'2026-11-01',date_livraison:'2026-11-01'}])[0];
+ L.check('Préparation reprend la motorisation principale',p.motorisation==='Électrique');L.check('Préparation reprend celle de restitution',p.restit_motorisation==='Hybride');
+ L.check('Annonce porte la motorisation',plan.publicData(p).rows.some(r=>r.label==='Motorisation'&&r.value==='Électrique'));
+ L.check('Aucune exception JS',errors.length===0,errors.join(' / '));
+ const pdf=fs.readFileSync('supabase/functions/_shared/devis-pdf.mjs','utf8');L.check('Le moteur de devis ne lit pas la motorisation',!pdf.includes('motorisation'));
+ await page.close();
+ }finally{await browser.close();}process.exitCode=L.results()?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});

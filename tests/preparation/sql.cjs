@@ -87,5 +87,6 @@ const planner=require('../../assets/preparation-missions.js');
 
  await db.exec("select set_config('request.jwt.claim.sub','55555555-5555-5555-5555-555555555555',false)");await rejected('RPC refusée au non-admin',()=>rpc('source_preparation_missions',[cid]));
  await db.exec('set role authenticated');check('table de préparation invisible au non-admin',(await db.query('select * from preparations_missions')).rows.length===0);await db.exec('reset role');
+ if(process.env.HC_TEST_MOTORISATION) await require('../motorisation/sql.cjs')({db,rpc,check,rejected,admin,cid,vid,uid,cv,pub});
  console.log('TOTAL '+count+' vérifications SQL');await db.close();
 })().catch(e=>{console.error(e.message,e.detail||'',e.where||'');process.exitCode=1;});

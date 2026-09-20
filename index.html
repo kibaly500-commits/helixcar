@@ -7464,6 +7464,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div style="background:#f5f5f0;border-radius:2px;padding:8px 12px;font-size:.78rem;color:#666;margin-bottom:8px">Visible sur la carte grise, case E.</div>
           <input type="text" id="client-vin" placeholder="VF1XXXXXXXX000000" style="text-transform:uppercase;letter-spacing:.04em" maxlength="17" autocomplete="off">
         </div>
+<div class="modal-form-group"><label for="client-motorisation">Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="client-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
         </div><!-- /bloc-vehicule-unique -->
 
         <!-- Fiches véhicules : générées quand nb_vehicules >= 2 -->
@@ -7584,6 +7585,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
               <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
+<div class="modal-form-group"><label for="client-restit-motorisation">Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="client-restit-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
 
           </div>
         </div>
@@ -8156,7 +8158,7 @@ function supabaseInsertReturning(table, data) {
 // champs reste la source unique — impossible d'en oublier un en
 // ajoutant une saisie.
 var CHAMPS_VEHICULE = [
-  'position','type_vehicule','marque_modele','immatriculation','vin',
+  'position','type_vehicule','marque_modele','immatriculation','vin','motorisation',
   'mode_transport','consignes',
   'adresse_depart_rue','code_postal_depart','ville_depart',
   'pc_contact_nom','pc_contact_tel','date_prise_en_charge',
@@ -8175,7 +8177,7 @@ var CHAMPS_VEHICULE = [
   'restit_heure','restit_heure_type','restit_creneau_debut','restit_creneau_fin',
   'restit_contraintes','heure_recuperation_client',
   // V55 — identité du véhicule à restituer (voir migration SQL fournie).
-  'restit_type_vehicule','restit_marque_modele','restit_immatriculation','restit_vin'
+  'restit_type_vehicule','restit_marque_modele','restit_immatriculation','restit_vin','restit_motorisation'
 ];
 
 function _normaliserVehiculePourEnvoi(v) {
@@ -9773,8 +9775,10 @@ function _completerRendre(lignes) {
         groupe.appendChild(motif);
       }
 
-      var champ = document.createElement('input');
-      champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
+      var estMotorisation = /(^|_)motorisation$/.test(l.cle);
+      var champ = document.createElement(estMotorisation ? 'select' : 'input');
+      if (estMotorisation) champ.innerHTML = _optionsMotorisation(l.valeur || '');
+      if (!estMotorisation) champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
                  : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
       champ.id = _completerChampId(l.cle);
       champ.value = l.valeur || '';
@@ -11835,7 +11839,7 @@ function _viderRestitutionVehicule(i) {
    'restit-consignes',
    // V55 — identité du véhicule à restituer, nettoyée avec le reste de
    // la restitution : aucune valeur fantôme ne subsiste après Oui → Non.
-   'restit-marque','restit-immat','restit-vin'].forEach(function (suffixe) {
+   'restit-marque','restit-immat','restit-vin','restit-motorisation'].forEach(function (suffixe) {
     var el = document.getElementById('veh-' + i + '-' + suffixe);
     if (el) el.value = '';
     _clearFieldError('veh-' + i + '-' + suffixe);
@@ -12055,7 +12059,7 @@ function validerVehicule(i) {
 
 function effacerVehicule(i) {
   var aDesDonnees = false;
-  ['type','marque','immat','vin'].concat(_champsRequisVehicule(i)).forEach(function (s) {
+  ['type','marque','immat','vin','motorisation'].concat(_champsRequisVehicule(i)).forEach(function (s) {
     var el = document.getElementById('veh-' + i + '-' + s);
     if (el && (el.value || '').trim() && s !== 'type') aDesDonnees = true;
   });
@@ -12120,6 +12124,7 @@ function _attr(v) {
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
+function _optionsMotorisation(selection) { return ['', 'Essence','Diesel','Hybride','Hybride rechargeable','Électrique','Autre'].map(function(v){return '<option value="'+v+'"'+(v===selection?' selected':'')+'>'+ (v||'À préciser')+'</option>';}).join(''); }
 function _optionsTypeVehicule(selection) {
   // Aucun gabarit n'est choisi à la place du client. Sans cette option
   // neutre, le navigateur sélectionnait automatiquement « Citadine » et
@@ -12220,7 +12225,7 @@ function _hcVehiculeEstVierge(j) {
   function val(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
   if (val('veh-' + j + '-marque')) return false;
   if (val('veh-' + j + '-immat')) return false;
-  if (val('veh-' + j + '-vin')) return false;
+  if (val('veh-' + j + '-vin') || val('veh-' + j + '-motorisation')) return false;
   var typeEl = document.getElementById('veh-' + j + '-type');
   if (typeEl && typeEl.value && typeEl.value !== 'citadine') return false;
   // V55 — l'identité du véhicule à restituer compte comme une donnée
@@ -12228,7 +12233,7 @@ function _hcVehiculeEstVierge(j) {
   // l'écrasement, exactement comme avec une adresse ou une date.
   if (val('veh-' + j + '-restit-marque')) return false;
   if (val('veh-' + j + '-restit-immat')) return false;
-  if (val('veh-' + j + '-restit-vin')) return false;
+  if (val('veh-' + j + '-restit-vin') || val('veh-' + j + '-restit-motorisation')) return false;
   var typeRestitEl = document.getElementById('veh-' + j + '-restit-vtype');
   if (typeRestitEl && typeRestitEl.value && typeRestitEl.value !== 'citadine') return false;
   var champsParPrefixe = ['rue', 'cp', 'ville', 'contact', 'tel', 'date', 'heure', 'cdeb', 'cfin', 'consignes'];
@@ -12293,8 +12298,8 @@ function _hcCopierVehiculeVers(source, cible) {
   // La duplication remplace les informations duplicables déjà présentes
   // dans la cible : les valeurs de la source confirmée sont prioritaires.
   // Les plaques restent propres à chaque véhicule et ne sont jamais copiées.
-  ['type', 'marque', 'vin',
-   'restit-vtype', 'restit-marque', 'restit-vin'].forEach(function (suffixe) {
+  ['type', 'marque', 'vin', 'motorisation',
+   'restit-vtype', 'restit-marque', 'restit-vin', 'restit-motorisation'].forEach(function (suffixe) {
     var src = document.getElementById('veh-' + source + '-' + suffixe);
     var dst = document.getElementById('veh-' + cible + '-' + suffixe);
     if (src && dst) {
@@ -12832,7 +12837,7 @@ function construireRecap() {
     var uniq = _recapLigne('Type', _libelleGabarit((document.getElementById('client-vtype') || {}).value)) +
                _recapLigne('Marque / modèle', (document.getElementById('client-marque') || {}).value) +
                _recapLigne('Immatriculation', (document.getElementById('client-immat') || {}).value) +
-               _recapLigne('VIN', (document.getElementById('client-vin') || {}).value);
+               _recapLigne('VIN', (document.getElementById('client-vin') || {}).value) + _recapLigne('Motorisation', (document.getElementById('client-motorisation') || {}).value);
     if (uniq) html += _recapBloc('Véhicule', uniq, 4);
   } else {
     var vh = _lireFichesVehicules().filter(Boolean);
@@ -12840,7 +12845,7 @@ function construireRecap() {
     vh.forEach(function (v, i) {
       var corps = _recapLigne('Type', _libelleGabarit(v.type_vehicule)) +
                   _recapLigne('Immatriculation', v.immatriculation) +
-                  _recapLigne('VIN', v.vin);
+                  _recapLigne('VIN', v.vin) + _recapLigne('Motorisation', v.motorisation);
 
       // Opérations individuelles uniquement lorsqu'elles s'appliquent.
       if (sc.pc && !commun) {
@@ -12893,7 +12898,7 @@ function construireRecap() {
         corps += _recapLigne('Véhicule à restituer — Type', _libelleGabarit(v.restit_type_vehicule));
         corps += _recapLigne('Véhicule à restituer — Marque / modèle', v.restit_marque_modele);
         corps += _recapLigne('Véhicule à restituer — Immatriculation', v.restit_immatriculation);
-        corps += _recapLigne('Véhicule à restituer — VIN', v.restit_vin);
+        corps += _recapLigne('Véhicule à restituer — VIN', v.restit_vin) + _recapLigne('Véhicule à restituer — motorisation', v.restit_motorisation);
         corps += _recapLigne('Consignes de restitution', v.restit_contraintes);
       }
 
@@ -13137,7 +13142,7 @@ function _viderBlocRestitution() {
   ['client-restit-rue','client-restit-cp','client-restit-ville',
    'client-restit-contact-nom','client-restit-contact-tel',
    'client-date-restit','client-heure-restit','client-restit-cdeb','client-restit-cfin',
-   'client-restit-marque','client-restit-immat','client-restit-vin',
+   'client-restit-marque','client-restit-immat','client-restit-vin','client-restit-motorisation',
    'client-contraintes-restit'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
@@ -14438,11 +14443,11 @@ function _attacherEcouteursClient() {
     'nb-vehicules','stock-debut','stock-fin',
     'client-from','client-from-rue','client-from-cp','client-contact-pc-nom','client-contact-pc-tel',
     'client-date-pc','client-heure-pc','client-to','client-to-rue','client-to-cp','client-contact-liv-nom','client-contact-liv-tel',
-    'client-date-livraison','client-heure-liv','client-marque','client-immat','client-vin',
+    'client-date-livraison','client-heure-liv','client-marque','client-immat','client-vin','client-motorisation',
     'client-type','client-vtype',
     'client-restit-rue','client-restit-cp','client-restit-ville','client-restit-contact-nom','client-restit-contact-tel',
     'client-date-restit','client-heure-restit','client-restit-cdeb','client-restit-cfin','client-restit-vtype',
-    'client-restit-marque','client-restit-immat','client-restit-vin'];
+    'client-restit-marque','client-restit-immat','client-restit-vin','client-restit-motorisation'];
   ids.forEach(_clearFieldErrorOnInput);
 }
 
@@ -17100,6 +17105,7 @@ async function _submitClientFormInterne() {
     marque_modele:          marque_val || null,
     immatriculation:        immat_val || null,
     vin:                    vin_val || null,
+    motorisation: (document.getElementById('client-motorisation') || {}).value || null,
     // mode_transport et plateau ne sont plus envoyés au niveau du
     // DOSSIER : ils décrivaient un choix global qui contredisait celui
     // de chaque véhicule. La donnée vit desormais sur vehicules.
@@ -17121,6 +17127,7 @@ async function _submitClientFormInterne() {
     restit_marque_modele:   (restitActif ? restit_marque.trim() : '') || null,
     restit_immatriculation: (restitActif ? restit_immat.trim() : '') || null,
     restit_vin:             (restitActif ? restit_vin.trim() : '') || null,
+    restit_motorisation: restitActif ? ((document.getElementById('client-restit-motorisation') || {}).value || null) : null,
     contact_pc_nom:         (pcActif ? contact_pc_nom.trim() : '') || null,
     contact_pc_tel:         (pcActif ? contact_pc_tel.trim() : '') || null,
     contraintes_pc:         (pcActif ? contraintes_pc.trim() : '') || null,
@@ -20687,6 +20694,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
+    identite+='<div class="modal-form-group"><label>Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="veh-'+i+'-motorisation">'+_optionsMotorisation(v.motorisation)+'</select></div>';
     html+=_hcSousVeh(i,'identite',1,'Identité du véhicule',identite,true);
 
     var no=2;
@@ -20729,6 +20737,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
+      '<div class="modal-form-group"><label>Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="veh-'+i+'-restit-motorisation">'+_optionsMotorisation(v.restit_motorisation)+'</select></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
@@ -20808,7 +20817,7 @@ function _lireFichesVehicules() {
     var livActive=_vehiculeLivraisonApresStockage(i);
     function h(p,c){var t=_typeHoraire(i,p); if(c==='type')return t; if(c==='heure')return t==='precise'?g(p+'-heure'):''; if(c==='cdeb')return t==='creneau'?g(p+'-cdeb'):''; if(c==='cfin')return t==='creneau'?g(p+'-cfin'):''; return '';}
     out.push({
-      position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),mode_transport:livActive===false?'':(modeEl?modeEl.value:''),consignes:g('consignes'),
+      position:i+1,type_vehicule:g('type'),marque_modele:g('marque'),immatriculation:g('immat'),vin:g('vin'),motorisation:g('motorisation'),mode_transport:livActive===false?'':(modeEl?modeEl.value:''),consignes:g('consignes'),
       adresse_depart_rue:g('pc-rue'),code_postal_depart:g('pc-cp'),ville_depart:g('pc-ville'),pc_contact_nom:g('pc-contact'),pc_contact_tel:g('pc-tel'),date_prise_en_charge:g('pc-date'),heure_prise_en_charge:h('pc','heure'),pc_heure_type:h('pc','type'),pc_creneau_debut:h('pc','cdeb'),pc_creneau_fin:h('pc','cfin'),
       // LOT D1 — quand HelixCar n'intervient sur aucun trajet, aucune
       // valeur de livraison ne part en base, meme heritee d'un
@@ -20826,7 +20835,7 @@ function _lireFichesVehicules() {
       // Même convention que les autres champs de restitution : lues
       // uniquement si aRestit, donc automatiquement vides quand
       // Restitution = Non — aucune donnée fantôme dans le payload.
-      restit_type_vehicule:aRestit?g('restit-vtype'):'',restit_marque_modele:aRestit?g('restit-marque'):'',restit_immatriculation:aRestit?g('restit-immat'):'',restit_vin:aRestit?g('restit-vin'):''
+      restit_type_vehicule:aRestit?g('restit-vtype'):'',restit_marque_modele:aRestit?g('restit-marque'):'',restit_immatriculation:aRestit?g('restit-immat'):'',restit_vin:aRestit?g('restit-vin'):'',restit_motorisation:aRestit?g('restit-motorisation'):''
     });
   }
   return out;

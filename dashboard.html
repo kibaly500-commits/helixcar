@@ -10087,6 +10087,7 @@ function _vehiculesDuDossier(c) {
       marque_modele: c.marque_modele,
       immatriculation: c.immatriculation,
       vin: c.vin,
+      motorisation: c.motorisation,
       mode_transport: c.mode_transport,
       _depuisDossier: true
     }];
@@ -10106,6 +10107,7 @@ function _detailVehicule(c, v, idx) {
   ln('Marque / modèle', v.marque_modele);
   lnMission('Immatriculation', v.immatriculation);
   lnMission('VIN', v.vin);
+  lnMission('Motorisation', v.motorisation);
   // CORRECTION (Anomalie 3) — le mode de transport n'a de sens que
   // lorsqu'une opération HelixCar (prise en charge OU livraison)
   // existe réellement pour CE véhicule. Sans cette garde, une valeur
@@ -10173,6 +10175,7 @@ function _detailVehicule(c, v, idx) {
     ln('Véhicule à restituer — Marque / modèle', v.restit_marque_modele);
     ln('Véhicule à restituer — Immatriculation', v.restit_immatriculation);
     ln('Véhicule à restituer — VIN', v.restit_vin);
+    lnMission('Véhicule à restituer — motorisation', v.restit_motorisation);
     ln('Consignes restitution', v.restit_contraintes);
   }
 
@@ -11240,6 +11243,7 @@ function _rendreFicheDemande(c) {
       _ligneFiche('Marque / modèle', _vMono.marque_modele) +
       (_vMono.immatriculation ? _ligneFiche('Immatriculation', _vMono.immatriculation) : '') +
       (_vMono.vin ? _ligneFiche('VIN', _vMono.vin) : '') +
+      _ligneFiche('Motorisation', _vMono.motorisation || 'À compléter avant mission') +
       (_modeTransportMonoOk ? _ligneFiche('Mode de transport', _libelleModeTransport(c.mode_transport)) : '') +
       _ligneFiche('Services additionnels', servicesArr.length ? servicesArr.join(', ') : 'Aucun'));
   }
@@ -11259,7 +11263,7 @@ function _rendreFicheDemande(c) {
       _ligneFiche('Véhicule (restitution)', c.restit_type_vehicule) +
       _ligneFiche('Marque / modèle', c.restit_marque_modele) +
       _ligneFiche('Immatriculation', c.restit_immatriculation) +
-      _ligneFiche('VIN', c.restit_vin));
+      _ligneFiche('VIN', c.restit_vin) + _ligneFiche('Motorisation', c.restit_motorisation || 'À compléter avant mission'));
   }
 
   // ── Bloc devis ──

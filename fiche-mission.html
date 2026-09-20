@@ -88,6 +88,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #1a1a1a; }
     <div class="grid-3">
       <div class="field"><div class="field-label">Marque / Modèle</div><div class="field-value" id="f-vehicule">—</div></div>
       <div class="field"><div class="field-label">Immatriculation</div><div class="field-value" id="f-immat">—</div></div>
+      <div class="field"><div class="field-label">Motorisation</div><div class="field-value" id="f-motorisation">—</div></div>
       <div class="field"><div class="field-label">Options</div><div class="field-value" id="f-options">—</div></div>
     </div>
   </div>
@@ -192,6 +193,7 @@ function setField(id, value) {
     setField('f-contact-arrivee', [m.contact_arrivee_nom, m.contact_arrivee_tel].filter(Boolean).join(' — '));
     setField('f-vehicule', m.marque_modele);
     setField('f-immat', m.immatriculation);
+    setField('f-motorisation', m.motorisation || (m.electrique ? 'Électrique' : 'À préciser'));
     const optionsListe = [m.nettoyage ? 'Nettoyage' : null, m.plateau ? 'Plateau' : null, m.urgence ? 'Urgent' : null, m.electrique ? 'Électrique' : null].filter(Boolean);
     setField('f-options', optionsListe.length ? optionsListe.join(', ') : 'Standard');
 
@@ -210,7 +212,7 @@ function setField(id, value) {
       setField('f-restit', m.adresse_restitution || 'Même adresse qu\'au départ');
       const restitVeh = [(m.restit_marque_modele || m.marque_modele), (m.restit_immatriculation || m.immatriculation)].filter(Boolean).join(' · ');
       const restitVinTxt = m.restit_vin || m.vin;
-      setField('f-restit-vehicule', restitVeh + (restitVinTxt ? ' (VIN : ' + restitVinTxt + ')' : ''));
+      setField('f-restit-vehicule', restitVeh + (m.restit_motorisation ? ' · '+m.restit_motorisation : '') + (restitVinTxt ? ' (VIN : ' + restitVinTxt + ')' : ''));
       setField('f-restit-info', m.restit_info);
       setField('f-restit-contact', [m.restit_contact_nom, m.restit_contact_tel].filter(Boolean).join(' — '));
       document.getElementById('restit-section').style.display = 'block';
