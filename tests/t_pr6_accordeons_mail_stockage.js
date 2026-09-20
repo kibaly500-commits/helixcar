@@ -2,7 +2,7 @@ const L=require('./lib');
 const {urlFichier}=require('./env');
 (async()=>{
  const {preparerMailAccesStockage:mail,STOCKAGE_ACCES_ENVOI_ACTIF:actif}=await import('../emails/stockage-acces.mjs');
- L.check('Mail préparé sans activation',actif===false);
+ L.check('Mail branché au worker serveur',actif===true);
  for(const [depotClient,recuperationClient] of [[true,false],[false,true],[true,true]]){
   const m=mail({reference:'HC-QA',adresse:'Adresse de test <b>\nNoisy-le-Grand',depotClient,recuperationClient,dateDepot:'08/10/2026',heureDepot:'15:30',dateRecuperation:'13/10/2026',heureRecuperation:'16:00'});
   L.check('Contenu conditionnel '+depotClient+'/'+recuperationClient,m.text.includes('Dépôt de votre véhicule')===depotClient&&m.text.includes('Récupération de votre véhicule')===recuperationClient);

@@ -110,6 +110,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #1a1a1a; }
     <div class="field"><div class="field-label">Contact restitution</div><div class="field-value" id="f-restit-contact">—</div></div>
   </div>
 
+  <section id="stockage-remise-section" style="display:none"><h2>Point de remise HelixCar</h2><p id="stockage-remise-adresse"></p><p id="stockage-remise-mouvements"></p></section>
   <div class="doc-footer">HelixCar — contact@helixcar.fr — Document généré automatiquement le <span id="doc-date-gen"></span></div>
 
 </div>
@@ -125,9 +126,10 @@ const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let ficheAccessToken='';
 function sbFetch(path) {
   return fetch(SUPABASE_URL + '/rest/v1/' + path, {
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + ficheAccessToken }
   }).then(function(r) { return r.json(); });
 }
 
@@ -156,8 +158,10 @@ function setField(id, value) {
       refuserAcces("Tu n'es pas connecté. Connecte-toi sur ton espace convoyeur (dashboard) dans cet appareil, puis rouvre ce lien.");
       return;
     }
-    const convRows = await sbFetch('convoyeurs?email=eq.' + encodeURIComponent(session.user.email) + '&order=created_at.desc&limit=1');
-    if (!convRows || convRows.length === 0) {
+    ficheAccessToken=session.access_token;
+    const convRows = await sbFetch('convoyeurs?auth_user_id=eq.' + encodeURIComponent(session.user.id) + '&order=created_at.desc&limit=1');
+    const {data:admin}=await sbAuth.from('admins').select('id').eq('auth_user_id',session.user.id).eq('actif',true).maybeSingle();
+    if (!admin && (!convRows || convRows.length === 0)) {
       refuserAcces("Aucun dossier convoyeur associé à ce compte.");
       return;
     }
@@ -165,6 +169,17 @@ function setField(id, value) {
     const rows = await sbFetch('missions?reference=eq.' + encodeURIComponent(ref));
     const m = (rows || [])[0];
     if (!m) { refuserAcces('Mission introuvable.'); return; }
+    if(!admin && (!m.convoyeur_id || m.convoyeur_id!==convRows[0].id)){refuserAcces('Cette mission ne vous est pas attribuée.');return;}
+    const {data:remise,error:remiseError}=await sbAuth.rpc('point_remise_mission',{p_mission_id:m.id});
+    if(remiseError)throw Error('Point de remise indisponible');
+    if(remise){
+      setField('stockage-remise-adresse',remise.adresse);
+      setField('stockage-remise-mouvements',[
+        remise.arriveeAvantStockage?'Avant stockage : après la prise en charge chez le client, remettre le véhicule à cette adresse.':'',
+        remise.departApresStockage?'Après stockage : récupérer le véhicule à cette adresse, puis le livrer à la destination prévue.':''
+      ].filter(Boolean).join(' '));
+      document.getElementById('stockage-remise-section').style.display='block';
+    }
 
     document.getElementById('doc-code').textContent = m.reference;
     setField('f-ville-depart', m.adresse_depart || m.ville_depart);

@@ -13,6 +13,11 @@ export function messageAttribution(n,from){
      if(value)html+='<p><strong>'+label+'</strong><br>'+esc(value)+'</p>';
    }
    if(m.restitution)html+='<p><strong>Restitution prévue</strong><br>'+esc(m.adresse_restitution)+'<br>'+esc(m.date_restitution_depart)+'</p>';
+   if(s.point_remise){
+     html+='<p><strong>Point de remise HelixCar</strong><br>'+esc(s.point_remise.adresse)+'</p>';
+     if(s.point_remise.arriveeAvantStockage)html+='<p>Avant stockage : remettre le véhicule au point de remise après sa prise en charge chez le client.</p>';
+     if(s.point_remise.departApresStockage)html+='<p>Après stockage : récupérer le véhicule au point de remise, puis le livrer à la destination prévue.</p>';
+   }
  }
  html+='<p>Scénario de recette fictif. Ne réalisez aucun déplacement.</p><p><a href="'+PREVIEW+'/dashboard.html">Ouvrir mon espace HelixCar</a></p>';
  return {from,to:[n.destinataire],subject:'[TEST] '+title+' — '+m.reference,html};
@@ -24,7 +29,13 @@ export async function envoyerNotificationsMissionTest(missionId,{sb,env,fetchFn=
  for(let n of rows){
    if(n.fournisseur_id)continue;
    if(!['helixcarpro@gmail.com','helixcarpro+qa-final01@gmail.com','kibaly500@gmail.com','kibaly500+qa-final01@gmail.com'].includes(n.destinataire.toLowerCase()))throw new Error('DESTINATAIRE_HORS_RECETTE');
-   if(!n.premier_essai)await check(sb.from('notifications_mission_test').update({payload:messageAttribution(n,env.RESEND_FROM),premier_essai:new Date(now()).toISOString()}).eq('id',n.id).is('premier_essai',null));
+   if(!n.premier_essai){
+     if(n.role_destinataire==='convoyeur'&&(n.evenement||'attribution')==='attribution'){
+       const remise=await check(sb.rpc('point_remise_mission',{p_mission_id:missionId}));
+       n={...n,snapshot:{...n.snapshot,point_remise:remise}};
+     }
+     await check(sb.from('notifications_mission_test').update({payload:messageAttribution(n,env.RESEND_FROM),premier_essai:new Date(now()).toISOString()}).eq('id',n.id).is('premier_essai',null));
+   }
    n=await check(sb.from('notifications_mission_test').select('*').eq('id',n.id).single());
    if(n.fournisseur_id)continue;
    if(now()-Date.parse(n.premier_essai)>=23*3600000)throw new Error('EMAIL_RECONCILIATION_REQUIRED');

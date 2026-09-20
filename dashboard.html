@@ -8577,9 +8577,14 @@ function accepterMission(id) {
 
 function envoyerEmailFicheMission(missionId, conv) {
   if (!window.emailjs || !conv.email) return;
-  sbFetch('missions?id=eq.' + missionId).then(function(rows) {
+  sbFetch('missions?id=eq.' + missionId).then(async function(rows) {
     const m = (rows || [])[0];
-    if (!m) return;
+    if (!m || !m.convoyeur_id || m.convoyeur_id!==conv.id) return;
+    const {data:remise,error:remiseError}=await sbAuth.rpc('point_remise_mission',{p_mission_id:missionId});
+    if(remiseError)throw Error('Point de remise indisponible');
+    const remiseTxt=remise?'\n\nPoint de remise HelixCar : '+remise.adresse+
+      (remise.arriveeAvantStockage?'\nAvant stockage : remettre le véhicule à cette adresse après la prise en charge.':'')+
+      (remise.departApresStockage?'\nAprès stockage : récupérer le véhicule à cette adresse avant sa livraison.':''):'';
     const vehicule = [m.marque_modele, m.immatriculation].filter(Boolean).join(' · ') || '—';
     const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR') : 'à convenir';
     const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR') : 'à convenir';
@@ -8615,7 +8620,7 @@ function envoyerEmailFicheMission(missionId, conv) {
       'Véhicule : ' + vehicule + optionsTxt + vinTxt + '\n' +
       'Votre rémunération : ' + prix +
       contactDepartTxt + contactArriveeTxt +
-      restitTxt + notesTxt +
+      restitTxt + notesTxt + remiseTxt +
       '\n\n📸 L\'état des lieux (photos + signature) se fait directement depuis votre espace convoyeur, au départ et à l\'arrivée.\n' +
       '📄 N\'oubliez pas de faire signer la lettre de voiture par le client au départ et à l\'arrivée.\n\n' +
       'Quelques règles importantes à respecter pour cette mission :\n' +

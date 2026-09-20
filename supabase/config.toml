@@ -69,3 +69,7 @@ verify_jwt = false
 
 [functions.mission-accepter-test]
 verify_jwt = false
+
+[functions.stockage-notifications]
+# Secret dédié dans Vault, vérifié côté serveur avant accès à la file.
+verify_jwt = false

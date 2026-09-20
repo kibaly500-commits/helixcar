@@ -2,11 +2,11 @@
 
 Le modèle `stockage-acces.mjs` a été préparé à la demande du propriétaire le 20 septembre 2026. Il existe dans le dépôt pour être repris lors d’une prochaine intervention.
 
-**État : préparé, envoi automatique désactivé.** Aucun déclencheur, webhook ou service d’envoi existant n’a été modifié. Aucun mail n’est envoyé par ce module.
+**État : envoi automatique branché côté serveur.** La migration `20260920153911_stockage_notifications_et_point_remise.sql` crée une file privée et les déclencheurs ; l’Edge Function `stockage-notifications` traite la file chaque minute. Le modèle seul n’envoie rien. Le parcours de paiement Stripe conserve ses restrictions de recette existantes.
 
 Adresse fournie par le propriétaire le 20 septembre 2026 : **Point de remise HelixCar — ALDI, 12 rue de l’Université, 93160 Noisy-le-Grand**. C’est le rendez-vous de dépôt/récupération, pas le parking de stockage. Elle est utilisée par défaut par le modèle.
 
-Restriction expressément précisée par le propriétaire : aucune adresse dans le formulaire public, le devis ou les récapitulatifs avant acceptation et paiement. Côté client, le dashboard affiche le point de remise seulement pour une demande avec stockage dont le devis est accepté ET payé. Côté convoyeur, la communication doit attendre sa sélection ; aucun ajout n’est fait ici aux opportunités ouvertes ni aux écrans partenaire. Cette restriction doit être conservée lors du futur branchement des mails.
+Restriction expressément précisée par le propriétaire : aucune adresse dans le formulaire public, le devis ou les récapitulatifs avant acceptation et paiement. Côté client, le dashboard affiche le point de remise seulement pour une demande avec stockage dont le devis est accepté ET payé. Côté convoyeur, la fonction `point_remise_mission` contrôle l’affectation avant de fournir l’adresse à la fiche et à la confirmation. Les opportunités ouvertes ne reçoivent aucune adresse.
 
 ## Cas couverts
 
@@ -15,14 +15,17 @@ Restriction expressément précisée par le propriétaire : aucune adresse dans 
 - Le client effectue les deux : un seul mail avec les deux rendez-vous.
 - HelixCar assure les deux trajets : ce mail ne s’applique pas.
 
-Le texte confirme l’acceptation de la demande et le paiement enregistré. Le futur déclenchement devra donc attendre **ces deux conditions**, quel que soit leur ordre, avec un envoi unique par demande. Il ne doit pas partir à la simple création de demande ou à l’envoi du devis.
+Le déclenchement attend **acceptation ET paiement**, quel que soit leur ordre, avec un envoi unique par demande. Il ne part pas à la simple création de demande ou à l’envoi du devis. Aucun ancien dossier n’est ajouté rétroactivement au déploiement.
 
-## À compléter avant activation
+## Exploitation et reprise
 
-1. L’adresse du point de remise est renseignée. Le modèle refuse toujours une adresse explicitement vide. Conserver la distinction entre point de remise et lieu de stockage.
-2. Relier les choix réels de dépôt/récupération, la référence et les dates/heures du dossier au modèle (dates affichées en français, horaires locaux, sans décalage de fuseau).
-3. Brancher l’envoi côté serveur sur les événements métier existants, avec vérification des deux conditions et protection persistante contre les doublons/reprises.
-4. Valider le contenu final avec le propriétaire avant activation. Ne pas activer uniquement en changeant la constante : elle documente l’état, ce module n’effectue aucun envoi.
+- Source du modèle : `supabase/functions/_shared/stockage-acces.mjs`, réexportée depuis `emails/stockage-acces.mjs`.
+- Référence, dates et heures viennent du dossier ; aucune conversion UTC des horaires civils.
+- Une contrainte unique sur le dossier, un verrou de traitement et une clé Resend stable empêchent les doublons. Corps figé avant l’appel fournisseur.
+- Échec temporaire : nouvelle tentative après cinq minutes. Après 23 heures depuis le premier essai, `RECONCILIATION_REQUIRED` impose de rapprocher le résultat Resend avant toute reprise, sans renvoi aveugle.
+- Changement d’adresse e-mail, de choix de trajet, annulation ou paiement non confirmé : `DOSSIER_MODIFIE`, pas d’envoi automatique.
+- Les messages liés aux paiements de recette sont marqués TEST, sans déplacement à effectuer. Aucun paiement réel n’est activé par ce branchement.
+- La fiche mission conserve les destinations client et ajoute le point de remise comme arrivée avant stockage / départ après stockage selon les trajets prévus.
 
 ## Texte préparé
 
