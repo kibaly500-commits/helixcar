@@ -1,8 +1,12 @@
-# Mail d’accès au stockage — modèle existant, en attente d’adresse
+# Mail d’accès au stockage — point de remise renseigné
 
 Le modèle `stockage-acces.mjs` a été préparé à la demande du propriétaire le 20 septembre 2026. Il existe dans le dépôt pour être repris lors d’une prochaine intervention.
 
 **État : préparé, envoi automatique désactivé.** Aucun déclencheur, webhook ou service d’envoi existant n’a été modifié. Aucun mail n’est envoyé par ce module.
+
+Adresse fournie par le propriétaire le 20 septembre 2026 : **Point de remise HelixCar — ALDI, 12 rue de l’Université, 93160 Noisy-le-Grand**. C’est le rendez-vous de dépôt/récupération, pas le parking de stockage. Elle est utilisée par défaut par le modèle.
+
+Restriction expressément précisée par le propriétaire : aucune adresse dans le formulaire public, le devis ou les récapitulatifs avant acceptation et paiement. Côté client, le dashboard affiche le point de remise seulement pour une demande avec stockage dont le devis est accepté ET payé. Côté convoyeur, la communication doit attendre sa sélection ; aucun ajout n’est fait ici aux opportunités ouvertes ni aux écrans partenaire. Cette restriction doit être conservée lors du futur branchement des mails.
 
 ## Cas couverts
 
@@ -15,7 +19,7 @@ Le texte confirme l’acceptation de la demande et le paiement enregistré. Le f
 
 ## À compléter avant activation
 
-1. Le propriétaire fournit et valide l’adresse exacte. Ne pas inventer d’adresse ni envoyer un placeholder. Le modèle refuse une adresse vide.
+1. L’adresse du point de remise est renseignée. Le modèle refuse toujours une adresse explicitement vide. Conserver la distinction entre point de remise et lieu de stockage.
 2. Relier les choix réels de dépôt/récupération, la référence et les dates/heures du dossier au modèle (dates affichées en français, horaires locaux, sans décalage de fuseau).
 3. Brancher l’envoi côté serveur sur les événements métier existants, avec vérification des deux conditions et protection persistante contre les doublons/reprises.
 4. Valider le contenu final avec le propriétaire avant activation. Ne pas activer uniquement en changeant la constante : elle documente l’état, ce module n’effectue aucun envoi.
@@ -34,7 +38,9 @@ Dépôt de votre véhicule par vos soins : le [date choisie] à [heure choisie].
 
 Récupération de votre véhicule par vos soins après stockage : le [date choisie] à [heure choisie]. *(Si concerné.)*
 
-Adresse du lieu de stockage : **[adresse exacte à fournir par le propriétaire]**
+Point de remise HelixCar : **ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand**
+
+Il s’agit du point de rendez-vous pour la remise de votre véhicule. Votre véhicule sera stocké sur un site distinct.
 
 Cette adresse concerne uniquement le dépôt et/ou la récupération que vous effectuez vous-même, selon les choix de votre demande.
 

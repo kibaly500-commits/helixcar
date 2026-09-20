@@ -1,9 +1,10 @@
 // Modèle préparé ; aucun envoi automatique n'est branché à ce stade.
 export const STOCKAGE_ACCES_ENVOI_ACTIF = false;
+export const POINT_REMISE_HELIXCAR = 'ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand';
 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-export function preparerMailAccesStockage({reference, adresse, depotClient = false, recuperationClient = false, dateDepot = '', heureDepot = '', dateRecuperation = '', heureRecuperation = ''}) {
+export function preparerMailAccesStockage({reference, adresse = POINT_REMISE_HELIXCAR, depotClient = false, recuperationClient = false, dateDepot = '', heureDepot = '', dateRecuperation = '', heureRecuperation = ''}) {
   if (!depotClient && !recuperationClient) throw new Error('Aucun déplacement du client au lieu de stockage.');
   if (!String(adresse || '').trim()) throw new Error('L’adresse exacte doit être renseignée avant de préparer un mail destiné au client.');
   if (!String(reference || '').trim()) throw new Error('La référence de la demande est requise.');
@@ -14,7 +15,8 @@ export function preparerMailAccesStockage({reference, adresse, depotClient = fal
     'Voici les informations pratiques pour votre stockage automobile.',
     ...(depotClient ? [rendezVous('Dépôt de votre véhicule par vos soins', dateDepot, heureDepot)] : []),
     ...(recuperationClient ? [rendezVous('Récupération de votre véhicule par vos soins après stockage', dateRecuperation, heureRecuperation)] : []),
-    'Adresse du lieu de stockage :\n' + String(adresse).trim(),
+    'Point de remise HelixCar :\n' + String(adresse).trim(),
+    'Il s’agit du point de rendez-vous pour la remise de votre véhicule. Votre véhicule sera stocké sur un site distinct.',
     'Cette adresse concerne uniquement le dépôt et/ou la récupération que vous effectuez vous-même, selon les choix de votre demande.',
     'Pour toute question ou modification de rendez-vous, contactez notre équipe.',
     'L’équipe HelixCar'

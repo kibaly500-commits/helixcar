@@ -8,7 +8,9 @@ const {urlFichier}=require('./env');
   L.check('Contenu conditionnel '+depotClient+'/'+recuperationClient,m.text.includes('Dépôt de votre véhicule')===depotClient&&m.text.includes('Récupération de votre véhicule')===recuperationClient);
   L.check('Adresse échappée et rendez-vous corrects '+depotClient+'/'+recuperationClient,m.html.includes('&lt;b&gt;')&&!m.html.includes('<b>')&&(!depotClient||m.text.includes('08/10/2026 à 15:30'))&&(!recuperationClient||m.text.includes('13/10/2026 à 16:00')));
  }
- for(const args of [{depotClient:true},{adresse:'Test'}]){let rejected=false;try{mail({reference:'QA',...args});}catch(e){rejected=true;}L.check('Pas de mail sans adresse ou sans déplacement client',rejected);}
+ for(const args of [{depotClient:true,adresse:''},{adresse:'Test'}]){let rejected=false;try{mail({reference:'QA',...args});}catch(e){rejected=true;}L.check('Pas de mail sans adresse ou sans déplacement client',rejected);}
+ const remise=mail({reference:'QA',depotClient:true,recuperationClient:true});
+ L.check('Mail : adresse fournie par défaut, remise distincte du stockage',remise.text.includes('ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand')&&remise.text.includes('site distinct')&&!remise.text.includes('Adresse du lieu de stockage'));
  const browser=await L.launch();
  try{
   for(const width of [390,1280]){
@@ -31,6 +33,16 @@ const {urlFichier}=require('./env');
     await summary.click();L.check(width+' '+key+' : fermeture',!(await details.evaluate(e=>e.open)));
     await summary.focus();await p.keyboard.press('Enter');L.check(width+' '+key+' : ouverture clavier',await details.evaluate(e=>e.open));
    }
+   for(const [service,statut,paiement,visible] of [['stockage','envoye','paye',false],['stockage','accepte','en_attente',false],['stockage','accepte','paye',true],['convoyage','accepte','paye',false],['stockage','refuse','paye',false]]){
+    await p.evaluate(async({service,statut,paiement})=>{
+     chargerDemandesClient=async()=>[{id:'stock-qa',type_service:service,groupe:'preparation'}];
+     chargerDevisClient=async()=>[{client_id:'stock-qa',statut,paiement_statut:paiement}];
+     await loadDemandesClient();
+    },{service,statut,paiement});
+    L.check(width+' adresse réservée au stockage accepté et payé : '+service+'/'+statut+'/'+paiement,(await p.locator('[data-point-remise]').count()===1)===visible);
+   }
+   await p.evaluate(async()=>{chargerDevisClient=async()=>{throw Error('indisponible');};await loadDemandesClient();});
+   L.check(width+' pas d’adresse si paiement invérifiable',await p.locator('[data-point-remise]').count()===0);
    await p.close();
   }
  }finally{await browser.close();}

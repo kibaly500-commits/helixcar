@@ -3114,6 +3114,8 @@ async function loadDemandesClient() {
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
       const paiement=devisIndisponibles?'inconnu':dv && dv.paiement_statut==='paye'?'paye':'non-paye';
+      const pointRemise= !devisIndisponibles && _aStockage(d) && dv && dv.statut==='accepte' && paiement==='paye'
+        ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
@@ -3122,7 +3124,7 @@ async function loadDemandesClient() {
       const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
-        +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement
+        +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement+pointRemise
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis && paiement!=='paye'?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
         +'<div class="hc-demande-documents"><button class="btn btn-sm btn-outline hc-demande-apercu-btn" '+actionHtml('ouvrirApercuDemandeClient',[d.id])+'>Récapitulatif de la demande</button>'
