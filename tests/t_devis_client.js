@@ -39,11 +39,24 @@ try{
  await cas('Refus depuis Dashboard sans token : décision persistée puis relue',async()=>{
    const page=await browser.newPage();await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);await page.click('#bouton-refuser-devis',{timeout:2000});await page.click('#modal-bouton-confirmer');await page.waitForFunction(()=>document.getElementById('zone-contenu').textContent.includes('Devis refusé'),{timeout:2000});assert.equal(await page.evaluate(()=>window.__appels.filter(a=>a.body.action==='refuse').length),1);await page.close();
  });
- await cas('Lien anonyme : aucune donnée privée et retour à la connexion intégrée',async()=>{
-   const page=await browser.newPage();await page.addInitScript(INIT+'window.__session=null;');await page.goto(urlFichier('devis.html')+'#token='+'t'.repeat(64));await page.waitForSelector('a.bouton',{timeout:2000});assert.equal(await page.evaluate(()=>window.__appels.length),0);assert.ok((await page.locator('a.bouton').getAttribute('href')).startsWith('index.html?connexion=1#devis='));await page.close();
+ await cas('ID sans session : retour à la connexion intégrée',async()=>{
+   const page=await browser.newPage();await page.addInitScript(INIT+'window.__session=null;');await page.goto(urlFichier('devis.html')+'?id='+ID);await page.waitForSelector('a.bouton',{timeout:2000});assert.equal(await page.evaluate(()=>window.__appels.length),0);assert.ok((await page.locator('a.bouton').getAttribute('href')).startsWith('index.html?connexion=1&devis_id='));await page.close();
+ });
+ for(const decision of ['accept','refuse'])await cas('Lien e-mail sans session : consultation puis '+decision,async()=>{
+   const page=await browser.newPage();await page.addInitScript(INIT+'window.__session=null;');
+   await page.goto(urlFichier('devis.html')+'?token='+'t'.repeat(64));
+   await page.waitForSelector('#bouton-accepter-devis',{timeout:2000});
+   assert.equal(await page.evaluate(()=>location.search),'');
+   await page.evaluate(()=>window.__auth('SIGNED_OUT'));
+   await page.click(decision==='accept'?'#bouton-accepter-devis':'#bouton-refuser-devis');
+   await page.click('#modal-bouton-confirmer');
+   await page.waitForFunction(()=>window.__devis.statut!=='envoye');
+   const calls=await page.evaluate(()=>window.__appels);
+   assert.ok(calls.some(a=>a.body.action===decision));assert.ok(calls.every(a=>!a.authorization&&a.body.token==='t'.repeat(64)));
+   await page.close();
  });
  await cas('Une réponse retardée ne réaffiche pas le devis après déconnexion',async()=>{
-   const page=await browser.newPage();await page.addInitScript(INIT+'window.__retard=300;');await page.goto(urlFichier('devis.html')+'#token='+'t'.repeat(64));await page.evaluate(()=>{window.__session=null;window.__auth('SIGNED_OUT');});await page.waitForTimeout(400);assert.equal(await page.locator('#bouton-accepter-devis').count(),0);assert.ok((await page.locator('#zone-contenu').textContent()).includes('Connectez-vous'));await page.close();
+   const page=await browser.newPage();await page.addInitScript(INIT+'window.__retard=300;');await page.goto(urlFichier('devis.html')+'?id='+ID);await page.evaluate(()=>{window.__session=null;window.__auth('SIGNED_OUT');});await page.waitForTimeout(400);assert.equal(await page.locator('#bouton-accepter-devis').count(),0);assert.ok((await page.locator('#zone-contenu').textContent()).includes('Connectez-vous'));await page.close();
  });
  await cas('Modal clavier : focus contenu, boucle Tab et retour Escape',async()=>{
    const page=await browser.newPage();await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);await page.click('#bouton-refuser-devis');assert.equal(await page.evaluate(()=>document.activeElement.id),'modal-champ-motif');await page.keyboard.press('Shift+Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'modal-bouton-confirmer');await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.id),'modal-champ-motif');await page.keyboard.press('Escape');assert.ok(await page.locator('#voile-modal').isHidden());assert.equal(await page.evaluate(()=>document.activeElement.id),'bouton-refuser-devis');await page.close();

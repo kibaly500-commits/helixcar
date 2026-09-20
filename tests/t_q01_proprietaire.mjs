@@ -13,8 +13,22 @@ async function fixture() {
   return {etat,d:creerDouble(etat),row};
 }
 for(const action of ['get','accept','refuse']) {
-  await cas(action+' : anonyme porteur du lien refusé',async()=>{
-    const {d}=await fixture();const r=await appeler(d,{action,token},{jwt:null});assert.equal(r.statut,401);
+  await cas(action+' : lien valide accessible sans session',async()=>{
+    const {d,row}=await fixture();const r=await appeler(d,{action,token},{jwt:null});assert.equal(r.statut,200);
+    if(action==='accept')assert.equal(row.accepte_par,null);
+    if(action==='refuse')assert.equal(row.refuse_par,null);
+  });
+  await cas(action+' : ID seul sans session refusé',async()=>{
+    const {d}=await fixture();const r=await appeler(d,{action,devis_id:ID_DEVIS},{jwt:null});assert.equal(r.statut,401);
+    assert.equal(d.journal.majsDevis.length,0);assert.equal(d.journal.signatures.length,0);
+  });
+  for(const bad of ['', 'court', 'x'.repeat(64)])await cas(action+' : lien invalide sans repli sur ID '+bad.length,async()=>{
+    const {d}=await fixture();const r=await appeler(d,{action,token:bad,devis_id:ID_DEVIS},{jwt:null});assert.equal(r.statut,404);
+    assert.equal(d.journal.majsDevis.length,0);assert.equal(d.journal.signatures.length,0);
+  });
+  await cas(action+' : lien expiré sans session refusé',async()=>{
+    const {d,row}=await fixture();row.date_expiration_token='2020-01-01T00:00:00Z';
+    const r=await appeler(d,{action,token},{jwt:null});assert.equal(r.statut,404);
     assert.equal(d.journal.majsDevis.length,0);assert.equal(d.journal.signatures.length,0);
   });
   await cas(action+' : autre identité portant le bon lien refusée',async()=>{
@@ -38,6 +52,20 @@ await cas('ID canonique d’un autre client : même refus',async()=>{
 await cas('Devis annulé : aucun téléchargement ni acceptation',async()=>{
   const {d,row}=await fixture();row.annule_le=new Date().toISOString();
   const r=await appeler(d,{action:'accept',token},{jwt:'jwt-client'});assert.equal(r.statut,409);
+  assert.equal(d.journal.majsDevis.length,0);
+});
+for(const action of ['get','accept','refuse'])await cas(action+' : préparation jamais envoyée inaccessible sans session',async()=>{
+  const {d,etat,row}=await fixture();
+  etat.tables.devis_preparations=[{devis_id:ID_DEVIS,token_hash:row.acceptation_token_hash,version:1,envoyee_le:null}];
+  const r=await appeler(d,{action,token},{jwt:null});assert.equal(r.statut,404);
+  assert.equal(d.journal.majsDevis.length,0);assert.equal(d.journal.signatures.length,0);
+});
+for(const action of ['get','accept','refuse'])await cas(action+' : archive ancienne sans session reste non modifiable',async()=>{
+  const {d,etat,row}=await fixture();row.version=2;
+  etat.tables.devis_preparations=[{devis_id:ID_DEVIS,token_hash:row.acceptation_token_hash,version:1,
+    envoyee_le:new Date().toISOString(),date_expiration:row.date_expiration_token,snapshot_devis:{prix:450}}];
+  const r=await appeler(d,{action,token},{jwt:null});assert.equal(r.statut,action==='get'?200:409);
+  if(action==='get')assert.equal(r.json.devis.version_obsolete,true);else assert.equal(r.json.code,'VERSION_OBSOLETE');
   assert.equal(d.journal.majsDevis.length,0);
 });
 console.log(`\n=== ${pass} PASS / ${fail} FAIL ===`);process.exitCode=fail?1:0;

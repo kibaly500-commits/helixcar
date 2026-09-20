@@ -548,8 +548,8 @@
   }
 
   // ────────────────────────────────────────────────────────────
-  // Appel vers le serveur : identité Auth et propriété requises.
-  // Le token identifie une version, il ne remplace pas la connexion.
+  // Le lien e-mail autorise sa version du devis ; un accès par ID
+  // depuis le Dashboard exige toujours la session du propriétaire.
   // ────────────────────────────────────────────────────────────
   function appellerAction(action, motif) {
     var corps = { action: action, token: token, devis_id: devisId };
@@ -891,18 +891,19 @@
   async function requeteAuthentifiee(options) {
     var session = null;
     try { var res = authDevis && await authDevis.auth.getSession(); session = res && res.data && res.data.session; } catch (e) {}
+    stripeQa = /\+qa-final01@/i.test(session && session.user && session.user.email || '') && [
+      'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
+      'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
+    ].indexOf(window.location.hostname)!==-1;
+    if (token) return fetch(URL_FONCTION, options);
     if (!session || !session.access_token) {
       return new Response(JSON.stringify({ok:false,code:'UNAUTHORIZED'}), {status:401,headers:{'Content-Type':'application/json'}});
     }
     options.headers.Authorization = 'Bearer ' + session.access_token;
-    stripeQa = /\+qa-final01@/i.test(session.user && session.user.email || '') && [
-      'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
-      'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
-    ].indexOf(window.location.hostname)!==-1;
     return fetch(URL_FONCTION, options);
   }
   if (authDevis) authDevis.auth.onAuthStateChange(function (event) {
-    if (event === 'SIGNED_OUT') afficherConnexionRequise();
+    if (event === 'SIGNED_OUT' && !token) afficherConnexionRequise();
   });
   window.addEventListener('pageshow', function (event) {
     if (event.persisted) { zone.textContent = 'Vérification de votre accès…'; chargerEtAfficherDevis(); }

@@ -633,7 +633,7 @@ export async function actionSendEmail(
     <p>${introduction}</p>
     <p>Vous trouverez également votre devis au format PDF en pièce jointe.</p>
     <div style="text-align:center;margin:28px 0">
-      <a href="${urlClient}" style="background:#14181D;color:#FFFFFF;text-decoration:none;padding:14px 26px;border-radius:2px;display:inline-block;font-weight:600">Consulter et accepter mon devis</a>
+      <a href="${urlClient}" style="background:#14181D;color:#FFFFFF;text-decoration:none;padding:14px 26px;border-radius:2px;display:inline-block;font-weight:600">Consulter mon devis</a>
     </div>
     <p style="font-size:0.88rem;color:#454C55">Ce lien sécurisé vous permet de consulter votre devis et de l'accepter ou de le refuser en ligne.</p>
     <p>Cordialement,<br>L'équipe HelixCar</p>
@@ -759,15 +759,20 @@ export async function actionReprendreEnvoi(sb:any,req:Request,corps:any,cors:Rec
 }
 
 // ============================================================
-// ACTIONS 2-4 — identité Auth vérifiée ET propriété du dossier.
-// Le lien identifie le devis ; il ne confère jamais le rôle de son client.
+// ACTIONS 2-4 — lien secret envoyé OU identité Auth propriétaire.
+// Le lien ne donne accès qu'à sa version du devis, jamais au compte client.
 // ============================================================
 async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
   const jwt = (req?.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  if (!jwt) return { refus: erreur("UNAUTHORIZED", "Connectez-vous à votre espace client pour consulter ce devis.", 401, cors) };
-  const { data, error: authError } = await sb.auth.getUser(jwt);
-  if (authError || !data?.user?.id) return { refus: erreur("UNAUTHORIZED", "Votre session a expiré. Reconnectez-vous.", 401, cors) };
   const tokenBrut = corps?.token;
+  const parLien = tokenBrut != null;
+  let uid: string | null = null;
+  if (jwt || !parLien) {
+    if (!jwt) return { refus: erreur("UNAUTHORIZED", "Connectez-vous à votre espace client pour consulter ce devis.", 401, cors) };
+    const { data, error: authError } = await sb.auth.getUser(jwt);
+    if (authError || !data?.user?.id) return { refus: erreur("UNAUTHORIZED", "Votre session a expiré. Reconnectez-vous.", 401, cors) };
+    uid = data.user.id;
+  }
   const devisId = corps?.devis_id;
   const invalide = () => ({ refus: erreur("INVALID_OR_EXPIRED_LINK", "Devis inaccessible ou lien expiré.", 404, cors) });
   let query = sb.from("devis").select("*");
@@ -779,16 +784,18 @@ async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, 
     archive=preparation;
     if(archive && !archive.envoyee_le) return invalide();
     query = archive ? query.eq("id",archive.devis_id) : query.eq("acceptation_token_hash", hash);
-  } else if (typeof devisId === "string" && /^[0-9a-f-]{36}$/i.test(devisId)) {
+  } else if (!parLien && typeof devisId === "string" && /^[0-9a-f-]{36}$/i.test(devisId)) {
     query = query.eq("id", devisId);
   } else return invalide();
   const { data: devisCourant, error } = await query.maybeSingle();
   let devis = devisCourant;
   if (error || !devis) return invalide();
-  const { data: dossier, error: dossierError } = await sb.from("clients").select("id")
-    .eq("id", devis.client_id).eq("auth_user_id", data.user.id).maybeSingle();
-  if (dossierError || !dossier) return invalide();
-  if (!archive && typeof devisId === "string") {
+  if (uid) {
+    const { data: dossier, error: dossierError } = await sb.from("clients").select("id")
+      .eq("id", devis.client_id).eq("auth_user_id", uid).maybeSingle();
+    if (dossierError || !dossier) return invalide();
+  }
+  if (!parLien && !archive && typeof devisId === "string") {
     const {data:derniere,error:e}=await sb.from("devis_preparations").select("*").eq("devis_id",devis.id)
       .gt("envoyee_le","1970-01-01T00:00:00Z").order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(e) return invalide();archive=derniere;
@@ -801,7 +808,7 @@ async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, 
   if (devis.annule_le || devis.expire_le || ["annule", "expire"].includes(devis.statut)) {
     return { refus: erreur("ACTION_IMPOSSIBLE", "Ce devis est annulé ou expiré.", 409, cors) };
   }
-  return { devis, uid: data.user.id as string };
+  return { devis, uid };
 }
 
 export async function actionGet(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
@@ -859,7 +866,9 @@ async function traiterReponseDevis(sb: any, corps: any, cibleStatut: "accepte" |
     return erreur("VERSION_OBSOLETE", "Ce devis a été mis à jour depuis son envoi. Un nouveau devis vous sera envoyé : cette version ne peut plus être acceptée ni refusée.", 409, cors);
   }
 
-  // L'acceptation enregistre l'identité Auth propriétaire du dossier,
+  // L'identité Auth n'est enregistrée que si elle a été vérifiée ;
+  // une réponse par lien seul ne prétend pas authentifier le client.
+  // L'acceptation enregistre
   // la date, la version acceptée, et ouvre l'état « paiement en
   // attente » — SANS créer ni mission ni paiement (décision C02).
   const champsEcriture: Record<string, unknown> = cibleStatut === "accepte"

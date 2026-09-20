@@ -279,8 +279,8 @@ async function executerSuite() {
       && /DEV-2026-0062/.test(d.journal.resend[0].subject), JSON.stringify(d.journal.resend[0] && d.journal.resend[0].to));
     check('4.7 Le PDF joint est EXACTEMENT celui préparé (mêmes octets, nom de fichier)',
       d.journal.resend[0].piece === 'Devis_HelixCar_DEV-2026-0062.pdf' && d.journal.resend[0].pieceOctets === d.journal.pdfs[l.pdf_path].length);
-    check('4.8 Le bouton « Consulter et accepter mon devis » pointe vers l\'origine appelante autorisée + le token',
-      /Consulter et accepter mon devis/.test(d.journal.resend[0].html) && d.journal.resend[0].lien === APERCU + '/devis.html?token=' + encodeURIComponent(token),
+    check('4.8 Le bouton « Consulter mon devis » pointe vers l\'origine appelante autorisée + le token',
+      /Consulter mon devis/.test(d.journal.resend[0].html) && d.journal.resend[0].lien === APERCU + '/devis.html?token=' + encodeURIComponent(token),
       d.journal.resend[0].lien);
     check('4.9 La clé Resend n\'apparaît que dans l\'en-tête d\'autorisation, jamais dans le corps',
       d.journal.resend[0].auth === 'Bearer k-secret' && !d.journal.resend[0].html.includes('k-secret'));
