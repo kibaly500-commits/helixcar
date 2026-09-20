@@ -3183,23 +3183,37 @@ async function loadMissionsClient() {
 async function loadMissionsResumeClient() {
   const zone = document.getElementById('client-missions-resume');
   if (!zone) return;
-  let missions = [];
-  try { missions = await chargerMissionsSuiviClient(); }
-  catch (e) { zone.innerHTML = '<div class="fid-note">Impossible de charger vos missions pour le moment.</div>'; return; }
-  if (!missions.length) {
-    zone.innerHTML = '<div class="fid-note" id="client-missions-resume-vide">Aucune mission pour le moment.</div>';
-    _majBadgeEvaluations(0);
+  const generation = (zone._generationSuivi || 0) + 1;
+  zone._generationSuivi = generation;
+  let missions = [], resultats = [];
+  try {
+    const [ms, demandes, devis] = await Promise.all([
+      chargerMissionsSuiviClient(), chargerDemandesClient(), chargerDevisClient()
+    ]);
+    missions = ms;
+    const parDemande = {};
+    devis.forEach(dv => { if (dv.client_id && !parDemande[dv.client_id]) parDemande[dv.client_id] = dv; });
+    resultats = await Promise.all(demandes.map(async d => {
+      const lignes = await chargerInformationsDemande(d.id);
+      return {id:d.id, groupe:_presentationDemandeClient(d, parDemande[d.id], lignes, false, false).groupe};
+    }));
+  } catch (e) {
+    if (zone._generationSuivi === generation) zone.innerHTML = '<div class="fid-note">Impossible de charger le suivi pour le moment.</div>';
     return;
   }
-  const compter = phase => missions.filter(m => _phaseMissionClient(m) === phase).length;
-  const enCours = compter('En cours');
-  const terminees = compter('Terminée');
-  const aEvaluer = missions.filter(function (m) { return m.statut === 'terminee' && !m.evaluee; }).length;
-  zone.innerHTML = ['En attente de paiement','Paiement à vérifier','En préparation','Planifiée','Réalisation terminée — à valider'].filter(phase => compter(phase) > 0).map(phase => '<div class="detail-row"><span class="detail-label">' + phase + '</span><span class="detail-val">' + compter(phase) + '</span></div>').join('')
-    + '<div class="detail-row"><span class="detail-label">En cours</span><span class="detail-val" id="client-resume-en-cours">' + enCours + '</span></div>'
-    + '<div class="detail-row"><span class="detail-label">Terminées</span><span class="detail-val" id="client-resume-terminees">' + terminees + '</span></div>'
-    + (aEvaluer ? '<div class="detail-row"><span class="detail-label">À évaluer</span><span class="detail-val">'
-        + '<button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">' + aEvaluer + ' mission(s) à évaluer</button></span></div>' : '');
+  if (zone._generationSuivi !== generation) return;
+  const compterDossiers = groupe => new Set(resultats.filter(r => r.groupe === groupe).map(r => r.id)).size;
+  const enPreparation = compterDossiers('preparation');
+  const enVerification = compterDossiers('verification');
+  const enCours = missions.filter(m => _phaseMissionClient(m) === 'En cours').length;
+  const terminees = missions.filter(m => _phaseMissionClient(m) === 'Terminée').length;
+  const aEvaluer = missions.filter(m => m.statut === 'terminee' && !m.evaluee).length;
+  const ligne = (titre, n, id) => '<div class="detail-row"><span class="detail-label">' + titre + '</span><span class="detail-val" id="' + id + '">' + n + '</span></div>';
+  zone.innerHTML = ligne('En préparation', enPreparation, 'client-resume-preparation')
+    + ligne('En cours de vérification', enVerification, 'client-resume-verification')
+    + (enCours ? ligne('En cours', enCours, 'client-resume-en-cours') : '')
+    + ligne('Terminées', terminees, 'client-resume-terminees')
+    + (aEvaluer ? '<div class="detail-row"><span class="detail-label">À évaluer</span><span class="detail-val"><button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">' + aEvaluer + ' mission(s) à évaluer</button></span></div>' : '');
   _majBadgeEvaluations(aEvaluer);
 }
 
