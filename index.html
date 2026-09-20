@@ -7464,7 +7464,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
           <div style="background:#f5f5f0;border-radius:2px;padding:8px 12px;font-size:.78rem;color:#666;margin-bottom:8px">Visible sur la carte grise, case E.</div>
           <input type="text" id="client-vin" placeholder="VF1XXXXXXXX000000" style="text-transform:uppercase;letter-spacing:.04em" maxlength="17" autocomplete="off">
         </div>
-<div class="modal-form-group"><label for="client-motorisation">Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="client-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
+<div class="modal-form-group"><label for="client-motorisation">Motorisation</label><select id="client-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
         </div><!-- /bloc-vehicule-unique -->
 
         <!-- Fiches véhicules : générées quand nb_vehicules >= 2 -->
@@ -7585,7 +7585,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
               <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
-<div class="modal-form-group"><label for="client-restit-motorisation">Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="client-restit-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
+<div class="modal-form-group"><label for="client-restit-motorisation">Motorisation</label><select id="client-restit-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
 
           </div>
         </div>
@@ -20694,7 +20694,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
-    identite+='<div class="modal-form-group"><label>Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="veh-'+i+'-motorisation">'+_optionsMotorisation(v.motorisation)+'</select></div>';
+    identite+='<div class="modal-form-group"><label>Motorisation</label><select id="veh-'+i+'-motorisation">'+_optionsMotorisation(v.motorisation)+'</select></div>';
     html+=_hcSousVeh(i,'identite',1,'Identité du véhicule',identite,true);
 
     var no=2;
@@ -20737,7 +20737,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
       '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
-      '<div class="modal-form-group"><label>Motorisation <span class="field-optional-hint">(facultatif pour le devis)</span></label><select id="veh-'+i+'-restit-motorisation">'+_optionsMotorisation(v.restit_motorisation)+'</select></div>'+
+      '<div class="modal-form-group"><label>Motorisation</label><select id="veh-'+i+'-restit-motorisation">'+_optionsMotorisation(v.restit_motorisation)+'</select></div>'+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';
 
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
@@ -21916,6 +21916,12 @@ document.addEventListener('click', function (e) {
 #modal-client .hc-select-menu { display:none; position:absolute; z-index:80; left:0; right:0; top:calc(100% + 6px); padding:6px; background:#fff; border:1px solid rgba(23,28,33,.12); border-radius:11px; box-shadow:0 18px 45px rgba(23,28,33,.16); max-height:260px; overflow:auto; }
 #modal-convoyeur .hc-select-menu { display:none; position:absolute; z-index:80; left:0; right:0; top:calc(100% + 6px); padding:6px; background:#fff; border:1px solid rgba(23,28,33,.12); border-radius:11px; box-shadow:0 18px 45px rgba(23,28,33,.16); max-height:260px; overflow:auto; }
 #modal-client .hc-select-wrap.open .hc-select-menu { display:block; }
+/* La motorisation en bas d'accordéon doit agrandir le bloc ouvert :
+   un menu absolu serait coupé par ses bordures (overflow:hidden). */
+#modal-client .hc-select-wrap:has(> select[id$="-motorisation"]) > .hc-select-menu {
+  position:relative; top:auto; left:auto; right:auto; margin-top:6px;
+  box-sizing:border-box; width:100%;
+}
 #modal-convoyeur .hc-select-wrap.open .hc-select-menu { display:block; }
 #modal-client .hc-select-option { display:block; width:100%; border:0; border-radius:7px; background:#fff; color:#171C21; padding:10px 11px; text-align:left; font:500 .88rem var(--font-body); cursor:pointer; }
 #modal-convoyeur .hc-select-option { display:block; width:100%; border:0; border-radius:7px; background:#fff; color:#171C21; padding:10px 11px; text-align:left; font:500 .88rem var(--font-body); cursor:pointer; }

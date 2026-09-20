@@ -5,6 +5,27 @@ const L=require('./lib');const plan=require('../assets/preparation-missions.js')
  await page.evaluate(()=>{document.getElementById('nb-vehicules').value='2';onNbVehiculesChange();rendreFichesVehicules();});
  L.check('Motorisation proposée pour chaque véhicule',await page.locator('select[id^="veh-"][id$="-motorisation"]').count()===4);
  L.check('Motorisation facultative pour établir le devis',await page.locator('#veh-0-motorisation').evaluate(e=>!e.required));
+ // Le menu doit rester dans les limites du bloc, même sur petit écran.
+ for(const [service,width] of [['stockage',1280],['stockage',390],['convoyage',1280],['convoyage',390]]){
+  await page.setViewportSize({width,height:900});
+  await page.evaluate(()=>{_formStepState.client=2;_renderFormStep('client');});
+  await L.chooseService(page,service);
+  await page.evaluate(()=>{document.getElementById('nb-vehicules').value='2';onNbVehiculesChange();rendreFichesVehicules();});
+  await page.evaluate(()=>{_formStepState.client=4;_renderFormStep('client');_ouvrirVehicule(0);});
+  const wrap=page.locator('#veh-0-motorisation').locator('..');
+  await wrap.locator('.hc-select-btn').click();
+  const bounds=await wrap.evaluate(w=>{
+   const m=w.querySelector('.hc-select-menu'),a=w.closest('.veh-sous-accordeon');
+   const r=m.getBoundingClientRect(),b=a.getBoundingClientRect();
+   return {inside:r.height>0&&r.bottom<=b.bottom&&r.left>=b.left&&r.right<=b.right,
+    label:w.parentElement.querySelector('label').textContent.trim()};
+  });
+  L.check('Menu entièrement dans le bloc '+service+' '+width,bounds.inside);
+  L.check('Libellé Motorisation sans parenthèses '+width,bounds.label==='Motorisation');
+  await wrap.getByRole('button',{name:'Autre',exact:true}).click();
+  L.check('Dernier choix accessible '+width,await page.locator('#veh-0-motorisation').inputValue()==='Autre');
+ }
+ await page.setViewportSize({width:1280,height:2400});
  await page.evaluate(()=>{document.getElementById('veh-0-motorisation').value='Électrique';document.getElementById('veh-1-motorisation').value='Diesel';document.querySelector('input[name="veh-0-restit-active"][value="oui"]').checked=true;basculerRestitVehicule(0);document.getElementById('veh-0-restit-motorisation').value='Hybride';});
  const vs=await page.evaluate(()=>_lireFichesVehicules());
  L.check('Valeurs indépendantes par véhicule',vs[0].motorisation==='Électrique'&&vs[1].motorisation==='Diesel');
