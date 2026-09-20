@@ -1031,8 +1031,8 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demande-montant{font-size:1.1rem;font-weight:700;margin:0 0 12px}
 .hc-demande-complement{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0 0}
 [data-groupe-demandes="devis"] .hc-demande-card{border-left:3px solid #7044b5}
-[data-groupe-demandes="informations"] .hc-demande-card{border-left:3px solid #d17a29}
-[data-groupe-demandes="verification"] .hc-demande-card{border-left:3px solid #397bc4}
+.hc-demande-card[data-etat-demande="informations"]{border-left:3px solid #d17a29}
+.hc-demande-card[data-etat-demande="verification"]{border-left:3px solid #397bc4}
 [data-groupe-demandes="preparation"] .hc-demande-card{border-left:3px solid #378452}
 .hc-demandes-groupe h3{color:#273139;display:flex;align-items:center;gap:10px}
 .hc-demandes-groupe{--hc-groupe:#66717e;border-top:1px solid #e8eaed;padding-top:22px}
@@ -3094,22 +3094,19 @@ async function loadDemandesClient() {
   const groupes=[
     {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
     {cle:'devis',titre:'Vos devis',description:'Retrouvez le détail de nos propositions.'},
-    {cle:'verification',titre:'Informations en vérification',description:'Vous avez transmis vos informations. Notre équipe vérifie votre dossier.'},
-    {cle:'devis-preparation',titre:'Demandes reçues',description:'Nous étudions votre demande.'},
+    {cle:'demandes',etats:['devis-preparation','informations','verification'],titre:'Demandes en cours',description:'Retrouvez le suivi de vos demandes et les éventuelles informations à compléter.'},
     {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes missions ».'},
     {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
-    {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'},
-    {cle:'informations',titre:'Informations à compléter',description:'Complétez les informations nécessaires à votre prestation.'}
+    {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'}
   ];
   zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
-    const selection=resultats.filter(r=>r.presentation.groupe===g.cle).sort(function(a,b){
+    const selection=resultats.filter(r=>(g.etats||[g.cle]).includes(r.presentation.groupe)).sort(function(a,b){
       return (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0) || String(a.d.id).localeCompare(String(b.d.id));
     });
-    if(!selection.length && g.cle!=='informations')return '';
-    const accordeon=selection.length>=4 && ['devis','informations','verification','preparation'].includes(g.cle);
+    if(!selection.length)return '';
+    const accordeon=selection.length>=4 && ['devis','demandes','preparation'].includes(g.cle);
     const titre='<h3>'+g.titre+' <span class="hc-demandes-compteur">'+selection.length+'</span></h3>';
-    const vide=!selection.length?'<p class="hc-demandes-vide">'+(devisIndisponibles || resultats.some(r=>r.erreurInfos)?'Impossible de confirmer les informations restantes pour le moment.': 'Aucune information à compléter.')+'</p>':'';
-    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p>'+vide+'<div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
+    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p><div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
       const {d,dv,lignes,erreurInfos,presentation:p}=r;
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
@@ -3121,7 +3118,7 @@ async function loadDemandesClient() {
       const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
       const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
-      return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
+      return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis && paiement!=='paye'?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
