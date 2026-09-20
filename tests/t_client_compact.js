@@ -80,7 +80,9 @@ const {lancerNavigateur} = require('./env');
     assert.equal(await p.locator('[data-groupe-demandes="devis"] [data-demande="d4"]').count(),1);
     assert.equal(await p.locator('#client-demandes-liste [data-demande="d4"]').count(),1);
     assert(await p.locator('[data-demande="d4"] .hc-demande-complement button').isVisible());
-    assert.equal(await p.locator('[data-groupe-demandes="preparation"]').count(),0);
+    assert.equal(await p.locator('[data-groupe-demandes="preparation"]').count(),1);
+    assert.equal(await p.locator('[data-groupe-demandes="preparation"] .hc-demande-card').count(),0);
+    assert.match(await p.locator('[data-groupe-demandes="preparation"]').textContent(),/Prestations en préparation 0.*Aucune prestation en préparation pour le moment/s);
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'HC-DEMO-001',type_service:'convoyage',statut:'nouveau'}];
       window.chargerDevisClient = async () => [{id:'q1',client_id:'d1',statut:'accepte',paiement_statut:'paye'}];

@@ -1070,7 +1070,7 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demandes-accordeon>summary h3::after{content:'⌄';flex:0 0 auto;color:#626973;transition:transform .15s}
 .hc-demandes-accordeon[open]>summary h3::after{transform:rotate(180deg)}
 .hc-demandes-accordeon>summary:focus-visible{outline:2px solid var(--hc-groupe);outline-offset:4px;border-radius:4px}
-.hc-demandes-vide{padding:16px 18px;border:1px solid #e8eaed;border-left:3px solid #d17a29;border-radius:10px;color:#626973;font-size:.85rem;margin:0}
+.hc-demandes-vide{padding:16px 18px;border:1px solid #e8eaed;border-left:3px solid var(--hc-groupe);border-radius:10px;color:#626973;font-size:.85rem;margin:0}
 @media(min-width:1101px){
  .hc-demandes-grille[data-plusieurs="true"]{grid-template-columns:repeat(2,minmax(0,1fr))}
  .hc-demande-card:not(:has(>.btn)){grid-template-columns:minmax(0,1fr) auto}
@@ -3107,10 +3107,13 @@ async function loadDemandesClient() {
     const selection=resultats.filter(r=>(g.etats||[g.cle]).includes(r.presentation.groupe)).sort(function(a,b){
       return (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0) || String(a.d.id).localeCompare(String(b.d.id));
     });
-    if(!selection.length)return '';
+    // La rubrique « Prestations en préparation » reste un repère permanent
+    // du parcours client, même tant qu'aucun dossier n'y est encore classé.
+    if(!selection.length && g.cle!=='preparation')return '';
     const accordeon=['devis','demandes','preparation'].includes(g.cle);
     const titre='<h3>'+g.titre+' <span class="hc-demandes-compteur">'+selection.length+'</span></h3>';
-    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"'+(selection.length<4?' open':'')+'><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p><div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
+    const vide=!selection.length?'<p class="hc-demandes-vide">Aucune prestation en préparation pour le moment.</p>':'';
+    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"'+(selection.length<4?' open':'')+'><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p>'+vide+'<div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
       const {d,dv,lignes,erreurInfos,presentation:p}=r;
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
