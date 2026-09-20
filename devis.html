@@ -46,6 +46,7 @@
   .entete-sous { color: #9AA0A8; font-size: 0.8rem; }
   .retour-client { grid-column: 3; justify-self: end; color: var(--anthracite); background: var(--blanc); border-radius: 6px; font-size: .85rem; font-weight: 700; text-decoration: none; padding: 8px 12px; text-align: center; }
   .retour-client:hover, .retour-client:focus-visible { text-decoration: underline; }
+  @media (min-width: 901px) { .retour-client { margin-right: clamp(24px, 5vw, 96px); } }
   @media (max-width: 640px) {
     .entete-contenu { grid-template-columns: 1fr; gap: 4px; }
     .entete-contenu .logo-image, .retour-client { grid-column: 1; justify-self: center; }
