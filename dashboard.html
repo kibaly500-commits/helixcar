@@ -10270,8 +10270,7 @@ function _statutDevisBadge(statut, d) {
   // en attente ; « payé » n'est posé que par un événement serveur
   // authentifié (aucun dans ce lot) ; la consultation est distinguée de
   // l'envoi.
-  if (d && statut === 'accepte' && d.paiement_statut === 'paye') return '<span class="badge badge-active">PAYÉ</span>';
-  if (d && statut === 'accepte' && d.paiement_statut === 'en_attente') return '<span class="badge badge-active">ACCEPTÉ — PAIEMENT EN ATTENTE</span>';
+  if (d && statut === 'accepte' && d.paiement_statut === 'paye') return '<span class="badge badge-active">DEVIS PAYÉ</span>';
   if (d && statut === 'envoye' && d.consulte_le) return '<span class="badge badge-success">DEVIS CONSULTÉ</span>';
   // V50.5D.3B — Objectif 1/3 : cas accepte/refuse manquants, seule
   // cause du bug d'affichage — statut réel déjà correctement relu
@@ -10436,7 +10435,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td>' + _escapeHtml(trajet) + '</td>' +
       '<td>' + _escapeHtml(_dv(vehicule)) + '</td>' +
       '<td>' + _dvDate(_dateSouhaiteeListe(c)) + '</td>' +
-      '<td>' + _statutDevisBadge(statut) + '</td>' +
+      '<td>' + _statutDevisBadge(statut, d) + '</td>' +
       '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirFicheDemande', [c.id]) + '>Ouvrir</button></td>' +
       '</tr>';
   });

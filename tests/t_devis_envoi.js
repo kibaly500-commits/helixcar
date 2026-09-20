@@ -354,7 +354,7 @@ window.fetch = function (url, options) {
   await page.evaluate((id) => ouvrirFicheDemande(id), DEMANDE.id);
   await page.waitForTimeout(80);
   f = await fiche();
-  check('I1 : devis accepté -> aucun bouton d\'envoi, badge « accepté — paiement en attente »', f.bouton === null && /PAIEMENT EN ATTENTE/.test(f.texte));
+  check('I1 : devis accepté -> aucun bouton d\'envoi, badge « devis accepté »', f.bouton === null && /DEVIS ACCEPTÉ/.test(f.texte));
 
   // ── J. Hygiène du code ──
   const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');

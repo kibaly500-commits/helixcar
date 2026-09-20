@@ -8,6 +8,18 @@ window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:wi
 window.fetch=async(url,opt)=>{const b=JSON.parse(opt.body);window.__appels.push({body:b,authorization:opt.headers.Authorization});await new Promise(r=>setTimeout(r,window.__retard));if(b.action==='accept')Object.assign(window.__devis,{statut:'accepte',paiement_statut:'en_attente'});if(b.action==='refuse')window.__devis.statut='refuse';return new Response(JSON.stringify({ok:true,devis:window.__devis}));};`;
 (async()=>{const browser=await lancerNavigateur();
 try{
+ for(const paiement of ['en_attente','paye'])await cas('Statut '+paiement+' et retour espace client',async()=>{
+   const page=await browser.newPage({viewport:{width:390,height:844}});
+   await page.addInitScript(INIT+`Object.assign(window.__devis,{statut:'accepte',paiement_statut:'${paiement}',date_acceptation:'2026-09-20T20:39:00Z'});`);
+   await page.goto(urlFichier('devis.html')+'?id='+ID);
+   await page.waitForSelector('.statut-final');
+   assert.equal(await page.locator('.statut-final strong').textContent(),paiement==='paye'?'Devis payé':'Devis accepté');
+   assert.equal(await page.locator('#bouton-accepter-devis').count(),0);
+   const retour=page.getByRole('link',{name:'Accéder à mon espace client'});
+   assert.ok(await retour.isVisible());assert.equal(await retour.getAttribute('href'),'dashboard.html');
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await page.close();
+ });
  for(const width of [320,390,768,1280,1440])await cas('Consultation depuis Dashboard par ID — '+width+' px émulés',async()=>{
    const page=await browser.newPage({viewport:{width,height:900}});await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);
    await page.waitForSelector('#bouton-accepter-devis',{timeout:2000});const a=await page.evaluate(()=>window.__appels[0]);assert.equal(a.body.devis_id,ID);assert.equal(a.authorization,'Bearer TEST-QA-CLAUDE-HELIXCAR-jwt');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.close();

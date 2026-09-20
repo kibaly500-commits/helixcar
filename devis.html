@@ -40,6 +40,10 @@
   .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.01em; color: var(--blanc); }
   .logo span { color: var(--rouge); }
   .entete-sous { color: #9AA0A8; font-size: 0.8rem; }
+  .retour-client { margin-left: auto; max-width: 440px; text-align: right; color: var(--blanc); }
+  .retour-client p { margin: 0 0 10px; font-size: 1rem; }
+  .retour-client a { display: inline-block; padding: 10px 16px; border-radius: 6px; background: var(--blanc); color: var(--anthracite); font-weight: 700; text-decoration: none; }
+  @media (max-width: 640px) { .retour-client { margin-left: 0; text-align: left; } }
 
   main {
     flex: 1;
@@ -310,7 +314,10 @@
 <div class="voile">
   <header class="entete">
     <img class="logo-image" src="assets/logo-helixcar-blanc.png" alt="HelixCar — Services automobiles">
-    <div class="entete-sous">Consultation de devis</div>
+    <div class="retour-client">
+      <p>Retrouvez le suivi de votre prestation dans votre espace client.</p>
+      <a href="dashboard.html">Accéder à mon espace client</a>
+    </div>
   </header>
 
   <main id="zone-contenu">
@@ -423,7 +430,7 @@
   }
 
   function badgeStatut(statut, devis) {
-    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Accepté — payé</span>';
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Devis payé</span>';
     if (statut === 'accepte' && devis && devis.paiement_statut === 'en_attente') return '<span class="badge accepte">Accepté — paiement en attente</span>';
     if (statut === 'accepte') return '<span class="badge accepte">Accepté</span>';
     if (statut === 'refuse') return '<span class="badge refuse">Refusé</span>';
@@ -742,8 +749,8 @@
         '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
         '<button class="bouton bouton-simulation" data-scenario="refused">Paiement refusé</button><button class="bouton bouton-simulation" data-scenario="abandoned">Paiement abandonné</button></div>'+
         '<div id="paiement-recette-resultat" class="paiement-recette-resultat" role="status" aria-live="polite"></div></section>' : '';
-      return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
-        (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
+      return '<div class="statut-final accepte"><div><strong>' + (devis.paiement_statut === 'paye' ? 'Devis payé' : 'Devis accepté') + '</strong>' +
+        (devis.date_acceptation ? echapperHtml((devis.paiement_statut === 'paye' ? 'Accepté le ' : 'le ') + formaterDate(devis.date_acceptation)) : '') +
         echapperHtml(suite) +
         '</div></div>'+simulation+(stripeQa && devis.paiement_statut !== 'paye' ?
         '<section class="paiement-recette"><h2>Paiement Stripe — test</h2><p>Aucun débit réel. Utilisez uniquement une carte de test Stripe.</p>'+

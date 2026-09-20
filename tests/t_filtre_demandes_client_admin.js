@@ -70,6 +70,18 @@ const { urlFichier } = require('./env');
 
     L.check('Mobile 390 px : aucun débordement horizontal du document',
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
+    await page.evaluate(() => {
+      _devisParClient = {
+        'a-1': {statut:'accepte',paiement_statut:'paye'},
+        'a-2': {statut:'accepte',paiement_statut:'en_attente'},
+        'b-1': {statut:'envoye',paiement_statut:'en_attente'}
+      };
+      _rendreTableDemandesDevis(window.qaDemandes);
+    });
+    const lignes = page.locator('#tbody-demandes-devis tr');
+    L.check('Admin : accepté puis payé affiche DEVIS PAYÉ', (await lignes.nth(0).innerText()).includes('DEVIS PAYÉ'));
+    L.check('Admin : accepté non payé conserve DEVIS ACCEPTÉ', (await lignes.nth(1).innerText()).includes('DEVIS ACCEPTÉ') && !(await lignes.nth(1).innerText()).includes('DEVIS PAYÉ'));
+    L.check('Admin : devis envoyé conserve son statut', (await lignes.nth(2).innerText()).includes('DEVIS ENVOYÉ'));
     await ctx.close();
   } finally {
     await browser.close();
