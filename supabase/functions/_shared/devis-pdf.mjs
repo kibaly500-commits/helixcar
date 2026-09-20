@@ -1454,6 +1454,14 @@ function _construirePdfDevis(c, d, options) {
   // récapitulatif sans tarif affiché au client connecté.
   if (estRecapitulatif) {
     carteTexte('Informations complémentaires', c.notes);
+    _vehiculesDuDossier(c).forEach(function(v,i){
+      if(v.restitution_concernee && v.restit_contraintes){
+        var identite='Véhicule '+(v.position||i+1)+
+          (v.marque_modele?' · '+v.marque_modele:'')+
+          (v.immatriculation?' · '+v.immatriculation:'');
+        carteTexte('Consignes de restitution — '+identite, v.restit_contraintes);
+      }
+    });
   }
 
   // ══ VÉHICULE(S) — depuis la source de vérité, jamais un faux véhicule ══

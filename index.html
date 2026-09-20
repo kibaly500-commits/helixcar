@@ -12812,7 +12812,7 @@ function construireRecap() {
     html += _recapBloc('Véhicules',
       _recapLigne('Quantité', n + (n > 1 ? ' véhicules' : ' véhicule')) +
       _recapLigne('Détail', 'Sera finalisé avec notre équipe'), 2);
-  } else if (!multi) {
+  } else if (!multi && !document.getElementById('veh-0-type')) {
     // Restitution mono-véhicule : bloc dédié, uniquement si demandée.
     var caseR = document.getElementById('client-restit');
     if (caseR && caseR.checked) {
@@ -12894,6 +12894,7 @@ function construireRecap() {
         corps += _recapLigne('Véhicule à restituer — Marque / modèle', v.restit_marque_modele);
         corps += _recapLigne('Véhicule à restituer — Immatriculation', v.restit_immatriculation);
         corps += _recapLigne('Véhicule à restituer — VIN', v.restit_vin);
+        corps += _recapLigne('Consignes de restitution', v.restit_contraintes);
       }
 
       var entete2 = 'Véhicule ' + (i + 1) +
@@ -20733,7 +20734,17 @@ function rendreFichesVehicules() {
     // LOT D1 — rubrique entierement absente quand HelixCar n'intervient
     // sur aucun des deux trajets. Ni titre, ni numero, ni sous-champ,
     // ni validation cachee : rien n'est rendu.
-    if (livraison && !_livraisonSansObjet()) html+=_hcSousVeh(i,'livraison',no++,'Livraison',livraison,false);
+    var recuperationStockage = _avecStockage() && _sortieStockage()==='recuperation_client';
+    if (recuperationStockage && !_livraisonSansObjet()) {
+      var dateRecup=(document.getElementById('stock-fin')||{}).value||'';
+      var heureRecup=(document.getElementById('stock-heure-sortie')||{}).value||'';
+      livraison='<div class="veh-sstitre">Récupération après stockage</div>'+
+        '<p>Date de récupération : <strong data-hc-recuperation-date>'+_attr(_formaterDateFr(dateRecup)||'À renseigner')+'</strong></p>'+
+        '<p>Horaire de récupération : <strong data-hc-recuperation-heure>'+_attr(heureRecup||'À renseigner')+'</strong></p>'+
+        '<p class="field-optional-hint">Cette date et cet horaire reprennent vos choix à l’étape précédente.</p>'+
+        '<p>Vous récupérerez votre véhicule à '+_attr(_localisationStockage())+'. L’adresse exacte vous sera communiquée par HelixCar.</p>';
+    }
+    if (livraison && !_livraisonSansObjet()) html+=_hcSousVeh(i,'livraison',no++,recuperationStockage?'Récupération après stockage':'Livraison',livraison,false);
 
     // ── LE MODE DE TRANSPORT, TOUJOURS PRESENT, TOUJOURS ICI ──
     //
@@ -21105,7 +21116,7 @@ function _hcDateMinimaleChamp(id) {
     if (_avecStockage()) {
       return _hcParserYMD((document.getElementById('stock-debut') || {}).value);
     }
-    return null;
+    return _hcParserYMD((document.getElementById(ctx.type === 'vehicule' ? 'veh-'+ctx.i+'-pc-date' : 'client-date-pc') || {}).value);
   }
   if (ctx.prefixe === 'restit') {
     var periode = ctx.type === 'vehicule' ? _hcPeriodeVehicule(ctx.i) : _hcPeriodeGlobale();
@@ -22478,6 +22489,9 @@ document.addEventListener('click', function (e) {
   }
   window.verifierChronologieVehicule=function(i){
     var ok=true,pcS=instantVeh(i,'pc',false),pcE=instantVeh(i,'pc',true),livS=instantVeh(i,'liv',false),livE=instantVeh(i,'liv',true),reS=instantVeh(i,'restit',false);
+    var datePc=(document.getElementById('veh-'+i+'-pc-date')||{}).value, dateLiv=(document.getElementById('veh-'+i+'-liv-date')||{}).value;
+    clearChrono(dateTargetVeh(i,'liv'));
+    if(datePc&&dateLiv&&dateLiv<datePc){setChrono(dateTargetVeh(i,'liv'),'La livraison ne peut pas précéder la prise en charge.');ok=false;}
     if(pcE!==null&&livS!==null) ok=validatePair(pcE,livS,dateTargetVeh(i,'liv'),timeTargetVeh(i,'liv'),'Livraison','la prise en charge')&&ok;
     if(livE!==null&&reS!==null) ok=validatePair(livE,reS,dateTargetVeh(i,'restit'),timeTargetVeh(i,'restit'),'Restitution','la livraison')&&ok;
     else if(livE===null&&pcE!==null&&reS!==null) ok=validatePair(pcE,reS,dateTargetVeh(i,'restit'),timeTargetVeh(i,'restit'),'Restitution','la prise en charge')&&ok;
@@ -22493,6 +22507,8 @@ document.addEventListener('click', function (e) {
   };
   window._chronologieVehiculeOk=function(i){
     var pcE=instantVeh(i,'pc',true),livS=instantVeh(i,'liv',false),livE=instantVeh(i,'liv',true),reS=instantVeh(i,'restit',false);
+    var datePc=(document.getElementById('veh-'+i+'-pc-date')||{}).value, dateLiv=(document.getElementById('veh-'+i+'-liv-date')||{}).value;
+    if(datePc&&dateLiv&&dateLiv<datePc)return false;
     if(pcE!==null&&livS!==null&&livS<pcE+GAP)return false;
     if(livE!==null&&reS!==null&&reS<livE+GAP)return false;
     if(livE===null&&pcE!==null&&reS!==null&&reS<pcE+GAP)return false;
@@ -23230,6 +23246,8 @@ console.log('HelixCar ' + window.HC_VERSION);
   // La prise en charge HelixCar reprend la date de début de stockage :
   // valeur visible, grisée, non modifiable, sans calendrier.
   function verrouillerDatePriseEnCharge() {
+    document.querySelectorAll('[data-hc-recuperation-date]').forEach(function(el){el.textContent=_formaterDateFr((document.getElementById('stock-fin')||{}).value)||'À renseigner';});
+    document.querySelectorAll('[data-hc-recuperation-heure]').forEach(function(el){el.textContent=(document.getElementById('stock-heure-sortie')||{}).value||'À renseigner';});
     var actif = typeof _avecStockage === 'function' && _avecStockage()
       && typeof _acheminementStockage === 'function' && _acheminementStockage() === 'helixcar';
     var debut = (document.getElementById('stock-debut') || {}).value || '';
@@ -23242,6 +23260,11 @@ console.log('HelixCar ' + window.HC_VERSION);
       champ.disabled = !!actif;
       champ.readOnly = true;
       champ.classList.toggle('hc-date-verrouillee', !!actif);
+      var noteId=champ.id+'-origine-date', note=document.getElementById(noteId);
+      if(actif&&debut){
+        if(!note){note=document.createElement('p');note.id=noteId;note.className='field-optional-hint';champ.insertAdjacentElement('afterend',note);}
+        note.textContent='Cette date correspond au début du stockage que vous avez sélectionné à l’étape précédente : le '+_formaterDateFr(debut)+'.';
+      }else if(note)note.remove();
       if (actif) {
         champ.setAttribute('aria-disabled', 'true');
         champ.title = 'Cette date reprend automatiquement le début du stockage.';
@@ -23267,8 +23290,8 @@ console.log('HelixCar ' + window.HC_VERSION);
     };
   }
   document.addEventListener('change', function (e) {
-    if (e.target && (e.target.id === 'stock-debut' || e.target.name === 'stock-acheminement')) {
-      setTimeout(verrouillerDatePriseEnCharge, 0);
+    if (e.target && (['stock-debut','stock-fin','stock-heure-sortie'].includes(e.target.id) || e.target.name === 'stock-acheminement')) {
+      setTimeout(function(){verrouillerDatePriseEnCharge();for(var i=0;i<_nbVehicules();i++)_majBarreVehicule(i);}, 0);
     }
   }, true);
 
@@ -23582,6 +23605,8 @@ console.log('HelixCar ' + window.HC_VERSION);
 
   function etapeComplete(i, bloc) {
     if (!etapeApplicable(bloc)) return true;
+    if(bloc.querySelector('[data-hc-recuperation-date]') &&
+      (!(document.getElementById('stock-fin')||{}).value || !(document.getElementById('stock-heure-sortie')||{}).value))return false;
     var cle = String(bloc.id || '').replace('veh-' + i + '-sous-', '');
     var req = _champsRequisVehicule(i);
     for (var k = 0; k < req.length; k++) {
