@@ -9812,7 +9812,7 @@ async function ouvrirCompleterInformations(demandeId) {
   var envoyer = document.getElementById('completer-envoyer');
   if (envoyer) envoyer.style.display = 'none';
   var contexte = document.getElementById('completer-sous-titre');
-  if (contexte) contexte.textContent = 'Dossier ' + demandeId + ' — complétez uniquement les informations demandées.';
+  if (contexte) contexte.textContent = 'Complétez uniquement les informations demandées.';
   _completerAfficherMessage('');
   if (typeof openModal === 'function') openModal('completer');
   var zone = document.getElementById('completer-rubriques');
@@ -9826,6 +9826,13 @@ async function ouvrirCompleterInformations(demandeId) {
     return;
   }
   try {
+    // Lecture via la vue du client connecté : ne jamais afficher l’identifiant technique.
+    try {
+      var dossier = await _sb.from('v_mes_demandes').select('numero_client').eq('id', demandeId).limit(1);
+      if (generation !== _completerGeneration) return;
+      var reference = !dossier.error && dossier.data && dossier.data[0] && dossier.data[0].numero_client;
+      if (contexte && reference) contexte.textContent = 'Dossier ' + reference + ' — complétez uniquement les informations demandées.';
+    } catch(e) { /* La référence ne doit pas bloquer la complétion. */ }
     var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
     if (generation !== _completerGeneration) return;
     if (r && r.error) throw new Error(r.error.message);
