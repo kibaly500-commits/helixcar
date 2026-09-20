@@ -3043,10 +3043,28 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
   if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
   if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.',null,'verification');
+  if (!lignes.every(l=>['validee','fournie'].includes(l.statut))) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
   if (paye) return etat(d.statut === 'en_cours' ? 'Prestation en cours' : 'Prestation en préparation','vert',
     d.statut === 'en_cours' ? 'Retrouvez le suivi dans « Mes missions ».' : 'Nous vous informerons dès que l’organisation sera confirmée.',null,d.statut === 'en_cours' ? 'en-cours' : 'preparation');
   if (dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Retrouvez votre devis dans les détails de la demande.');
-  return etat('Devis en préparation','neutre','Nous avons les informations nécessaires pour préparer votre devis.',null,'devis-preparation');
+  return etat('Demande reçue','neutre','Nous étudions votre demande.',null,'devis-preparation');
+}
+// Le devis et les informations avancent indépendamment. Ces badges ne
+// modifient aucun statut et ne conditionnent jamais l’accès au devis.
+function _badgesSuiviDemandeClient(dv, lignes, erreurInfos, erreurDevis) {
+  const badges = [];
+  if (erreurDevis) badges.push({type:'devis',texte:'Devis : suivi indisponible',couleur:'neutre'});
+  else if (dv && dv.paiement_statut === 'paye') badges.push({type:'devis',texte:'Paiement effectué',couleur:'vert'});
+  else if (dv && dv.statut === 'accepte') badges.push({type:'devis',texte:'Paiement en attente',couleur:'violet'});
+  else if (dv && dv.statut === 'envoye') badges.push({type:'devis',texte:'Devis à consulter',couleur:'violet'});
+  else if (dv && dv.statut === 'refuse') badges.push({type:'devis',texte:'Devis refusé',couleur:'neutre'});
+  else badges.push({type:'devis',texte:'Demande reçue',couleur:'neutre'});
+  if (erreurInfos) badges.push({type:'informations',texte:'Informations : suivi indisponible',couleur:'neutre'});
+  else if (lignes.some(_estRestante)) badges.push({type:'informations',texte:lignes.some(l=>l.statut==='a_corriger')?'Informations à corriger':'Informations à compléter',couleur:'orange'});
+  else if (lignes.some(l=>l.statut==='transmise')) badges.push({type:'informations',texte:'Informations en vérification',couleur:'bleu'});
+  else if (lignes.length && lignes.every(l=>['validee','fournie'].includes(l.statut))) badges.push({type:'informations',texte:lignes.some(l=>l.statut==='validee')?'Informations validées':'Informations renseignées',couleur:'vert'});
+  else badges.push({type:'informations',texte:lignes.length?'Informations : suivi indisponible':'Aucune information complémentaire demandée',couleur:'neutre'});
+  return badges;
 }
 var _demandesClientGeneration = 0;
 async function loadDemandesClient() {
@@ -3077,7 +3095,7 @@ async function loadDemandesClient() {
     {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
     {cle:'devis',titre:'Vos devis',description:'Retrouvez le détail de nos propositions.'},
     {cle:'verification',titre:'Informations en vérification',description:'Vous avez transmis vos informations. Notre équipe vérifie votre dossier.'},
-    {cle:'devis-preparation',titre:'Devis en préparation',description:'Notre équipe prépare votre devis.'},
+    {cle:'devis-preparation',titre:'Demandes reçues',description:'Nous étudions votre demande.'},
     {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes missions ».'},
     {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
     {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'},
@@ -3101,9 +3119,10 @@ async function loadDemandesClient() {
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
       if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">Voir mon devis →</a>';
       const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
-      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><span class="hc-info-etat hc-info-orange">Informations également à compléter</span> <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
+      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
+      const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
-        +'<div class="hc-completion-note" data-completion-note><span class="hc-info-etat hc-info-'+p.couleur+'">'+escapeHtml(p.texte)+'</span>'+(paiement==='paye'?'<span class="hc-info-etat hc-info-vert" data-devis-paye>Paiement effectué</span>':'')+'</div><p class="hc-demande-message">'+escapeHtml(p.message)+'</p>'+montant+bouton+complement
+        +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis && paiement!=='paye'?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
         +'<div class="hc-demande-documents"><button class="btn btn-sm btn-outline hc-demande-apercu-btn" '+actionHtml('ouvrirApercuDemandeClient',[d.id])+'>Récapitulatif de la demande</button>'
@@ -4184,10 +4203,10 @@ function _etatInformationsClient(lignes) {
   if (!lignes.length) return 'Aucune information complémentaire demandée';
   if (lignes.some(l => l.statut === 'a_corriger')) return 'À corriger';
   if (lignes.some(_estRestante)) return 'À compléter';
-  if (lignes.some(l => l.statut === 'transmise')) return 'Demande en attente de validation';
-  if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Demande validée';
+  if (lignes.some(l => l.statut === 'transmise')) return 'Informations en vérification';
+  if (lignes.some(l => l.statut === 'validee') && lignes.every(l => ['validee','fournie'].includes(l.statut))) return 'Informations validées';
   if (lignes.every(l => l.statut === 'fournie')) return 'Informations renseignées';
-  return 'Demande en attente de validation';
+  return 'Informations en attente de validation';
 }
 
 async function loadInfosClient() {
