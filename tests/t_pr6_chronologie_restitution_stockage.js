@@ -17,7 +17,7 @@ const fs=require('fs');
      const dates=[...document.querySelectorAll('#hc-cal-grille [data-jour]')];
      const disabled=dates.filter(b=>Number(b.dataset.jour)<8).every(b=>b.disabled);
      const sameEnabled=!dates.find(b=>b.dataset.jour==='8').disabled;
-     _hcCalOverlay.classList.remove('open');
+     _hcFermerCalendrier();
      val('veh-0-pc-heure','');val('veh-0-liv-heure','');
      const noHours=!verifierChronologieVehicule(0)&&!_chronologieVehiculeOk(0);
      val('veh-0-liv-date','2027-10-08');
@@ -33,7 +33,7 @@ const fs=require('fs');
     },n);
     for(const [k,v] of Object.entries(r))L.check(width+'px '+n+' véhicule(s) : '+k,v);
    }
-   const s=await p.evaluate(async()=>{
+   const s=await p.evaluate(()=>{
     const radio=(name,v)=>document.querySelector('input[name="'+name+'"][value="'+v+'"]').checked=true;
     radio('type-service','stockage');radio('stock-acheminement','helixcar');radio('stock-sortie','recuperation_client');
     document.getElementById('stock-debut').value='2027-10-08';document.getElementById('stock-fin').value='2027-10-13';document.getElementById('stock-heure-sortie').value='16:30';
@@ -43,16 +43,28 @@ const fs=require('fs');
     const text=b.textContent;
     const note=document.getElementById('veh-0-pc-date-origine-date');
     const r={recovery:title.includes('Récupération après stockage'),date:text.includes('13/10/2027'),hour:text.includes('16:30'),address:text.includes('Noisy-le-Grand')&&text.includes('L’adresse exacte vous sera communiquée'),noDeliveryInputs:!b.querySelector('input[id*="-liv-"]'),locked:document.getElementById('veh-0-pc-date').disabled&&note.textContent.includes('08/10/2027')};
-    const change=async(id,value)=>{const el=document.getElementById(id);el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,50));};
-    await change('stock-fin','2027-10-14');await change('stock-heure-sortie','17:00');
-    r.recoveryUpdated=b.textContent.includes('14/10/2027')&&b.textContent.includes('17:00');
-    await change('stock-heure-sortie','');r.missingHourIncomplete=!_hcEtapeVehiculeComplete(b);
-    await change('stock-heure-sortie','17:00');r.recoveryComplete=_hcEtapeVehiculeComplete(b);
+    return r;
+   });
+   // Attendre l'état observable depuis le pilote : une longue Promise
+   // conservée uniquement dans evaluate était parfois collectée par Chromium.
+   const change=async(id,value)=>p.evaluate(({id,value})=>{const el=document.getElementById(id);el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));},{id,value});
+   await change('stock-fin','2027-10-14');await change('stock-heure-sortie','17:00');
+   await p.waitForFunction(()=>{const b=document.getElementById('veh-0-sous-livraison');return b.textContent.includes('14/10/2027')&&b.textContent.includes('17:00');});
+   s.recoveryUpdated=true;
+   await change('stock-heure-sortie','');
+   await p.waitForFunction(()=>!_hcEtapeVehiculeComplete(document.getElementById('veh-0-sous-livraison')));
+   s.missingHourIncomplete=true;
+   await change('stock-heure-sortie','17:00');
+   await p.waitForFunction(()=>_hcEtapeVehiculeComplete(document.getElementById('veh-0-sous-livraison')));
+   s.recoveryComplete=true;
+   Object.assign(s,await p.evaluate(()=>{
+    const r={};
+    const radio=(name,v)=>document.querySelector('input[name="'+name+'"][value="'+v+'"]').checked=true;
     radio('stock-sortie','helixcar');rendreFichesVehicules();r.deliveryRestored=!!document.getElementById('veh-0-liv-active-group');
     radio('stock-sortie','recuperation_client');radio('stock-acheminement','depot_client');rendreFichesVehicules();r.selfServiceUnchanged=!document.getElementById('veh-0-sous-livraison');
     radio('type-service','convoyage');rendreFichesVehicules();r.unlocked=!document.getElementById('veh-0-pc-date').disabled&&!document.getElementById('veh-0-pc-date-origine-date');
     return r;
-   });
+   }));
    for(const [k,v] of Object.entries(s))L.check(width+'px stockage : '+k,v);
    await p.close();
   }

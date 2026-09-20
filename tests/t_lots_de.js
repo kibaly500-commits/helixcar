@@ -82,8 +82,9 @@ function rubriquesVisibles(page, n) {
     // DÈS QUE HelixCar intervient, la rubrique revient.
     await scenarioStockage(page, 'helixcar', 'recuperation_client', 3);
     r = await rubriquesVisibles(page, 3);
-    check('D1-5 : dès que HelixCar achemine, la rubrique revient',
-      r.every(v => v && v.indexOf('Livraison') !== -1), JSON.stringify(r));
+    check('D1-5 : acheminement HelixCar et récupération client après stockage',
+      r.every(v => v && v.includes('Prise en charge avant stockage')
+        && v.includes('Récupération après stockage') && !v.includes('Livraison')), JSON.stringify(r));
 
     await scenarioStockage(page, 'depot_client', 'helixcar', 3);
     r = await rubriquesVisibles(page, 3);

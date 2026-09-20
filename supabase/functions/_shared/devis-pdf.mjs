@@ -166,6 +166,7 @@ function _vehiculesDuDossier(c) {
       marque_modele: c.marque_modele,
       immatriculation: c.immatriculation,
       vin: c.vin,
+      motorisation: c.motorisation,
       mode_transport: c.mode_transport,
       _depuisDossier: true
     }];

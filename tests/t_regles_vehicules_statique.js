@@ -21,7 +21,7 @@ const fs = require('fs');
   L.check('RVS4 : Dupliquer est masqué en mono-véhicule',
     /if \(n > 1 && i === 0 && complet\)/.test(barre));
   L.check('RVS5 : la copie exclut les deux plaques mais garde le reste de l’identité',
-    /\['type', 'marque', 'vin',[\s\S]{0,100}'restit-vtype', 'restit-marque', 'restit-vin'\]/.test(copie)
+    /\['type', 'marque', 'vin', 'motorisation',[\s\S]{0,100}'restit-vtype', 'restit-marque', 'restit-vin', 'restit-motorisation'\]/.test(copie)
       && !/\['type', 'marque', 'immat'/.test(copie)
       && !/'restit-marque', 'restit-immat'/.test(copie));
   L.check('RVS6 : la copie reprend contacts, téléphones et heure de récupération',

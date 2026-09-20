@@ -313,19 +313,46 @@ const futur = dansNJours;
   // comme n'importe quel autre fichier (lots A3 et B2). Ils ne sont
   // pas déployés par une fusion : ils se recopient à la main dans
   // Supabase, comme l'indique le dossier de recette.
-  const horsPerimetre = f => PERIMETRE.indexOf(f) === -1
+  // Livraisons PR6 déjà présentes : liste fermée, sans autoriser un dossier entier.
+  const PERIMETRE_PR6 = [
+    'assets/DejaVu-LICENSE.txt',
+    'assets/preparation-missions-ui.js',
+    'assets/preparation-missions.css',
+    'assets/preparation-missions.js',
+    'edl.html',
+    'emails/README.md',
+    'emails/stockage-acces.mjs',
+    'supabase/migrations/20260919150912_stripe_checkout_test.sql',
+    'supabase/migrations/20260919160707_paid_test_fulfilment.sql',
+    'supabase/migrations/20260919161813_paid_test_sync_and_worker.sql',
+    'supabase/migrations/20260919162933_paid_test_assignment.sql',
+    'supabase/migrations/20260919163902_edl_test_transactionnel.sql',
+    'supabase/migrations/20260919164504_mission_test_notifications_etapes.sql',
+    'supabase/migrations/20260919164948_edl_test_kilometrage.sql',
+    'supabase/migrations/20260919173155_completion_validation.sql',
+    'supabase/migrations/20260919212455_completion_soumission_globale.sql',
+    'supabase/migrations/20260920153911_stockage_notifications_et_point_remise.sql',
+    'supabase/migrations/20260920154907_corriger_declencheur_stockage.sql',
+    'supabase/migrations/20260920162027_preparation_missions_devis.sql',
+    'supabase/migrations/20260920170316_motorisation_vehicules.sql',
+  ];
+  const horsPerimetre = f => PERIMETRE.indexOf(f) === -1 && !PERIMETRE_PR6.includes(f)
     && !f.startsWith('migrations/') && !f.startsWith('tests/')
     && !f.startsWith('supabase/functions/') && !f.startsWith('supabase/templates/');
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 28,
+    [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 20,
     PERIMETRE.length + ' entrées');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
-  L.check('E6b : aucun fichier annexe hors périmètre (edl.html…)',
-    !fichiers.some(f => ['edl.html'].indexOf(f) !== -1),
-    fichiers.join(', '));
+  L.check('E6b : chaque page HTML modifiée reste explicitement autorisée',
+    !fichiers.some(f => f.endsWith('.html') && horsPerimetre(f)),
+    fichiers.filter(f => f.endsWith('.html') && horsPerimetre(f)).join(', '));
+  L.check('E6e : un nouveau fichier ou une nouvelle migration reste refusé',
+    ['assets/non-autorise.js', 'emails/non-autorise.mjs', 'page-non-autorisee.html',
+      'supabase/migrations/20990101000000_non_autorisee.sql'].every(horsPerimetre));
   L.check('E6d : la fonction devis-secure n\'est plus à la racine du dépôt',
     !fs.existsSync(fichier('index.ts')) && fs.existsSync(fichier('supabase/functions/devis-secure/index.ts')));
   // Ce qui est touché dans l'inscription partenaire doit se limiter aux
