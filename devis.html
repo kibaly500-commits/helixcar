@@ -30,20 +30,27 @@
 
   header.entete {
     background: var(--anthracite);
-    padding: 20px 24px;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
+    padding: 10px 16px;
   }
+  .entete-contenu {
+    width: 100%;
+    max-width: 1168px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px 24px;
+  }
+  .entete-contenu .logo-image { grid-column: 2; justify-self: center; }
   .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.01em; color: var(--blanc); }
   .logo span { color: var(--rouge); }
   .entete-sous { color: #9AA0A8; font-size: 0.8rem; }
-  .retour-client { margin-left: auto; max-width: 440px; text-align: right; color: var(--blanc); }
-  .retour-client p { margin: 0 0 10px; font-size: 1rem; }
-  .retour-client a { display: inline-block; padding: 10px 16px; border-radius: 6px; background: var(--blanc); color: var(--anthracite); font-weight: 700; text-decoration: none; }
-  @media (max-width: 640px) { .retour-client { margin-left: 0; text-align: left; } }
+  .retour-client { grid-column: 3; justify-self: end; color: var(--blanc); font-size: .85rem; text-decoration: none; padding: 6px 0; text-align: right; }
+  .retour-client:hover, .retour-client:focus-visible { text-decoration: underline; }
+  @media (max-width: 640px) {
+    .entete-contenu { grid-template-columns: 1fr; gap: 4px; }
+    .entete-contenu .logo-image, .retour-client { grid-column: 1; justify-self: center; }
+  }
 
   main {
     flex: 1;
@@ -195,8 +202,8 @@
      ══════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
     header.entete {
-      padding: 16px 18px;
-      padding-top: max(16px, env(safe-area-inset-top));
+      padding: 10px 18px;
+      padding-top: max(10px, env(safe-area-inset-top));
       padding-left: max(18px, env(safe-area-inset-left));
       padding-right: max(18px, env(safe-area-inset-right));
     }
@@ -313,10 +320,9 @@
 <body>
 <div class="voile">
   <header class="entete">
+    <div class="entete-contenu">
     <img class="logo-image" src="assets/logo-helixcar-blanc.png" alt="HelixCar — Services automobiles">
-    <div class="retour-client">
-      <p>Retrouvez le suivi de votre prestation dans votre espace client.</p>
-      <a href="dashboard.html">Accéder à mon espace client</a>
+      <a class="retour-client" href="dashboard.html">Accéder à mon espace client</a>
     </div>
   </header>
 
