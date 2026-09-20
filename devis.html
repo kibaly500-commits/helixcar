@@ -891,7 +891,7 @@
   async function requeteAuthentifiee(options) {
     var session = null;
     try { var res = authDevis && await authDevis.auth.getSession(); session = res && res.data && res.data.session; } catch (e) {}
-    stripeQa = /\+qa-final01@/i.test(session && session.user && session.user.email || '') && [
+    stripeQa = String(session && session.user && session.user.email || '').trim().toLowerCase() === 'helixcarpro+qa-final01@gmail.com' && [
       'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
       'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
     ].indexOf(window.location.hostname)!==-1;

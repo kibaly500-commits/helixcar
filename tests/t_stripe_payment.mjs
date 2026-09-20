@@ -4,9 +4,10 @@ import {checkout,webhook,PREVIEW} from '../supabase/functions/_shared/stripe-pay
 const ID='11111111-1111-4111-8111-111111111111';
 function fixture(){
   const q={id:ID,reference:'DEV-QA',client_id:'client',prix:1200,statut:'accepte',version:1,version_acceptee:1,paiement_statut:'en_attente'};
-  const c={id:'client',auth_user_id:'user',prenom:'TEST-QA',nom:'PARCOURS-FINAL-01',email:'qa+qa-final01@example.invalid'};
+  const c={id:'client',auth_user_id:'user',prenom:'TEST-QA',nom:'PARCOURS-FINAL-01',email:'helixcarpro+qa-final01@gmail.com'};
+  const user={id:'user',email:c.email};
   let row=null,session=null,created=0,rpcs=0;const idempotent=new Map();
-  const sb={auth:{getUser:async token=>token==='valid'?{data:{user:{id:'user'}}}:{error:true}},from(table){
+  const sb={auth:{getUser:async token=>token==='valid'?{data:{user}}:{error:true}},from(table){
     let filters=[],op='read',payload;
     const builder={select(){return builder;},eq(k,v){filters.push([k,v]);return builder;},
       upsert(v){op='upsert';payload=v;return builder;},update(v){op='update';payload=v;return builder;},
@@ -27,7 +28,7 @@ function fixture(){
     session={id:'cs_test_1',livemode:false,status:'open',payment_status:'unpaid',mode:'payment',currency:'eur',amount_total:120000,metadata:params.metadata,url:'https://checkout.stripe.com/c/pay/test',payment_intent:'pi_test'};
     idempotent.set(opts.idempotencyKey,session);return session;
   },async retrieve(){return session;}}},webhooks:{async constructEventAsync(body,sig){if(sig!=='valid')throw Error('invalid');return JSON.parse(body);}}};
-  return {sb,stripe,configured:true,secret:'test-only',q,c,get row(){return row;},get session(){return session;},get created(){return created;},get rpcs(){return rpcs;}};
+  return {sb,stripe,configured:true,secret:'test-only',q,c,user,get row(){return row;},get session(){return session;},get created(){return created;},get rpcs(){return rpcs;}};
 }
 function req(body={devis_id:ID},origin=PREVIEW,jwt='valid') {return new Request('https://example.invalid',{method:'POST',headers:{origin,authorization:'Bearer '+jwt},body:JSON.stringify(body)});}
 async function pay(f){const r=await checkout(req(),f);assert.equal(r.status,200);f.session.status='complete';f.session.payment_status='paid';}
@@ -35,9 +36,17 @@ function event(f,signature='valid',changes={}) {return new Request('https://exam
 test('origine, session absente, tiers, client réel, devis non accepté, obsolète, payé refusés',async()=>{
   const a=fixture();assert.equal((await checkout(req({},'https://evil.invalid'),a)).status,403);
   assert.equal((await checkout(req(undefined,PREVIEW,'invalid'),a)).status,401);
-  for(const mutate of [f=>f.c.auth_user_id='other',f=>f.c.prenom='Jean',f=>f.q.statut='envoye',f=>f.q.version_acceptee=2,f=>f.q.paiement_statut='paye']){
+  for(const mutate of [f=>f.c.auth_user_id='other',f=>f.c.email='client@example.invalid',f=>f.user.email='intrus+qa-final01@example.invalid',f=>f.q.statut='envoye',f=>f.q.version_acceptee=2,f=>f.q.paiement_statut='paye']){
     const f=fixture();mutate(f);assert.ok((await checkout(req(),f)).status>=400);assert.equal(f.created,0);
   }
+});
+test('compte QA : prénom et nom libres, y compris uhu uuhu',async()=>{
+  const f=fixture();f.c.prenom='uhu';f.c.nom='uuhu';
+  const r=await checkout(req(),f);assert.equal(r.status,200);assert.equal(f.created,1);assert.equal(f.rpcs,0);
+});
+test('suffixe QA imité dans le compte et le dossier refusé',async()=>{
+  const f=fixture();f.user.email=f.c.email='intrus+qa-final01@example.invalid';
+  assert.equal((await checkout(req(),f)).status,403);assert.equal(f.created,0);
 });
 test('webhook non configuré empêche Checkout',async()=>{const f=fixture();f.configured=false;assert.equal((await checkout(req(),f)).status,503);assert.equal(f.created,0);});
 test('double clic concurrent : une session, montant exclusivement serveur',async()=>{

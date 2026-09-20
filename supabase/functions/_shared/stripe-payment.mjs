@@ -38,8 +38,10 @@ export async function checkout(req, {sb, stripe, configured}) {
     if(qe||!quote) return fail('Devis inaccessible.',404,headers);
     const {data:client,error:ce}=await sb.from('clients').select('id,email,prenom,nom').eq('id',quote.client_id).eq('auth_user_id',auth.user.id).maybeSingle();
     if(ce||!client) return fail('Devis inaccessible.',404,headers);
-    // Le mode test reste réservé au dossier QA convenu, jamais aux clients réels.
-    if(!`${client.prenom} ${client.nom}`.toUpperCase().includes('TEST-QA') || !/\+qa-final01@/i.test(client.email))
+    // Compte de recette exact, vérifié par Auth et propriétaire du dossier.
+    // Le prénom et le nom saisis ne déterminent jamais les permissions.
+    const qaEmail='helixcarpro+qa-final01@gmail.com';
+    if(String(auth.user.email||'').trim().toLowerCase()!==qaEmail || String(client.email||'').trim().toLowerCase()!==qaEmail)
       return fail('Paiement de test réservé au parcours QA.',403,headers);
     if(quote.statut!=='accepte'||quote.version_acceptee!==quote.version) return fail('Acceptez la version actuelle du devis avant de payer.',409,headers);
     if(quote.paiement_statut==='paye') return fail('Ce devis est déjà payé.',409,headers);
