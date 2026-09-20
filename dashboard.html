@@ -11132,8 +11132,7 @@ function _rendreFicheDemande(c) {
 
   if (_aConvoyage(c)) html += _blocFiche('Mission',
     _ligneFiche('Raison / type de trajet', c.type_trajet) +
-    _ligneFiche('Disponibilité', c.disponibilite) +
-    (c.notes ? _ligneFiche('Informations complémentaires', c.notes) : ''));
+    _ligneFiche('Disponibilité', c.disponibilite));
 
   // V50.4A — Objectif 8 : quand le bloc dossier est masqué UNIQUEMENT parce
   // que l'organisation est individuelle par véhicule (pas parce que
@@ -11170,6 +11169,15 @@ function _rendreFicheDemande(c) {
       (c.contraintes_liv ? _ligneFiche('Contraintes particulières', c.contraintes_liv) : ''));
   } else if (_multiIndividuel && _operationAssureeParHelixCar(c, 'liv')) {
     html += _noteIndividuel.replace('%s', 'Livraisons');
+  }
+
+  // Information générale saisie à la fin du formulaire : visible quel que
+  // soit le service et placée juste avant le détail des véhicules. Elle ne
+  // dépend plus du seul bloc Convoyage, donc un stockage seul ne la masque
+  // plus alors qu'elle peut être essentielle à l'exécution de la mission.
+  if (c.notes) {
+    html += _blocFiche('Informations complémentaires',
+      _ligneFiche('Détails', c.notes));
   }
 
   var servicesArr = [];
@@ -12604,6 +12612,14 @@ function _construirePdfDevis(c, d, options) {
   });
   y += ESPACE_SECTION;
   } // fin bloc TRAJET
+
+  // Le PDF de récapitulatif ouvert depuis le Dashboard reprend la note
+  // générale au même emplacement que la fiche détaillée : juste avant les
+  // véhicules. Le devis commercial reste inchangé ; ce bloc est réservé au
+  // récapitulatif sans tarif affiché au client connecté.
+  if (estRecapitulatif) {
+    carteTexte('Informations complémentaires', c.notes);
+  }
 
   // ══ VÉHICULE(S) — depuis la source de vérité, jamais un faux véhicule ══
   var vhPdf = _vehiculesDuDossier(c);
@@ -14633,6 +14649,9 @@ function declencherChampFichier(id) {
       +'<div class="hc-apercu-ligne"><small>Date d’émission</small><strong>'+escapeHtml(dateFr(d.created_at))+'</strong></div>'
       +'<div class="hc-apercu-ligne"><small>Référence client</small><strong>'+escapeHtml(val(d.numero_client))+'</strong></div>'
       +'</div>';
+    if(d.notes){
+      h+='<div class="hc-apercu-ligne large" style="margin-top:13px"><small>Informations complémentaires</small><strong>'+escapeHtml(String(d.notes))+'</strong></div>';
+    }
     if(vs.length){
       h+='<ul class="hc-apercu-vehicules">';
       vs.forEach(function(v,i){

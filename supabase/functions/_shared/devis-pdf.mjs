@@ -1448,6 +1448,14 @@ function _construirePdfDevis(c, d, options) {
   y += ESPACE_SECTION;
   } // fin bloc TRAJET
 
+  // Le PDF de récapitulatif ouvert depuis le Dashboard reprend la note
+  // générale au même emplacement que la fiche détaillée : juste avant les
+  // véhicules. Le devis commercial reste inchangé ; ce bloc est réservé au
+  // récapitulatif sans tarif affiché au client connecté.
+  if (estRecapitulatif) {
+    carteTexte('Informations complémentaires', c.notes);
+  }
+
   // ══ VÉHICULE(S) — depuis la source de vérité, jamais un faux véhicule ══
   var vhPdf = _vehiculesDuDossier(c);
   var stockSeul = _aStockage(c) && !_aConvoyage(c);

@@ -24,6 +24,18 @@ try{
    await page.screenshot({path:'/tmp/hc-devis-mobile-fix.png',fullPage:true});
    await page.close();
  });
+ await cas('Le devis mobile prévoit toutes les pages ajustées avec repli natif',async()=>{
+   const page=await browser.newPage({viewport:{width:390,height:844}});
+   await page.addInitScript(INIT+`window.pdfjsLib={GlobalWorkerOptions:{},getDocument:()=>({promise:Promise.resolve({numPages:2,getPage:async()=>({getViewport:({scale})=>({width:595*scale,height:842*scale}),render:()=>({promise:Promise.resolve()})})})})};window.__devis.pdf_disponible=true;window.__devis.pdf_url='https://zsetmqnmmupqbkgqbjbo.supabase.co/storage/v1/object/sign/devis/test.pdf';`);
+   await page.goto(urlFichier('devis.html')+'?id='+ID);
+   await page.waitForSelector('.pdf-cadre.pdf-rendu-mobile');
+   assert.equal(await page.locator('.pdf-mobile-pages').getAttribute('aria-label'),'Pages du devis');
+   assert.equal(await page.locator('.pdf-mobile-page').count(),2);
+   assert.equal(await page.locator('.pdf-mobile-page figcaption').allTextContents().then(v=>v.join('|')),'Page 1 sur 2|Page 2 sur 2');
+   assert.ok(await page.locator('.pdf-cadre iframe').isHidden());
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await page.close();
+ });
  await cas('Refus depuis Dashboard sans token : décision persistée puis relue',async()=>{
    const page=await browser.newPage();await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'?id='+ID);await page.click('#bouton-refuser-devis',{timeout:2000});await page.click('#modal-bouton-confirmer');await page.waitForFunction(()=>document.getElementById('zone-contenu').textContent.includes('Devis refusé'),{timeout:2000});assert.equal(await page.evaluate(()=>window.__appels.filter(a=>a.body.action==='refuse').length),1);await page.close();
  });

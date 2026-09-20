@@ -108,7 +108,7 @@ check('Une demande client envoyée ne peut pas se rouvrir ni être renvoyée',
   dashboard.includes("cadre.removeAttribute('src');") &&
   dashboard.includes("loadDemandesClient()"));
 check('Mes demandes propose un aperçu compact en lecture seule',
-  dashboard.includes("actionHtml('ouvrirApercuDemandeClient', [d.id])") &&
+  /actionHtml\('ouvrirApercuDemandeClient',\s*\[d\.id\]\)/.test(dashboard) &&
   dashboard.includes("window.ouvrirApercuDemandeClient=async function(id)") &&
   dashboard.includes("HC_ACTIONS.ouvrirApercuDemandeClient") &&
   dashboard.includes('Télécharger le PDF') &&
@@ -126,6 +126,14 @@ check('Le récapitulatif masque le titre de devis, le tarif et les mentions comm
   dashboard.includes("T('RÉCAPITULATIF DE LA DEMANDE'") &&
   dashboard.includes("if (!estRecapitulatif && HELIXCAR_MENTION_TVA)") &&
   dashboard.includes("if (!estRecapitulatif) {\n  var yFinPrestations = y;"));
+
+check('Les informations complémentaires précèdent les véhicules dans le récapitulatif',
+  dashboard.indexOf("carteTexte('Informations complémentaires', c.notes);") !== -1 &&
+  dashboard.indexOf("carteTexte('Informations complémentaires', c.notes);") <
+    dashboard.indexOf('var vhPdf = _vehiculesDuDossier(c);'));
+check('Les informations complémentaires restent visibles pour un stockage sans convoyage',
+  dashboard.includes("html += _blocFiche('Informations complémentaires',") &&
+  dashboard.includes("_ligneFiche('Détails', c.notes)"));
 
 check('Le bandeau de brouillon propose explicitement reprendre ou recommencer',
   index.includes("titre.textContent = 'Demande en cours';") &&
