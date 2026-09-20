@@ -131,7 +131,10 @@ window.fetch = function (url, options) {
     return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(rep); } });
   }
   if (url.indexOf('/rest/v1/') !== -1) {
-    return Promise.resolve({ ok: true, status: 200, headers: { get: function(){ return 'items 0-0/0'; } }, text: function(){ return Promise.resolve('[]'); } });
+    const u = new URL(url);
+    const id = (u.searchParams.get('id') || '').slice(3);
+    const lignes = u.pathname.endsWith('/clients') ? (window.__demandesServeur || []).filter(c => c.id === id) : [];
+    return Promise.resolve({ ok: true, status: 200, headers: { get: function(){ return 'items 0-0/0'; } }, text: function(){ return Promise.resolve(JSON.stringify(lignes)); } });
   }
   return _f.apply(window, arguments);
 };
@@ -147,6 +150,7 @@ window.fetch = function (url, options) {
   await page.evaluate((dem) => {
     document.getElementById('login-screen') && (document.getElementById('login-screen').style.display = 'none');
     window._demandesDevisListe = [dem];
+    window.__demandesServeur = [dem];
     window._devisParClient = {};
   }, DEMANDE);
 

@@ -127,6 +127,15 @@ window.fetch=function(url){
     check('D1 : carte avec zone, badge et mission indépendante', /Rhône/.test(html) && /Renfort automobile/.test(html) && /Mission indépendante/.test(html));
     check('D2 : aucune propriété confidentielle supplémentaire rendue', !/CLIENT_CONFIDENTIEL|SECRET@|0600000099|12 RUE CONFIDENTIELLE|9876/.test(html));
     check('D3 : bouton Postuler unique', await page.locator('#convoyeur-opportunites-liste button').count() === 1);
+    check('D3a : le bouton classique conserve son action et son identifiant',
+      await page.locator('#opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').getAttribute('data-hc-action') === 'postulerOpportunite'
+      && await page.locator('#opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').getAttribute('data-hc-a0') === 'TEST-QA-CLAUDE-HELIXCAR-ouverte');
+    check('D3b : l’acceptation directe conserve son propre parcours', await page.evaluate(()=>{
+      const host=document.createElement('div');
+      host.innerHTML=_oppCarteHtml({...__partenaire[0],acceptation_directe:true},{partenaire:true});
+      const b=host.querySelector('button');
+      return b.dataset.hcAction==='accepterOpportuniteTest' && b.dataset.hcA0===__partenaire[0].id;
+    }));
     await capturerQA(page,'o01-opportunite-desktop','#convoyeur-opportunites-liste');
     await page.evaluate(async () => {__erreur=true;await postulerOpportunite('TEST-QA-CLAUDE-HELIXCAR-ouverte');__erreur=false;});
     message = await page.locator('#opp-msg-TEST-QA-CLAUDE-HELIXCAR-ouverte').textContent();

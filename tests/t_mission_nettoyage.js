@@ -235,6 +235,7 @@ window.fetch = function(u, o){
   await page.evaluate(([d, ko]) => {
     _demandesDevisListe = [d, ko];
     window.__demandes = [d, ko];
+    window.__db.clients = [d, ko];
     // Decision C02 (migration 110) : les deux devis sont acceptes ET payes
     // (paiement confirme par le serveur) — sans cela, aucune mission.
     _devisParClient = {

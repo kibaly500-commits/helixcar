@@ -20,8 +20,8 @@ function check(libelle, condition, detail) {
       && /nav-account-action/.test(source) && /nav-menu-lines/.test(source)
       && /site-menu-panel/.test(source) && !/site-menu-quick/.test(source));
   check('N3 : le nouveau texte commercial exact remplace le doublon',
-    source.includes('Tout est défini avant le départ.')
-      && source.includes('Prestation, conditions et montant : chaque élément est confirmé avant votre validation. Vous gardez une vision claire, du devis à la livraison.')
+    source.includes('Tout est défini à l’avance.')
+      && source.includes('Prestation, conditions et montant : chaque élément est confirmé avant votre validation. Vous gardez une vision claire, du devis à la réalisation de votre prestation.')
       && !source.includes('Prix transparent, sans surprise')
       && !source.includes('Prix transparent, du devis à la livraison.'));
   check('N3a : l’action du renfort professionnel adopte le libellé validé',

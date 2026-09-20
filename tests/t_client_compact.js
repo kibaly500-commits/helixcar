@@ -49,17 +49,20 @@ const {lancerNavigateur} = require('./env');
       window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
       await loadDemandesClient();
     });
-    for(const groupe of ['devis','informations','verification','preparation']) assert.equal(await p.locator('[data-groupe-demandes="'+groupe+'"] .hc-demande-card').count(),1);
+    // Interface actuelle : informations et vérification dans « Demandes en cours ».
+    for(const [groupe,nombre] of [['devis',1],['demandes',2],['preparation',1]]) assert.equal(await p.locator('[data-groupe-demandes="'+groupe+'"] .hc-demande-card').count(),nombre);
     assert.equal(await p.locator('#client-demandes-liste .hc-demande-card').count(),4);
-    assert(await p.locator('[data-demande="d2"] [data-devis-paye]').isVisible());
+    await p.locator('[data-demande="d2"] summary').click();
+    assert.match(await p.locator('[data-demande="d2"] .hc-demande-meta').textContent(),/PaiementEffectué/);
+    await p.locator('[data-demande="d2"] summary').click();
     assert.match(await p.locator('[data-demande="d2"] .hc-demande-message').first().textContent(),/Votre paiement est reçu/);
     assert.match(await p.locator('[data-demande="d1"] [data-completion-note]').textContent(),/Informations en vérification/);
     assert.match(await p.locator('[data-demande="d2"] [data-completion-note]').textContent(),/Informations à compléter/);
-    assert.match(await p.locator('[data-demande="d3"] .hc-demande-meta').textContent(),/Demande validée/);
-    assert.match(await p.locator('[data-demande="d3"] [data-completion-note]').textContent(),/Prestation en préparation/);
-    assert.match(await p.locator('[data-demande="d4"] [data-completion-note]').textContent(),/Devis à régler/);
+    assert.match(await p.locator('[data-demande="d3"] .hc-demande-meta').textContent(),/validées/);
+    assert.equal(await p.locator('[data-demande="d3"]').getAttribute('data-etat-demande'),'preparation');
+    assert.match(await p.locator('[data-demande="d4"] [data-completion-note]').textContent(),/Paiement en attente/);
     assert.equal(await p.locator('[data-demande="d4"] > a').getAttribute('href'),'devis.html?id=q4');
-    assert.match(await p.locator('[data-demande="d4"] > a').textContent(),/Consulter et régler/);
+    assert.match(await p.locator('[data-demande="d4"] > a').textContent(),/Voir mon devis/);
     assert.match(await p.locator('[data-demande="d4"] .hc-demande-montant').textContent(),/120,00/);
     assert.equal(await p.getByText('Reçue',{exact:true}).count(),0);
     for (const width of [390,1440]) {
@@ -89,7 +92,7 @@ const {lancerNavigateur} = require('./env');
     assert.match(await vehicle.textContent(), /Peugeot 308 · AB-123-CD · Paris → Lyon/);
     assert.equal(await p.locator('.hc-info-vehicle').getAttribute('open'), null);
     await p.evaluate(async () => {window.chargerInformationsDemande = async () => [];await loadDemandesClient();});
-    assert.match(await p.locator('[data-completion-note]').textContent(), /Prestation en préparation/);
+    assert.equal(await p.locator('#client-demandes-liste [data-demande="d1"]').getAttribute('data-etat-demande'),'preparation');
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'PAYÉ',type_service:'convoyage'},{id:'d2',numero_client:'NON PAYÉ',type_service:'stockage'}];
       window.chargerInformationsDemande = async () => [{cle:'vehicule_1_vin',statut:'transmise'}];

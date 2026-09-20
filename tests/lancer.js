@@ -27,7 +27,7 @@ const sansSql = args.includes('--sans-sql');
 const iMotif = args.indexOf('--seulement');
 const motif = iMotif !== -1 ? args[iMotif + 1] : null;
 
-const LIGNE_SYNTHESE = /===\s*(\d+)\s+PASS\s*\/\s*(\d+)\s+FAIL\s*===/;
+const resultatSuite = require('./resultat-suite');
 
 function suites() {
   const js = fs.readdirSync(__dirname)
@@ -76,23 +76,11 @@ for (const s of liste) {
   });
   const secondes = ((Date.now() - debut) / 1000).toFixed(1);
   const sortie = (r.stdout || '') + (r.stderr || '');
-  const m = sortie.match(LIGNE_SYNTHESE);
-
-  let pass = 0, fail = 0, etat;
-  if (m) {
-    pass = parseInt(m[1], 10);
-    fail = parseInt(m[2], 10);
-    // Une suite peut afficher « 0 FAIL » ET sortir en erreur : on ne
-    // croit pas la ligne sur parole, on regarde aussi le code de sortie.
-    etat = (fail === 0 && r.status === 0) ? 'OK' : 'ÉCHEC';
-    if (fail === 0 && r.status !== 0) fail = 1;   // incohérence = échec
-  } else if (s.facultative && r.status !== 0 && /BLOQUÉ|introuvable|not found|command not found|initdb/i.test(sortie)) {
+  let {pass, fail, etat} = resultatSuite(sortie, r.status);
+  if (s.facultative && r.status !== 0 && /BLOQUÉ|introuvable|not found|command not found|initdb/i.test(sortie)) {
     etat = 'BLOQUÉE';
+    pass = 0; fail = 0;
     bloques.push(s.nom);
-  } else {
-    // Pas de ligne de synthèse : plantage, timeout, sortie tronquée.
-    etat = 'ÉCHEC';
-    fail = 1;
   }
 
   totalPass += pass;

@@ -3505,7 +3505,7 @@ function _oppCarteHtml(o, options) {
         + '</div>';
     } else if (o.statut === 'a_pourvoir') {
       html += '<button class="btn btn-primary" style="margin-top:12px" id="opp-postuler-' + escapeHtml(o.id) + '" '
-        + actionHtml('accepterOpportuniteTest', 'postulerOpportunite', [o.id]) + '>Postuler</button>';
+        + actionHtml('postulerOpportunite', [o.id]) + '>Postuler</button>';
     }
   }
   return html + '</div>';
@@ -14148,7 +14148,7 @@ function envoyerDevis(clientId) {
       }
 
       _devisBoutonEnvoi('Envoi en cours…', false);
-      envoyerEmailDevisSecure(d.id, tokenBrut, envoiCle, renvoi, resultatPrepare.reprendre).then(function (resultatEnvoi) {
+      envoyerEmailDevisSecure(d.id, tokenBrut, envoiCle, renvoi, resultatPrepare.reprendre).then(async function (resultatEnvoi) {
         tokenBrut = null; // dissociation immédiate, ne sert plus à rien ensuite
         _envoiDevisEnCours = false;
 
@@ -14160,7 +14160,12 @@ function envoyerDevis(clientId) {
           if (resultatEnvoi.version_envoyee) d.version_envoyee = resultatEnvoi.version_envoyee;
           _devisParClient[String(clientId)] = d;
           _rendreTableDemandesDevis(_demandesDevisListe);
-          ouvrirFicheDemande(clientId);
+          var relectureFiche = ouvrirFicheDemande(clientId);
+          var generationFiche = _ficheDemandeGeneration;
+          await relectureFiche;
+          // La fiche est rechargée avant d'afficher la confirmation.
+          // Ne jamais la reporter sur un autre dossier ouvert entre-temps.
+          if (generationFiche !== _ficheDemandeGeneration || _ficheDemandeActive !== clientId) return;
           _devisSuccesEnvoi((resultatEnvoi.deja_envoye ? 'Cet envoi avait déjà été accepté par le prestataire : aucun second e-mail. ' : '') +
             'Devis ' + d.reference + (renvoi ? ' renvoyé' : ' envoyé') + ' à ' + (resultatEnvoi.destinataire || c.email) +
             ' avec le PDF en pièce jointe et le lien sécurisé. La réception en boîte n\'est pas prouvée par cet écran.');

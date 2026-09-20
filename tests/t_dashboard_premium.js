@@ -5,6 +5,7 @@ const section=src.slice(src.indexOf('// Informations manquantes : les valeurs'),
 (async()=>{
  const status={textContent:''},calls=[];
  const ctx={currentRole:'admin',_sbAuthPret:()=>true,document:{getElementById:()=>status},rendreCentreInformationsAdmin:()=>{},
+ sbAuth:{from:()=>({select(){return this},in(){return this},order(){return this},range:async()=>({data:[],error:null})})},
  sbAuthListeDevisTriee:async()=>[
   {client_id:'paid',statut:'accepte',paiement_statut:'paye'},
   {client_id:'unpaid',statut:'accepte',paiement_statut:'en_attente'},

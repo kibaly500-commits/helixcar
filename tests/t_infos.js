@@ -205,7 +205,7 @@ window.emailjs = { init: function () {},
   check('B5 : la valeur existante est préremplie',
     ecran.valeurs.includes('06'), JSON.stringify(ecran.valeurs));
   check('B6 : le motif de correction est rappelé', /Numéro incomplet/.test(ecran.html));
-  check('B7 : la progression est rappelée', /4 sur 6 déjà renseignées/.test(ecran.progression), ecran.progression);
+  check('B7 : la progression et les deux informations restantes sont rappelées', /4 \/ 6 informations renseignées/.test(ecran.progression) && /2 information\(s\) à compléter ou à vérifier/.test(ecran.progression), ecran.progression);
   check('B8 : les composants du formulaire sont réutilisés',
     /modal-form-group/.test(ecran.html) && /field-required/.test(ecran.html));
 
