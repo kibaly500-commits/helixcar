@@ -1065,9 +1065,9 @@ body.scroll-verrouille { overflow: hidden; }
  .hc-demande-card>.hc-demande-complement,.hc-demande-card>.hc-demande-details{grid-column:1 / -1}
  .hc-demande-details{margin-top:4px}
 }
-.hc-demandes-accordeon>summary{cursor:pointer;list-style:none;min-height:44px;padding:4px 0}
+.hc-demandes-accordeon>summary{cursor:pointer;list-style:none;min-height:44px;padding:4px 0;width:fit-content;max-width:100%}
 .hc-demandes-accordeon>summary::-webkit-details-marker{display:none}
-.hc-demandes-accordeon>summary h3::after{content:'⌄';margin-left:auto;color:#626973;transition:transform .15s}
+.hc-demandes-accordeon>summary h3::after{content:'⌄';flex:0 0 auto;color:#626973;transition:transform .15s}
 .hc-demandes-accordeon[open]>summary h3::after{transform:rotate(180deg)}
 .hc-demandes-accordeon>summary:focus-visible{outline:2px solid var(--hc-groupe);outline-offset:4px;border-radius:4px}
 .hc-demandes-vide{padding:16px 18px;border:1px solid #e8eaed;border-left:3px solid #d17a29;border-radius:10px;color:#626973;font-size:.85rem;margin:0}
@@ -3107,9 +3107,9 @@ async function loadDemandesClient() {
       return (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0) || String(a.d.id).localeCompare(String(b.d.id));
     });
     if(!selection.length)return '';
-    const accordeon=selection.length>=4 && ['devis','demandes','preparation'].includes(g.cle);
+    const accordeon=['devis','demandes','preparation'].includes(g.cle);
     const titre='<h3>'+g.titre+' <span class="hc-demandes-compteur">'+selection.length+'</span></h3>';
-    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p><div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
+    return '<section class="hc-demandes-groupe" data-groupe-demandes="'+g.cle+'">'+(accordeon?'<details class="hc-demandes-accordeon"'+(selection.length<4?' open':'')+'><summary>'+titre+'</summary>':titre)+'<p class="hc-demandes-description">'+g.description+'</p><div class="hc-demandes-grille" data-plusieurs="'+(selection.length>=2)+'">'+selection.map(function(r){
       const {d,dv,lignes,erreurInfos,presentation:p}=r;
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
