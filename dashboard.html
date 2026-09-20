@@ -1396,7 +1396,7 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
 <div class="page" id="page-admin-infos">
-<div class="ai-heading"><div><h1>Informations manquantes</h1><div class="ai-muted">Dossiers payés : les éléments à compléter ou à vérifier avant la mission.</div></div><button type="button" onclick="chargerCentreInformationsAdmin()">Actualiser ↻</button></div>
+<div class="ai-heading"><div><h1>Informations manquantes</h1><div class="ai-muted">Informations transmises à vérifier et corrections à suivre. Informations à compléter pour les dossiers payés.</div></div><button type="button" onclick="chargerCentreInformationsAdmin()">Actualiser ↻</button></div>
 <div class="ai-stats"><div class="ai-stat review"><strong id="admin-infos-total-transmise">—</strong>Informations à vérifier</div><div class="ai-stat"><strong id="admin-infos-total-attendue">—</strong>Informations manquantes</div><div class="ai-stat"><strong id="admin-infos-total-a_corriger">—</strong>Corrections attendues</div></div>
 <div class="ai-toolbar"><input id="admin-infos-recherche" type="search" placeholder="Rechercher un client ou une référence…" aria-label="Rechercher un dossier" oninput="rendreCentreInformationsAdmin()"><select id="admin-infos-filtre" aria-label="Filtrer les dossiers" onchange="rendreCentreInformationsAdmin()"><option value="a_traiter">Dossiers à compléter ou vérifier</option><option value="transmise">Informations transmises</option><option value="attendue">Informations manquantes</option><option value="a_corriger">Corrections attendues</option><option value="tous">Tous les dossiers</option></select></div>
 <div class="ai-layout"><div id="admin-infos-liste" aria-label="Dossiers clients"></div><div id="admin-infos-detail" class="ai-detail"></div></div><p id="admin-infos-statut" class="ai-live" role="status"></p>
@@ -2589,18 +2589,38 @@ async function chargerCentreInformationsAdmin(silencieux) {
     var sources = await Promise.all([
       sbFetchToutePage('clients?select=id,prenom,nom,numero_client,email,marque_modele,immatriculation,ville_depart,ville_arrivee,nb_vehicules&type_service=not.is.null&order=created_at.desc'),
       sbAuthListeDevisTriee(),
-      sbFetchToutePage('vehicules?select=dossier_id,position,marque_modele,immatriculation,ville_depart,ville_arrivee&order=position.asc')
+      sbFetchToutePage('vehicules?select=dossier_id,position,marque_modele,immatriculation,ville_depart,ville_arrivee&order=position.asc'),
+      (async function(){
+        var lignes=[],offset=0,limite=1000;
+        while(true){
+          var res=await sbAuth.from('demande_informations_manquantes')
+            .select('client_id').in('statut',['transmise','a_corriger'])
+            .order('id',{ascending:true}).range(offset,offset+limite-1);
+          if(res.error) throw new Error('Impossible de lire les informations à vérifier.');
+          var page=res.data||[];lignes=lignes.concat(page);
+          if(page.length<limite)return lignes;
+          offset+=limite;
+        }
+      })()
     ]);
     // Le paiement est relu depuis le serveur ; une erreur ne devient
     // jamais un paiement confirmé. Aucun statut n'est écrit ici.
     var derniers = {};
     sources[1].forEach(function(d){if(!derniers[d.client_id])derniers[d.client_id]=d;});
-    var clients = sources[0].filter(function(c){var d=derniers[c.id];return d && d.statut==='accepte' && d.paiement_statut==='paye';});
+    var suivis = new Set(sources[3].map(function(l){return String(l.client_id);}));
+    function estPaye(c) {var d=derniers[c.id];return !!(d && d.statut==='accepte' && d.paiement_statut==='paye');}
+    // Une information transmise doit être vérifiable même avant le paiement.
+    // Les corrections demandées restent accessibles jusqu'à leur validation.
+    var clients = sources[0].filter(function(c){return estPaye(c) || suivis.has(String(c.id));});
     clients.forEach(function(c){c.vehicules=sources[2].filter(function(v){return String(v.dossier_id)===String(c.id);});if(!c.vehicules.length && Number(c.nb_vehicules||1)===1)c.vehicules=[Object.assign({position:1},c)];});
     var dossiers = [];
     for (var i=0;i<clients.length;i+=4) {
       var lot = await Promise.all(clients.slice(i,i+4).map(async function(c){
-        try {return {client:c,lignes:await chargerInfosDemandeAdmin(c.id)};}
+        try {
+          var lignes = await chargerInfosDemandeAdmin(c.id);
+          if(!estPaye(c)) lignes=lignes.filter(function(l){return ['transmise','a_corriger','validee'].includes(l.statut);});
+          return {client:c,lignes:lignes};
+        }
         catch(e){return {client:c,lignes:[],erreur:true};}
       }));
       dossiers = dossiers.concat(lot);
