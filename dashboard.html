@@ -1086,6 +1086,7 @@ body.scroll-verrouille { overflow: hidden; }
 @media(max-width:600px){.hc-demande-card{padding:16px}.hc-demande-summary .detail-val{min-width:0;overflow-wrap:anywhere}}
 .hc-info-vehicle{margin-top:12px;border-top:1px solid var(--gray-light);padding:12px 0}.hc-info-vehicle>summary{cursor:pointer;min-height:44px;overflow-wrap:anywhere}
 </style>
+<link rel="stylesheet" href="assets/preparation-missions.css">
 </head>
 <body>
 
@@ -3146,14 +3147,15 @@ async function chargerMissionsClient() {
   return data || [];
 }
 function _missionLieuClient(m) {
-  if (m.type_mission === 'nettoyage') return m.ville_intervention || 'Lieu à préciser';
+  if (['nettoyage','professionnel'].includes(m.type_mission)) return m.ville_intervention || 'Lieu à préciser';
   return (m.ville_depart || '—') + ' → ' + (m.ville_arrivee || '—');
 }
 function _missionDateClient(m) {
-  const v = m.type_mission === 'nettoyage' ? m.date_intervention : m.date_prise_en_charge;
+  const v = ['nettoyage','professionnel'].includes(m.type_mission) ? m.date_intervention : m.date_prise_en_charge;
   return v ? _dvDate(v) : '—';
 }
 function _missionPrestationClient(m) {
+  if (m.type_mission === 'professionnel') return m.prestation || 'Professionnel automobile';
   if (m.type_mission === 'nettoyage') return m.prestation || 'Nettoyage';
   return 'Convoyage';
 }
@@ -3470,6 +3472,7 @@ function _oppCompteur(o) {
 // La carte telle que le partenaire la voit. Même rendu pour l'aperçu de
 // l'administrateur (« Ne pas publier lors de l'ouverture de l'aperçu »).
 function _oppCarteHtml(o, options) {
+  if (o.preparation_annonce && window.hcPreparationCarteOpportunite) return window.hcPreparationCarteOpportunite(o, options || {});
   options = options || {};
   var badges = (o.badges_requis || []).map(function (b) {
     return '<span class="badge badge-service">' + escapeHtml(_oppLibCategorie(b)) + '</span>';
@@ -8330,6 +8333,7 @@ function loadMissions() {
       // d'arrivée : elle a un LIEU d'intervention. On affiche ce que la
       // mission porte réellement, jamais une flèche vers du vide.
       const estNettoyage = m.type_mission === 'nettoyage';
+      const estSurPlace = estNettoyage || m.type_mission === 'professionnel';
       const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
       const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
       const badge = MISSION_STATUT_BADGE[m.statut] || '<span class="badge">' + escapeHtml(m.statut) + '</span>';
@@ -8376,33 +8380,33 @@ function loadMissions() {
       // L'URL vient de la base : « javascript:… » y serait exécutable au
       // clic, et un guillemet suffisait à sortir de l'attribut.
       var urlLettre = urlSure(m.lettre_voiture_signee_url);
-      const lettreVdv = estNettoyage ? '—' : (urlLettre
+      const lettreVdv = estSurPlace ? '—' : (urlLettre
         ? '<a href="' + escapeHtml(urlLettre) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
         : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>');
-      var badgeType = estNettoyage
+      var badgeType = m.type_mission === 'professionnel' ? '<span class="badge badge-service">Professionnel automobile</span>' : estSurPlace
         ? '<span class="badge badge-service">🧼 Nettoyage</span>'
         : '<span class="badge badge-service">🚗 Convoyage</span>';
-      var lieu = estNettoyage
+      var lieu = estSurPlace
         ? ([m.adresse_intervention, [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
              .filter(Boolean).join(', ') || '—')
         : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
       return '<tr>'
         + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(m.reference) + '</td>'
         + '<td>' + badgeType + '</td>'
-        + '<td><strong>' + (estNettoyage ? escapeHtml(lieu) : lieu) + '</strong>'
-        + (estNettoyage && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
+        + '<td><strong>' + (estSurPlace ? escapeHtml(lieu) : lieu) + '</strong>'
+        + (estSurPlace && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
             + escapeHtml(m.prestation) + '</span>' : '') + '</td>'
         + '<td>' + clientNom + '</td>'
         + '<td>' + convoyeurNom + '</td>'
-        + '<td>' + (estNettoyage ? (m.nb_vehicules ? escapeHtml(m.nb_vehicules) + ' véhicule(s)' : '—') : vehicule) + '</td>'
-        + '<td>' + (estNettoyage ? '—' : (m.electrique ? '⚡ Oui' : 'Non')) + '</td>'
-        + '<td>' + (estNettoyage ? '—'
+        + '<td>' + (estSurPlace ? (m.nb_vehicules ? escapeHtml(m.nb_vehicules) + ' véhicule(s)' : '—') : vehicule) + '</td>'
+        + '<td>' + (estSurPlace ? '—' : (m.electrique ? '⚡ Oui' : 'Non')) + '</td>'
+        + '<td>' + (estSurPlace ? '—'
             : (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non')) + '</td>'
-        + '<td>' + (estNettoyage
+        + '<td>' + (estSurPlace
             ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
                + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
             : datePec) + '</td>'
-        + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
+        + '<td>' + (estSurPlace ? '—' : dateLivr) + '</td>'
         + '<td>' + (m.prix_ttc != null ? escapeHtml(m.prix_ttc) + ' €' : '—') + '</td>'
         + '<td>' + badge + '</td>'
         + '<td>' + lettreVdv + '</td>'
@@ -8546,7 +8550,7 @@ function loadMissionsConvoyeur() {
           + '<td><strong style="color:var(--green)">'
           // La rémunération du partenaire, pas le prix client : c'est ce
           // qui l'intéresse, et c'est la même règle que le convoyage.
-          + (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—') + '</strong></td>'
+          + (m.preparation_id && m.remuneration_prevue != null ? escapeHtml(String(m.remuneration_prevue)) + ' €' : (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—')) + '</strong></td>'
           + '<td>' + restitution + '</td>'
           + '<td>' + options + '</td>'
           + '<td><button class="btn btn-sm btn-primary" ' + actionHtml('accepterMission', [m.id]) + '>Accepter</button></td></tr>';
@@ -9095,7 +9099,7 @@ function loadHistoriqueConvoyeur() {
           + '<td>' + quand + '</td>'
           + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
           + '<td><strong style="color:var(--green)">'
-          + (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—') + '</strong></td>'
+          + (m.preparation_id && m.remuneration_prevue != null ? escapeHtml(String(m.remuneration_prevue)) + ' €' : (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—')) + '</strong></td>'
           + '<td>' + badge + '</td>'
           + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
       }).join('');
@@ -10694,6 +10698,7 @@ function _blocDevisHtml(c) {
       '</div>' +
       '<div style="font-size:.76rem;color:#888;margin-top:8px">Vérifiez le contenu du devis avant de saisir le montant.</div>';
   }
+  if (d && d.statut === 'accepte' && d.paiement_statut === 'paye') html += '<div style="margin-top:14px"><button class="btn btn-primary" '+actionHtml('ouvrirPreparationDemande',[c.id])+'>Préparer les missions</button></div>';
   html += '</div>';
   return html;
 }
@@ -14833,5 +14838,7 @@ function declencherChampFichier(id) {
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lancer);else lancer();
 })();
 </script>
+<script src="assets/preparation-missions.js"></script>
+<script src="assets/preparation-missions-ui.js"></script>
 </body>
 </html>
