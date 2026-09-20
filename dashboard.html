@@ -3040,6 +3040,21 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   if (['annule','annulee'].includes(d.statut)) return etat('Demande annulée','neutre','Cette demande est clôturée.');
   if (['termine','terminee'].includes(d.statut)) return etat('Prestation terminée','vert','Retrouvez vos documents dans le détail de la demande.');
   const paye = dv && dv.paiement_statut === 'paye';
+  // Le paiement confirmé classe le dossier en préparation ; la complétude
+  // reste signalée séparément et conserve les contrôles de lancement.
+  if (!erreurDevis && paye) {
+    const enCours = d.statut === 'en_cours';
+    const restantes = !erreurInfos && lignes.some(_estRestante);
+    const message = erreurInfos
+      ? 'Votre paiement est reçu. Le suivi des informations est momentanément indisponible.'
+      : restantes
+        ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.'
+        : lignes.some(l=>l.statut==='transmise')
+          ? 'Votre paiement est reçu. Vos informations ont été transmises et sont en cours de vérification.'
+          : enCours ? 'Retrouvez le suivi dans « Mes missions ».' : 'Nous vous informerons dès que l’organisation sera confirmée.';
+    return etat(enCours ? 'Prestation en cours' : 'Prestation en préparation','vert',message,
+      restantes ? 'completer' : null,enCours ? 'en-cours' : 'preparation');
+  }
   if (!erreurDevis && !paye && dv && ['envoye','accepte'].includes(dv.statut)) {
     return etat(dv.statut === 'accepte' ? 'Paiement en attente' : 'À consulter','violet',
       !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis','devis');
@@ -3048,8 +3063,6 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
   if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.',null,'verification');
   if (!lignes.every(l=>['validee','fournie'].includes(l.statut))) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
-  if (paye) return etat(d.statut === 'en_cours' ? 'Prestation en cours' : 'Prestation en préparation','vert',
-    d.statut === 'en_cours' ? 'Retrouvez le suivi dans « Mes missions ».' : 'Nous vous informerons dès que l’organisation sera confirmée.',null,d.statut === 'en_cours' ? 'en-cours' : 'preparation');
   if (dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Retrouvez votre devis dans les détails de la demande.');
   return etat('Demande reçue','neutre','Nous étudions votre demande.',null,'devis-preparation');
 }

@@ -27,6 +27,16 @@ const {lancerNavigateur} = require('./env');
       window.__completion = null;
       HC_ACTIONS.ouvrirCompletionDemande = id => window.__completion = id;
     });
+    for (const statut of ['attendue','a_corriger','transmise','validee','fournie']) {
+      const resultat = await p.evaluate(statut => _presentationDemandeClient({statut:'nouveau'}, {statut:'accepte',paiement_statut:'paye'}, [{statut}], false, false), statut);
+      assert.equal(resultat.groupe,'preparation');
+      if (['attendue','a_corriger'].includes(statut)) assert.equal(resultat.action,'completer');
+    }
+    for (const [statut,groupe] of [['en_cours','en-cours'],['terminee','cloture'],['annulee','cloture']]) {
+      assert.equal(await p.evaluate(statut => _presentationDemandeClient({statut}, {statut:'accepte',paiement_statut:'paye'}, [], false, false).groupe, statut),groupe);
+    }
+    assert.equal(await p.evaluate(() => _presentationDemandeClient({}, {paiement_statut:'paye'}, [], true, false).groupe),'preparation');
+    assert.notEqual(await p.evaluate(() => _presentationDemandeClient({}, {paiement_statut:'paye'}, [], false, true).groupe),'preparation');
     const details = p.locator('.hc-demande-details');
     assert.equal(await p.locator('.hc-demande-date').textContent(),'19/09/2026 à 16:35');
     assert(await p.locator('.hc-demande-card>.btn').evaluate(el=>el.getBoundingClientRect().width<el.parentElement.getBoundingClientRect().width-50));
@@ -49,8 +59,8 @@ const {lancerNavigateur} = require('./env');
       window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
       await loadDemandesClient();
     });
-    // Interface actuelle : informations et vérification dans « Demandes en cours ».
-    for(const [groupe,nombre] of [['devis',1],['demandes',2],['preparation',1]]) assert.equal(await p.locator('[data-groupe-demandes="'+groupe+'"] .hc-demande-card').count(),nombre);
+    // Dès le paiement, le dossier rejoint la préparation, même incomplet.
+    for(const [groupe,nombre] of [['devis',1],['demandes',1],['preparation',2]]) assert.equal(await p.locator('[data-groupe-demandes="'+groupe+'"] .hc-demande-card').count(),nombre);
     assert.equal(await p.locator('#client-demandes-liste .hc-demande-card').count(),4);
     await p.locator('[data-demande="d2"] summary').click();
     assert.match(await p.locator('[data-demande="d2"] .hc-demande-meta').textContent(),/PaiementEffectué/);
@@ -81,8 +91,8 @@ const {lancerNavigateur} = require('./env');
     assert.equal(await p.locator('#client-demandes-liste [data-demande="d4"]').count(),1);
     assert(await p.locator('[data-demande="d4"] .hc-demande-complement button').isVisible());
     assert.equal(await p.locator('[data-groupe-demandes="preparation"]').count(),1);
-    assert.equal(await p.locator('[data-groupe-demandes="preparation"] .hc-demande-card').count(),0);
-    assert.match(await p.locator('[data-groupe-demandes="preparation"]').textContent(),/Prestations en préparation 0.*Aucune prestation en préparation pour le moment/s);
+    assert.equal(await p.locator('[data-groupe-demandes="preparation"] .hc-demande-card').count(),2);
+    assert.equal(await p.locator('[data-groupe-demandes="preparation"] [data-demande="d2"]').count(),1);
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'HC-DEMO-001',type_service:'convoyage',statut:'nouveau'}];
       window.chargerDevisClient = async () => [{id:'q1',client_id:'d1',statut:'accepte',paiement_statut:'paye'}];
