@@ -1004,8 +1004,8 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demandes-groupe h3{font-size:1rem;margin:0 0 5px}
 .hc-demandes-description{font-size:.85rem;color:#626973;margin:0 0 16px}
 .hc-demandes-compteur{display:inline-block;padding:1px 8px;border-radius:20px;background:#f1f2f4;color:#626973;font-size:.75rem;margin-left:6px}
-.hc-demandes-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
-.hc-demandes-grille .hc-demande-card{margin:0;min-width:0}
+.hc-demandes-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+.hc-demandes-grille .hc-demande-card{margin:0;min-width:0;box-sizing:border-box;height:100%}
 [data-groupe-demandes="demandes"] .hc-demandes-grille{align-items:stretch;grid-auto-rows:1fr}
 [data-groupe-demandes="demandes"] .hc-demande-card{box-sizing:border-box;height:100%}
 .hc-demande-message{font-size:.85rem;color:#626973;margin:10px 0 15px}
@@ -1073,7 +1073,7 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demandes-accordeon>summary:focus-visible{outline:2px solid var(--hc-groupe);outline-offset:4px;border-radius:4px}
 .hc-demandes-vide{padding:16px 18px;border:1px solid #e8eaed;border-left:3px solid var(--hc-groupe);border-radius:10px;color:#626973;font-size:.85rem;margin:0}
 @media(min-width:1101px){
- .hc-demandes-grille[data-plusieurs="true"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .hc-demandes-grille[data-plusieurs="true"]{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
  .hc-demande-card:not(:has(>.btn)){grid-template-columns:minmax(0,1fr) auto}
  .hc-demande-card>.hc-completion-note{justify-self:end;justify-content:flex-end;text-align:right}
  .hc-demandes-grille[data-plusieurs="true"] .hc-demande-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;min-width:0}
@@ -3049,7 +3049,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
     const message = erreurInfos
       ? 'Votre paiement est reçu. Le suivi des informations est momentanément indisponible.'
       : restantes
-        ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.'
+        ? 'Votre paiement est reçu. Nous préparons votre prestation.'
         : lignes.some(l=>l.statut==='transmise')
           ? 'Votre paiement est reçu. Vos informations ont été transmises et sont en cours de vérification.'
           : enCours ? 'Retrouvez le suivi dans « Mes missions ».' : 'Nous vous informerons dès que l’organisation sera confirmée.';
@@ -3060,7 +3060,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
     return etat(dv.statut === 'accepte' ? 'Paiement en attente' : 'À consulter','violet',
       !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis','devis');
   }
-  if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
+  if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Nous préparons votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
   if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
   if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.',null,'verification');
   if (!lignes.every(l=>['validee','fournie'].includes(l.statut))) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
@@ -3143,7 +3143,7 @@ async function loadDemandesClient() {
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement+pointRemise
-        +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Informations</span><span class="hc-info-etat hc-info-'+(erreurInfos?'neutre':_couleurInformationsClient(lignes))+'">'+escapeHtml(erreurInfos?'Indisponibles':_etatInformationsClient(lignes))+'</span><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
+        +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis && paiement!=='paye'?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
         +'<div class="hc-demande-documents"><button class="btn btn-sm btn-outline hc-demande-apercu-btn" '+actionHtml('ouvrirApercuDemandeClient',[d.id])+'>Récapitulatif de la demande</button>'
         +(devisAccessible?'<a class="btn btn-sm btn-outline" href="'+lienDevis+'">Consulter mon devis</a>':'')

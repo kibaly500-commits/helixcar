@@ -69,7 +69,7 @@ const {lancerNavigateur} = require('./env');
     assert.match(await p.locator('[data-demande="d2"] .hc-demande-message').first().textContent(),/Votre paiement est reçu/);
     assert.match(await p.locator('[data-demande="d1"] [data-completion-note]').textContent(),/Informations en vérification/);
     assert.match(await p.locator('[data-demande="d2"] [data-completion-note]').textContent(),/Informations à compléter/);
-    assert.match(await p.locator('[data-demande="d3"] .hc-demande-meta').textContent(),/validées/);
+    assert.match(await p.locator('[data-demande="d3"] [data-suivi="informations"]').textContent(),/validées/);
     assert.equal(await p.locator('[data-demande="d3"]').getAttribute('data-etat-demande'),'preparation');
     assert.match(await p.locator('[data-demande="d4"] [data-completion-note]').textContent(),/Paiement en attente/);
     assert.equal(await p.locator('[data-demande="d4"] > a').getAttribute('href'),'devis.html?id=q4');
@@ -85,6 +85,11 @@ const {lancerNavigateur} = require('./env');
         return s.backgroundColor==='rgb(255, 255, 255)' && parseFloat(s.borderTopWidth)>=1 && (!prev || r.top-prev.bottom>=15 || r.left-prev.right>=15);
       })));
       assert(await p.locator('.hc-demande-details summary').first().evaluate(el=>{const c=getComputedStyle(el,'::marker').color.match(/\d+/g).map(Number);return c[0]>c[1]+50 && c[0]>c[2]+50;}));
+      if (width===1440) {
+        const tailles=await p.locator('[data-groupe-demandes="preparation"] .hc-demande-card').evaluateAll(cards=>cards.map(c=>({w:c.getBoundingClientRect().width,h:c.getBoundingClientRect().height})));
+        assert(Math.abs(tailles[0].w-tailles[1].w)<1 && Math.abs(tailles[0].h-tailles[1].h)<1);
+      }
+      assert.equal(await p.locator('[data-demande="d2"] .hc-demande-meta .hc-info-etat').count(),0);
       await p.screenshot({path:'/tmp/hc-demandes-compactes-'+width+'.png',fullPage:true});
     }
     await p.evaluate(async()=>{window.chargerInformationsDemande=async()=>[{cle:'vehicule_1_vin',statut:'attendue'}];await loadDemandesClient();});
