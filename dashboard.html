@@ -3017,7 +3017,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   if (['termine','terminee'].includes(d.statut)) return etat('Prestation terminée','vert','Retrouvez vos documents dans le détail de la demande.');
   const paye = dv && dv.paiement_statut === 'paye';
   if (!erreurDevis && !paye && dv && ['envoye','accepte'].includes(dv.statut)) {
-    return etat(dv.statut === 'accepte' ? 'Devis à régler' : 'Devis à consulter','violet',
+    return etat(dv.statut === 'accepte' ? 'Paiement en attente' : 'À consulter','violet',
       !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis','devis');
   }
   if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Complétez les informations restantes pour nous permettre d’organiser votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
@@ -3054,14 +3054,14 @@ async function loadDemandesClient() {
   }));
   if(generation!==_demandesClientGeneration)return;
   const groupes=[
-    {cle:'devis',titre:'Devis à consulter ou à régler',description:'Retrouvez les devis qui attendent votre réponse ou votre règlement.'},
-    {cle:'informations',titre:'Informations à compléter',description:'Complétez les informations nécessaires à votre prestation.'},
-    {cle:'verification',titre:'Informations en vérification',description:'Vous avez transmis vos informations. Notre équipe vérifie votre dossier.'},
     {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
+    {cle:'devis',titre:'Vos devis',description:'Retrouvez le détail de nos propositions.'},
+    {cle:'verification',titre:'Informations en vérification',description:'Vous avez transmis vos informations. Notre équipe vérifie votre dossier.'},
     {cle:'devis-preparation',titre:'Devis en préparation',description:'Notre équipe prépare votre devis.'},
     {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes missions ».'},
     {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
-    {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'}
+    {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'},
+    {cle:'informations',titre:'Informations à compléter',description:'Complétez les informations nécessaires à votre prestation.'}
   ];
   zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
     const selection=resultats.filter(r=>r.presentation.groupe===g.cle).sort(function(a,b){
@@ -3079,7 +3079,7 @@ async function loadDemandesClient() {
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
-      if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">'+(dv.statut==='accepte'?'Consulter et régler mon devis':'Consulter mon devis')+' →</a>';
+      if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">Voir mon devis →</a>';
       const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
       const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><span class="hc-info-etat hc-info-orange">Informations également à compléter</span> <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
