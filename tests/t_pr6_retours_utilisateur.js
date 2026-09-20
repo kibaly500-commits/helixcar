@@ -28,9 +28,8 @@ check('Une fiche sans choix explicite du type reste incomplète',
  index.includes("var req=['type'];") &&
  index.includes("if (!el || !(el.value || '').trim()) return false;"));
 
-check('Le bandeau intégré apparaît dès qu’un brouillon existe',
- index.includes('function _actualiserNoticeBrouillonIntegre()') &&
- index.includes('if (_hcModeIntegre()) _actualiserNoticeBrouillonIntegre();'));
+check('Seule une saisie réelle masque le bandeau, pas le préremplissage',
+ index.includes('if (e.isTrusted) _masquerNoticeBrouillonDesReprise();'));
 check('Le bandeau ne peut pas être ajouté deux fois',
  index.includes("if (document.getElementById('notice-brouillon-restaure')) return;"));
 check('Le Dashboard redemande le bandeau lors du retour au formulaire',

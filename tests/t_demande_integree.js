@@ -181,6 +181,20 @@ window.fetch = function (url, options) {
       check('A11 : ni compte ni e-mail ne sont redemandés',
         dedans.emailVerrouille === true && dedans.mdpRequis === false, JSON.stringify(dedans));
 
+      // Réouverture réelle d'un brouillon : le profil pro est prérempli
+      // après restauration et ne doit pas faire disparaître la carte.
+      await cadres[0].evaluate(() => {
+        document.getElementById('client-notes').value = 'Consigne reprise PR6';
+        _formulaireClientSale = true;
+        _sauvegarderBrouillonClient();
+        location.reload();
+      });
+      await cadres[0].waitForFunction(() => document.body.classList.contains('hc-sans-identite'));
+      check('A11b : bandeau visible dès le chargement malgré le préremplissage du profil',
+        await cadres[0].locator('#notice-brouillon-restaure').isVisible());
+      check('A11c : notes restaurées dès le premier chargement',
+        await cadres[0].locator('#client-notes').inputValue() === 'Consigne reprise PR6');
+
       // C'est bien LE MÊME formulaire : mêmes fonctions métier.
       const memeCode = await cadres[0].evaluate(() => ({
         services: ['stockage', 'convoyage', 'professionnel', 'nettoyage']

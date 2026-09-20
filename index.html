@@ -12802,6 +12802,11 @@ function construireRecap() {
     }
   }
 
+  var notesDemande = ((document.getElementById('client-notes') || {}).value || '').trim();
+  if (notesDemande) {
+    html += _recapBloc('Informations complémentaires', _recapLigne('Détails', notesDemande), 4);
+  }
+
   // ── Véhicules ──
   if (flotte) {
     html += _recapBloc('Véhicules',
@@ -14600,17 +14605,28 @@ function _actualiserNoticeBrouillonIntegre() {
 document.addEventListener('input', function (e) {
   var ov = document.getElementById('modal-client');
   if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) {
-    if (_hcModeIntegre()) _actualiserNoticeBrouillonIntegre();
-    else _masquerNoticeBrouillonDesReprise();
+    // Le préremplissage du profil et la restauration émettent aussi des
+    // événements : ils ne constituent pas une reprise par le client.
+    if (e.isTrusted) _masquerNoticeBrouillonDesReprise();
     _planifierSauvegardeBrouillonClient();
   }
 }, true);
 document.addEventListener('change', function (e) {
   var ov = document.getElementById('modal-client');
   if (ov && ov.classList.contains('open') && e.target && ov.contains(e.target)) {
-    if (_hcModeIntegre()) _actualiserNoticeBrouillonIntegre();
-    else _masquerNoticeBrouillonDesReprise();
+    if (e.isTrusted) _masquerNoticeBrouillonDesReprise();
     _planifierSauvegardeBrouillonClient();
+  }
+}, true);
+// Continuer via un bouton, un accordéon ou un sélecteur vaut aussi reprise.
+// Les actions du bandeau gardent leur propre comportement (et confirmation).
+document.addEventListener('click', function (e) {
+  var formulaire = document.getElementById('modal-client-form');
+  var notice = document.getElementById('notice-brouillon-restaure');
+  if (e.isTrusted && notice && formulaire && formulaire.contains(e.target)
+      && !notice.contains(e.target)
+      && e.target.closest('button, input, select, textarea, label')) {
+    _masquerNoticeBrouillonDesReprise();
   }
 }, true);
 // Appelée par le Dashboard lorsque le client revient dans le formulaire
@@ -20693,7 +20709,7 @@ function rendreFichesVehicules() {
     // son propre conteneur identifiable (veh-restit-question-i), display
     // initial selon livActive — permet à basculerLivraisonVehicule et
     // _hcEffacerSousVeh de la basculer explicitement.
-    livraison+='<div id="veh-restit-question-'+i+'" style="display:'+(livActive===true?'block':'none')+'"><div class="veh-sep"></div><div class="veh-sstitre">Une restitution est-elle prévue pour ce véhicule ? <span class="field-required">*</span></div>'+
+    livraison+='<div id="veh-restit-question-'+i+'" style="display:'+((livraisonStockVehicule ? livActive===true : sc.liv)?'block':'none')+'"><div class="veh-sep"></div><div class="veh-sstitre">Une restitution est-elle prévue pour ce véhicule ? <span class="field-required">*</span></div>'+
       '<div class="veh-binary-choice" id="veh-'+i+'-restit-active-group">'+
       '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="oui" '+(restActive===true?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Oui</span></label>'+
       '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="non" '+(restActive===false?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Non</span></label></div>'+
@@ -22166,7 +22182,8 @@ document.addEventListener('click', function (e) {
       // Bug 6 — masque aussi la QUESTION restitution elle-même (pas
       // seulement son formulaire) : tant que Livraison n'a pas de
       // réponse, la question dépendante ne doit pas apparaître.
-      var rq=document.getElementById('veh-restit-question-'+i); if(rq)rq.style.display='none';
+      var rq=document.getElementById('veh-restit-question-'+i);
+      if(rq)rq.style.display=(!_avecStockage() && _scenarioTrajet().liv)?'block':'none';
       var gl=document.getElementById('veh-'+i+'-liv-active-group'); if(gl)gl.classList.remove('hc-group-error');
     }
     bloc.classList.remove('termine'); bloc.classList.add('ouvert');
