@@ -520,7 +520,7 @@ async function modesParVehicule(page, n) {
     });
     await page.waitForTimeout(150);
     const brouillon = await page.evaluate(() => {
-      try { return JSON.parse(localStorage.getItem('helixcar_brouillon_client_v1') || 'null'); }
+      try { return JSON.parse(localStorage.getItem(_cleBrouillonClient()) || 'null'); }
       catch (e) { return null; }
     });
     // Le brouillon mémorise les boutons radio par NOM de groupe : le mode

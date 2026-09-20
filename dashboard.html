@@ -1005,6 +1005,8 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demandes-compteur{display:inline-block;padding:1px 8px;border-radius:20px;background:#f1f2f4;color:#626973;font-size:.75rem;margin-left:6px}
 .hc-demandes-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .hc-demandes-grille .hc-demande-card{margin:0;min-width:0}
+[data-groupe-demandes="demandes"] .hc-demandes-grille{align-items:stretch;grid-auto-rows:1fr}
+[data-groupe-demandes="demandes"] .hc-demande-card{box-sizing:border-box;height:100%}
 .hc-demande-message{font-size:.85rem;color:#626973;margin:10px 0 15px}
 .hc-demande-card>.btn{width:auto;max-width:100%;min-height:40px;padding:9px 16px;justify-content:center;white-space:normal}
 .hc-demande-date{font-size:.78rem;color:#626973;font-weight:400}
@@ -1043,6 +1045,7 @@ body.scroll-verrouille { overflow: hidden; }
 [data-groupe-demandes="preparation"]{--hc-groupe:#378452}
 .hc-demandes-groupe h3::before{content:'';flex:0 0 32px;width:32px;height:32px;border-radius:50%;background-color:var(--hc-groupe);background-position:center;background-repeat:no-repeat;background-size:19px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3h7l4 4v14H7zM14 3v5h4M10 12h5M10 16h5'/%3E%3C/svg%3E")}
 [data-groupe-demandes="informations"] h3::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E")}
+[data-groupe-demandes="demandes"] h3::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11a9 9 0 1 1 2 7M3 5v6h6M12 7v5l3 2'/%3E%3C/svg%3E")}
 [data-groupe-demandes="verification"] h3::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 19v-6M12 19V5M19 19V9'/%3E%3C/svg%3E")}
 [data-groupe-demandes="preparation"] h3::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m7 12 3 3 7-7'/%3E%3C/svg%3E")}
 .hc-demandes-description{margin-left:42px}
@@ -4693,6 +4696,15 @@ function buildNav(role) {
 // précédente ne peut réapparaître à la connexion suivante dans le même
 // onglet.
 async function doLogout() {
+  // Termine la sauvegarde du brouillon privé avant de quitter le cadre.
+  // La vitrine repart vierge ; les brouillons propres aux comptes restent.
+  try {
+    const cadre = document.getElementById('client-demande-cadre');
+    if (cadre && cadre.contentWindow && typeof cadre.contentWindow._finaliserBrouillonClientAvantFermeture === 'function') {
+      cadre.contentWindow._finaliserBrouillonClientAvantFermeture();
+    }
+    localStorage.removeItem('helixcar_brouillon_public_v3');
+  } catch (e) {}
   window._hcSortieConfirmee = true;
   window._currentConvoyeur = null;
   window._currentAdmin = null;
@@ -9684,7 +9696,12 @@ function _dvDate(v) {
 function _dvDateHeure(v) {
   if (!v) return '—';
   try {
-    var d = new Date(v);
+    // clients.created_at est un timestamp sans fuseau, écrit en UTC.
+    // Les timestamps déjà munis d'un offset restent inchangés.
+    var valeur = String(v);
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(valeur)
+        && !/(Z|[+-]\d{2}(?::?\d{2})?)$/i.test(valeur)) valeur = valeur.replace(' ', 'T') + 'Z';
+    var d = new Date(valeur);
     if (isNaN(d.getTime())) return String(v);
     return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   } catch (e) { return String(v); }

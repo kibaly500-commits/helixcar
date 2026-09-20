@@ -139,15 +139,9 @@ function check(libelle, condition, detail) {
     miseEnPage.largeurStockage >= miseEnPage.viewport * .87
     && miseEnPage.largeurEtapes >= miseEnPage.largeurStockage * .98
     && miseEnPage.alignementGauche <= 1, JSON.stringify(miseEnPage));
-  check('R13 : la frise Fidélité synchronise la ligne et les cinq paliers sur dix secondes',
-    miseEnPage.animationLigne === 'loyaltyRun'
-    && miseEnPage.animationLigneCumulee === 'loyaltyFill'
-    && miseEnPage.dureeLigne === '10s'
-    && miseEnPage.dureeLigneCumulee === '10s'
-    && miseEnPage.rythmeLigne === 'linear'
-    && miseEnPage.animations.length === 5
-    && miseEnPage.animations.map(a => a.nom).join('|') === 'loyaltyMilestone1|loyaltyMilestone2|loyaltyMilestone3|loyaltyMilestone4|loyaltyMilestone5'
-    && miseEnPage.animations.every(a => a.duree === '10s' && a.rythme === 'linear')
+  check('R13 : les cinq paliers n’ont plus de minuteries indépendantes',
+    miseEnPage.animations.length === 5
+    && miseEnPage.animations.every(a => a.nom === 'none')
     && miseEnPage.fausseProgression === false, JSON.stringify(miseEnPage));
   check('R14 : le bloc Renfort partage l’alignement et la largeur généreuse du Stockage',
     miseEnPage.renfort.largeur >= miseEnPage.largeurStockage * .99
@@ -167,39 +161,24 @@ function check(libelle, condition, detail) {
     JSON.stringify(miseEnPage.positions));
   check('R17 : Mission type défile lentement vers la droite avec étape centrale et brillance blanche',
     miseEnPage.flechesHero === 1 && !miseEnPage.precedenteHero
-    && miseEnPage.heroFill.nom === 'hero2-draw'
-    && miseEnPage.heroMarker.nom === 'hero2-marker'
-    && miseEnPage.heroStage.nom === 'hero2-stage'
-    && miseEnPage.heroFill.duree === '8.5s'
-    && miseEnPage.heroFill.duree === miseEnPage.heroMarker.duree
-    && miseEnPage.heroFill.duree === miseEnPage.heroStage.duree
+    && miseEnPage.heroFill.nom === 'none'
+    && miseEnPage.heroMarker.nom === 'none'
+    && miseEnPage.heroStage.nom === 'none'
     && miseEnPage.heroTrackLargeur >= 260
     && miseEnPage.heroTrackLargeur <= 321
-    && /255, 255, 255/.test(miseEnPage.brillanceHero)
-    && miseEnPage.routeAnimee === 'hero2-route-flow'
-    && miseEnPage.routeDuree === miseEnPage.heroFill.duree, JSON.stringify(miseEnPage));
+    && /255, 255, 255/.test(miseEnPage.brillanceHero), JSON.stringify(miseEnPage));
 
-  const fideliteCumulee = await page.evaluate(async () => {
-    const toutes = document.getAnimations();
-    const animations = toutes.filter(animation => /^loyaltyMilestone/.test(animation.animationName || ''));
-    const remplissage = toutes.find(animation => animation.animationName === 'loyaltyFill');
-    const largeur = () => parseFloat(getComputedStyle(document.querySelector('.track-line'), '::before').width);
+  const fideliteCumulee = await page.evaluate(() => {
+    const largeur = () => document.querySelector('.track-line .hc-sync-fill').getBoundingClientRect().width;
     const largeurTotale = document.querySelector('.track-line').getBoundingClientRect().width;
     const couleurs = () => Array.from(document.querySelectorAll('.node-circle')).map(el => getComputedStyle(el).borderTopColor);
-    remplissage.currentTime = 6000;
-    remplissage.pause();
-    animations.forEach(animation => { animation.currentTime = 6000; animation.pause(); });
-    await new Promise(requestAnimationFrame);
+    _hcRendreProgressionVitrine(.6);
     const milieu = couleurs();
     const ligneMilieu = largeur();
-    remplissage.currentTime = 9500;
-    animations.forEach(animation => { animation.currentTime = 9500; });
-    await new Promise(requestAnimationFrame);
+    _hcRendreProgressionVitrine(1);
     const fin = couleurs();
     const ligneFin = largeur();
-    remplissage.currentTime = 10000;
-    animations.forEach(animation => { animation.currentTime = 10000; });
-    await new Promise(requestAnimationFrame);
+    _hcRendreProgressionVitrine(0);
     return { milieu, fin, reprise: couleurs(), ligneMilieu, ligneFin, ligneReprise: largeur(), largeurTotale };
   });
   const rouge = couleur => /181, 68, 75|229, 72, 77/.test(couleur);
@@ -207,7 +186,7 @@ function check(libelle, condition, detail) {
     fideliteCumulee.milieu.slice(0, 3).every(rouge)
     && fideliteCumulee.milieu.slice(3).every(c => !rouge(c))
     && fideliteCumulee.fin.every(rouge)
-    && fideliteCumulee.reprise.every(c => !rouge(c))
+    && rouge(fideliteCumulee.reprise[0]) && fideliteCumulee.reprise.slice(1).every(c => !rouge(c))
     && fideliteCumulee.ligneMilieu > fideliteCumulee.largeurTotale * .5
     && fideliteCumulee.ligneMilieu < fideliteCumulee.largeurTotale * .75
     && fideliteCumulee.ligneFin >= fideliteCumulee.largeurTotale * .99

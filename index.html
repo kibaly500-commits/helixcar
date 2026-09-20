@@ -14497,7 +14497,14 @@ document.addEventListener('change', function(e) {
 // est explicitement exclu ci-dessous, en plus d'une exclusion
 // défensive générique de tout type="password"/"hidden" présent
 // aujourd'hui ou ajouté plus tard sans mise à jour de cette liste.
-var _CLE_BROUILLON_CLIENT = 'helixcar_brouillon_client_v1';
+// Les anciens brouillons partagés n'ont pas de propriétaire fiable.
+var _CLE_BROUILLON_CLIENT = 'helixcar_brouillon_public_v3';
+function _cleBrouillonClient() {
+  var espace = new URLSearchParams(window.location.search).get('nouvelle-demande') === '1';
+  if (!espace) return _CLE_BROUILLON_CLIENT;
+  return _hcSessionClient && _hcSessionClient.userId
+    ? 'helixcar_brouillon_compte_v3:' + _hcSessionClient.userId : null;
+}
 var _EXPIRATION_BROUILLON_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 var _EXCLUS_BROUILLON_CLIENT = ['client-password'];
 var _minuteurBrouillonClient = null;
@@ -14581,7 +14588,8 @@ function _sauvegarderBrouillonClient() {
   try {
     var brouillon = _construireBrouillonClient();
     if (!brouillon) return;
-    localStorage.setItem(_CLE_BROUILLON_CLIENT, JSON.stringify(brouillon));
+    var cle = _cleBrouillonClient();
+    if (cle) localStorage.setItem(cle, JSON.stringify(brouillon));
   } catch (e) {
     // Stockage plein/indisponible (navigation privée, quota) : le
     // brouillon est un confort, jamais un blocage du parcours.
@@ -14636,7 +14644,7 @@ window._hcAfficherBrouillonIntegre = function () {
 };
 
 function _supprimerBrouillonClient() {
-  try { localStorage.removeItem(_CLE_BROUILLON_CLIENT); } catch (e) {}
+  try { var cle = _cleBrouillonClient(); if (cle) localStorage.removeItem(cle); } catch (e) {}
 }
 
 // V77.2 - COURSE ENTRE DEUX MINUTEURS, corrigee.
@@ -14666,7 +14674,7 @@ function _finaliserBrouillonClientAvantFermeture() {
 
 function _lireBrouillonClientValide() {
   var brut;
-  try { brut = localStorage.getItem(_CLE_BROUILLON_CLIENT); } catch (e) { return null; }
+  try { var cle = _cleBrouillonClient(); if (!cle) return null; brut = localStorage.getItem(cle); } catch (e) { return null; }
   if (!brut) return null;
   var brouillon;
   try { brouillon = JSON.parse(brut); } catch (e) { _supprimerBrouillonClient(); return null; }
@@ -23677,6 +23685,8 @@ console.log('HelixCar ' + window.HC_VERSION);
   }
 })();
 </script>
+<script src="assets/pr6-ui-sync.js"></script>
+<script src="assets/pr6-delai-mission.js"></script>
 </body>
 
 </html>

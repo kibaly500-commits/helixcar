@@ -256,6 +256,9 @@ const futur = dansNJours;
   const PERIMETRE = [
     'index.html',
     'dashboard.html',
+    // PR6 : synchronisation visuelle et délai minimum explicitement demandés.
+    'assets/pr6-ui-sync.js',
+    'assets/pr6-delai-mission.js',
     // Visuel éditorial demandé pour la section « Nos services ».
     'assets/helixcar-services-mercedes.webp',
     // Logo original fourni par le client, extrait en blanc pour le Dashboard.
@@ -316,7 +319,7 @@ const futur = dansNJours;
   L.check('E6 : périmètre de fichiers maîtrisé',
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
-    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 26,
+    PERIMETRE.every(f => f.indexOf('*') === -1) && PERIMETRE.length <= 28,
     PERIMETRE.length + ' entrées');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.

@@ -35,6 +35,11 @@ function check(libelle, condition, detail) {
     const dot3 = document.querySelector('.hero2-panel .hero2-route-point:nth-child(5) .hero2-route-dot');
     const evt = new Event('touchstart', { bubbles: true, cancelable: true });
     document.getElementById('stock-debut').dispatchEvent(evt);
+    const etats=[0,.6,1].map(p=>{
+      _hcRendreProgressionVitrine(p);
+      return [dot1,dot2,dot3].map(d=>d.classList.contains('hc-reached'));
+    });
+    const remplissage=document.querySelector('.hero2-panel .hc-sync-fill');
     return {
       touchAction: getComputedStyle(document.body).touchAction,
       noteDisplay: getComputedStyle(note).display,
@@ -45,7 +50,10 @@ function check(libelle, condition, detail) {
       decoration: getComputedStyle(tag).textDecorationLine,
       bordBas: getComputedStyle(tag).borderBottomWidth,
       ligneLargeur: ligne.getBoundingClientRect().width,
-      ligneEffet: getComputedStyle(ligne, '::after').filter,
+      ligneEffet: getComputedStyle(remplissage).boxShadow,
+      etats,
+      remplissage:remplissage.style.width,
+      paris:document.querySelector('.hero2-panel-progress-fill').style.width,
       dot1Fond: getComputedStyle(dot1).backgroundColor,
       dot1Bord: getComputedStyle(dot1).borderTopColor,
       dot1Halo: getComputedStyle(dot1).boxShadow,
@@ -67,8 +75,7 @@ function check(libelle, condition, detail) {
   check('M4 : les traits de progression sont élargis sur mobile',
     renduMobile.ligneLargeur >= 34, JSON.stringify(renduMobile));
   check('M5 : les deuxième et troisième étapes s’allument successivement',
-    /hc-mobile-route-dot-2/.test(renduMobile.animationDot2) &&
-    /hc-mobile-route-dot-3/.test(renduMobile.animationDot3), JSON.stringify(renduMobile));
+    JSON.stringify(renduMobile.etats)==='[[true,false,false],[true,true,false],[true,true,true]]', JSON.stringify(renduMobile));
   check('M5b : le premier jalon reprend le rendu lumineux Paris-Lyon',
     renduMobile.dot1Fond === 'rgb(245, 242, 234)' &&
     renduMobile.dot1Bord === 'rgb(181, 68, 75)' && renduMobile.dot1Halo !== 'none' &&
@@ -76,10 +83,7 @@ function check(libelle, condition, detail) {
   check('M5c : les traits utilisent aussi la surbrillance lumineuse',
     renduMobile.ligneEffet !== 'none', JSON.stringify(renduMobile));
   check('M5d : traits et jalons partagent exactement les seuils de synchronisation',
-    /hc-mobile-route-line-1[\s\S]*30%,94%/.test(source) &&
-    /hc-mobile-route-dot-2[\s\S]*30%,94%/.test(source) &&
-    /hc-mobile-route-line-2[\s\S]*60%,94%/.test(source) &&
-    /hc-mobile-route-dot-3[\s\S]*60%,94%/.test(source));
+    renduMobile.remplissage==='100%' && renduMobile.paris==='100%' && renduMobile.etats[2].every(Boolean));
   check('M6 : le calendrier HelixCar remplace le calendrier natif au toucher',
     renduMobile.datePrevented && renduMobile.calendrierOuvert, JSON.stringify(renduMobile));
   check('M7 : aucun débordement horizontal mobile', !renduMobile.debordement, JSON.stringify(renduMobile));
