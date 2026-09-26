@@ -39,6 +39,18 @@ for(const scenario of ['refused','abandoned','requires_action']){
 {
  const d=double({paiement:'paye'});const {r,j}=await call(d,'success');check('rejeu déjà payé sans second traitement',r.status===200&&j.code==='DEJA_PAYE'&&d.rpc===0);
 }
+
+for(const scenario of ['success','refused','abandoned','requires_action']){
+ const d=double({qa:false});
+ d.client.id='951410e8-7104-4256-b46d-59487e73890a';d.client.numero_client='HC-2026-2184';d.devis.client_id=d.client.id;
+ const {r,j}=await call(d,scenario);
+ check('dossier explicitement autorisé : '+scenario,r.status===200&&j.ok);
+}
+{
+ const d=double({qa:false});d.client.numero_client='HC-2026-2184';
+ const {r}=await call(d,'success');
+ check('même référence sur un autre dossier refusée',r.status===403&&d.rpc===0);
+}
 const TOKEN='qa-secret-link-not-a-real-token';
 const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(TOKEN))).toString('hex');
 function linkFixture(options={}){

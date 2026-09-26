@@ -25,3 +25,5 @@ Cette simulation n'appelle ni Stripe ni aucun autre prestataire. Elle ne collect
 
 Test automatisé : `node tests/t_paiement_recette.mjs`.
 
+
+Dossier supplémentaire autorisé explicitement par Hamid le 27/09/2026 : HC-2026-2184 (identifiant serveur 951410e8-7104-4256-b46d-59487e73890a). Les contrôles d’origine, de propriété ou de lien, et de version restent applicables.
