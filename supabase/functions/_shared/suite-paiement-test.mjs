@@ -5,7 +5,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const base64=bytes=>{let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s);};
 async function checked(p){const r=await p;if(r.error)throw new Error('PERSISTENCE_FAILED');return r.data;}
 export async function suitePaiementTest(devisId,{sb,jsPDF,env,fetchFn=fetch,now=()=>Date.now(),documentSeulement=false}){
- let f=await checked(sb.rpc('preparer_suite_paiement_test',{p_devis_id:devisId}));
+ let f=await checked(sb.rpc(documentSeulement?'preparer_document_paiement_test':'preparer_suite_paiement_test',{p_devis_id:devisId}));
  const path=f.id+'/document.pdf';
  let bytes;
  const download=await sb.storage.from(bucket).download(path);

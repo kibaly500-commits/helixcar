@@ -16,7 +16,7 @@ Deno.serve(async req=>{
      const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body.jeton)))).map(x=>x.toString(16).padStart(2,'0')).join('');
      const {data:job}=await sb.from('documents_paiement_test').select('id').eq('devis_id',body.devis_id).eq('worker_token_hash',hash).gt('worker_expire_le',new Date().toISOString()).maybeSingle();
      if(!job)return reply({ok:false},401);
-     await suitePaiementTest(body.devis_id,{sb,jsPDF,env:{RESEND_API_KEY:Deno.env.get('RESEND_API_KEY'),RESEND_FROM:Deno.env.get('RESEND_FROM')}});
+     await suitePaiementTest(body.devis_id,{sb,jsPDF,env:{RESEND_API_KEY:Deno.env.get('RESEND_API_KEY'),RESEND_FROM:Deno.env.get('RESEND_FROM')},documentSeulement:body.document_seulement===true});
      const {error:clearError}=await sb.from('documents_paiement_test').update({worker_token_hash:null,worker_expire_le:null}).eq('id',job.id).eq('worker_token_hash',hash);
      if(clearError)throw clearError;
      return reply({ok:true});
@@ -32,7 +32,7 @@ Deno.serve(async req=>{
    // Reprise facultative, autorisée aux administrateurs seulement.
    if(body.action==='preparer'){
      if(!a)return reply({ok:false},403);
-     await suitePaiementTest(d.id,{sb,jsPDF,env:{RESEND_API_KEY:Deno.env.get('RESEND_API_KEY'),RESEND_FROM:Deno.env.get('RESEND_FROM')}});
+     await suitePaiementTest(d.id,{sb,jsPDF,env:{},documentSeulement:true});
    }
    let {data:f,error:lectureErreur}=await sb.from('documents_paiement_test').select('numero,pdf_path').eq('devis_id',d.id).maybeSingle();
    if(lectureErreur)throw lectureErreur;

@@ -25,8 +25,10 @@ test('PDF stable, privé canonique, reprise séquentielle sans second document n
  assert.equal(f.pdf,pdf);assert.equal(f.deliveries.size,2);assert.ok(f.row.pdf_path);assert.ok(f.row.email_admin_id);
  const payload=JSON.parse([...f.deliveries.values()][0].body);assert.deepEqual(payload.to,['helixcarpro+qa-final01@gmail.com']);assert.equal(payload.attachments.length,1);assert.doesNotMatch(payload.html,/<li>|Contact|Immatriculation/);assert.equal((payload.html.match(/<a /g)||[]).length,1);assert.match(payload.html,/Compléter mes informations/);assert.match(payload.html,/Aucun débit réel/);assert.match(payload.html,/sans valeur fiscale/);
 });
-test('consultation après paiement : prépare le PDF manquant sans envoyer d’e-mail, puis réutilise le même document',async()=>{
+test('consultation stockage : prépare le PDF sans lancer la création de missions ni les e-mails, puis réutilise le même document',async()=>{
  const f=fixture();
+ f.row.snapshot.devis.type_service='stockage';
+ f.deps.sb.rpc=async name=>{assert.equal(name,'preparer_document_paiement_test');return {data:structuredClone(f.row)};};
  await suitePaiementTest(f.row.devis_id,{...f.deps,env:{},documentSeulement:true});
  const pdf=f.pdf;
  assert.ok(f.row.pdf_path);assert.ok(pdf);assert.equal(f.deliveries.size,0);
