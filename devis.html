@@ -30,16 +30,28 @@
 
   header.entete {
     background: var(--anthracite);
-    padding: 20px 24px;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px;
+    padding: 10px 16px;
   }
+  .entete-contenu {
+    width: 100%;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 24px;
+  }
+  .entete-contenu .logo-image { grid-column: 2; justify-self: center; }
   .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.01em; color: var(--blanc); }
   .logo span { color: var(--rouge); }
   .entete-sous { color: #9AA0A8; font-size: 0.8rem; }
+  .retour-client { grid-column: 3; justify-self: end; color: var(--anthracite); background: var(--blanc); border-radius: 6px; font-size: .85rem; font-weight: 700; text-decoration: none; padding: 8px 12px; text-align: center; }
+  .retour-client:hover, .retour-client:focus-visible { text-decoration: underline; }
+  @media (min-width: 901px) { .retour-client { margin-right: clamp(24px, 5vw, 96px); } }
+  @media (max-width: 640px) {
+    .entete-contenu { grid-template-columns: 1fr; gap: 4px; }
+    .entete-contenu .logo-image, .retour-client { grid-column: 1; justify-self: center; }
+    .retour-client { justify-self: center; max-width:100%; margin:6px 0 0; }
+  }
 
   main {
     flex: 1;
@@ -104,6 +116,17 @@
     min-height: 480px;
     border: none;
   }
+  .pdf-mobile-pages { display: none; }
+  .pdf-mobile-page { margin: 0; background: var(--blanc); }
+  .pdf-mobile-page + .pdf-mobile-page { border-top: 12px solid var(--ivoire); }
+  .pdf-mobile-page figcaption {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ligne);
+    color: var(--gris);
+    font-size: 0.76rem;
+    text-align: center;
+  }
+  .pdf-mobile-page canvas { display: block; width: 100%; height: auto; }
   .pdf-indispo { font-size: 0.9rem; color: var(--gris); text-align: center; padding: 50px 16px; }
 
   .bouton {
@@ -120,8 +143,8 @@
   .decision-groupe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .bouton-accepter { background: var(--ok); color: var(--blanc); }
   .bouton-accepter:hover:not(:disabled) { background: #256640; }
-  .bouton-refuser { background: var(--blanc); color: var(--refus); border: 1.5px solid var(--refus); }
-  .bouton-refuser:hover:not(:disabled) { background: #FBF1F1; }
+  .bouton-refuser { background: var(--refus); color: var(--blanc); border: 1.5px solid var(--refus); }
+  .bouton-refuser:hover:not(:disabled) { background: #8A2B2B; }
 
   .statut-final {
     display: flex; align-items: center; gap: 12px;
@@ -130,6 +153,12 @@
   .statut-final.accepte { background: #E3F2E8; color: #1E5734; }
   .statut-final.refuse { background: #F5E3E3; color: #7A2B2B; }
   .statut-final strong { display: block; font-size: 1rem; margin-bottom: 2px; }
+  .paiement-recette { margin-top:12px; padding:16px 18px; background:#fff; border:1px solid var(--ligne); border-left:4px solid var(--rouge); }
+  .paiement-recette h2 { margin:0 0 6px; font-size:1rem; }
+  .paiement-recette p { margin:0 0 12px; color:var(--anthracite-clair); font-size:.88rem; }
+  .paiement-recette-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .bouton-simulation { background:var(--anthracite); color:#fff; }
+  .paiement-recette-resultat { margin-top:10px; font-size:.88rem; min-height:1.3em; }
 
   footer.pied { text-align: center; padding: 24px; font-size: 0.76rem; color: var(--gris); }
 
@@ -174,8 +203,8 @@
      ══════════════════════════════════════════════════════════════ */
   @media (max-width: 768px) {
     header.entete {
-      padding: 16px 18px;
-      padding-top: max(16px, env(safe-area-inset-top));
+      padding: 10px 18px;
+      padding-top: max(10px, env(safe-area-inset-top));
       padding-left: max(18px, env(safe-area-inset-left));
       padding-right: max(18px, env(safe-area-inset-right));
     }
@@ -203,6 +232,12 @@
       height: 70dvh;
       min-height: 380px;
     }
+    /* Safari iOS peut recadrer un PDF intégré et ne rendre visible que sa
+       première page. Une fois le rendu multipage prêt, le même fichier est
+       affiché page par page à la largeur du téléphone. L'iframe demeure le
+       repli tant que le rendu n'a pas abouti. */
+    .pdf-cadre.pdf-rendu-mobile iframe { display: none; }
+    .pdf-cadre.pdf-rendu-mobile .pdf-mobile-pages { display: block; }
 
     .bouton { min-height: 48px; font-size: 0.92rem; }
     .decision-groupe { grid-template-columns: 1fr; gap: 10px; }
@@ -269,13 +304,27 @@
     .pdf-cadre iframe { height: 78vh; height: 78dvh; min-height: 240px; }
     .modal-carte { max-height: min(80vh, 80dvh); }
   }
+  .logo-image{width:190px;max-width:55vw;height:auto;display:block}
+  .bouton{border-radius:12px;min-height:52px}
+  .pdf-cadre,.statut-final,.paiement-recette{border-radius:16px;overflow:hidden}
+  .reference{font-family:inherit;font-weight:600;border:0;padding:0;font-size:1.05rem}
+  .resume-mobile{display:none}
+  @media(max-width:640px){
+    main{padding:24px 16px 40px}
+    .resume-mobile{display:none}
+    .resume-mobile h2{font-size:1.15rem;margin:0 0 16px}.resume-mobile h3{font-size:1rem;margin:0 0 10px}
+    .resume-vehicule{border-top:1px solid var(--ligne);padding:18px 0}.resume-vehicule p{margin:7px 0;font-size:.9rem}
+    .resume-total{background:var(--anthracite);color:white;padding:18px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}
+  }
 </style>
 </head>
 <body>
 <div class="voile">
   <header class="entete">
-    <div class="logo">HELIX<span>CAR</span></div>
-    <div class="entete-sous">Consultation de devis</div>
+    <div class="entete-contenu">
+    <img class="logo-image" src="assets/logo-helixcar-blanc.png" alt="HelixCar — Services automobiles">
+      <a class="retour-client" href="dashboard.html">Accéder à mon espace client</a>
+    </div>
   </header>
 
   <main id="zone-contenu">
@@ -285,7 +334,7 @@
     </div>
   </main>
 
-  <footer class="pied">HelixCar — Convoyage &amp; stockage automobile</footer>
+  <footer class="pied">HelixCar — Services automobiles</footer>
 </div>
 
 <!-- Modal générique, réutilisé pour la confirmation d'acceptation ET la saisie du motif de refus. -->
@@ -294,7 +343,7 @@
     <div class="modal-titre" id="modal-titre"></div>
     <div class="modal-texte" id="modal-texte"></div>
     <div id="modal-zone-champ"></div>
-    <div class="modal-erreur" id="modal-erreur"></div>
+    <div class="modal-erreur" id="modal-erreur" role="alert"></div>
     <div class="modal-actions">
       <button class="bouton bouton-annuler" id="modal-bouton-annuler">Annuler</button>
       <button class="bouton" id="modal-bouton-confirmer">Confirmer</button>
@@ -302,14 +351,26 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function () {
   "use strict";
 
-  var URL_FONCTION = "https://zsetmqnmmupqbkgqbjbo.supabase.co/functions/v1/devis-secure";
-  var HOSTNAME_SUPABASE_ATTENDU = "zsetmqnmmupqbkgqbjbo.supabase.co";
+  // Une seule constante de projet : l'URL de la fonction et l'hôte
+  // attendu des PDF signés en dérivent (lot A01-036).
+  var SUPABASE_URL = "https://zsetmqnmmupqbkgqbjbo.supabase.co";
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
+  var authDevis = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  var URL_FONCTION = SUPABASE_URL + "/functions/v1/devis-secure";
+  var URL_PAIEMENT_RECETTE = SUPABASE_URL + "/functions/v1/paiement-recette";
+  var stripeQa = false;
+  var retourStripe = new URLSearchParams(window.location.search).get('paiement') === 'retour';
+  var lecturesStripe = 0;
+  var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
+  var chargementPdfJsMobile = null;
+  var renduPdfMobileNumero = 0;
 
   // ────────────────────────────────────────────────────────────
   // Token : lu une seule fois depuis l'URL, conservé en mémoire dans
@@ -318,10 +379,16 @@
   // ────────────────────────────────────────────────────────────
   var token = null;
   try {
-    token = new URLSearchParams(window.location.search).get('token');
+    token = new URLSearchParams(window.location.hash.slice(1)).get('token') || new URLSearchParams(window.location.search).get('token');
+    if (token) window.history.replaceState(null, '', window.location.pathname + '#token=' + encodeURIComponent(token));
   } catch (e) { token = null; }
 
+  var devisId = new URLSearchParams(window.location.search).get('id');
+  if (!/^[0-9a-f-]{36}$/i.test(devisId || '')) devisId = null;
+
+  var numeroChargement = 0;
   var enCoursTraitement = false; // protection double-clic partagée accept/refuse
+  var hoteProduction = window.location.hostname === 'helixcar.vercel.app';
 
   // ── Échappement HTML (V50.5C.1A, conservé à l'identique) ──
   function echapperHtml(valeur) {
@@ -369,9 +436,12 @@
       '</div>';
   }
 
-  function badgeStatut(statut) {
+  function badgeStatut(statut, devis) {
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Devis payé</span>';
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'en_attente') return '<span class="badge accepte">Accepté — paiement en attente</span>';
     if (statut === 'accepte') return '<span class="badge accepte">Accepté</span>';
     if (statut === 'refuse') return '<span class="badge refuse">Refusé</span>';
+    if (devis && devis.version_obsolete) return '<span class="badge attente">Devis mis à jour</span>';
     return '<span class="badge attente">En attente de réponse</span>';
   }
 
@@ -386,6 +456,16 @@
   var modalErreur = document.getElementById('modal-erreur');
   var modalBoutonAnnuler = document.getElementById('modal-bouton-annuler');
   var modalBoutonConfirmer = document.getElementById('modal-bouton-confirmer');
+  var focusAvantModal = null;
+  voileModal.addEventListener('keydown', function(e) {
+    if(e.key === 'Escape' && !enCoursTraitement){ e.preventDefault(); fermerModal(); return; }
+    if(e.key !== 'Tab') return;
+    var champs = Array.from(voileModal.querySelectorAll('button:not(:disabled),textarea:not(:disabled)'));
+    if(!champs.length){e.preventDefault();return;}
+    var premier=champs[0], dernier=champs[champs.length-1];
+    if(e.shiftKey && document.activeElement===premier){e.preventDefault();dernier.focus();}
+    else if(!e.shiftKey && document.activeElement===dernier){e.preventDefault();premier.focus();}
+  });
 
   function fermerModal() {
     voileModal.hidden = true;
@@ -400,6 +480,7 @@
     // modifiées) n'intervient qu'une fois definirEtatTraitement(false)
     // déjà exécuté.
     _deverrouillerScrollArrierePlan();
+    if(focusAvantModal && focusAvantModal.isConnected)focusAvantModal.focus({preventScroll:true});
   }
   modalBoutonAnnuler.addEventListener('click', function () {
     if (enCoursTraitement) return; // ne pas fermer pendant un appel réseau en cours
@@ -427,6 +508,7 @@
   }
 
   function ouvrirModalAccepter(devis) {
+    focusAvantModal = document.activeElement;
     modalTitre.textContent = 'Confirmer l\'acceptation';
     modalTexte.textContent = 'Confirmez-vous l\'acceptation du devis ' + (devis.reference || '') + ' pour ' + formaterMontant(devis.prix) + ' ?';
     modalZoneChamp.innerHTML = '';
@@ -435,13 +517,15 @@
     modalBoutonConfirmer.onclick = function () { lancerAccept(); };
     _verrouillerScrollArrierePlan();
     voileModal.hidden = false;
+    modalBoutonAnnuler.focus({preventScroll:true});
   }
 
   function ouvrirModalRefuser(devis) {
+    focusAvantModal = document.activeElement;
     modalTitre.textContent = 'Refuser le devis';
     modalTexte.textContent = 'Souhaitez-vous indiquer la raison de votre refus ? (facultatif)';
     modalZoneChamp.innerHTML =
-      '<textarea class="modal-champ" id="modal-champ-motif" maxlength="' + MOTIF_LONGUEUR_MAX + '" placeholder="Raison de votre refus (facultatif)"></textarea>' +
+      '<label for="modal-champ-motif">Raison de votre refus (facultatif)</label><textarea class="modal-champ" id="modal-champ-motif" maxlength="' + MOTIF_LONGUEUR_MAX + '"></textarea>' +
       '<div class="modal-compteur"><span id="modal-compteur-valeur">0</span>/' + MOTIF_LONGUEUR_MAX + '</div>';
     var champ = document.getElementById('modal-champ-motif');
     var compteur = document.getElementById('modal-compteur-valeur');
@@ -451,6 +535,7 @@
     modalBoutonConfirmer.onclick = function () { lancerRefuse(); };
     _verrouillerScrollArrierePlan();
     voileModal.hidden = false;
+    champ.focus({preventScroll:true});
   }
 
   function afficherErreurModal(message) {
@@ -477,13 +562,13 @@
   }
 
   // ────────────────────────────────────────────────────────────
-  // Appel générique vers l'Edge Function pour accept/refuse — jamais
-  // d'en-tête Authorization Supabase, la seule preuve est le token.
+  // Le lien e-mail autorise sa version du devis ; un accès par ID
+  // depuis le Dashboard exige toujours la session du propriétaire.
   // ────────────────────────────────────────────────────────────
   function appellerAction(action, motif) {
-    var corps = { action: action, token: token };
+    var corps = { action: action, token: token, devis_id: devisId };
     if (action === 'refuse') corps.motif = motif || undefined;
-    return fetch(URL_FONCTION, {
+    return requeteAuthentifiee({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corps)
@@ -498,7 +583,7 @@
 
   function lancerAccept() {
     if (enCoursTraitement) return; // protection double-clic
-    if (!token) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
+    if (!token && !devisId) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
     definirEtatTraitement(true);
     appellerAction('accept', null)
       .then(function (resultat) {
@@ -506,6 +591,7 @@
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           afficherErreurModal((corps && corps.message) || 'Une erreur est survenue. Merci de réessayer.');
+          if (corps && corps.code === 'VERSION_OBSOLETE') { fermerModal(); chargerEtAfficherDevis(); }
           return;
         }
         fermerModal();
@@ -522,7 +608,7 @@
 
   function lancerRefuse() {
     if (enCoursTraitement) return; // protection double-clic
-    if (!token) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
+    if (!token && !devisId) { afficherErreurModal('Session invalide. Rechargez la page.'); return; }
     var champ = document.getElementById('modal-champ-motif');
     var motif = champ ? champ.value.slice(0, MOTIF_LONGUEUR_MAX) : null;
     definirEtatTraitement(true);
@@ -547,6 +633,95 @@
   // Affichage principal : le VRAI PDF officiel en grand, jamais une
   // reconstruction du contenu du devis en HTML.
   // ────────────────────────────────────────────────────────────
+  function resumeMobile(devis) {
+    var s=devis.snapshot;if(!s)return '';
+    var e=echapperHtml;
+    var dateCourte=function(v){return /^\d{4}-\d{2}-\d{2}$/.test(v||'')?v.split('-').reverse().join('/'):v;};
+    var lieu=function(t,p){return [t['adresse_'+p+'_rue'],t['code_postal_'+p],t['ville_'+p]].filter(Boolean).join(' ');};
+    var html='<section class="resume-mobile"><h2>Récapitulatif du devis</h2><p>'+e(s.client?.nom_complet||'')+'</p>';
+    (s.vehicules||[]).forEach(function(v,i){
+      var t=v.trajet||s.trajet||{},r=v.restitution||s.restitution;
+      html+='<article class="resume-vehicule"><h3>Véhicule '+(i+1)+'</h3><p><strong>'+e(v.marque_modele||v.type_vehicule||'Véhicule')+'</strong></p>';
+      if(lieu(t,'depart'))html+='<p><strong>Prise en charge</strong><br>'+e(lieu(t,'depart'))+'<br>'+e([dateCourte(t.date_prise_en_charge),t.horaire_prise_en_charge].filter(Boolean).join(' · '))+'</p>';
+      if(lieu(t,'arrivee'))html+='<p><strong>Livraison</strong><br>'+e(lieu(t,'arrivee'))+'<br>'+e([dateCourte(t.date_livraison),t.horaire_livraison].filter(Boolean).join(' · '))+'</p>';
+      if(t.mode_transport)html+='<p>Transport : '+e(t.mode_transport)+'</p>';
+      if(r)html+='<p><strong>Restitution prévue</strong><br>'+e(r.adresse||'')+'<br>'+e([dateCourte(r.date),r.horaire].filter(Boolean).join(' · '))+'</p>';
+      html+='</article>';
+    });
+    if(s.stockage)html+='<p><strong>Stockage</strong><br>'+e([s.stockage.date_debut,s.stockage.date_fin_prevue].filter(Boolean).join(' au '))+'</p>';
+    html+='<div class="resume-total"><span>Montant du devis</span><strong>'+e(Number(s.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</strong></div><p>Le document complet et ses conditions sont disponibles ci-dessous.</p></section>';
+    return html;
+  }
+
+  function chargerPdfJsPourMobile() {
+    if (window.pdfjsLib && window.pdfjsLib.getDocument) return Promise.resolve(window.pdfjsLib);
+    if (chargementPdfJsMobile) return chargementPdfJsMobile;
+    chargementPdfJsMobile = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      script.async = true;
+      script.onload = function () {
+        if (!window.pdfjsLib || !window.pdfjsLib.getDocument) {
+          reject(new Error('PDF.js indisponible'));
+          return;
+        }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      };
+      script.onerror = function () { reject(new Error('Chargement PDF.js impossible')); };
+      document.head.appendChild(script);
+    });
+    return chargementPdfJsMobile;
+  }
+
+  async function afficherToutesLesPagesSurMobile(devis) {
+    if (!window.matchMedia || !window.matchMedia('(max-width: 768px)').matches) return;
+    var urlPdf = urlPdfValideOuNull(devis && devis.pdf_url);
+    var cadre = document.querySelector('.pdf-cadre');
+    var pages = cadre && cadre.querySelector('.pdf-mobile-pages');
+    if (!urlPdf || !cadre || !pages) return;
+
+    var numero = ++renduPdfMobileNumero;
+    try {
+      var pdfjs = await chargerPdfJsPourMobile();
+      var pdf = await pdfjs.getDocument({ url: urlPdf, withCredentials: false }).promise;
+      var largeurCss = Math.max(280, cadre.clientWidth || document.documentElement.clientWidth || 320);
+      var densite = Math.min(window.devicePixelRatio || 1, 2);
+      var fragment = document.createDocumentFragment();
+
+      for (var numeroPage = 1; numeroPage <= pdf.numPages; numeroPage++) {
+        if (numero !== renduPdfMobileNumero || !pages.isConnected) return;
+        var pagePdf = await pdf.getPage(numeroPage);
+        var vueBase = pagePdf.getViewport({ scale: 1 });
+        var echelleCss = largeurCss / vueBase.width;
+        var vueRendu = pagePdf.getViewport({ scale: echelleCss * densite });
+        var figure = document.createElement('figure');
+        figure.className = 'pdf-mobile-page';
+        var legende = document.createElement('figcaption');
+        legende.textContent = 'Page ' + numeroPage + ' sur ' + pdf.numPages;
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(vueRendu.width);
+        canvas.height = Math.ceil(vueRendu.height);
+        canvas.style.width = largeurCss + 'px';
+        canvas.style.height = Math.round(vueRendu.height / densite) + 'px';
+        canvas.setAttribute('aria-label', 'Page ' + numeroPage + ' du devis');
+        figure.appendChild(legende);
+        figure.appendChild(canvas);
+        fragment.appendChild(figure);
+        await pagePdf.render({ canvasContext: canvas.getContext('2d'), viewport: vueRendu }).promise;
+      }
+
+      if (numero !== renduPdfMobileNumero || !pages.isConnected) return;
+      pages.replaceChildren(fragment);
+      cadre.classList.add('pdf-rendu-mobile');
+    } catch (erreurPdfMobile) {
+      // Repli volontaire : le visualiseur PDF natif et le bouton d'ouverture
+      // restent disponibles si le moteur ou le fichier distant ne répond pas.
+      console.warn('Rendu multipage mobile indisponible, iframe conservée :', erreurPdfMobile);
+    }
+  }
+
   function blocPdf(devis) {
     var urlPdf = urlPdfValideOuNull(devis.pdf_url);
     if (!devis.pdf_disponible || !urlPdf) {
@@ -558,16 +733,36 @@
     // qu'il s'ajuste à la largeur disponible.
     var urlPdfAffichage = urlPdf + '#view=FitH';
     return (
-      '<div class="pdf-cadre"><iframe src="' + echapperHtml(urlPdfAffichage) + '" title="Devis PDF HelixCar"></iframe></div>' +
+      resumeMobile(devis) + '<div class="pdf-cadre"><iframe src="' + echapperHtml(urlPdfAffichage) + '" title="Devis PDF HelixCar"></iframe>' +
+      '<div class="pdf-mobile-pages" aria-label="Pages du devis"></div></div>' +
       '<a class="bouton bouton-pdf" href="' + echapperHtml(urlPdf) + '" target="_blank" rel="noopener">Ouvrir / télécharger le PDF</a>'
     );
   }
 
   function blocActions(devis) {
+    // LOT Q01 — une version modifiée après envoi ne peut plus être
+    // acceptée ni refusée : le client le lit, sans bouton trompeur.
+    if (devis.version_obsolete) {
+      return '<div class="statut-final refuse" style="background:#FDF0D5;color:#5C4200"><div><strong>Ce devis a été mis à jour</strong>' +
+        'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.</div></div>';
+    }
     if (devis.statut === 'accepte') {
-      return '<div class="statut-final accepte"><div><strong>Devis accepté</strong>' +
-        (devis.date_acceptation ? echapperHtml('le ' + formaterDate(devis.date_acceptation)) : '') +
-        '</div></div>';
+      var suite = devis.paiement_statut === 'en_attente'
+        ? (stripeQa ? ' Vous pouvez effectuer le paiement de test.' : !hoteProduction ? ' Choisissez une simulation de paiement ci-dessous.' : ' Le paiement vous sera proposé prochainement.')
+        : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
+      var simulation = (!stripeQa && !hoteProduction && devis.paiement_statut === 'en_attente') ?
+        '<section class="paiement-recette" aria-labelledby="titre-paiement-recette"><h2 id="titre-paiement-recette">Simulation de paiement — recette</h2>'+
+        '<p>Aucun paiement réel et aucun débit. Choisissez le résultat à vérifier.</p><div class="paiement-recette-actions">'+
+        '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
+        '<button class="bouton bouton-simulation" data-scenario="refused">Paiement refusé</button><button class="bouton bouton-simulation" data-scenario="abandoned">Paiement abandonné</button></div>'+
+        '<div id="paiement-recette-resultat" class="paiement-recette-resultat" role="status" aria-live="polite"></div></section>' : '';
+      return '<div class="statut-final accepte"><div><strong>' + (devis.paiement_statut === 'paye' ? 'Devis payé' : 'Devis accepté') + '</strong>' +
+        (devis.date_acceptation ? echapperHtml((devis.paiement_statut === 'paye' ? 'Accepté le ' : 'le ') + formaterDate(devis.date_acceptation)) : '') +
+        echapperHtml(suite) +
+        '</div></div>'+simulation+(stripeQa && devis.paiement_statut !== 'paye' ?
+        '<section class="paiement-recette"><h2>Paiement Stripe — test</h2><p>Aucun débit réel. Utilisez uniquement une carte de test Stripe.</p>'+
+        '<button class="bouton bouton-accepter" id="bouton-payer-stripe">Payer en mode test</button>'+
+        '<div id="stripe-resultat" role="status" aria-live="polite">'+(retourStripe?'Confirmation du paiement en cours…':'')+'</div></section>' : '');
     }
     if (devis.statut === 'refuse') {
       // Le motif de refus n'est pas exposé par la réponse GET actuelle
@@ -590,16 +785,72 @@
     html += '<div class="entete-devis">';
     html += '<div><div class="titre-devis">Votre devis</div><div class="reference">' + echapperHtml(devis.reference || '—') + '</div></div>';
     html += '</div>';
-    html += '<div>' + badgeStatut(devis.statut) + '</div>';
+    html += '<div>' + badgeStatut(devis.statut, devis) + '</div>';
     html += blocPdf(devis);
     html += blocActions(devis);
+    if(stripeQa && devis.paiement_statut==='paye') html+='<section class="paiement-recette"><h2>Votre document de paiement</h2><p>Document TEST sans valeur fiscale.</p><button class="bouton bouton-pdf" id="document-paiement-test">Ouvrir le document TEST</button><p id="document-message" role="status"></p></section>';
 
     zone.innerHTML = html;
+    afficherToutesLesPagesSurMobile(devis);
 
     var boutonAccepter = document.getElementById('bouton-accepter-devis');
     var boutonRefuser = document.getElementById('bouton-refuser-devis');
     if (boutonAccepter) boutonAccepter.addEventListener('click', function () { ouvrirModalAccepter(devis); });
     if (boutonRefuser) boutonRefuser.addEventListener('click', function () { ouvrirModalRefuser(devis); });
+    Array.from(document.querySelectorAll('[data-scenario]')).forEach(function(b){b.addEventListener('click',function(){simulerPaiement(devis,b.getAttribute('data-scenario'));});});
+    var documentBouton=document.getElementById('document-paiement-test');
+    if(documentBouton)documentBouton.addEventListener('click',async function(){
+      documentBouton.disabled=true;
+      try{
+        var session=(await authDevis.auth.getSession()).data.session;
+        var r=await fetch(SUPABASE_URL+'/functions/v1/document-paiement-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({devis_id:devis.id})});
+        var d=await r.json();if(!r.ok||!d.ok)throw new Error(d.message||'Document indisponible');
+        var u=urlPdfValideOuNull(d.url);if(!u)throw new Error('Lien invalide');
+        window.location.assign(u);
+      }catch(e){document.getElementById('document-message').textContent=e.message;}finally{documentBouton.disabled=false;}
+    });
+    var payer = document.getElementById('bouton-payer-stripe');
+    if(payer) payer.addEventListener('click',payerStripe);
+    if(stripeQa && retourStripe && devis.paiement_statut !== 'paye' && lecturesStripe++ < 12) setTimeout(chargerEtAfficherDevis,2500);
+  }
+
+  async function payerStripe(){
+    if(enCoursTraitement)return;
+    enCoursTraitement=true;
+    var bouton=document.getElementById('bouton-payer-stripe'),sortie=document.getElementById('stripe-resultat');
+    if(bouton)bouton.disabled=true;
+    if(sortie)sortie.textContent='Ouverture du paiement sécurisé…';
+    try{
+      var session=(await authDevis.auth.getSession()).data.session;
+      if(!session)throw new Error('Reconnectez-vous à votre espace client.');
+      var rep=await fetch(SUPABASE_URL+'/functions/v1/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({devis_id:devisId,token:token})});
+      var corps=await rep.json();
+      if(!rep.ok||!corps.ok)throw new Error(corps.message||'Paiement indisponible.');
+      if(new URL(corps.url).origin!=='https://checkout.stripe.com')throw new Error('Lien de paiement invalide.');
+      window.location.assign(corps.url);
+    }catch(e){if(sortie)sortie.textContent=e.message||'Paiement indisponible.';}
+    finally{enCoursTraitement=false;if(bouton)bouton.disabled=false;}
+  }
+
+  async function simulerPaiement(devis,scenario){
+    if(enCoursTraitement)return; enCoursTraitement=true;
+    var boutons=Array.from(document.querySelectorAll('[data-scenario]'));boutons.forEach(function(b){b.disabled=true;});
+    var sortie=document.getElementById('paiement-recette-resultat');if(sortie)sortie.textContent='Simulation en cours…';
+    try{
+      var headers={'Content-Type':'application/json'};
+      var demande={scenario:scenario};
+      if(token){demande.token=token;}else{
+        var session=authDevis&&(await authDevis.auth.getSession()).data.session;
+        if(!session)throw new Error('UNAUTHORIZED');
+        headers.Authorization='Bearer '+session.access_token;
+        demande.devis_id=devisId;
+      }
+      var rep=await fetch(URL_PAIEMENT_RECETTE,{method:'POST',headers:headers,body:JSON.stringify(demande)});
+      var corps=await rep.json();if(!rep.ok||!corps.ok)throw new Error(corps.message||'Simulation impossible.');
+      if(sortie)sortie.textContent=corps.message;
+      if(corps.paiement_statut==='paye')setTimeout(chargerEtAfficherDevis,500);
+    }catch(e){if(sortie)sortie.textContent=e&&e.message&&e.message!=='UNAUTHORIZED'?e.message:'Reconnectez-vous puis réessayez.';}
+    finally{enCoursTraitement=false;boutons.forEach(function(b){b.disabled=false;});}
   }
 
   // ────────────────────────────────────────────────────────────
@@ -607,15 +858,16 @@
   // après un accept/refuse réussi (objectif 4 : refresh cohérent).
   // ────────────────────────────────────────────────────────────
   function chargerEtAfficherDevis() {
-    if (!token) {
+    var chargement = ++numeroChargement;
+    if (!token && !devisId) {
       afficherEtatSimple('⚠️', 'Lien de devis invalide.', 'Le lien que vous avez utilisé ne contient pas les informations nécessaires. Vérifiez qu\'il a été copié en entier depuis votre email.');
       return;
     }
 
-    fetch(URL_FONCTION, {
+    requeteAuthentifiee({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get', token: token })
+      body: JSON.stringify({ action: 'get', token: token, devis_id: devisId })
     })
       .then(function (reponse) {
         return reponse.json().then(function (corps) {
@@ -625,11 +877,15 @@
         });
       })
       .then(function (resultat) {
+        if (chargement !== numeroChargement) return;
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           var code = corps && corps.code;
-          if (code === 'INVALID_OR_EXPIRED_LINK') {
+          if (code === 'UNAUTHORIZED') { afficherConnexionRequise();
+          } else if (code === 'INVALID_OR_EXPIRED_LINK') {
             afficherEtatSimple('🔒', 'Lien invalide ou expiré.', 'Ce lien de devis est invalide ou a expiré. Contactez HelixCar si vous pensez qu\'il s\'agit d\'une erreur.');
+          } else if (code === 'VERSION_OBSOLETE') {
+            afficherEtatSimple('🔄', 'Ce devis a été mis à jour.', 'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.');
           } else {
             afficherEtatSimple('⚠️', 'Impossible d\'afficher ce devis.', 'Une erreur est survenue. Merci de réessayer dans quelques instants.');
           }
@@ -638,10 +894,40 @@
         afficherDevis(corps.devis);
       })
       .catch(function () {
+        if (chargement !== numeroChargement) return;
         afficherEtatSimple('📡', 'Problème de connexion.', 'Impossible de contacter HelixCar pour le moment. Vérifiez votre connexion internet et réessayez.');
       });
   }
 
+  function afficherConnexionRequise() {
+    numeroChargement++;
+    fermerModal();
+    afficherEtatSimple('', 'Connectez-vous à votre espace client', 'Utilisez le compte auquel ce devis est destiné.');
+    var lien = document.createElement('a');
+    lien.className = 'bouton'; lien.textContent = 'Se connecter';
+    lien.href = 'index.html?connexion=1' + (devisId ? '&devis_id=' + encodeURIComponent(devisId) : '#devis=' + encodeURIComponent(token || ''));
+    zone.querySelector('.etat-simple').appendChild(lien);
+  }
+  async function requeteAuthentifiee(options) {
+    var session = null;
+    try { var res = authDevis && await authDevis.auth.getSession(); session = res && res.data && res.data.session; } catch (e) {}
+    stripeQa = String(session && session.user && session.user.email || '').trim().toLowerCase() === 'helixcarpro+qa-final01@gmail.com' && [
+      'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
+      'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
+    ].indexOf(window.location.hostname)!==-1;
+    if (token) return fetch(URL_FONCTION, options);
+    if (!session || !session.access_token) {
+      return new Response(JSON.stringify({ok:false,code:'UNAUTHORIZED'}), {status:401,headers:{'Content-Type':'application/json'}});
+    }
+    options.headers.Authorization = 'Bearer ' + session.access_token;
+    return fetch(URL_FONCTION, options);
+  }
+  if (authDevis) authDevis.auth.onAuthStateChange(function (event) {
+    if (event === 'SIGNED_OUT' && !token) afficherConnexionRequise();
+  });
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) { zone.textContent = 'Vérification de votre accès…'; chargerEtAfficherDevis(); }
+  });
   chargerEtAfficherDevis();
 })();
 </script>

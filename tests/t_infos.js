@@ -109,6 +109,7 @@ window.supabase = { createClient: function () { return {
   rpc: async function (nom, params) {
     if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
     window.__journal.push({ op: 'rpc', nom, params });
+    if (nom === 'contexte_completion_demande') return { data: { verrouillee: false }, error: null };
     if (nom === 'informations_demande') {
       return { data: (window.__infosParDemande[params.p_client_id] || []).map(l => Object.assign({}, l)), error: null };
     }
@@ -152,10 +153,11 @@ window.emailjs = { init: function () {},
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   page.on('dialog', d => d.accept());
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'clientA@helixcar.test';
-    document.getElementById('login-pw').value = 'x';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'clientA@helixcar.test', password: 'x' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('clientA@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'clientA@helixcar.test', __uid);
     showPage('client-infos');
   });
   await page.waitForTimeout(600);
@@ -171,8 +173,8 @@ window.emailjs = { init: function () {},
     /4 informations sur 6/.test(onglet), (onglet.match(/\d+ informations? sur \d+/g) || []).join(' | '));
   check('A5 : une autre progression pour un autre service',
     /2 informations sur 3/.test(onglet), (onglet.match(/\d+ informations? sur \d+/g) || []).join(' | '));
-  check('A6 : les informations déjà reçues sont listées',
-    /Déjà reçues/.test(onglet) && /Adresse de livraison/.test(onglet));
+  check('A6 : les informations déjà reçues ne sont plus détaillées',
+    !/Déjà reçues/.test(onglet) && !/Adresse de livraison/.test(onglet));
   check('A7 : les informations encore attendues sont listées',
     /Encore attendues/.test(onglet) && /Nom du contact sur place au départ/.test(onglet));
   check('A8 : le motif de correction est visible pour le client',
@@ -204,18 +206,30 @@ window.emailjs = { init: function () {},
   check('B5 : la valeur existante est préremplie',
     ecran.valeurs.includes('06'), JSON.stringify(ecran.valeurs));
   check('B6 : le motif de correction est rappelé', /Numéro incomplet/.test(ecran.html));
-  check('B7 : la progression est rappelée', /4 information/.test(ecran.progression), ecran.progression);
+  check('B7 : la progression et les deux informations restantes sont rappelées', /4 \/ 6 informations renseignées/.test(ecran.progression) && /2 information\(s\) à compléter ou à vérifier/.test(ecran.progression), ecran.progression);
   check('B8 : les composants du formulaire sont réutilisés',
     /modal-form-group/.test(ecran.html) && /field-required/.test(ecran.html));
 
+  const refusTelephone = await page.evaluate(async () => {
+    window.__journal = [];
+    document.getElementById('completer-champ-contact_pc_nom').value = 'TEST-QA Contact';
+    document.getElementById('completer-champ-contact_pc_tel').value = '06';
+    await envoyerInformationsCompletees();
+    return { appels: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'repondre_informations_demande').length, texte: document.getElementById('completer-message').textContent };
+  });
+  check('B8a : numéro incomplet refusé avant envoi', refusTelephone.appels === 0 && /numéro de téléphone complet/.test(refusTelephone.texte));
+
   // Enregistrement + double clic
-  const envoi = await page.evaluate(async () => {
+  await page.evaluate(() => {
     document.getElementById('completer-champ-contact_pc_nom').value = 'TEST-QA Dupont';
     document.getElementById('completer-champ-contact_pc_tel').value = '+33600000099';
     window.__journal = [];
     envoyerInformationsCompletees();
     envoyerInformationsCompletees();   // double clic réel
-    await new Promise(r => setTimeout(r, 600));
+  });
+  await page.locator('.hc-completion-confirm [data-confirm]').click();
+  await page.waitForFunction(()=>!_completerEnvoiEnCours && !_completerConfirmationEnCours);
+  const envoi = await page.evaluate(() => {
     return {
       appels: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'repondre_informations_demande').length,
       message: (document.getElementById('completer-message') || {}).textContent || '',
@@ -224,7 +238,7 @@ window.emailjs = { init: function () {},
   });
   check('B9 : un double clic n\'envoie qu\'UNE fois', envoi.appels === 1, 'appels=' + envoi.appels);
   check('B10 : une confirmation simple est affichée',
-    /bien été enregistrées/.test(envoi.message), envoi.message);
+    /Toutes vos informations ont été soumises/.test(envoi.message), envoi.message);
   check('B11 : l\'écran est relu depuis le serveur après enregistrement',
     envoi.champsRestants.length === 0, JSON.stringify(envoi.champsRestants));
 
@@ -236,7 +250,7 @@ window.emailjs = { init: function () {},
     texte: (document.getElementById('completer-rubriques') || {}).textContent || ''
   }));
   check('B12 : après F5, les réponses transmises ne sont plus redemandées',
-    apresF5.champs.length === 0 && /Aucune information ne manque/.test(apresF5.texte),
+    apresF5.champs.length === 0 && /Informations transmises — en attente de validation/.test(apresF5.texte),
     JSON.stringify(apresF5.champs));
 
   // Coupure réseau : rien n'est perdu, aucun faux succès
@@ -246,11 +260,15 @@ window.emailjs = { init: function () {},
   });
   await page.goto(urlFichier('index.html') + '?completer=dem-nett', { waitUntil: 'load' });
   await page.waitForTimeout(600);
-  const reseau = await page.evaluate(async () => {
+  await page.evaluate(() => {
     const champ = document.getElementById('completer-champ-contact_pc_nom');
     if (champ) champ.value = 'TEST-QA Reseau';
     window.__reseauCoupe = true;
-    await envoyerInformationsCompletees();
+    envoyerInformationsCompletees();
+  });
+  await page.locator('.hc-completion-confirm [data-confirm]').click();
+  await page.waitForFunction(()=>!_completerEnvoiEnCours && !_completerConfirmationEnCours);
+  const reseau = await page.evaluate(() => {
     window.__reseauCoupe = false;
     return {
       message: (document.getElementById('completer-message') || {}).textContent || '',
@@ -278,13 +296,14 @@ window.emailjs = { init: function () {},
   check('C2 : le client concerné est indiqué', /TEST-QA ClientA/.test(bloc));
   check('C3 : la référence de la demande est indiquée', /TEST-QA-C1/.test(bloc));
   check('C4 : le devis associé est indiqué', /DEV-TEST-QA-1/.test(bloc));
-  check('C5 : les informations déjà reçues sont listées', /Déjà reçues/.test(bloc));
-  check('C6 : les informations manquantes sont listées', /Encore manquantes/.test(bloc));
+  check('C5 : les informations déjà reçues ne sont plus listées',
+    !/Déjà reçues/.test(bloc) && !/Adresse de livraison/.test(bloc));
+  check('C6 : les informations restant à traiter sont listées', /Encore manquantes ou à traiter/.test(bloc));
   // À ce stade le client a répondu (section B) : les deux rubriques
   // concernées sont « Transmise », l'adresse reste « Validée » et les
   // données du dépôt initial « Reçue ».
-  check('C7 : le statut de chaque information est affiché',
-    /Validée/.test(bloc) && /Transmise/.test(bloc) && /Reçue/.test(bloc), bloc.slice(0, 260));
+  check('C7 : seuls les statuts nécessitant encore une action sont affichés',
+    /Transmise/.test(bloc) && !/Validée/.test(bloc) && !/Reçue/.test(bloc), bloc.slice(0, 260));
 
   // Valider
   const validation = await page.evaluate(async () => {
@@ -369,6 +388,15 @@ window.emailjs = { init: function () {},
     !/from\('demande_informations_manquantes'\)[\s\S]{0,200}update/.test(idx),
     'index.html doit passer par repondre_informations_demande');
   check('D6 : aucune erreur JS', erreursJs.length === 0, erreursJs.join(' | '));
+  const migrationVin = fs.readFileSync(fichier('migrations/130_vin_information_attendue.sql'), 'utf8');
+  check('D7 : le VIN manquant devient une information attendue côté serveur',
+    /vehicule_' \|\| rang::text \|\| '_vin'/.test(migrationVin)
+      && /Numéro de châssis \(VIN\)/.test(migrationVin));
+  const debutRequisVin = idx.indexOf('function _champsRequisVehicule');
+  const finRequisVin = idx.indexOf('return req;', debutRequisVin);
+  const blocRequisVin = idx.slice(debutRequisVin, finRequisVin);
+  check('D8 : le VIN reste non bloquant pour l’enregistrement du devis',
+    !/req\.push\([^)]*['"](?:restit-)?vin['"]/.test(blocRequisVin));
 
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
   echecs.forEach(e => console.log('  - ' + e));

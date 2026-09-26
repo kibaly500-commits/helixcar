@@ -19,6 +19,10 @@ window.__comptes = { 'connu@helixcar.test': 'ancienMotDePasse1' };
 window.__modeEnvoi = 'ok';        // ok | limite | reseau
 window.__modeUpdate = 'ok';       // ok | expire | reseau
 window.__session = null;
+// Lot A01 : le Dashboard renvoie au site public ; en file://, on observe
+// la destination demandée au lieu de naviguer.
+window.__retours = [];
+window._hcRetourVitrine = function (motif) { window.__retours.push(motif || ''); };
 
 window.supabase = { createClient: function () { return {
   auth: {
@@ -267,8 +271,11 @@ window.emailjs = { init: function () {},
   const apresF5 = await page.evaluate(async () => {
     // On rejoue ce que fait le navigateur après un rechargement :
     // PASSWORD_RECOVERY n'est pas rejoué, seule INITIAL_SESSION l'est.
-    sessionStorage.setItem('helixcar_reinit_en_cours', '1');
+    // Fermer la fenêtre efface le drapeau (lot A01) ; un F5 réel ne la
+    // ferme pas : on rejoue donc l'état laissé par la page rechargée.
     closeModal('reinit-mdp');
+    sessionStorage.setItem('helixcar_reinit_en_cours', '1');
+    sessionStorage.setItem('helixcar_reinit_uid', window.__session.user.id);
     window.__declencher('INITIAL_SESSION', window.__session);
     await new Promise(r => setTimeout(r, 200));
     return {
@@ -297,11 +304,11 @@ window.emailjs = { init: function () {},
     return {
       fermee: !document.getElementById('modal-reinit-mdp').classList.contains('open'),
       deconnexion: window.__journal.some(j => j.op === 'signOut'),
-      ecranConnexion: (document.getElementById('login-screen') || {}).style.display
+      retour: window.__retours.slice(-1)[0]
     };
   });
-  check('D3 : retour vers la connexion normale',
-    retour.fermee && retour.deconnexion && retour.ecranConnexion === 'flex', JSON.stringify(retour));
+  check('D3 : retour vers la connexion normale, sur le site public (lot A01)',
+    retour.fermee && retour.deconnexion && retour.retour === 'mdp-modifie', JSON.stringify(retour));
 
   // ── E. GARDE-FOUS ──
   check('E1 : aucun e-mail EmailJS déclenché par ce parcours',
@@ -316,10 +323,19 @@ window.emailjs = { init: function () {},
   // demande ni une table.
   const destinationsMdp = (idx.match(/password:\s*[A-Za-z_$][\w$]*/g) || []);
   const appelsAuth = (idx.match(/auth\.(signUp|signInWithPassword|updateUser)\(/g) || []).length;
+  // Retirer uniquement les objets passés aux trois méthodes Auth qui
+  // acceptent légitimement un mot de passe. L'ancienne fenêtre de 120
+  // caractères s'arrêtait au milieu d'un appel signUp mis en forme sur
+  // plusieurs lignes (avec emailRedirectTo) et prenait ensuite son
+  // champ `password` pour une écriture applicative interdite.
+  const horsAppelsAuth = idx.replace(
+    /auth\.(signUp|signInWithPassword|updateUser)\(\s*\{[\s\S]{0,800}?\}\s*\)/g,
+    ''
+  );
   check('E2 : le mot de passe ne va QUE vers Supabase Auth, jamais dans un payload',
     destinationsMdp.length > 0 && destinationsMdp.length <= appelsAuth
     && !/payload\.[a-z_]*(password|mot_de_passe)/i.test(idx)
-    && !/(mot_de_passe|password)\s*:\s*(mdp|password|motDePasse)/i.test(idx.replace(/auth\.[\s\S]{0,120}?\)/g, '')),
+    && !/(mot_de_passe|password)\s*:\s*(mdp|password|motDePasse)/i.test(horsAppelsAuth),
     JSON.stringify(destinationsMdp) + ' / appels auth=' + appelsAuth);
   check('E3 : aucun mot de passe écrit dans les journaux',
     !/console\.(log|error|warn)\([^)]*\b(mdp|password)\b/i.test(idx.replace(/autocomplete="new-password"/g, ''))

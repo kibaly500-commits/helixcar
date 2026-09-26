@@ -20,6 +20,8 @@ async function setVal(page, id, v) {
   let page = await L.newPage(browser);
   await L.fillStep1(page, 'pro');
   await L.chooseService(page, 'professionnel');
+  // LOT F01 — les rubriques vivent à l'étape 3 dédiée : on l'ouvre d'abord.
+  await L.ouvrirEtapeProfessionnel(page);
   await page.evaluate(() => proBasculerRubrique('besoin'));
   await page.click('input[name="pro-categorie"][value="technicien"]');
   await page.waitForTimeout(50);
@@ -65,6 +67,8 @@ async function setVal(page, id, v) {
   page = await L.newPage(browser);
   await L.fillStep1(page, 'pro');
   await L.chooseService(page, 'professionnel');
+  // LOT F01 — les rubriques vivent à l'étape 3 dédiée : on l'ouvre d'abord.
+  await L.ouvrirEtapeProfessionnel(page);
   await page.evaluate(() => proBasculerRubrique('besoin'));
   await page.click('input[name="pro-categorie"][value="technicien"]');
   await page.waitForTimeout(60);

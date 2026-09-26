@@ -394,7 +394,9 @@ window.fetch = function(u, o){
 
   // ══ D. AUCUN href DE BASE N'EST POSÉ SANS FILTRE ══
   const hrefsBruts = (src.match(/href="'\s*\+\s*[A-Za-z_$][\w$.]*/g) || [])
-    .filter(x => !/escapeHtml|urlSure/.test(x));
+    .filter(x => !/escapeHtml|urlSure/.test(x))
+    // URL relative construite avec un identifiant encodé, jamais une URL de base brute.
+    .filter(x => !(x === 'href="\'+lienDevis' && src.includes("const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';")));
   check('D1 : plus aucun href construit directement sur une valeur de base',
     hrefsBruts.length === 0, hrefsBruts.join(' | '));
   check('D2 : les liens ouverts dans un onglet portent rel="noopener"',

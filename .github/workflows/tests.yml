@@ -39,10 +39,34 @@ jobs:
       - name: Rendre origin/main disponible
         run: git fetch --no-tags origin main:refs/remotes/origin/main || true
 
+      - name: Installer le décodeur de recette vidéo
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Lancer toutes les suites
         env:
           CI_NO_SANDBOX: '1'
+          HC_VIDEO_GRANDE: '1'
         run: node tests/lancer.js --sans-sql
+
+  webkit-mobile:
+    name: Dashboards mobiles sur WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Vérifier la fiche longue et la sélection
+        env:
+          HC_TEST_WEBKIT: '1'
+        run: |
+          node tests/t_fiche_mobile.js
+          node tests/t_audit_dashboard_ui.js
+          node tests/t_sortie_dashboard.js
 
   sql:
     name: Politiques RLS sur PostgreSQL 16

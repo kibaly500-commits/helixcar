@@ -151,7 +151,37 @@ function croisements(lignes) {
     JSON.stringify(Object.keys(envoye[0] || {}).filter(k => CHAMPS.indexOf(k) === -1)));
 
   // ══ D. MONO-VÉHICULE : MÊME MOTEUR, AUCUN RÉSIDU ══
-  const page2 = await L.newPage(browser);
+  const page2 = await browser.newPage({ viewport: { width: 1280, height: 2400 } });
+  await page2.addInitScript(`
+    window.__monoRpc = null;
+    function __tableVide() {
+      var api = {
+        select:function(){return api;}, eq:function(){return api;}, order:function(){return api;}, limit:function(){return api;},
+        then:function(resolve){return Promise.resolve({data:[],error:null}).then(resolve);},
+        maybeSingle:async function(){return {data:null,error:null};}
+      };
+      return api;
+    }
+    window.supabase = { createClient: function () { return {
+      auth: {
+        onAuthStateChange:function(){return {data:{subscription:{unsubscribe:function(){}}}};},
+        getSession:async function(){return {data:{session:null}};},
+        signUp:async function(){return {data:{user:{id:'TEST-QA-MONO-USER',identities:[{}]},session:{access_token:'TEST-QA'}},error:null};},
+        signInWithPassword:async function(){return {data:{session:{access_token:'TEST-QA'}},error:null};}
+      },
+      from:function(){return __tableVide();},
+      rpc:async function(nom,params){
+        if(nom==='creer_demande_avec_vehicules'){
+          window.__monoRpc=params;
+          return {data:{id:params.p_demande.id,numero_client:params.p_demande.numero_client,vehicules:params.p_vehicules.length},error:null};
+        }
+        return {data:null,error:null};
+      },
+      storage:{from:function(){return {};}}
+    }; } };
+    window.emailjs={init:function(){},send:function(){return Promise.resolve();},sendForm:function(){return Promise.resolve();}};
+  `);
+  await page2.goto(L.FILE, { waitUntil: 'load' });
   page2.on('dialog', d => d.accept());
   await L.fillStep1(page2, 'particulier');
   await L.chooseService(page2, 'convoyage');
@@ -175,6 +205,22 @@ function croisements(lignes) {
   L.check('D5 : le mono-véhicule passe par le MÊME lecteur que le multi',
     (fs.readFileSync(fichier('index.html'), 'utf8')
       .match(/function _lireFichesVehicules\(/g) || []).length === 1);
+  const soumissionMono = await page2.evaluate(async () => {
+    await submitClientForm();
+    return window.__monoRpc;
+  });
+  L.check('D6 : le bouton final ENVOIE réellement une ligne véhicule en mono',
+    soumissionMono && soumissionMono.p_vehicules && soumissionMono.p_vehicules.length === 1,
+    JSON.stringify(soumissionMono && soumissionMono.p_vehicules));
+  L.check('D7 : cette ligne contient le trajet et l’identité réellement saisis',
+    soumissionMono && soumissionMono.p_vehicules[0]
+      && soumissionMono.p_vehicules[0].marque_modele === VEH[0].marque
+      && soumissionMono.p_vehicules[0].adresse_depart_rue === VEH[0].pcRue
+      && soumissionMono.p_vehicules[0].adresse_arrivee_rue === VEH[0].livRue,
+    JSON.stringify(soumissionMono && soumissionMono.p_vehicules && soumissionMono.p_vehicules[0]));
+  L.check('D8 : le dossier mono moderne n’est jamais marqué trajet commun',
+    soumissionMono && soumissionMono.p_demande && soumissionMono.p_demande.trajet_commun === false,
+    JSON.stringify(soumissionMono && soumissionMono.p_demande));
 
   // ══ V. VERROUS DE NON-RÉGRESSION DEMANDÉS ══
   // Ces huit points sont ceux que le chantier §15 nomme explicitement.
@@ -427,6 +473,32 @@ function croisements(lignes) {
   }));
   L.check('E5 : aucun bloc véhicule du PDF ne porte la donnée d\'un autre',
     fautesPdf.length === 0, fautesPdf.slice(0, 3).join(' | '));
+
+  // Régression observée en recette réelle : une fiche unique était remplie
+  // dans le formulaire, mais le PDF relisait encore les anciens champs du
+  // dossier et affichait des tirets. Ces champs dossier sont volontairement
+  // absents ici : la vraie ligne véhicule doit suffire de bout en bout.
+  const textesPdfMonoModerne = await dash.evaluate(v => {
+    const c = {
+      id: 'qa-mono-moderne', numero_client: 'TEST-QA-MONO-MODERNE',
+      prenom: 'TEST-QA', nom: 'Mono', email: 'mono@example.invalid',
+      type_service: 'convoyage', nb_vehicules: 1, trajet_commun: false,
+      _vehicules: [v]
+    };
+    _construirePdfDevis(c, { reference: 'DEV-QA-MONO', client_id: c.id,
+      prix: 450, statut: 'genere', date_generation: '2026-09-11T10:00:00Z' });
+    return window.__pdfTextes.slice();
+  }, DEMANDE._vehicules[0]);
+  const pdfMonoModerne = textesPdfMonoModerne.join(' | ');
+  L.check('E6 : le PDF mono moderne reprend la marque et l’immatriculation de la ligne véhicule',
+    pdfMonoModerne.includes(VEH[0].marque) && pdfMonoModerne.includes(VEH[0].immat),
+    pdfMonoModerne.slice(0, 220));
+  L.check('E7 : le PDF mono moderne reprend aussi le départ, l’arrivée et les dates saisis',
+    pdfMonoModerne.includes(VEH[0].pcVille)
+      && pdfMonoModerne.includes(VEH[0].livVille)
+      && pdfMonoModerne.includes('01/10/2026')
+      && pdfMonoModerne.includes('11/10/2026'),
+    pdfMonoModerne.slice(0, 260));
 
   // ── FICHE ADMINISTRATEUR ──
   const fiche = await dash.evaluate(() => {

@@ -269,7 +269,8 @@ async function verifierOeil(page, prefixe, idChamp, idBouton) {
   // ══ D. DASHBOARD : CONNEXION ET RÉINITIALISATION ══
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.waitForTimeout(300);
-  await verifierOeil(page, 'D-connexion dashboard', 'login-pw', '#login-screen .btn-oeil');
+  // Lot A01 : le Dashboard n'a plus de formulaire de connexion (l'œil de
+  // la fenêtre « Connexion » du site est vérifié en section B).
 
   await page.evaluate(() => {
     window.__session = { access_token: 'j', user: { id: 'u-1', email: 'connu@helixcar.test' } };

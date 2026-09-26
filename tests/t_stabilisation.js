@@ -295,8 +295,8 @@ async function modesParVehicule(page, n) {
       JSON.stringify(pendantStockage[2]));
     const modesStockage = await page.evaluate(() =>
       _lireFichesVehicules().map(v => v && v.mode_transport));
-    check('Dbis1 quater : REPRODUCTION — et aucun ne part en base avec un mode vide',
-      modesStockage.length === 3 && modesStockage.every(m => m === 'standard' || m === 'plateau'),
+    check('Dbis1 quater : aucun mode n’est inventé avant le choix du client',
+      modesStockage.length === 3 && modesStockage.every(m => m === ''),
       JSON.stringify(modesStockage));
 
     // Retour au Convoyage : c'est là que le bloc manquait.
@@ -313,8 +313,8 @@ async function modesParVehicule(page, n) {
       JSON.stringify(apresRetour[2]));
     const modesLus = await page.evaluate(() =>
       _lireFichesVehicules().map(v => v && v.mode_transport));
-    check('Dbis4 : le mode part au serveur pour les trois, jamais vide',
-      modesLus.length === 3 && modesLus.every(m => m === 'standard' || m === 'plateau'),
+    check('Dbis4 : le changement de service ne présélectionne aucun mode',
+      modesLus.length === 3 && modesLus.every(m => m === ''),
       JSON.stringify(modesLus));
     await page.close();
   }
@@ -344,12 +344,15 @@ async function modesParVehicule(page, n) {
     check('Dter2 : et il est dans sa fiche, pas sous les fiches',
       communModes.every(m => m.dansLeConteneur === 2), JSON.stringify(communModes));
     const distincts = await page.evaluate(() => {
-      const r = document.querySelector('input[name="veh-2-mode"][value="plateau"]');
-      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      const poser = (i, v) => {
+        const r = document.querySelector('input[name="veh-' + i + '-mode"][value="' + v + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      };
+      poser(0, 'standard'); poser(2, 'plateau');
       return _lireFichesVehicules().map(v => v && v.mode_transport);
     });
     check('Dter3 : deux véhicules du même trajet peuvent avoir des modes différents',
-      distincts.length === 3 && distincts[0] === 'standard' && distincts[2] === 'plateau',
+      distincts.length === 3 && distincts[0] === 'standard' && distincts[1] === '' && distincts[2] === 'plateau',
       JSON.stringify(distincts));
     await page.close();
   }
@@ -416,7 +419,7 @@ async function modesParVehicule(page, n) {
 
     // Le formulaire et le récapitulatif doivent poser la MÊME condition.
     check('Dquater5 : le récapitulatif applique la même règle que le formulaire',
-      /if \(\(sc\.pc \|\| sc\.liv\) && v\.mode_transport\)/.test(idx),
+      /if \(\(sc\.pc \|\| sc\.liv\) && v\.livraison_apres_stockage !== false && v\.mode_transport\)/.test(idx),
       'le récapitulatif teste encore une autre condition');
     await page.close();
   }
@@ -426,9 +429,13 @@ async function modesParVehicule(page, n) {
     const page = await pageClient(browser);
     await convoyageAvecVehicules(page, 3, false);
     await page.evaluate(() => {
-      // Véhicule 1 sur plateau, les deux autres par la route.
-      const r = document.querySelector('input[name="veh-1-mode"][value="plateau"]');
-      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      // Trois choix explicites et indépendants : le véhicule 2 sur
+      // plateau, les deux autres par la route.
+      const poser = (i, v) => {
+        const r = document.querySelector('input[name="veh-' + i + '-mode"][value="' + v + '"]');
+        if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      };
+      poser(0, 'standard'); poser(1, 'plateau'); poser(2, 'standard');
     });
     await page.waitForTimeout(120);
     const lues = await page.evaluate(() =>
@@ -513,7 +520,7 @@ async function modesParVehicule(page, n) {
     });
     await page.waitForTimeout(150);
     const brouillon = await page.evaluate(() => {
-      try { return JSON.parse(localStorage.getItem('helixcar_brouillon_client_v1') || 'null'); }
+      try { return JSON.parse(localStorage.getItem(_cleBrouillonClient()) || 'null'); }
       catch (e) { return null; }
     });
     // Le brouillon mémorise les boutons radio par NOM de groupe : le mode
@@ -566,10 +573,30 @@ async function modesParVehicule(page, n) {
     const dash = fs.readFileSync(fichier('dashboard.html'), 'utf8');
     check('Kbis1 : le Dashboard lit mode_transport SUR LE VÉHICULE',
       /_libelleModeTransport|mt === 'plateau'/.test(dash));
+    check('Kbis1a : la colonne Date souhaitée utilise la règle propre à chaque service',
+      /function _dateSouhaiteeListe\(c\)/.test(dash)
+      && /_dvDate\(_dateSouhaiteeListe\(c\)\)/.test(dash)
+      && /c\.stockage_date_debut/.test(
+           dash.slice(dash.indexOf('function _dateSouhaiteeListe'),
+                      dash.indexOf('function _dateSouhaiteeListe') + 1400)));
     const pageD = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
     const errsD = [];
     pageD.on('pageerror', e => errsD.push(e.message));
     await pageD.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
+    const datesListe = await pageD.evaluate(() => ({
+      stockage: _dateSouhaiteeListe({
+        type_service: 'stockage', stockage_date_debut: '2026-10-02',
+        date_prise_en_charge: null, _vehicules: []
+      }),
+      convoyageMulti: _dateSouhaiteeListe({
+        type_service: 'convoyage', date_prise_en_charge: null,
+        _vehicules: [{ date_prise_en_charge: '2026-10-05' },
+                     { date_prise_en_charge: '2026-10-03' }]
+      })
+    }));
+    check('Kbis1b : stockage et convoyage multi retrouvent réellement leur date',
+      datesListe.stockage === '2026-10-02' && datesListe.convoyageMulti === '2026-10-03',
+      JSON.stringify(datesListe));
     const rendu = await pageD.evaluate(() => {
       const f = Object.keys(window).filter(k => /^_libelleMode|^_modeTransport/.test(k));
       const lu = [];
@@ -602,7 +629,7 @@ async function modesParVehicule(page, n) {
     && /_hcEffacerBandeauErreur\(\);\s*\n\s*document\.getElementById\('modal-' \+ type\)\.classList\.add\('open'\)/.test(idx));
   check('F5 : un échec de candidature retire les documents devenus orphelins',
     /_supprimerFichierTeleverse/.test(idx)
-    && /\[id_url, permis_url, rc_pro_url\]\.map\(_supprimerFichierTeleverse\)/.test(idx));
+    && /\[id_url, permis_url, kbis_url, rc_pro_url\]\.filter\(Boolean\)\.map\(_supprimerFichierTeleverse\)/.test(idx));
 
   // Une erreur laissée par la candidature ne doit plus accueillir le
   // client dans SA fenêtre.
@@ -632,14 +659,20 @@ async function modesParVehicule(page, n) {
   }
 
   // ══ G. LE FAUX SUCCÈS DE CRÉATION DE COMPTE ══
-  check('G1 : la phrase « compte créé » dépend de l\'issue réelle du signUp',
-    /_compteEtat === 'cree' \|\| _compteEtat === 'existe_deja' \|\| _compteEtat === 'non_demande'/.test(idx));
-  check('G2 : un refus du serveur est dit tel quel',
-    /_compteEtat === 'echec'/.test(idx) && /Votre compte n\\'a pas pu être créé/.test(idx));
+  check('G1 : la phrase « compte créé » n\'accompagne QUE la création réelle (lot A01)',
+    /_compteEtat === 'cree'\) \{\s*html \+= '<div class="hc-succes-txt">Votre compte HelixCar est maintenant créé/.test(idx)
+    && (idx.match(/hc-succes-txt">Votre compte HelixCar est maintenant créé/g) || []).length === 1);
+  check('G2 : un refus du serveur arrête le parcours sans faux succès',
+    /_compteEtat === 'echec'/.test(idx)
+    && /Votre compte et votre demande n\\'ont pas pu être enregistrés/.test(idx)
+    && /return;/.test(idx.slice(idx.indexOf("if (!_idCompteDepot && _compteEtat === 'echec')"),
+                                 idx.indexOf("if (!_idCompteDepot && _compteEtat === 'echec')") + 900)));
   check('G3 : une adresse déjà inscrite n\'est pas un échec',
     /_compteEtat = 'existe_deja'/.test(idx) && /rien n\\'a été créé en double/.test(idx));
-  check('G4 : le numéro affiché est celui que le SERVEUR a renvoyé',
-    /_retourSrv\.numero_client \|\| clientNum/.test(idx));
+  check('G4 : le numéro affiché vient uniquement de la preuve SERVEUR',
+    /var _numeroReel = _retourSrv\.numero_client;/.test(idx)
+    && /HC_REPONSE_CREATION_INCOMPLETE/.test(idx)
+    && !/_retourSrv\.numero_client \|\| clientNum/.test(idx));
   check('G5 : le succès n\'est plus déduit d\'un bloc finally',
     !/finally\s*\{[^}]*succes/i.test(idx));
 
@@ -661,10 +694,11 @@ async function modesParVehicule(page, n) {
     }, opts.email || 'test-qa-claude-postpr2@example.invalid');
     await L.chooseService(page, 'compte');
     await page.waitForTimeout(80);
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       const fini = await page.evaluate(() =>
-        !!document.querySelector('#client-success-msg') &&
-        (document.getElementById('client-success-msg').textContent || '').trim().length > 0);
+        (!!document.querySelector('#client-success-msg')
+          && (document.getElementById('client-success-msg').textContent || '').trim().length > 0)
+        || ((document.getElementById('supabase-debug') || {}).textContent || '').trim().length > 0);
       if (fini) break;
       await page.evaluate(() => {
         const mdp = document.getElementById('client-password');
@@ -683,6 +717,8 @@ async function modesParVehicule(page, n) {
     await page.waitForTimeout(600);
     return page.evaluate(() => ({
       ecran: (document.getElementById('client-success-msg') || {}).textContent || '',
+      erreurEmail: (document.getElementById('client-email-err') || {}).textContent || '',
+      erreurGenerale: (document.getElementById('supabase-debug') || {}).textContent || '',
       comptes: window.__comptes.slice(),
       demandes: window.__demandesEcrites.slice()
     }));
@@ -708,8 +744,10 @@ async function modesParVehicule(page, n) {
       r.comptes.length === 0, JSON.stringify(r.comptes));
     check('Gbis5 : et l\'écran n\'annonce PAS un compte créé',
       !/compte HelixCar est maintenant créé/i.test(r.ecran), r.ecran.slice(0, 300));
-    check('Gbis6 : il dit au contraire que le compte n\'a pas pu être créé',
-      /compte n'a pas pu être créé/i.test(r.ecran), r.ecran.slice(0, 300));
+    check('Gbis6 : il indique l\'échec sans prétendre que la demande est partie',
+      /compte et votre demande n'ont pas pu être enregistrés/i.test(r.erreurGenerale)
+      && !/demande de devis a bien été enregistrée/i.test(r.ecran),
+      (r.erreurGenerale + ' | ' + r.ecran).slice(0, 300));
     await page.close();
   }
 
@@ -723,8 +761,10 @@ async function modesParVehicule(page, n) {
     const r2 = await parcoursCompteSeul(page2, { email: 'rejeu@example.invalid' });
     check('Gbis7 : une adresse déjà inscrite ne crée AUCUN second compte',
       r2.comptes.length === 1, JSON.stringify(r2.comptes));
-    check('Gbis8 : et l\'écran le dit, sans prétendre avoir créé quoi que ce soit',
-      /existait déjà avec cette adresse/i.test(r2.ecran), r2.ecran.slice(0, 300));
+    check('Gbis8 : et l\'écran le dit avant tout envoi, sans prétendre avoir créé quoi que ce soit',
+      /adresse e-mail est déjà utilisée/i.test(r2.erreurEmail)
+      && !/compte HelixCar est maintenant créé/i.test(r2.ecran),
+      (r2.erreurEmail + ' | ' + r2.ecran).slice(0, 300));
     await page.close(); await page2.close();
   }
 
@@ -1282,7 +1322,7 @@ window.jspdf = { jsPDF: function () {
       const d = _construireDetailsProfessionnel();
       return { okCat, okMet, categorie: d.categorie, mission: d.mission,
                libelle: _proLibelleMetier(d), etape4: _estEtapeApplicable(4),
-               apresEtape2: _prochaineEtape(2) };
+               apresEtape2: _prochaineEtape(2), apresEtape3: _prochaineEtape(3) };
     });
     check('N9 : parcours « Trouver un professionnel » — il vit et se remplit (t_pro, t_pro_ui)',
       pro.okCat === true && pro.okMet === true && pro.categorie === 'renfort',
@@ -1290,12 +1330,14 @@ window.jspdf = { jsPDF: function () {
     check('N10 : le métier « Soutien administratif » est réellement sélectionnable (t_metiers)',
       pro.mission === 'soutien_administratif' && pro.libelle === 'Soutien administratif',
       JSON.stringify(pro));
-    // Le parcours professionnel tient TOUT ENTIER dans l'étape 2 : la
-    // 4 ne lui est pas applicable, et « Continuer » mène directement au
-    // récapitulatif. C'est la nouveauté, pas un manque.
-    check('N11 : le parcours professionnel va de l\'étape 2 au récapitulatif (t_etapes)',
-      pro.etape4 === false && pro.apresEtape2 === 5,
-      JSON.stringify([pro.etape4, pro.apresEtape2]));
+    // LOT F01 (F01-023..027) — ANCIEN COMPORTEMENT ADAPTÉ : le parcours
+    // tenait tout entier dans l'étape 2 et « Continuer » menait de 2 au
+    // récapitulatif. Les quatre rubriques vivent désormais dans l'étape
+    // 3 dédiée : 2 -> 3 (rubriques) -> 5 (récapitulatif). L'étape 4
+    // (véhicules) ne lui est toujours pas applicable.
+    check('N11 : le parcours professionnel va de l\'étape 2 à l\'étape 3 dédiée, puis au récapitulatif (t_etapes)',
+      pro.etape4 === false && pro.apresEtape2 === 3 && pro.apresEtape3 === 5,
+      JSON.stringify([pro.etape4, pro.apresEtape2, pro.apresEtape3]));
     await pagePro.close();
 
     // ── N12 à N13 : les huit métiers de candidature ──
@@ -1427,8 +1469,8 @@ window.jspdf = { jsPDF: function () {
       nonExpliques.length === 0, nonExpliques.join(' | '));
     check('O3 : et aucune « raison » ne couvre un libellé toujours présent',
       excusesSansObjet.length === 0, excusesSansObjet.join(' | '));
-    check('O4 : les onze disparitions sont exactement celles qui étaient demandées',
-      disparus.length === 11, disparus.length + ' : ' + disparus.join(' | '));
+    check('O4 : les dix-huit disparitions sont exactement celles qui étaient demandées',
+      disparus.length === 18, disparus.length + ' : ' + disparus.join(' | '));
 
     // Les nouveautés ne sont pas écrasées : l'index actuel en propose
     // strictement PLUS que l'ancien, et les libellés propres au main

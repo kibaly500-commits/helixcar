@@ -562,8 +562,11 @@ async function preparerVideo(page, octets) {
     && src.indexOf('URL_FONCTION_VIDEO') !== -1
     && !/URL_FONCTION_VIDEO[\s\S]{0,400}fichier/.test(src));
   check('F5 : la nouvelle action ne resigne QUE le chemin déjà enregistré',
-    /createSignedUploadUrl\(c\.video_chemin/.test(fn)
-    && !/createSignedUploadUrl\(\s*corps/.test(fn));
+    // V01 : l'envoi en cours vit dans video_envoi_chemin (deux phases) ;
+    // la prolongation ne resigne que ce chemin-la, jamais un chemin recu.
+    /createSignedUploadUrl\(c\.video_envoi_chemin/.test(fn)
+    && !/createSignedUploadUrl\(\s*corps/.test(fn)
+    && !/createSignedUploadUrl\(c\.video_chemin\b/.test(fn));
   check('F6 : elle ne consomme pas le jeton à usage unique',
     !/actionProlonger[\s\S]*?video_upload_jeton_hash:\s*null/.test(
       fn.slice(fn.indexOf('export async function actionProlonger'),
