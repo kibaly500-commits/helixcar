@@ -7,7 +7,7 @@ const fs = require('fs');
   const migration = fs.readFileSync(L.fichier('migrations/125_email_partenaire_unique.sql'), 'utf8');
   const verification = fs.readFileSync(L.fichier('migrations/126_verification_precoce_email_partenaire.sql'), 'utf8');
   const correction = fs.readFileSync(L.fichier('migrations/127_correction_verification_email_partenaire.sql'), 'utf8');
-  const verificationClient = fs.readFileSync(L.fichier('migrations/128_verification_precoce_email_client.sql'), 'utf8');
+  const verificationClient = fs.readFileSync(L.fichier('supabase/migrations/20260926212234_email_client_compte_auth_uniquement.sql'), 'utf8');
 
   L.check('E1 : le serveur normalise l’adresse partenaire avant comparaison',
     /email_normalise\s*:=\s*pg_catalog\.lower\(new\.email\)/i.test(migration));
@@ -47,8 +47,8 @@ const fs = require('fs');
       && /Adresse déjà associée à un compte/i.test(index));
   L.check('E12 : le bleu natif est neutralisé aussi pour le formulaire partenaire',
     /#modal-convoyeur input[^\n]*:-webkit-autofill[\s\S]{0,1400}box-shadow:\s*0 0 0 1000px #fff inset !important/i.test(index));
-  L.check('E13 : le serveur vérifie les comptes et les dossiers client',
-    /function public\.email_client_deja_utilise\(p_email text\)[\s\S]*from auth\.users[\s\S]*from public\.clients/i.test(verificationClient));
+  L.check('E13 : seul un compte Auth bloque une inscription, jamais un dossier seul',
+    /from auth\.users/i.test(verificationClient) && !/from public\.clients/i.test(verificationClient));
   L.check('E14 : le contrôle client ne renvoie qu’un booléen borné',
     /returns boolean/i.test(verificationClient)
       && /length\(v_email_normalise\) > 254/i.test(verificationClient));
