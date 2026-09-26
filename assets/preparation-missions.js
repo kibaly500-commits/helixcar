@@ -54,13 +54,15 @@
         const m=Object.assign({},base),pre=leg==='avant_stockage',post=leg==='apres_stockage';
         let start=v.date_prise_en_charge,end=v.date_livraison,sh=hour(v,'pc'),eh=hour(v,'liv');
         if(pre){m.ville_arrivee='Noisy-le-Grand';m.adresse_arrivee=point;m.contact_arrivee_nom=null;m.contact_arrivee_tel=null;end=c.stockage_date_debut||start;eh='';m.date_livraison=null;m.restitution=false;['adresse_restitution','restit_contact_nom','restit_contact_tel','restit_marque_modele','restit_immatriculation','restit_vin','restit_motorisation','restit_info','date_restitution_depart'].forEach(k=>m[k]=null);}
-        if(post){m.ville_depart='Noisy-le-Grand';m.adresse_depart=point;m.contact_depart_nom=null;m.contact_depart_tel=null;start=type==='stockage'?(v.date_livraison||c.stockage_date_fin):(c.stockage_date_fin||end);sh='';m.date_prise_en_charge=null;}
-        const title=pre?'Prise en charge avant stockage':post?'Livraison après stockage':'Convoyage automobile';
+        if(post){m.ville_depart='Noisy-le-Grand';m.adresse_depart=point;m.contact_depart_nom=null;m.contact_depart_tel=null;start=c.stockage_date_fin||end;sh='';m.date_prise_en_charge=null;}
+        // Chaque trajet confié est un convoyage autonome. Le stockage long
+        // appartient à HelixCar et ne fait pas partie de l'annonce partenaire.
+        const title='Convoyage automobile';
         const details=[row('Départ',m.ville_depart),row('Arrivée',m.ville_arrivee),row('Prise en charge',join(start,sh)),row('Livraison',join(end,eh)),row('Véhicule',join(v.type_vehicule,v.marque_modele)),row('Transport',m.plateau?'Plateau':'Convoyage par la route')];
-        if(!split&&delta>0)details.push(row('Stockage',delta+' jour'+(delta>1?'s':'')));
+        if(!split&&delta>0)details.push(row('Garde du véhicule',delta+' jour'+(delta>1?'s':'')));
         if(m.restitution)details.push(row('Restitution',join(v.restit_type_vehicule,v.restit_marque_modele)),row('Trajet de restitution',join(m.ville_arrivee,v.restit_ville)),row('Restitution prévue',join(v.restit_date,hour(v,'restit'))));
-        const missing=[];if(!m.ville_depart||!m.ville_arrivee)missing.push('Villes du trajet');if(!v.marque_modele)missing.push('Modèle du véhicule');if(!start||!end)missing.push('Dates du trajet');if(delta!==null&&delta<0)missing.push('Livraison antérieure à la prise en charge');
-        plans.push({key:(v.id||'principal')+':'+leg,title,category:'convoyage',kind:leg,vehicule_id:v.id||null,position:v.position||1,nb_professionnels:1,date_debut:date(start),date_fin:date(end),zone:join(m.ville_depart,m.ville_arrivee),rows:details,mission:m,missing,stockage:split?join(c.stockage_date_debut||v.date_prise_en_charge,c.stockage_date_fin||v.date_livraison):'',distance:null,motorisation:v.motorisation||'',restit_motorisation:v.restit_motorisation||''});
+        const missing=[];if(!m.ville_depart||!m.ville_arrivee)missing.push('Villes du trajet');if(!v.marque_modele)missing.push('Modèle du véhicule');if(!start||!end)missing.push('Dates du trajet');if(daysBetween(start,end)<0)missing.push('Livraison antérieure à la prise en charge');
+        plans.push({key:(v.id||'principal')+':'+leg,title,category:'convoyage',kind:leg,vehicule_id:v.id||null,position:v.position||1,nb_professionnels:1,date_debut:date(start),date_fin:date(end),zone:join(m.ville_depart,m.ville_arrivee),rows:details,mission:m,missing,stockage:split?join(c.stockage_date_debut||v.date_prise_en_charge,c.stockage_date_fin||v.date_livraison):'',heure_prise_en_charge:firstHour(sh)||'',distance:null,motorisation:v.motorisation||'',restit_motorisation:v.restit_motorisation||''});
       };
       if(split){if(before)add('avant_stockage');if(after)add('apres_stockage');}else add('direct');
     });return plans;

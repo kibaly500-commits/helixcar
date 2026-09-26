@@ -23,7 +23,14 @@
     catch(e){if(ticket===generation){el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}
   };
-  function card(a){return '<section class="hc-prep-card"><div class="hc-prep-head"><h4>'+esc(a.title)+'</h4><div><small>Prix total de la mission</small><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong></div></div><dl class="hc-prep-facts">'+(a.rows||[]).map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl></section>';}
+  function card(a){
+    const rows=a.rows||[],value=label=>display(rows.find(r=>r.label===label)?.value||'À préciser');
+    const route=rows.some(r=>r.label==='Départ');
+    const rest=rows.filter(r=>!['Départ','Arrivée','Prise en charge','Livraison','Véhicule','Transport'].includes(r.label));
+    return '<section class="hc-prep-card hc-prep-annonce"><header class="hc-prep-annonce-head"><span class="hc-prep-kicker">'+esc(a.category==='convoyage'?'CONVOYAGE':a.category||'MISSION')+'</span><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong></header>'+
+      (route?'<div class="hc-prep-route"><div><small>Départ</small><strong>'+value('Départ')+'</strong><span>'+value('Prise en charge')+'</span></div><div><small>Arrivée</small><strong>'+value('Arrivée')+'</strong><span>'+value('Livraison')+'</span></div></div><div class="hc-prep-vehicle"><strong>'+value('Véhicule')+'</strong><span>'+value('Transport')+'</span></div>':'<h4>'+esc(a.title)+'</h4>')+
+      (rest.length?'<dl class="hc-prep-facts">'+rest.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>':'')+'</section>';
+  }
   window.hcPreparationCarteOpportunite=function(o,options){
     let html=card(o.preparation_annonce);if(options?.partenaire){html+='<div id="opp-msg-'+esc(o.id)+'" class="hc-note" role="status"></div>';
       if(o.ma_candidature_etat==='retenu')html+='<button class="btn btn-outline" '+actionHtml('ouvrirDetailsPreparation',[o.mission_id])+'>Voir les détails de la mission</button>';
@@ -34,22 +41,25 @@
   function input(p,i,key,label,type='number'){return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'1':'0.01')+'"':'')+' value="'+esc(p[key]??'')+'"></label>';}
   function motor(p,i,key,label){return '<label>'+label+'<select data-plan="'+i+'" data-field="'+key+'">'+['','Essence','Diesel','Hybride','Hybride rechargeable','Électrique','Autre'].map(x=>'<option value="'+esc(x)+'"'+(p[key]===x?' selected':'')+'>'+esc(x||'À préciser')+'</option>').join('')+'</select></label>';}
   function render(){
-    if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Paiement confirmé';
+    if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
       if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked)h+='<p class="hc-prep-muted">Mission déjà créée</p>';else h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'">Publier cette mission</button>';return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
+      if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>';
-      if(p.stockage)h+='<p class="hc-prep-muted">Stockage HelixCar · '+display(p.stockage)+'</p>';
+      if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+        if(p.kind!=='apres_stockage')h+=input(p,i,'heure_prise_en_charge','Heure de prise en charge','time');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de remise au point HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de retrait au point HelixCar','time');}
       h+='</div>';
       if(p.missing.length)h+='<p class="hc-prep-incomplete">À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';
-      h+='<details class="hc-prep-private"><summary>Détails administratifs</summary><dl class="hc-prep-facts">'+Object.entries(p.mission).filter(([k,v])=>v&&/adresse|contact|immatriculation|vin|consignes|restit_info/.test(k)).map(([k,v])=>'<div><dt>'+esc(({consignes:'Consignes',restit_info:'Consignes de restitution',immatriculation:'Immatriculation',vin:'VIN'})[k]||k.replaceAll('_',' '))+'</dt><dd>'+esc(v)+'</dd></div>').join('')+'</dl></details></section>';
+      const privateLabels={adresse_depart:'Adresse de prise en charge',adresse_arrivee:'Adresse de livraison',contact_depart_nom:'Contact au départ',contact_depart_tel:'Téléphone au départ',contact_arrivee_nom:'Contact à l’arrivée',contact_arrivee_tel:'Téléphone à l’arrivée',immatriculation:'Immatriculation du véhicule',vin:'VIN du véhicule livré',consignes:'Consignes',adresse_restitution:'Adresse de restitution',restit_contact_nom:'Contact à la restitution',restit_contact_tel:'Téléphone à la restitution',restit_immatriculation:'Immatriculation du véhicule à restituer',restit_vin:'VIN du véhicule à restituer',restit_info:'Consignes de restitution'};
+      h+='<details class="hc-prep-private"><summary>Informations privées de la mission</summary><p class="hc-prep-muted">Réservées à l’administration ; communiquées au partenaire retenu après attribution.</p><dl class="hc-prep-facts">'+Object.entries(privateLabels).filter(([k])=>p.mission[k]).map(([k,label])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(p.mission[k])+'</dd></div>').join('')+'</dl></details></section>';
     });
     if(!state.preview&&state.plans.some(p=>!p.saved?.mission_id))h+='<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-prep-save>Enregistrer le brouillon</button><button type="button" class="btn btn-primary" data-prep-view="preview">Voir l’aperçu partenaire</button></div>';
     el('hc-prep-body').innerHTML=h;
@@ -57,6 +67,7 @@
   function readEdits(){modal.querySelectorAll('[data-field]').forEach(e=>{const p=state.plans[Number(e.dataset.plan)],key=e.dataset.field;p[key]=e.type==='number'?(e.value===''?null:Number(e.value)):e.value;
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
+    if(key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
   });}
   async function save(){readEdits();const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
   modal.addEventListener('click',async e=>{
