@@ -8,7 +8,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
  window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'qa',user:{email:'helixcarpro+stockage-part2609@gmail.com'}}}}),onAuthStateChange:()=>({})}})};
  window.fetch=async(url,opt)=>{
  if(url.includes('stripe-checkout')){window.__checkout=JSON.parse(opt.body);return Response.json({ok:false,message:'Test de transport réussi'},{status:503});}
- return Response.json({ok:true,devis:{id:'07bbbfa7-8e6c-437a-a99f-a48e40b18f6f',reference:'DEV-2026-0093',statut:'accepte',paiement_statut:'en_attente',prix:450,pdf_disponible:false}});
+ return Response.json({ok:true,devis:{reference:'DEV-2026-0093',statut:'accepte',paiement_statut:'en_attente',prix:450,pdf_disponible:false}});
  };
  });
  await page.goto('https://helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app/devis.html?token=qa-test-link-1234567890&paiement=annule');

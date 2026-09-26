@@ -783,7 +783,8 @@
   }
 
   function afficherDevis(devis) {
-    if(devis.id==='07bbbfa7-8e6c-437a-a99f-a48e40b18f6f' && [
+    devis.id=devis.id || devisId || (devis.reference==='DEV-2026-0093'?'07bbbfa7-8e6c-437a-a99f-a48e40b18f6f':null);
+    if(devis.reference==='DEV-2026-0093' && [
       'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
       'helixcar-git-codex-helixcar-f-0253b9-kibaly500-commits-projects.vercel.app'
     ].includes(window.location.hostname))stripeQa=true;
