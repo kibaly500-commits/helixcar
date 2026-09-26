@@ -2707,10 +2707,10 @@ function rendreCentreInformationsAdmin(){
   groupes[k].sort(function(a,b){return Number(b.statut==='transmise')-Number(a.statut==='transmise');}).forEach(function(l){
    var row=document.createElement('div');row.className='ai-field';
    var text=document.createElement('div'),label=document.createElement('strong');label.textContent=String(l.libelle||l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/,'');
-   var value=document.createElement('p');value.textContent=l.valeur||'Non renseigné';text.append(label,value);
-   if(l.ancienne_valeur && l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Avant : '+l.ancienne_valeur;text.appendChild(old);}
-   if(l.commentaire){var motif=document.createElement('p');motif.className='ai-correction';motif.textContent='Correction demandée : '+l.commentaire;text.appendChild(motif);}
-   var actions=document.createElement('div');actions.className='ai-field-actions';var badge=document.createElement('span');badge.className='ai-status '+(l.statut==='transmise'?'transmitted':'');badge.textContent=LIB_STATUT_INFO[l.statut]||l.statut;actions.appendChild(badge);
+   var value=document.createElement('p');value.textContent=(l.valeur?(l.statut==='transmise'?'Réponse à vérifier : ':l.statut==='a_corriger'?'Réponse refusée : ':'')+l.valeur:'Non renseigné');text.append(label,value);
+   if(l.ancienne_valeur && l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Valeur avant modification : '+l.ancienne_valeur;text.appendChild(old);}
+   if(l.commentaire){var motif=document.createElement('p');motif.className='ai-correction';motif.textContent=(l.statut==='transmise'?'Motif du refus précédent : ':'Correction demandée au client : ')+l.commentaire;text.appendChild(motif);}
+   var actions=document.createElement('div');actions.className='ai-field-actions';var badge=document.createElement('span');badge.className='ai-status '+(l.statut==='transmise'?'transmitted':'');badge.textContent=l.statut==='transmise'?(l.correction_recue||l.commentaire?'Correction reçue · À vérifier':'Réponse reçue · À vérifier'):l.statut==='a_corriger'?'Attente de correction du client':LIB_STATUT_INFO[l.statut]||l.statut;actions.appendChild(badge);
    if(l.statut==='transmise'){
     [['validee','Valider'],['a_corriger','Demander une correction']].forEach(function(a){var b=document.createElement('button');b.type='button';b.textContent=a[1];b.className=a[0]==='validee'?'ai-validate':'ai-correct';b.disabled=_adminInfosBusy;b.onclick=function(){
      if(a[0]==='a_corriger'){_adminInfosCorrection={id:dossier.client.id,cle:l.cle,motif:''};++_adminInfosGeneration;rendreCentreInformationsAdmin();document.getElementById('ai-correction-motif').focus();}
@@ -2810,6 +2810,9 @@ async function rendreInfosDemandeAdmin(c) {
   let lignes = [];
   try {
     lignes = await chargerInfosDemandeAdmin(c.id);
+    const meta = await sbAuth.from('demande_informations_manquantes').select('cle,ancienne_valeur,correction_recue,transmise_le').eq('client_id',c.id);
+    if(meta.error)throw new Error(meta.error.message);
+    lignes.forEach(function(l){Object.assign(l,(meta.data||[]).find(function(m){return m.cle===l.cle;})||{});});
   } catch (e) {
     zone.innerHTML = '<div style="font-size:.85rem;color:var(--red);margin-top:16px">'
       + 'Informations indisponibles : ' + escapeHtml(e.message) + '</div>';
@@ -2838,26 +2841,29 @@ async function rendreInfosDemandeAdmin(c) {
   });
 
   const ligneHtml = function (l) {
+    const correctionRecue=l.statut==='transmise'&&(l.correction_recue||l.commentaire);
+    const statut=l.statut==='transmise'?(correctionRecue?'Correction reçue · À vérifier':'Réponse reçue · À vérifier'):l.statut==='a_corriger'?'Correction demandée · Attente du client':LIB_STATUT_INFO[l.statut]||l.statut;
     const badge = l.statut === 'validee' ? 'badge-active'
                 : l.statut === 'a_corriger' ? 'badge-refused'
                 : 'badge-progress';
     let actions = '';
     if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
-      actions = '<div style="margin-top:6px;display:flex;gap:8px">'
+      actions = '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
         + '<button class="btn btn-sm btn-primary"'
         + actionHtml('changerDecisionInformation', [c.id, l.cle, 'validee'])
-        + '>Valider</button>'
+        + '>Valider cette réponse</button>'
         + '<button class="btn btn-sm btn-secondary"'
         + actionHtml('changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
-        + '>À corriger</button>'
+        + '>Demander une correction</button>'
         + '</div>';
     }
     return '<div class="detail-row" style="align-items:flex-start">'
       + '<span class="detail-label">' + escapeHtml(l.libelle) + '</span>'
-      + '<span class="detail-val">'
-      + '<span class="badge ' + badge + '">' + escapeHtml(LIB_STATUT_INFO[l.statut] || l.statut) + '</span>'
-      + (l.valeur ? '<br>' + escapeHtml(l.valeur) : '')
-      + (l.commentaire ? '<br><em>Motif : ' + escapeHtml(l.commentaire) + '</em>' : '')
+      + '<span class="detail-val" style="text-align:left;max-width:65%;overflow-wrap:anywhere">'
+      + '<span class="badge ' + badge + '">' + escapeHtml(statut) + '</span>'
+      + (l.valeur ? '<div style="margin-top:10px"><small>'+(l.statut==='a_corriger'?'Réponse refusée':'Réponse du client à vérifier')+'</small><div style="font-weight:700;margin-top:3px">' + escapeHtml(l.valeur) + '</div></div>' : '')
+      + (l.ancienne_valeur&&l.ancienne_valeur!==l.valeur?'<div style="margin-top:8px;font-size:.85rem;color:#666">Valeur avant modification : '+escapeHtml(l.ancienne_valeur)+'</div>':'')
+      + (l.commentaire ? '<div style="margin-top:8px;padding:8px 10px;background:#fff5e6;border-radius:6px;font-size:.85rem"><strong>'+(correctionRecue?'Motif du refus précédent':'Correction demandée au client')+' :</strong><br>' + escapeHtml(l.commentaire) + '</div>' : '')
       + actions
       + '</span></div>';
   };

@@ -303,7 +303,7 @@ window.emailjs = { init: function () {},
   // concernées sont « Transmise », l'adresse reste « Validée » et les
   // données du dépôt initial « Reçue ».
   check('C7 : seuls les statuts nécessitant encore une action sont affichés',
-    /Transmise/.test(bloc) && !/Validée/.test(bloc) && !/Reçue/.test(bloc), bloc.slice(0, 260));
+    /Réponse reçue · À vérifier/.test(bloc) && !/Validée/.test(bloc) && !/Reçue/.test(bloc), bloc.slice(0, 260));
 
   // Valider
   const validation = await page.evaluate(async () => {
@@ -351,7 +351,7 @@ window.emailjs = { init: function () {},
     return (document.getElementById('fiche-demande-infos') || {}).textContent || '';
   });
   check('C13 : après rechargement, les décisions sont toujours là',
-    /À corriger/.test(relu) && /Numéro trop court/.test(relu), relu.slice(-200));
+    /Correction demandée · Attente du client/.test(relu) && /Numéro trop court/.test(relu), relu.slice(-200));
 
   // Le client voit la correction demandée
   await page.goto(urlFichier('index.html') + '?completer=dem-conv', { waitUntil: 'load' });
