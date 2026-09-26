@@ -9656,13 +9656,14 @@ function _completerGrouper(lignes) {
   });
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
 }
-function _completerEstRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger' || _completerEditions.has(l.cle); }
+function _completerEstManquante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+function _completerEstRestante(l) { return _completerEstManquante(l) || _completerEditions.has(l.cle); }
 function _completerPeutModifier(l){return !_completerVerrouillee && l.statut==='fournie' && /^(immatriculation|vin|restit_immatriculation|restit_vin|contact_(pc|liv|sur_place)_(nom|tel)|restit_contact_(nom|tel)|consignes|restit_consignes)$/.test(l.cle.replace(/^vehicule_[0-9]+_/,''));}
 function _completerLibelle(l) {
   var base = String(l.libelle || l.cle || '');
   var vehicule = /^vehicule_(\d+)_/.exec(l.cle || '');
   if (vehicule && !/^Véhicule \d+/.test(base)) base = 'Véhicule ' + vehicule[1] + ' — ' + base;
-  return l.statut === 'a_corriger' ? base + ' — à corriger' : base + ' manquante';
+  return l.statut === 'a_corriger' ? base + ' — à corriger' : _completerEstManquante(l) ? base + ' manquante' : base;
 }
 
 // Rend les rubriques par groupe : seules les manquantes ou à corriger
@@ -9697,7 +9698,7 @@ function _completerEtatBouton() {
   if (bouton) bouton.disabled = _completerEnvoiEnCours || (_completerVerrouillee && !_completerRubriques.length) || manquantes.length>0;
   var groupes = _completerGrouper(_completerToutesLignes), incomplets=[], vehicules=0, complets=0;
   groupes.forEach(function(g){
-    var restantes=g.lignes.filter(function(l){return _completerEstRestante(l) && !_completerChampPret(l);});
+    var restantes=g.lignes.filter(function(l){return _completerEstManquante(l) && !_completerChampPret(l);});
     if(g.rang){vehicules++;if(!restantes.length)complets++;}
     if(restantes.length)incomplets.push(g.titre);
     var badge=document.querySelector('#completer-rubriques [data-groupe="'+g.cle+'"] .completer-etat');
@@ -9708,14 +9709,15 @@ function _completerEtatBouton() {
   });
   var prog=document.getElementById('completer-progression');
   if(prog && _completerRubriques.length){
-    var total=_completerToutesLignes.length, remplis=total-manquantes.length;
+    var aRemplir=manquantes.filter(_completerEstManquante);
+    var total=_completerToutesLignes.length, remplis=total-aRemplir.length;
     var titre=prog.querySelector('strong'), detail=prog.querySelector('span'), barre=prog.querySelector('progress');
     if(titre)titre.textContent=vehicules ? complets+' / '+vehicules+' véhicules complets' : remplis+' / '+total+' informations renseignées';
-    if(detail)detail.textContent=manquantes.length ? manquantes.length+' information(s) à compléter ou à vérifier' : 'Toutes les informations sont renseignées.';
+    if(detail)detail.textContent=aRemplir.length ? aRemplir.length+' information(s) à compléter ou à vérifier' : 'Toutes les informations sont renseignées.';
     if(barre)barre.value=remplis;
   }
   var guide=document.getElementById('completer-guide');
-  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Tous les blocs sont complets. Cliquez sur « Valider mes informations » pour transmettre l’ensemble à notre équipe.';
+  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? (incomplets.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Terminez ou annulez les modifications en cours dans les informations déjà reçues avant de valider.') : 'Tous les blocs sont complets. Cliquez sur « Valider mes informations » pour transmettre l’ensemble à notre équipe.';
 }
 function _completerConserverSaisies() {
   var brouillon = {};
@@ -9731,10 +9733,11 @@ function _completerRendre(lignes) {
   var zone = document.getElementById('completer-rubriques');
   var prog = document.getElementById('completer-progression');
   if (!zone) return;
+  var ouverts={};zone.querySelectorAll('details.completion-card').forEach(function(c){var h=c.querySelector('[data-groupe]');if(h)ouverts[h.dataset.groupe]={carte:c.open,connues:!!c.querySelector('details.completion-known[open]')};});
   zone.innerHTML = '';
 
   var total = lignes.length;
-  var fournies = lignes.filter(function (l) { return !_completerEstRestante(l); }).length;
+  var fournies = lignes.filter(function (l) { return !_completerEstManquante(l); }).length;
   if (prog) {
     prog.style.display = 'block';
     prog.replaceChildren();
@@ -9767,7 +9770,8 @@ function _completerRendre(lignes) {
     var carte = document.createElement('details'); carte.className = 'completion-card';
     var contenu = document.createElement('div'); contenu.className = 'completion-fields';
     zone.appendChild(carte);
-    var restantes = g.lignes.filter(_completerEstRestante);
+    var restantes = g.lignes.filter(_completerEstManquante);
+    var champs = g.lignes.filter(_completerEstRestante), editionsRecues={};
     {
       var entete = document.createElement('summary');
       entete.className = 'completer-groupe';
@@ -9779,9 +9783,10 @@ function _completerRendre(lignes) {
       etat.textContent = restantes.length ? restantes.length + ' à compléter' : (g.lignes.some(function(l){return l.statut === 'transmise';}) ? 'En vérification' : 'Complet');
       entete.appendChild(titre); entete.appendChild(etat);
       carte.appendChild(entete); carte.appendChild(contenu);
-      if(restantes.length && !premierOuvert){carte.open = true; premierOuvert = true;}
+      if(ouverts[g.cle])carte.open=ouverts[g.cle].carte;
+      else if(restantes.length && !premierOuvert){carte.open = true; premierOuvert = true;}
     }
-    var connues = g.lignes.filter(function (l) { return !_completerEstRestante(l); });
+    var connues = g.lignes.filter(function (l) { return !_completerEstManquante(l); });
     if (connues.length) {
       var recap = document.createElement('div'); recap.className = 'completion-received';
       ['Votre véhicule','Prise en charge','Livraison','Restitution'].forEach(function(section){
@@ -9794,23 +9799,25 @@ function _completerRendre(lignes) {
           term.textContent=_completerLibelleCourt(l);
           value.textContent=l.valeur || (/(^|_)consignes$/.test(l.cle)?'Aucune consigne particulière':l.statut==='transmise'?'Transmis — en vérification':'Non disponible');
           if(/^\d{4}-\d{2}-\d{2}$/.test(l.valeur||''))value.textContent=l.valeur.split('-').reverse().join('/');
-          if(_completerPeutModifier(l)){
+          if(_completerPeutModifier(l)&&!_completerEditions.has(l.cle)){
             var edit=document.createElement('button');edit.type='button';edit.className='completion-edit';edit.textContent='✎';edit.setAttribute('aria-label','Modifier '+_completerLibelleCourt(l));
             edit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();_completerEditions.add(l.cle);_completerRendre(_completerToutesLignes);var field=document.getElementById(_completerChampId(l.cle));if(field){field.closest('details.completion-card').open=true;field.focus();}};term.appendChild(edit);
           }
+          if(_completerEditions.has(l.cle)){value.textContent='';editionsRecues[l.cle]=value;}
           cell.append(term,value);list.appendChild(cell);
         });
         block.append(heading,list);recap.appendChild(block);
       });
       var connus = document.createElement('details'); connus.className = 'completion-known';
       var resume = document.createElement('summary'); resume.textContent = connues.length + ' informations déjà reçues';
+      connus.open=!!(ouverts[g.cle]&&ouverts[g.cle].connues)||connues.some(function(l){return _completerEditions.has(l.cle);});
       connus.append(resume, recap); contenu.appendChild(connus);
     }
     var derniereSection = '';
     var ordreSections = ['Votre véhicule', 'Prise en charge', 'Livraison', 'Restitution'];
-    restantes.slice().sort(function(a,b){return ordreSections.indexOf(_completerSection(a))-ordreSections.indexOf(_completerSection(b));}).forEach(function (l) {
+    champs.slice().sort(function(a,b){return ordreSections.indexOf(_completerSection(a))-ordreSections.indexOf(_completerSection(b));}).forEach(function (l) {
       var section = _completerSection(l);
-      if(section !== derniereSection){var heading = document.createElement('h3'); heading.className = 'completion-section'; heading.textContent = section; contenu.appendChild(heading); derniereSection = section;}
+      if(!editionsRecues[l.cle] && section !== derniereSection){var heading = document.createElement('h3'); heading.className = 'completion-section'; heading.textContent = section; contenu.appendChild(heading); derniereSection = section;}
       var groupe = document.createElement('div');
       groupe.className = 'modal-form-group';
       groupe.setAttribute('data-cle', l.cle);
@@ -9848,7 +9855,7 @@ function _completerRendre(lignes) {
       champ.maxLength = 2000;
       champ.addEventListener('input', _completerConserverSaisies);
       if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
-      if(/(^|_)consignes$/.test(l.cle)){var help=document.createElement('p');help.className='completion-help';help.textContent='Précisions d’accès ou de remise des clés uniquement. Pour modifier le trajet ou la prestation, contactez HelixCar.';groupe.appendChild(help);}
+      if(/(^|_)consignes$/.test(l.cle)){var help=document.createElement('p');help.className='completion-help';help.textContent='Ajoutez toute information ou consigne utile au bon déroulement de la prestation. Pour modifier le trajet ou la prestation, contactez HelixCar.';groupe.appendChild(help);}
       champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
       if(estMotorisation){
@@ -9866,7 +9873,7 @@ function _completerRendre(lignes) {
         champ.addEventListener('input',function(){choices.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.dataset.value===champ.value));});});
         groupe.appendChild(choices);
       }
-      contenu.appendChild(groupe);
+      (editionsRecues[l.cle]||contenu).appendChild(groupe);
     });
 
   });
