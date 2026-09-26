@@ -3964,6 +3964,11 @@
 #modal-completer .completion-fields{padding:0 18px 18px}
 #modal-completer .completion-known{font-size:12px;color:#6f787d;padding:10px 0;border-bottom:1px solid #eee}
 #modal-completer .completion-known summary{cursor:pointer}
+#modal-completer .completion-edit-cancel{border:0;background:none;color:#a6343a;text-decoration:underline;padding:8px 0;cursor:pointer}
+#modal-completer .completion-edit{float:right;border:1px solid #ddd;background:#fff;color:#a6343a;border-radius:6px;width:36px;min-height:36px;font-size:20px;cursor:pointer;margin-left:8px}
+.hc-completion-confirm{box-sizing:border-box;width:min(520px,calc(100% - 32px));border:0;border-top:4px solid #a6343a;border-radius:14px;padding:28px;color:#202a30;font:15px/1.6 Arial,sans-serif}
+.hc-completion-confirm::backdrop{background:#101820aa}.hc-completion-confirm h2{font:700 22px Arial;margin:0 0 18px}.hc-completion-confirm p{margin:12px 0}.hc-completion-confirm>div{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.hc-completion-confirm button{flex:1;min-width:170px;min-height:48px;border:1px solid #ddd;background:white;border-radius:8px;padding:12px;cursor:pointer;font:600 14px Arial}.hc-completion-confirm [data-confirm]{background:#a6343a;color:white;border-color:#a6343a}
+
 #modal-completer .completion-received section{padding:0;margin:0;background:transparent;min-height:0}
 #modal-completer .completion-received .completion-section{margin:18px 0 4px}
 #modal-completer .completion-received dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:0}
@@ -9595,7 +9600,7 @@ async function _hcDemarrerDepuisEspaceClient() {
 
 var _completerDemandeId = null;
 var _completerRubriques = [];
-var _completerEnvoiEnCours = false;
+var _completerEnvoiEnCours = false, _completerVerrouillee = true, _completerEditions = new Set(), _completerConfirmationEnCours = false;
 var _completerGeneration = 0;
 
 function _completerAfficherMessage(texte, type) {
@@ -9632,7 +9637,8 @@ function _completerGrouper(lignes) {
   });
   return ordre.map(function (k) { return groupes[k]; }).sort(function (a, b) { return a.rang - b.rang; });
 }
-function _completerEstRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
+function _completerEstRestante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger' || _completerEditions.has(l.cle); }
+function _completerPeutModifier(l){return !_completerVerrouillee && l.statut==='fournie' && /^(immatriculation|vin|restit_immatriculation|restit_vin|contact_(pc|liv|sur_place)_(nom|tel)|restit_contact_(nom|tel)|consignes|restit_consignes)$/.test(l.cle.replace(/^vehicule_[0-9]+_/,''));}
 function _completerLibelle(l) {
   var base = String(l.libelle || l.cle || '');
   var vehicule = /^vehicule_(\d+)_/.exec(l.cle || '');
@@ -9669,7 +9675,7 @@ function _completerChampPret(l) {
 function _completerEtatBouton() {
   var bouton = document.getElementById('completer-envoyer');
   var manquantes = _completerRubriques.filter(function(l){return !_completerChampPret(l);});
-  if (bouton) bouton.disabled = _completerEnvoiEnCours || !_completerRubriques.length || manquantes.length>0;
+  if (bouton) bouton.disabled = _completerEnvoiEnCours || (_completerVerrouillee && !_completerRubriques.length) || manquantes.length>0;
   var groupes = _completerGrouper(_completerToutesLignes), incomplets=[], vehicules=0, complets=0;
   groupes.forEach(function(g){
     var restantes=g.lignes.filter(function(l){return _completerEstRestante(l) && !_completerChampPret(l);});
@@ -9722,19 +9728,14 @@ function _completerRendre(lignes) {
     prog.append(compteur, detail, barre);
   }
 
+  var brouillon = {};
+  try { brouillon=JSON.parse(sessionStorage.getItem(_completerBrouillonCle())||'{}')||{}; } catch(e) {}
+  lignes.forEach(function(l){if(_completerPeutModifier(l)&&brouillon[l.cle]&&brouillon[l.cle].base===(l.valeur||''))_completerEditions.add(l.cle);});
   var aCompleter = lignes.filter(_completerEstRestante);
   _completerRubriques = aCompleter;
 
-  if (!aCompleter.length) {
-    zone.innerHTML = '<p style="font-size:.85rem;color:#4B5563" id="completer-complet">'
-      + (lignes.some(function(l){return l.statut === 'transmise';}) ? 'Informations transmises — en attente de validation par notre équipe.' : 'Votre dossier est complet. Toutes les informations ont été reçues et traitées.') + '</p>';
-    var b = document.getElementById('completer-envoyer');
-    if (b) b.style.display = 'none';
-    _completerEtatBouton();
-    return;
-  }
   var bouton = document.getElementById('completer-envoyer');
-  if (bouton) { bouton.style.display = ''; bouton.textContent = 'Valider les informations'; }
+  if (bouton) { bouton.style.display = _completerVerrouillee && !aCompleter.length ? 'none' : ''; bouton.textContent = 'Valider mes informations'; }
   var brouillon = {};
   try { brouillon = JSON.parse(sessionStorage.getItem(_completerBrouillonCle()) || '{}') || {}; } catch(e) {}
 
@@ -9769,7 +9770,12 @@ function _completerRendre(lignes) {
         items.forEach(function(l){
           var cell=document.createElement('div'),term=document.createElement('dt'),value=document.createElement('dd');
           term.textContent=_completerLibelleCourt(l);
-          value.textContent=l.valeur || (l.statut==='transmise'?'Transmis — en vérification':'Renseigné');
+          value.textContent=l.valeur || (/(^|_)consignes$/.test(l.cle)?'Aucune consigne particulière':l.statut==='transmise'?'Transmis — en vérification':'Non disponible');
+          if(/^\d{4}-\d{2}-\d{2}$/.test(l.valeur||''))value.textContent=l.valeur.split('-').reverse().join('/');
+          if(_completerPeutModifier(l)){
+            var edit=document.createElement('button');edit.type='button';edit.className='completion-edit';edit.textContent='✎';edit.setAttribute('aria-label','Modifier '+_completerLibelleCourt(l));
+            edit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();_completerEditions.add(l.cle);_completerRendre(_completerToutesLignes);var field=document.getElementById(_completerChampId(l.cle));if(field){field.closest('details.completion-card').open=true;field.focus();}};term.appendChild(edit);
+          }
           cell.append(term,value);list.appendChild(cell);
         });
         block.append(heading,list);recap.appendChild(block);
@@ -9798,6 +9804,7 @@ function _completerRendre(lignes) {
       label.appendChild(document.createTextNode(' '));
       label.appendChild(etoile);
       groupe.appendChild(label);
+      if(_completerEditions.has(l.cle)){var cancelEdit=document.createElement('button');cancelEdit.type='button';cancelEdit.className='completion-edit-cancel';cancelEdit.textContent='Annuler la modification';cancelEdit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();var saved=JSON.parse(sessionStorage.getItem(_completerBrouillonCle())||'{}');delete saved[l.cle];sessionStorage.setItem(_completerBrouillonCle(),JSON.stringify(saved));_completerEditions.delete(l.cle);_completerRendre(_completerToutesLignes);};groupe.appendChild(cancelEdit);}
 
       if (l.statut === 'a_corriger' && l.commentaire) {
         var motif = document.createElement('div');
@@ -9819,6 +9826,7 @@ function _completerRendre(lignes) {
       champ.maxLength = 2000;
       champ.addEventListener('input', _completerConserverSaisies);
       if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
+      if(/(^|_)consignes$/.test(l.cle)){var help=document.createElement('p');help.className='completion-help';help.textContent='Précisions d’accès ou de remise des clés uniquement. Pour modifier le trajet ou la prestation, contactez HelixCar.';groupe.appendChild(help);}
       champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
       if(estMotorisation){
@@ -9830,7 +9838,7 @@ function _completerRendre(lignes) {
           var button=document.createElement('button');button.type='button';button.className='completion-choice';
           button.textContent=option.textContent;button.dataset.value=option.value;
           button.setAttribute('aria-pressed',String(champ.value===option.value));
-          button.addEventListener('click',function(){champ.value=option.value;champ.dispatchEvent(new Event('input',{bubbles:true}));});
+          button.addEventListener('click',function(){if(champ.disabled||_completerEnvoiEnCours)return;champ.value=option.value;champ.dispatchEvent(new Event('input',{bubbles:true}));});
           choices.appendChild(button);
         });
         champ.addEventListener('input',function(){choices.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.dataset.value===champ.value));});});
@@ -9856,6 +9864,7 @@ function _hcFermerCompletion() {
 async function ouvrirCompleterInformations(demandeId) {
   var generation = ++_completerGeneration;
   _completerDemandeId = demandeId;
+  _completerVerrouillee=true;_completerEditions=new Set();
   _completerRubriques = [];
   _completerToutesLignes = [];
   _completerEtatBouton();
@@ -9884,6 +9893,10 @@ async function ouvrirCompleterInformations(demandeId) {
       var reference = !dossier.error && dossier.data && dossier.data[0] && dossier.data[0].numero_client;
       if (contexte && reference) contexte.textContent = 'Dossier ' + reference + ' — complétez uniquement les informations demandées.';
     } catch(e) { /* La référence ne doit pas bloquer la complétion. */ }
+    var contexteEdition=await _sb.rpc('contexte_completion_demande',{p_client_id:demandeId});
+    if(generation!==_completerGeneration)return;
+    if(contexteEdition.error || !contexteEdition.data)throw Error('Lecture du verrou indisponible');
+    _completerVerrouillee=contexteEdition.data.verrouillee!==false;
     var r = await _sb.rpc('informations_demande', { p_client_id: demandeId });
     if (generation !== _completerGeneration) return;
     if (r && r.error) throw new Error(r.error.message);
@@ -9901,10 +9914,21 @@ async function ouvrirCompleterInformations(demandeId) {
   }
 }
 
+function _completerConfirmer(){
+ return new Promise(function(resolve){
+  var dialog=document.createElement('dialog');dialog.className='hc-completion-confirm';dialog.setAttribute('aria-labelledby','hc-confirm-title');
+  dialog.innerHTML='<h2 id="hc-confirm-title">Confirmer vos informations ?</h2><p>Vérifiez les informations de tous vos véhicules. Après confirmation, vous ne pourrez plus les modifier depuis votre espace, sauf si HelixCar vous demande une correction.</p><p>Les changements seront transmis à notre équipe pour validation.</p><div><button type="button" data-cancel>Revenir aux informations</button><button type="button" data-confirm>Confirmer et transmettre</button></div>';
+  var done=false;function finish(value){if(done)return;done=true;dialog.close();dialog.remove();resolve(value);}
+  dialog.querySelector('[data-cancel]').onclick=function(){finish(false);};dialog.querySelector('[data-confirm]').onclick=function(){finish(true);};
+  dialog.addEventListener('cancel',function(e){e.preventDefault();finish(false);});
+  document.body.appendChild(dialog);dialog.showModal();dialog.querySelector('[data-cancel]').focus();
+ });
+}
+
 async function envoyerInformationsCompletees() {
   // Double clic : le second appel est ignoré tant que le premier n'a
   // pas répondu. Rien n'est envoyé deux fois.
-  if (_completerEnvoiEnCours) return;
+  if (_completerEnvoiEnCours || _completerConfirmationEnCours) return;
   if (!_completerDemandeId) return;
   var demandeId = _completerDemandeId, generation = _completerGeneration;
 
@@ -9919,7 +9943,7 @@ async function envoyerInformationsCompletees() {
     nbSaisies++;
   });
   _completerConserverSaisies();
-  if (!nbSaisies || nbSaisies !== _completerRubriques.length) {
+  if (nbSaisies !== _completerRubriques.length) {
     _completerAfficherMessage('Complétez tous les champs obligatoires de tous les blocs avant de soumettre votre demande.');
     return;
   }
@@ -9936,7 +9960,11 @@ async function envoyerInformationsCompletees() {
     if(champ){var carte=champ.closest('details.completion-card');if(carte)carte.open=true;champ.setAttribute('aria-invalid','true');champ.focus();}
     _completerAfficherMessage('Indiquez un numéro de téléphone complet, avec indicatif pour un numéro international.');return;
   }
-  if (!window.confirm('Transmettre toutes les informations de cette demande à notre équipe pour vérification ?')) return;
+  if(_completerVerrouillee && !_completerRubriques.length)return;
+  _completerConfirmationEnCours=true;
+  var confirme=await _completerConfirmer();
+  _completerConfirmationEnCours=false;
+  if(!confirme || generation!==_completerGeneration)return;
   _completerEnvoiEnCours = true;
   var bouton = document.getElementById('completer-envoyer');
   var libelleBouton = bouton ? bouton.textContent : '';
@@ -9966,6 +9994,7 @@ async function envoyerInformationsCompletees() {
       _completerAfficherMessage('Le serveur a reçu votre enregistrement, mais son état ne peut pas être relu. Vos saisies sont conservées ; vérifiez le dossier avant de renvoyer.');
       return;
     }
+    _completerVerrouillee=true;_completerEditions=new Set();
     _completerRendre(lignesRelues);
     var restantes = lignesRelues.filter(_completerEstRestante).length;
     _completerAfficherMessage(restantes ? 'La demande a évolué. Vérifiez les informations encore à compléter.' : 'Toutes vos informations ont été soumises. Votre demande est en attente de validation par notre équipe.', restantes ? '' : 'ok');

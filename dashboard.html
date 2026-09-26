@@ -13,6 +13,7 @@ html, body { background:#f8f9fa; }
 .sidebar .hc-logo-officiel img{filter:brightness(0) invert(1)}
 .sidebar-logo.hc-logo-officiel{justify-content:center}
 .login-logo.hc-logo-officiel img{width:220px}
+.ai-home{padding:20px;margin-bottom:24px}.ai-home h2{font:700 22px Arial;margin:0}.ai-home select{padding:10px;border:1px solid #ddd;border-radius:7px;max-width:100%;margin:8px 0 18px}.ai-home-dossier{border-top:1px solid #ddd;padding:18px 0}.ai-home-dossier h3{font:700 15px Arial;margin:0 0 14px}.ai-home-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.ai-home-columns h4{font:700 13px Arial;margin:0 0 10px;color:#a6343a}.ai-home-field{border-bottom:1px solid #eee;padding:10px 0;overflow-wrap:anywhere;font-size:13px}.ai-home-field p{margin:5px 0}.ai-home .ai-stat{text-align:left;cursor:pointer}.ai-home-dossier>.btn{margin-top:14px}@media(max-width:750px){.ai-home-columns{grid-template-columns:1fr}.ai-home{padding:14px}.ai-home .card-header{flex-wrap:wrap}}
 .ai-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.ai-heading h1{font:700 29px Arial,sans-serif;letter-spacing:-.8px;margin:0 0 8px}.ai-muted{font-size:13px;color:#778087;line-height:1.6}.ai-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}.ai-stat{padding:20px;background:#fff;border:1px solid #e2e4e3;border-radius:12px;font-size:13px;color:#677079}.ai-stat strong{display:block;font-size:30px;color:#273139;margin-bottom:6px}.ai-stat.review{background:#edf4f0;border-color:#d1e2d7}.ai-toolbar{display:flex;gap:12px;margin-bottom:20px}.ai-toolbar input,.ai-toolbar select{padding:12px;border:1px solid #d7dcdd;border-radius:8px;background:#fff;font:14px Arial;min-width:0}.ai-toolbar input{flex:1}.ai-layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px}.ai-client{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:9px;text-align:left;background:#fff;border:1px solid #e0e3e3;border-radius:12px;padding:18px;margin-bottom:10px;color:#253139;cursor:pointer}.ai-client strong{font-size:14px}.ai-client small{color:#758087;font-size:12px}.ai-client.selected{border:1.5px solid #a63b40;box-shadow:0 0 0 2px #a63b400a}.ai-status{font-size:11px;padding:5px 9px;background:#fff3e7;color:#98622d;border-radius:5px;display:inline-block;white-space:nowrap}.ai-status.transmitted{background:#e8f2ec;color:#286748}.ai-detail{background:#fff;border:1px solid #e0e3e3;border-radius:14px;padding:26px}.ai-detail h2{margin:0;font:700 22px Arial}.ai-detail h3{font:700 12px Arial;text-transform:uppercase;letter-spacing:1px;margin:28px 0 4px;color:#667780}.ai-notice{font-size:12px;line-height:1.6;background:#f5f6f5;padding:13px;border-radius:8px;color:#657178;margin:18px 0}.ai-field{display:flex;gap:16px;justify-content:space-between;border-bottom:1px solid #eceeee;padding:19px 0}.ai-field>div:first-child{min-width:0;overflow-wrap:anywhere}.ai-field strong{font-size:13px}.ai-field p{font-size:14px;margin:8px 0 0;color:#515f67}.ai-field-actions{display:flex;align-items:flex-end;gap:8px;flex-direction:column;flex-shrink:0}.ai-validate,.ai-correct,.ai-heading button{font:600 12px Arial;border:1px solid #d9dfe0;padding:9px 13px;border-radius:6px;background:white;color:#39474e;cursor:pointer}.ai-validate{background:#263b31;color:#fff;border-color:#263b31}.ai-correct{font-size:11px}.ai-correction{color:#985627!important;font-size:12px!important}.ai-heading button{padding:12px 18px}.ai-live{font-size:11px;color:#7b8589;margin:16px 0}
 @media(max-width:800px){.ai-layout{grid-template-columns:1fr}.ai-stats{gap:8px}.ai-stat{padding:12px;font-size:11px}.ai-stat strong{font-size:24px}.ai-heading h1{font-size:24px}.ai-detail{padding:18px}.ai-field{flex-direction:column}.ai-field-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.ai-toolbar{flex-direction:column}.ai-client{padding:14px}}
 
@@ -1240,6 +1241,14 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Dashboard -->
       <div class="page" id="page-admin-dashboard">
+<section class="card ai-home" aria-labelledby="admin-infos-accueil-titre">
+ <div class="card-header"><div><h2 id="admin-infos-accueil-titre">Dossiers à traiter</h2><p class="ai-muted">Informations reçues et éléments encore attendus — sans ouvrir les demandes de devis.</p></div><button type="button" class="btn btn-outline" onclick="chargerCentreInformationsAdmin()">Actualiser</button></div>
+ <div id="admin-infos-accueil-compteurs" class="ai-stats"></div>
+ <label class="ai-muted" for="admin-infos-accueil-filtre">Afficher</label>
+ <select id="admin-infos-accueil-filtre" onchange="rendreAccueilInformationsAdmin()"><option value="tous">Tous les dossiers à traiter</option><option value="transmise">Informations à valider</option><option value="correction">Corrections reçues</option><option value="attente">En attente du client</option></select>
+ <div id="admin-infos-accueil-liste" aria-live="polite">Chargement des dossiers…</div>
+</section>
+
         <div id="alerte-nouvelles-demandes" class="alert alert-warning" style="display:none;margin-bottom:14px;cursor:pointer" onclick="showPage('admin-devis')"></div>
         <!-- Ces cinq chiffres étaient écrits en dur (3, 12, 47, 8,
              4 820 €) : ils ressemblaient à des indicateurs réels et
@@ -2588,7 +2597,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
 // ne le simule.
 
 // Informations manquantes : les valeurs et décisions viennent des RPC autorisées.
-var _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false, _adminInfosMobileDetail = false, _adminInfosCorrection = null;
+var _adminInfosMeta = {}, _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false, _adminInfosMobileDetail = false, _adminInfosCorrection = null;
 async function chargerCentreInformationsAdmin(silencieux) {
   if (currentRole !== 'admin' || !_sbAuthPret() || _adminInfosBusy || (silencieux && _adminInfosCorrection)) return;
   var generation = ++_adminInfosGeneration;
@@ -2603,7 +2612,7 @@ async function chargerCentreInformationsAdmin(silencieux) {
         var lignes=[],offset=0,limite=1000;
         while(true){
           var res=await sbAuth.from('demande_informations_manquantes')
-            .select('client_id').in('statut',['transmise','a_corriger'])
+            .select('client_id,cle,ancienne_valeur,correction_recue,transmise_le').in('statut',['transmise','a_corriger'])
             .order('id',{ascending:true}).range(offset,offset+limite-1);
           if(res.error) throw new Error('Impossible de lire les informations à vérifier.');
           var page=res.data||[];lignes=lignes.concat(page);
@@ -2616,6 +2625,7 @@ async function chargerCentreInformationsAdmin(silencieux) {
     // jamais un paiement confirmé. Aucun statut n'est écrit ici.
     var derniers = {};
     sources[1].forEach(function(d){if(!derniers[d.client_id])derniers[d.client_id]=d;});
+    _adminInfosMeta={};sources[3].forEach(function(l){_adminInfosMeta[l.client_id+':'+l.cle]=l;});
     var suivis = new Set(sources[3].map(function(l){return String(l.client_id);}));
     function estPaye(c) {var d=derniers[c.id];return !!(d && d.statut==='accepte' && d.paiement_statut==='paye');}
     // Une information transmise doit être vérifiable même avant le paiement.
@@ -2627,6 +2637,7 @@ async function chargerCentreInformationsAdmin(silencieux) {
       var lot = await Promise.all(clients.slice(i,i+4).map(async function(c){
         try {
           var lignes = await chargerInfosDemandeAdmin(c.id);
+          lignes.forEach(function(l){Object.assign(l,_adminInfosMeta[c.id+':'+l.cle]||{});});
           if(!estPaye(c)) lignes=lignes.filter(function(l){return ['transmise','a_corriger','validee'].includes(l.statut);});
           return {client:c,lignes:lignes};
         }
@@ -2640,9 +2651,36 @@ async function chargerCentreInformationsAdmin(silencieux) {
     if(!_adminInfosSelection && _adminInfosDossiers.length) _adminInfosSelection=_adminInfosDossiers[0].client.id;
     statut.textContent = 'Actualisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' · actualisation automatique';
     rendreCentreInformationsAdmin();
-  } catch(e){if(generation===_adminInfosGeneration)statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}
+  } catch(e){if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';var home=document.getElementById('admin-infos-accueil-liste');if(home)home.textContent=statut.textContent;}}
+}
+function rendreAccueilInformationsAdmin(){
+ var zone=document.getElementById('admin-infos-accueil-liste'),stats=document.getElementById('admin-infos-accueil-compteurs');if(!zone||!stats)return;
+ var counts={transmise:0,correction:0,attente:0};
+ function group(l){return l.statut==='transmise'?(l.correction_recue?'correction':'transmise'):'attente';}
+ var pending=function(l){return ['transmise','attendue','a_corriger'].includes(l.statut);};
+ _adminInfosDossiers.forEach(function(d){d.lignes.filter(pending).forEach(function(l){counts[group(l)]++;});});
+ stats.replaceChildren();[['transmise','À valider'],['correction','Corrections reçues'],['attente','En attente du client']].forEach(function(pair){var b=document.createElement('button');b.type='button';b.className='ai-stat';var n=document.createElement('strong');n.textContent=counts[pair[0]];b.append(n,document.createTextNode(pair[1]));b.onclick=function(){document.getElementById('admin-infos-accueil-filtre').value=pair[0];rendreAccueilInformationsAdmin();};stats.appendChild(b);});
+ var filtre=document.getElementById('admin-infos-accueil-filtre').value;zone.replaceChildren();
+ _adminInfosDossiers.forEach(function(d){
+  var lines=d.lignes.filter(pending);if(!d.erreur&&!lines.some(function(l){return filtre==='tous'||group(l)===filtre;}))return;
+  var card=document.createElement('article');card.className='ai-home-dossier';
+  var heading=document.createElement('h3');heading.textContent=([d.client.prenom,d.client.nom].filter(Boolean).join(' ')||d.client.email||'Client')+' · '+(d.client.numero_client||'Demande');card.appendChild(heading);
+  if(d.erreur){var err=document.createElement('p');err.textContent='Lecture indisponible — actualisez pour vérifier ce dossier.';card.appendChild(err);}
+  var columns=document.createElement('div');columns.className='ai-home-columns';
+  [['transmise','À valider'],['correction','Corrections reçues'],['attente','En attente du client']].forEach(function(pair){
+   var items=lines.filter(function(l){return group(l)===pair[0];});var col=document.createElement('div');var title=document.createElement('h4');title.textContent=pair[1]+' · '+items.length;col.appendChild(title);
+   items.forEach(function(l){var item=document.createElement('div');item.className='ai-home-field';var label=document.createElement('strong');label.textContent=l.libelle||l.cle;item.appendChild(label);
+    if(l.statut==='transmise'){var value=document.createElement('p');value.textContent='Reçu : '+(l.valeur||'—');item.appendChild(value);if(l.ancienne_valeur&&l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Avant : '+l.ancienne_valeur;item.appendChild(old);}}
+    if(l.commentaire){var note=document.createElement('p');note.className='ai-correction';note.textContent='Correction demandée : '+l.commentaire;item.appendChild(note);}
+    if(l.statut==='attendue'){var missing=document.createElement('p');missing.textContent='Non renseigné';item.appendChild(missing);}
+    col.appendChild(item);
+   });if(!items.length){var empty=document.createElement('p');empty.className='ai-muted';empty.textContent='Aucune';col.appendChild(empty);}columns.appendChild(col);
+  });card.appendChild(columns);
+  var open=document.createElement('button');open.type='button';open.className='btn btn-outline';open.textContent='Vérifier les informations';open.onclick=function(){_adminInfosSelection=d.client.id;showPage('admin-infos');_adminInfosMobileDetail=true;rendreCentreInformationsAdmin();};card.appendChild(open);zone.appendChild(card);
+ });if(!zone.children.length)zone.textContent='Aucun dossier pour ce filtre.';
 }
 function rendreCentreInformationsAdmin(){
+ rendreAccueilInformationsAdmin();
  var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
  if(!liste||!detail)return;
  var filtre=document.getElementById('admin-infos-filtre').value;
@@ -2693,6 +2731,7 @@ function rendreCentreInformationsAdmin(){
    var row=document.createElement('div');row.className='ai-field';
    var text=document.createElement('div'),label=document.createElement('strong');label.textContent=String(l.libelle||l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/,'');
    var value=document.createElement('p');value.textContent=l.valeur||'Non renseigné';text.append(label,value);
+   if(l.ancienne_valeur && l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Avant : '+l.ancienne_valeur;text.appendChild(old);}
    if(l.commentaire){var motif=document.createElement('p');motif.className='ai-correction';motif.textContent='Correction demandée : '+l.commentaire;text.appendChild(motif);}
    var actions=document.createElement('div');actions.className='ai-field-actions';var badge=document.createElement('span');badge.className='ai-status '+(l.statut==='transmise'?'transmitted':'');badge.textContent=LIB_STATUT_INFO[l.statut]||l.statut;actions.appendChild(badge);
    if(l.statut==='transmise'){
@@ -2720,6 +2759,7 @@ async function deciderCentreInformation(id,cle,decision,motif){
  try{
   var fait=await deciderInformation(id,cle,decision,motif);if(!fait)return;
   var lignes=await chargerInfosDemandeAdmin(id);
+  lignes.forEach(function(l){Object.assign(l,_adminInfosMeta[id+':'+l.cle]||{});});
   if(!lignes.some(function(l){return l.cle===cle&&l.statut===decision;}))throw new Error('La décision n’a pas été confirmée par le serveur.');
   var dossier=_adminInfosDossiers.find(function(d){return d.client.id===id;});if(dossier)dossier.lignes=lignes;
   _adminInfosCorrection=null;
@@ -2727,7 +2767,7 @@ async function deciderCentreInformation(id,cle,decision,motif){
  }catch(e){document.getElementById('admin-infos-statut').textContent='Décision non confirmée : '+e.message;}
  finally{_adminInfosBusy=false;rendreCentreInformationsAdmin();}
 }
-setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&p.classList.contains('active')&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
+setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&(p.classList.contains('active')||document.getElementById('page-admin-dashboard')?.classList.contains('active'))&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
 
 var _infosDemandeEnCours = null;
 
@@ -8106,6 +8146,7 @@ function _premierJourDuMoisSuivant() {
 }
 
 function chargerAccueilAdmin() {
+  chargerCentreInformationsAdmin();
   // Chaque compteur est indépendant : si l'un échoue, les autres
   // s'affichent quand même, et celui qui a échoué le dit.
   _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
