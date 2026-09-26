@@ -384,8 +384,8 @@ function etatEcran(page) {
     }));
     check('B2-2 : sans session, la connexion s\'ouvre',
       sansSession.connexionOuverte === true, JSON.stringify(sansSession));
-    check('B2-3 : avec le message neutre exactement demandé',
-      /Adresse e-mail confirmée, vous pouvez vous connecter\./.test(sansSession.message),
+    check('B2-3 : sans session, aucun succès de confirmation non vérifié',
+      /Connectez-vous pour accéder à votre espace/.test(sansSession.message),
       sansSession.message);
     check('B2-4 : et le jeton ne reste pas dans la barre d\'adresse',
       sansSession.hash === '', sansSession.hash);

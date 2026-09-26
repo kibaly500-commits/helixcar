@@ -3041,14 +3041,44 @@ function _libelleServiceClient(s) {
 
 // Recharge les demandes du client depuis la vue (jamais la table) et
 // les affiche. Résiste à F5 : tout vient du serveur, rien du cache.
+// Mutualiser uniquement les lectures simultanées, jamais mettre les dossiers en cache.
+var _hcDemandesLecture = null;
 async function chargerDemandesClient() {
-  if (!_sbAuthPret()) return [];
-  const { data, error } = await sbAuth
-    .from('v_mes_demandes')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (!_sbAuthPret()) throw new Error('Service indisponible');
+  if (_hcDemandesLecture) return _hcDemandesLecture;
+  const lecture = (async function(){
+    // Attendre la restauration locale de la session avant toute lecture protégée.
+    if (sbAuth.auth && sbAuth.auth.getSession) {
+      const session = await sbAuth.auth.getSession();
+      if (session.error || !session.data || !session.data.session) throw new Error('Session indisponible. Reconnectez-vous puis réessayez.');
+    }
+    for (let tentative = 0; tentative < 2; tentative++) {
+      try {
+        const res = await sbAuth.from('v_mes_demandes').select('*').order('created_at', { ascending:false });
+        if (res.error) {
+          const erreur = new Error(res.error.message);
+          erreur.status = res.status;
+          erreur.code = res.error.code;
+          throw erreur;
+        }
+        return res.data || [];
+      } catch(e) {
+        if (!tentative && e.status === 401 && sbAuth.auth && sbAuth.auth.getSession) {
+          const session = await sbAuth.auth.getSession();
+          if (session.data && session.data.session && !session.error) {
+            await new Promise(resolve => setTimeout(resolve, 350));
+            continue;
+          }
+        }
+        const transitoire = [0,502,503,504].includes(e.status) || e.code === '57014' || /failed to fetch|network|load failed|timeout|fetch failed/i.test(e.message || '');
+        if (tentative || !transitoire) throw e;
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+    }
+  })();
+  _hcDemandesLecture = lecture;
+  try { return await lecture; }
+  finally { if (_hcDemandesLecture === lecture) _hcDemandesLecture = null; }
 }
 
 // LOT Q02 — l'état du devis, tel que le serveur le connaît (v_mes_devis,
@@ -4276,7 +4306,9 @@ function _etatInformationsClient(lignes) {
   return 'Informations en attente de validation';
 }
 
+var _hcInfosGeneration = 0;
 async function loadInfosClient() {
+  const generation = ++_hcInfosGeneration;
   const zone = document.getElementById('client-infos-liste');
   if (!zone) return;
   window._hcInfosARelire = false;
@@ -4286,8 +4318,10 @@ async function loadInfosClient() {
   try {
     demandes = await chargerDemandesClient();
   } catch (e) {
-    zone.innerHTML = '<div style="font-size:.85rem;color:var(--red)">'
-      + 'Impossible de charger vos demandes pour le moment.</div>';
+    if (generation !== _hcInfosGeneration) return;
+    zone.innerHTML = '<div role="alert" style="font-size:.85rem;color:var(--red)">'
+      + 'Impossible de charger vos demandes pour le moment.</div>'
+      + '<button class="btn btn-sm"' + actionHtml('loadInfosClient', []) + '>Réessayer</button>';
     return;
   }
 
@@ -4307,6 +4341,7 @@ async function loadInfosClient() {
       .catch(function () { return { d: d, erreur: true }; });
   }));
 
+  if (generation !== _hcInfosGeneration) return;
   const blocs = [];
   let restantesTotal = 0;
   let erreurs = 0;
@@ -5394,10 +5429,17 @@ if (sbAuth) {
         && aSession && session.user.email) {
       if (reinitOuverte) return;
       const cleUser = session.user.id;
-      if (window._dernierAuthUserTraite === cleUser) return; // déjà traité cet utilisateur, évite les doublons
+      if (window._dernierAuthUserTraite === cleUser) {
+        const infos = document.getElementById('page-client-infos');
+        if (currentRole === 'client' && infos && infos.classList.contains('active')) setTimeout(loadInfosClient, 0);
+        return;
+      }
+      _hcDemandesLecture = null;
+      _hcInfosGeneration++;
       window._dernierAuthUserTraite = cleUser;
       window._hcAttenteResolue = true;
-      finaliserSessionParUid(session.user.email, session.user.id);
+      // Sortir du callback Auth avant les appels Supabase (verrou de session).
+      setTimeout(function(){ finaliserSessionParUid(session.user.email, session.user.id); }, 0);
     }
   });
 }

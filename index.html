@@ -6,6 +6,20 @@
 
 <meta charset="UTF-8">
 
+<script id="hc-confirmation-precoce">
+(function(){
+  var p = new URLSearchParams(location.hash.slice(1));
+  window._hcConfirmationAttendue = /^(signup|email_change|magiclink)$/.test(p.get('type') || '') && !p.has('error') && !p.has('error_code');
+  if (window._hcConfirmationAttendue) document.documentElement.classList.add('hc-confirmation-attente');
+})();
+</script>
+<style>
+html.hc-confirmation-attente body > :not(#hc-confirmation-attente) { visibility:hidden !important; }
+#hc-confirmation-attente { display:none; }
+html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:fixed; inset:0; z-index:2147483647; background:#fff; color:#101820; align-items:center; justify-content:center; padding:24px; text-align:center; font:500 18px/1.5 Arial,sans-serif; }
+</style>
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>HelixCar – Le convoyage qui roule, ne s'arrête jamais !</title>
@@ -5470,6 +5484,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 </head>
 
 <body>
+<div id="hc-confirmation-attente" role="status" aria-live="polite">Ouverture de votre espace client…</div>
 
 
 
@@ -7213,7 +7228,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             </div>
 
             <div class="modal-form-group">
-              <label>Informations complémentaires</label>
+              <label>Informations complémentaires <span class="field-optional-hint">(facultatif)</span></label>
               <textarea id="pro-infos" rows="3" placeholder="Tout élément utile à l'organisation de l'intervention" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
             </div>
 
@@ -7665,7 +7680,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
 
         <div class="modal-form-group">
 
-          <label>Informations complémentaires <span style="color:#aaa;font-weight:400;text-transform:none;letter-spacing:0">(optionnel)</span></label>
+          <label>Informations complémentaires <span style="color:#aaa;font-weight:400;text-transform:none;letter-spacing:0">(facultatif)</span></label>
 
           <textarea id="client-notes" placeholder="Accès, clés, contraintes particulières…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:70px;resize:vertical;outline:none;text-align:left"></textarea>
 
@@ -18216,11 +18231,14 @@ function _hcFragmentConfirmation() {
   try {
     var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
     var t = p.get('type');
-    return t === 'signup' || t === 'email_change' || t === 'magiclink';
+    return !!window._hcConfirmationAttendue || t === 'signup' || t === 'email_change' || t === 'magiclink';
   } catch (e) { return false; }
 }
 
 var _hcConfirmationAnnoncee = false;
+if (window._hcConfirmationAttendue) setTimeout(function(){
+  if (!_hcConfirmationAnnoncee) _hcAnnoncerAdresseConfirmee(false);
+}, 12000);
 function _hcAnnoncerAdresseConfirmee(avecSession) {
   if (_hcConfirmationAnnoncee) return;
   _hcConfirmationAnnoncee = true;
@@ -18231,11 +18249,13 @@ function _hcAnnoncerAdresseConfirmee(avecSession) {
     try { window.location.href = _hcUrlRetourReinitialisation(); } catch (e) {}
     return;
   }
+  document.documentElement.classList.remove('hc-confirmation-attente');
+  window._hcConfirmationAttendue = false;
   // Pas de session : on ouvre la connexion avec un message neutre. Il
   // ne dit rien de plus que ce qui est certain.
   if (typeof openModal === 'function') openModal('connexion');
   _hcNote('connexion-message',
-    'Adresse e-mail confirmée, vous pouvez vous connecter.', 'info');
+    'Connectez-vous pour accéder à votre espace. Si le lien a expiré, demandez un nouvel e-mail de confirmation.', 'info');
 }
 
 // Branchement : un seul ecouteur, pose une fois.
@@ -20826,11 +20846,11 @@ function rendreFichesVehicules() {
     if (recuperationStockage && !_livraisonSansObjet()) {
       var dateRecup=(document.getElementById('stock-fin')||{}).value||'';
       var heureRecup=(document.getElementById('stock-heure-sortie')||{}).value||'';
-      livraison='<div class="veh-sstitre">Récupération après stockage</div>'+
+      livraison='<div class="hc-recuperation-resume"><div class="veh-sstitre">Récupération après stockage</div>'+
         '<p>Date de récupération : <strong data-hc-recuperation-date>'+_attr(_formaterDateFr(dateRecup)||'À renseigner')+'</strong></p>'+
         '<p>Horaire de récupération : <strong data-hc-recuperation-heure>'+_attr(heureRecup||'À renseigner')+'</strong></p>'+
         '<p class="field-optional-hint">Cette date et cet horaire reprennent vos choix à l’étape précédente.</p>'+
-        '<p>Vous récupérerez votre véhicule à '+_attr(_localisationStockage())+'. L’adresse exacte vous sera communiquée par HelixCar.</p>';
+        '<p>Vous récupérerez votre véhicule à '+_attr(_localisationStockage())+'. L’adresse exacte vous sera communiquée par HelixCar.</p></div>';
     }
     if (livraison && !_livraisonSansObjet()) html+=_hcSousVeh(i,'livraison',no++,recuperationStockage?'Récupération après stockage':'Livraison',livraison,false);
 
@@ -21469,7 +21489,7 @@ function _hcClasseJour(date, periode) {
   if (!periode.debut && !periode.finLiv && !periode.finRestit) return '';
   if (periode.finRestit && periode.finLiv && _hcMemeJour(date, periode.finLiv)) return 'hc-cal-jour--transition';
   if (periode.debut && _hcMemeJour(date, periode.debut)) return 'hc-cal-jour--p1-borne';
-  if (periode.finLiv && _hcMemeJour(date, periode.finLiv)) return 'hc-cal-jour--p1-borne';
+  if (periode.finLiv && _hcMemeJour(date, periode.finLiv)) return 'hc-cal-jour--p1-borne hc-cal-jour--fin';
   if (periode.finRestit && _hcMemeJour(date, periode.finRestit)) return 'hc-cal-jour--p2-borne';
   if (periode.debut && periode.finLiv && date > periode.debut && date < periode.finLiv) return 'hc-cal-jour--p1-inter';
   if (periode.finLiv && periode.finRestit && date > periode.finLiv && date < periode.finRestit) return 'hc-cal-jour--p2-inter';
@@ -21525,6 +21545,10 @@ function _hcRendreCalendrier() {
     var estInterdit = date < borneReelle || (borneMaxMetier && date > borneMaxMetier);
     var estAuj = _hcMemeJour(date, auj);
     var classe = _hcClasseJour(date, periode);
+    if (periode.debut && periode.finLiv && periode.debut < periode.finLiv) {
+      if (_hcMemeJour(date, periode.debut)) classe += ' hc-cal-jour--debut-lie';
+      if (_hcMemeJour(date, periode.finLiv) && !periode.finRestit) classe += ' hc-cal-jour--fin-lie';
+    }
     var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '');
     html += '<button type="button" class="' + classesFinales + '" data-jour="' + j + '"' +
       (estInterdit ? ' disabled aria-disabled="true" tabindex="-1"' : '') + '>' + j + '</button>';
@@ -21543,25 +21567,19 @@ function _hcRendreCalendrier() {
     });
   });
 
-  // Légende discrète — affichée uniquement si une deuxième période
-  // existe réellement pour ce contexte (jamais de deuxième période
-  // fictive si la restitution est absente ou invalide).
   var legende = overlay.querySelector('#hc-cal-legende');
-  if (periode.finRestit) {
-    legende.innerHTML =
-      '<span><i class="p1"></i>Prise en charge → Livraison</span>' +
-      '<span><i class="p2"></i>Livraison → Restitution</span>';
-  } else if (_hcCalPeriode) {
-    // Période à deux bornes : on rappelle ce que la plage colorée
-    // représente, et laquelle des deux dates le prochain clic modifiera.
-    legende.innerHTML =
-      '<span><i class="p1"></i>' + _hcCalPeriode.legende + '</span>' +
-      '<span>' + (_hcCalSousEtapePeriode === 'fin'
-        ? 'Choisissez la date de fin'
-        : 'Choisissez la date de début') + '</span>';
-  } else {
-    legende.innerHTML = '';
-  }
+  if (_hcCalPeriode || periode.debut || periode.finLiv || periode.finRestit) {
+    legende.innerHTML = (_hcCalPeriode ? '<span class="hc-cal-instruction">' + _hcCalPeriode.legende + '</span>' : '') + '<span><i class="p1"></i>' + (_hcCalPeriode ? 'Début' : 'Prise en charge') + '</span>' +
+      '<span><i class="fin"></i>' + (_hcCalPeriode ? 'Fin' : 'Livraison') + '</span>' +
+      (periode.finRestit ? '<span><i class="p2"></i>Restitution</span>' : '');
+    if (_hcCalPeriode) {
+      var complete = periode.debut && periode.finLiv && periode.finLiv >= periode.debut;
+      legende.innerHTML += '<span class="hc-cal-instruction">' + (complete
+        ? 'Période sélectionnée · Validez avec OK'
+        : _hcCalSousEtapePeriode === 'fin' ? 'Choisissez la date de fin' : 'Choisissez la date de début') + '</span>';
+    }
+  } else legende.innerHTML = '';
+
 }
 
 function _hcSelectionnerJour(j) {
@@ -22643,7 +22661,7 @@ document.addEventListener('click', function (e) {
     if(periode.debut&&periode.finLiv&&periode.finRestit&&_hcMemeJour(date,periode.debut)&&_hcMemeJour(date,periode.finLiv)&&_hcMemeJour(date,periode.finRestit))return 'hc-cal-jour--triple';
     if(periode.finRestit&&periode.finLiv&&_hcMemeJour(date,periode.finLiv))return 'hc-cal-jour--transition';
     if(periode.debut&&_hcMemeJour(date,periode.debut))return 'hc-cal-jour--p1-borne';
-    if(periode.finLiv&&_hcMemeJour(date,periode.finLiv))return 'hc-cal-jour--p1-borne';
+    if(periode.finLiv&&_hcMemeJour(date,periode.finLiv))return 'hc-cal-jour--p1-borne hc-cal-jour--fin';
     if(periode.finRestit&&_hcMemeJour(date,periode.finRestit))return 'hc-cal-jour--p2-borne';
     if(periode.debut&&periode.finLiv&&date>periode.debut&&date<periode.finLiv)return 'hc-cal-jour--p1-inter';
     if(periode.finLiv&&periode.finRestit&&date>periode.finLiv&&date<periode.finRestit)return 'hc-cal-jour--p2-inter';
@@ -23295,7 +23313,7 @@ console.log('HelixCar ' + window.HC_VERSION);
     if(!p||(!p.debut&&!p.finLiv&&!p.finRestit))return '';
     var d=!!(p.debut&&_hcMemeJour(date,p.debut)),l=!!(p.finLiv&&_hcMemeJour(date,p.finLiv)),r=!!(p.finRestit&&_hcMemeJour(date,p.finRestit));
     var n=(d?1:0)+(l?1:0)+(r?1:0);if(n>=3)return 'hc-cal-jour--triple';if(n===2)return 'hc-cal-jour--double';
-    if(d)return 'hc-cal-jour--p1-borne';if(l)return 'hc-cal-jour--p1-borne';if(r)return 'hc-cal-jour--p2-borne';
+    if(d)return 'hc-cal-jour--p1-borne';if(l)return 'hc-cal-jour--p1-borne hc-cal-jour--fin';if(r)return 'hc-cal-jour--p2-borne';
     if(p.debut&&p.finLiv&&date>p.debut&&date<p.finLiv)return 'hc-cal-jour--p1-inter';
     if(p.finLiv&&p.finRestit&&date>p.finLiv&&date<p.finRestit)return 'hc-cal-jour--p2-inter';return '';
   };
@@ -23356,7 +23374,7 @@ console.log('HelixCar ' + window.HC_VERSION);
       champ.classList.toggle('hc-date-verrouillee', !!actif);
       var noteId=champ.id+'-origine-date', note=document.getElementById(noteId);
       if(actif&&debut){
-        if(!note){note=document.createElement('p');note.id=noteId;note.className='field-optional-hint';champ.insertAdjacentElement('afterend',note);}
+        if(!note){note=document.createElement('p');note.id=noteId;note.className='field-optional-hint hc-date-origine';champ.insertAdjacentElement('afterend',note);}
         note.textContent='Cette date correspond au début du stockage que vous avez sélectionné à l’étape précédente : le '+_formaterDateFr(debut)+'.';
       }else if(note)note.remove();
       if (actif) {
@@ -23806,6 +23824,26 @@ console.log('HelixCar ' + window.HC_VERSION);
 </script>
 <script src="assets/pr6-ui-sync.js"></script>
 <script src="assets/pr6-delai-mission.js"></script>
+
+<style id="hc-calendrier-retours-20260926">
+.hc-cal-grille { column-gap:0; row-gap:4px; }
+.hc-cal-jour--p1-borne { background:#9F2943; }
+.hc-cal-jour--fin { background:#C66B82; color:#231017 !important; }
+.hc-cal-jour--p1-inter { background:#F5E3E8; border-radius:0; color:var(--ink); }
+.hc-cal-jour--p2-inter { border-radius:0; }
+.hc-cal-legende { flex-direction:row; flex-wrap:wrap; gap:6px 14px; }
+.hc-cal-legende .p1 { background:#9F2943; }
+.hc-cal-legende .fin { background:#C66B82; }
+.hc-cal-jour--debut-lie:not(.hc-cal-jour--double):not(.hc-cal-jour--triple) { border-radius:0; background:radial-gradient(circle closest-side,#9F2943 97%,transparent 100%),linear-gradient(to right,transparent 50%,#F5E3E8 50%); }
+.hc-cal-jour--fin-lie:not(.hc-cal-jour--double):not(.hc-cal-jour--triple) { border-radius:0; background:radial-gradient(circle closest-side,#C66B82 97%,transparent 100%),linear-gradient(to right,#F5E3E8 50%,transparent 50%); }
+.hc-cal-instruction { flex-basis:100%; }
+.hc-cal-jour--double { background:conic-gradient(#9F2943 0 50%,#C66B82 50% 100%) !important; }
+.hc-cal-jour--triple { background:conic-gradient(#9F2943 0 33.333%,#C66B82 33.333% 66.666%,#6B1E3C 66.666% 100%) !important; }
+#modal-client .hc-recuperation-resume p { margin:6px 0 !important; line-height:1.45 !important; }
+#modal-client .hc-recuperation-resume .veh-sstitre { margin-bottom:8px; }
+#modal-client p.hc-date-origine { margin:9px 0 0 !important; line-height:1.45 !important; }
+</style>
+
 </body>
 
 </html>
