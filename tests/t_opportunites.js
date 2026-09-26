@@ -88,9 +88,9 @@ window.fetch=function(url){
 
     await page.evaluate(() => loadOpportunitesAdmin());
     let html = await page.locator('#opportunites-table').innerHTML();
-    check('A4 : références issues de la vue admin', html.includes('TEST-QA-CLAUDE-HELIXCAR-M1') && html.includes('TEST-QA-CLAUDE-HELIXCAR-M2'));
+    check('A4 : seules les missions publiées sont listées', !html.includes('TEST-QA-CLAUDE-HELIXCAR-M1') && html.includes('TEST-QA-CLAUDE-HELIXCAR-M2'));
     check('A5 : 6 retenus sur 9 reste À pourvoir', /6 professionnels retenus sur 9/.test(html) && /À pourvoir/.test(html) && !/partiellement/i.test(html));
-    check('A6 : brouillon distinct des états publiés', /Brouillon/.test(html));
+    check('A6 : aucun brouillon dans la liste', !/Brouillon/.test(html));
     await page.evaluate(() => ouvrirOpportuniteAdmin('TEST-QA-CLAUDE-HELIXCAR-brouillon'));
     check('B1 : formulaire prérempli depuis la mission', await page.locator('#opp-intitule').inputValue() === 'TEST-QA-CLAUDE-HELIXCAR Nettoyage');
     check('B2 : aperçu sans publication implicite', !(await page.evaluate(()=>__journal.some(x=>x.rpc==='publier_opportunite'))));
@@ -98,6 +98,8 @@ window.fetch=function(url){
     check('B3 : aperçu suit la saisie', (await page.locator('#opp-apercu').textContent()).includes('Description corrigée'));
     await page.evaluate(() => enregistrerOpportunite('TEST-QA-CLAUDE-HELIXCAR-brouillon'));
     check('B4 : enregistrement serveur invoqué avec la bonne identité', await page.evaluate(()=>__journal.some(x=>x.rpc==='modifier_opportunite' && x.params.p_id==='TEST-QA-CLAUDE-HELIXCAR-brouillon' && x.params.p_champs.description_publique.includes('Description corrigée'))));
+    await page.evaluate(() => loadOpportunitesAdmin());
+    check('B4bis : enregistrer ne fait pas apparaître la mission', !(await page.locator('#opportunites-table').innerHTML()).includes('TEST-QA-CLAUDE-HELIXCAR-M1'));
     check('B5 : confirmation après réponse serveur', (await page.locator('#opportunite-message').textContent()).includes('Brouillon enregistré'));
     await page.evaluate(async () => {__erreur=true;await enregistrerOpportunite('TEST-QA-CLAUDE-HELIXCAR-brouillon');__erreur=false;});
     let message = await page.locator('#opportunite-message').textContent();
@@ -106,6 +108,8 @@ window.fetch=function(url){
     check('B7 : annuler la confirmation ne publie rien', !(await page.evaluate(()=>__journal.some(x=>x.rpc==='publier_opportunite'))));
     await page.evaluate(() => publierOpportunite('TEST-QA-CLAUDE-HELIXCAR-brouillon'));
     check('B8 : publication relue, formulaire de brouillon retiré', await page.locator('#opportunite-form').count() === 0 && (await page.locator('#opportunite-titre').textContent()).includes('À pourvoir'));
+    await page.evaluate(() => loadOpportunitesAdmin());
+    check('B8bis : publication fait apparaître la mission', (await page.locator('#opportunites-table').innerHTML()).includes('TEST-QA-CLAUDE-HELIXCAR-M1'));
     check('B9 : confirmation de publication reste visible après relecture', (await page.locator('#opportunite-message').textContent()).includes('visible par les partenaires'));
 
     await page.evaluate(() => ouvrirOpportuniteAdmin('TEST-QA-CLAUDE-HELIXCAR-ouverte'));

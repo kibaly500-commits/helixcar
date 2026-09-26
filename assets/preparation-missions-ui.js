@@ -110,6 +110,7 @@
         if(!confirm('Publier cette mission au prix total de '+money(p.remuneration)+' auprès des partenaires éligibles ?'))return;
         await rpc('publier_preparation_mission',{p_id:p.saved.id});
         adopt(await rpc('source_preparation_missions',{p_client_id:state.source.client.id}));state.preview=true;render();note('Mission publiée dans les opportunités partenaires.');
+        await loadOpportunitesAdmin();
       }
     }catch(err){note(err.message,true);}finally{busy=false;b.disabled=false;}
   });

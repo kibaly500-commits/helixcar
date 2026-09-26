@@ -3542,7 +3542,8 @@ async function chargerOpportunitesAdmin() {
   if (!_sbAuthPret()) return [];
   const { data, error } = await sbAuth.from('v_opportunites_admin').select('*').order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return data || [];
+  // Une préparation ou un brouillon automatique ne constitue pas une publication.
+  return (data || []).filter(o => o.publiee_le && o.statut !== 'brouillon');
 }
 function _majBadgeOpportunitesAdmin(liste) {
   const b = document.getElementById('badge-admin-opportunites');
@@ -3564,7 +3565,7 @@ async function loadOpportunitesAdmin() {
   const sub = document.getElementById('opportunites-sub');
   if (sub) sub.textContent = liste.length ? liste.length + ' opportunité(s)' : 'Besoins publiés aux partenaires éligibles, sans coordonnées ni identité client';
   if (!liste.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune opportunité pour le moment. Un brouillon est préparé automatiquement pour chaque nouvelle mission ; le bouton « Opportunité » d\'une mission l\'ouvre.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune mission publiée pour le moment. Dans une demande de devis, ouvrez « Préparer les missions », puis cliquez sur « Publier cette mission ».</td></tr>';
     return;
   }
   tbody.innerHTML = liste.map(function (o) {
