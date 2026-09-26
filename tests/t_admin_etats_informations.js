@@ -27,5 +27,27 @@ await p.evaluate(()=>{document.getElementById('filtre-informations-devis').value
 await p.evaluate(()=>{document.getElementById('filtre-informations-devis').value='complet';filtrerDemandesDevis('');});assert.match(await p.locator('#tbody-demandes-devis').innerText(),/HC-B/);
 await p.evaluate(()=>{chargerInfosDemandeAdmin=async()=>{throw Error('réseau')};return _chargerEtatsInformationsDemandes()});assert.match(await p.locator('#tbody-demandes-devis').innerText(),/Aucune demande/);
 await p.evaluate(()=>{document.getElementById('filtre-informations-devis').value='indisponible';filtrerDemandesDevis('');});assert.match(await p.locator('#tbody-demandes-devis').innerText(),/Chargement impossible/);
+await p.evaluate(()=>{
+ document.getElementById('filtre-informations-devis').value='';
+ _demandesDevisListe=[
+  {id:'ancien',numero_client:'HC-ANCIEN',created_at:'2026-01-01',activite_demande_le:'2026-09-27T12:00:00.123456Z',vue_admin_at:null},
+  {id:'nouveau',numero_client:'HC-NOUVEAU',created_at:'2026-09-27T11:00:00Z',activite_demande_le:'2026-09-27T11:00:00Z',vue_admin_at:null}];
+ _devisParClient={ancien:{statut:'accepte',paiement_statut:'paye'}};filtrerDemandesDevis('');
+});
+assert.match(await p.locator('#tbody-demandes-devis tr').first().innerText(),/HC-ANCIEN/);
+assert.match(await p.locator('#tbody-demandes-devis tr').first().innerText(),/Non lu/);
+await p.evaluate(async()=>{
+ window._requeteLecture='';sbFetch=async(path,opts)=>{window._requeteLecture=path;return [{..._demandesDevisListe[0],vue_admin_at:JSON.parse(opts.body).vue_admin_at}];};
+ await _ecrireEtatLecture('ancien','2026-09-27T12:01:00Z','Échec');
+});
+assert.match(await p.evaluate(()=>window._requeteLecture),/activite_demande_le=eq.2026-09-27T12%3A00%3A00.123456Z/);
+assert.equal(await p.locator('#tbody-demandes-devis tr').first().getAttribute('class'),null);
+// Une nouveauté simultanée empêche le PATCH de marquer cette nouvelle version lue.
+await p.evaluate(async()=>{
+ sbFetch=async()=>[];
+ loadDemandesDevis=async()=>{_demandesDevisListe[0].vue_admin_at=null;_demandesDevisListe[0].activite_demande_le='2026-09-27T12:02:00Z';filtrerDemandesDevis('');};
+ await _ecrireEtatLecture('ancien','2026-09-27T12:01:00Z','Échec');
+});
+assert.equal(await p.locator('#tbody-demandes-devis tr').first().getAttribute('class'),'demande-non-lue');
 console.log('PASS : états simples et mixtes, modifications/corrections, paiement indépendant, filtres, actualisation et erreurs sans faux complet');
 }finally{await b.close()}})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,21 @@
+begin; do $$ declare cid uuid; vid uuid; t timestamptz; t2 timestamptz; lu timestamptz; n integer; begin
+insert into public.clients(code_parrainage,numero_client,prenom,nom,email,type_client,type_service) values(gen_random_uuid()::text,'QA-'||gen_random_uuid()::text,'QA','Activite','qa-activite@example.invalid','particulier','convoyage') returning id,activite_demande_le into cid,t;
+if t is null then raise exception 'Création sans activité';end if;
+update public.clients set vue_admin_at=clock_timestamp() where id=cid;
+select activite_demande_le,vue_admin_at into t2,lu from public.clients where id=cid;
+if t2<>t or lu is null then raise exception 'Lecture crée une activité';end if;
+update public.clients set notes='Nouvelle information' where id=cid;
+select activite_demande_le,vue_admin_at into t2,lu from public.clients where id=cid;
+if t2<=t or lu is not null then raise exception 'Modification non signalée';end if;
+update public.clients set vue_admin_at=clock_timestamp() where id=cid and activite_demande_le=t;
+get diagnostics n=row_count;if n<>0 then raise exception 'Lecture obsolète acceptée';end if;
+insert into public.vehicules(dossier_id,position,marque_modele) values(cid,1,'QA') returning id into vid;
+select activite_demande_le into t from public.clients where id=cid;
+update public.clients set vue_admin_at=clock_timestamp() where id=cid;
+update public.vehicules set marque_modele='QA' where id=vid;
+select activite_demande_le,vue_admin_at into t2,lu from public.clients where id=cid;
+if t2<>t or lu is null then raise exception 'Écriture identique signalée';end if;
+update public.vehicules set marque_modele='QA Modifié' where id=vid;
+select activite_demande_le,vue_admin_at into t2,lu from public.clients where id=cid;
+if t2<=t or lu is not null then raise exception 'Véhicule non signalé';end if;
+end $$; rollback; select 'PASS activité, lecture, concurrence et absence de changement (transaction annulée)' as resultat;

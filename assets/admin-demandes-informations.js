@@ -59,4 +59,11 @@ async function _lireEtatsInformationsDemandes() {
     filtrerDemandesDevis((document.getElementById('recherche-devis')||{}).value);
   }
 }
-setInterval(function(){var p=document.getElementById('page-admin-devis');if(p&&p.classList.contains('active')&&!document.hidden)_chargerEtatsInformationsDemandes();},30000);
+var _actualisationDemandesEnCours=false;
+async function _actualiserNouveautesDemandes(){
+ var p=document.getElementById('page-admin-devis');
+ if(!p||!p.classList.contains('active')||document.hidden||currentRole!=='admin'||_actualisationDemandesEnCours)return;
+ _actualisationDemandesEnCours=true;try{await loadDemandesDevis(true);}finally{_actualisationDemandesEnCours=false;}
+}
+setInterval(_actualiserNouveautesDemandes,30000);
+if(typeof document!=='undefined')document.addEventListener('visibilitychange',function(){if(!document.hidden)_actualiserNouveautesDemandes();});

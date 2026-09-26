@@ -1451,7 +1451,7 @@ body.scroll-verrouille { overflow: hidden; }
                   </select></th>
                   <th><select id="filtre-informations-devis" aria-label="Filtrer par état des informations" onchange="filtrerDemandesDevis(document.getElementById('recherche-devis').value)">
                     <option value="">Informations : toutes</option><option value="a_verifier">À vérifier par HelixCar</option><option value="nouvelles">Informations reçues</option><option value="modifications">Informations modifiées</option><option value="corrections">Corrections reçues</option><option value="attente_client">En attente du client</option><option value="manquantes">Champs manquants</option><option value="a_corriger">Corrections demandées</option><option value="confirmation">Confirmation client attendue</option><option value="complet">Dossier complet</option><option value="indisponible">État indisponible</option>
-                  </select><button type="button" class="hc-actualiser-infos" onclick="_chargerEtatsInformationsDemandes()">Actualiser</button></th>
+                  </select><button type="button" class="hc-actualiser-infos" onclick="loadDemandesDevis(true)">Actualiser</button></th>
                   <th></th>
                 </tr>
               </thead>
@@ -10366,11 +10366,11 @@ function _statutDevisBadge(statut, d) {
 }
 
 // Charge les demandes (clients ayant réellement demandé un convoyage)
-function loadDemandesDevis() {
+function loadDemandesDevis(silencieux) {
   var tbody = document.getElementById('tbody-demandes-devis');
   var alerte = document.getElementById('devis-alerte-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
+  if(!silencieux) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
 
   var pClients = sbFetchToutePage('clients?order=created_at.desc');
   var pDevis = sbAuthListeDevisTriee()
@@ -10384,7 +10384,7 @@ function loadDemandesDevis() {
 
   var pMissionsNett = chargerMissionsParDemande();
 
-  Promise.all([pClients, pDevis, pVehicules, pMissionsNett]).then(function(res) {
+  return Promise.all([pClients, pDevis, pVehicules, pMissionsNett]).then(function(res) {
     var clients = res[0] || [];
     var devis = res[1];
     var vehicules = res[2] || [];
@@ -10507,6 +10507,7 @@ function _rendreTableDemandesDevis(liste) {
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Aucune demande correspondant aux filtres.</td></tr>';
     return;
   }
+  liste=liste.slice().sort(function(a,b){return new Date(b.activite_demande_le||b.created_at||0)-new Date(a.activite_demande_le||a.created_at||0);});
   var html = '';
   liste.forEach(function(c) {
     var d = _devisParClient[String(c.id)];
@@ -10517,7 +10518,7 @@ function _rendreTableDemandesDevis(liste) {
     html += '<tr' + (nonLue ? ' class="demande-non-lue"' : '') + '>' +
       '<td>' + _dvDate(c.created_at) + '</td>' +
       '<td><b>' + _escapeHtml(_dv(c.numero_client)) + '</b></td>' +
-      '<td>' + (nonLue ? '<span class="pastille-non-lue" title="Non consultée"></span>' : '') +
+      '<td>' + (nonLue ? '<span class="pastille-non-lue" title="Non lu"></span><span style="color:#9F2943;font-size:.7rem;font-weight:700;margin-right:5px">Non lu</span>' : '') +
         '<span class="nom-client">' + _escapeHtml(_hcIdentiteClient(c)) + '</span>' +
         '<div style="font-size:.75rem;color:#888">' + _escapeHtml(_dv(c.email)) + '</div></td>' +
       '<td>' + _escapeHtml(c.type_client === 'pro' ? 'Pro' : 'Particulier') + '</td>' +
@@ -14605,10 +14606,14 @@ function _ecrireEtatLecture(clientId, valeur, messageErreur) {
   c.vue_admin_at = valeur;
   _rafraichirEtatLecture();
 
-  sbFetch('clients?id=eq.' + encodeURIComponent(clientId), {
+  var conditionActivite = c.activite_demande_le ? '&activite_demande_le=eq.' + encodeURIComponent(c.activite_demande_le) : '&activite_demande_le=is.null';
+  return sbFetch('clients?id=eq.' + encodeURIComponent(clientId) + conditionActivite, {
     method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
+    headers: { 'Prefer': 'return=representation' },
     body: JSON.stringify({ vue_admin_at: valeur })
+  }).then(function(rows){
+    if(!Array.isArray(rows)||!rows.length){return loadDemandesDevis(true);}
+    Object.assign(c,rows[0]);_rafraichirEtatLecture();
   }).catch(function (e) {
     console.error(messageErreur, e);
     c.vue_admin_at = precedent;              // rollback : jamais d'état incohérent
