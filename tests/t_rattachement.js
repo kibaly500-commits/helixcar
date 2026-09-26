@@ -110,6 +110,11 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
   await page.goto(urlFichier('index.html'), { waitUntil: 'load' });
   await page.waitForTimeout(200);
 
+  // Reproduit le cache laissé après consultation/complétion d'un ancien
+  // dossier sur la même page publique, en plus de la session Supabase.
+  if (sessionAmbiante) await page.evaluate(() => {
+    _hcSessionClient = { userId: window.__session.user.id, email: window.__session.user.email };
+  });
   await L.fillStep1(page, 'particulier');
   await L.chooseService(page, 'compte');
   await page.waitForTimeout(80);

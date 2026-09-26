@@ -9295,7 +9295,11 @@ function _hcNouvelIdentifiant() {
 }
 
 function _hcIdCompteConnecte() {
-  return (_hcSessionClient && _hcSessionClient.userId) || null;
+  // Une session chargée pour compléter un dossier ne transforme jamais
+  // « Devenir client » en dépôt pour ce compte. Seul le parcours explicite
+  // de nouvelle demande peut réutiliser l'identité connectée.
+  var depuisEspace = new URLSearchParams(window.location.search || '').get('nouvelle-demande') === '1';
+  return depuisEspace && _hcSessionClient ? _hcSessionClient.userId || null : null;
 }
 
 // Lit la session réellement ouverte. Aucune donnée de profil n'est
@@ -17314,7 +17318,7 @@ async function _submitClientFormInterne() {
   //                   échec : le nouvel essai avec la même adresse doit
   //                   rester possible et sans effet de bord ;
   //   'echec'       : le serveur a refusé, ou n'a pas répondu.
-  var _compteEtat = 'non_demande';
+  var _compteEtat = _idCompteDepot ? 'non_demande' : 'echec';
   var _compteSession = false;
   if (!_idCompteDepot && _sb && _sb.auth && email_val) {
     var mdpSaisi = ((document.getElementById('client-password') || {}).value || '');
