@@ -17,6 +17,7 @@
     saved.filter(s=>s.mission_id&&!plans.some(p=>p.key===s.cle)).forEach(s=>plans.push(Object.assign({},s.plan,{saved:s})));
     plans.forEach(p=>{
       if(p.category!=='convoyage')return;
+      if(!p.saved?.mission_id)p.missing=[...new Set([...(p.missing||[]),...HCPreparation.missingVins(p.mission)])];
       const pickupKey=p.kind==='apres_stockage'?'heure_retrait':'heure_prise_en_charge';
       if(p[pickupKey]==null)p[pickupKey]=p.rows.find(r=>r.label==='Prise en charge')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
       if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
@@ -68,7 +69,7 @@
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
-      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked)h+='<p class="hc-prep-muted">Mission déjà créée</p>';else h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'">Publier cette mission</button>';return;}
+      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked)h+='<p class="hc-prep-muted">Mission déjà créée</p>';else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>';
@@ -105,6 +106,7 @@
       if(b.dataset.prepView==='preview'){await save();state.preview=true;render();note('');}
       if(b.hasAttribute('data-prep-publish')){
         const p=state.plans[Number(b.dataset.prepPublish)];if(!p.saved)throw Error('Enregistrez le brouillon avant publication.');
+        if(p.missing.length)throw Error('Publication bloquée : '+p.missing.join(' · '));
         if(!confirm('Publier cette mission au prix total de '+money(p.remuneration)+' auprès des partenaires éligibles ?'))return;
         await rpc('publier_preparation_mission',{p_id:p.saved.id});
         adopt(await rpc('source_preparation_missions',{p_client_id:state.source.client.id}));state.preview=true;render();note('Mission publiée dans les opportunités partenaires.');

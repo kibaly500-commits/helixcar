@@ -10,6 +10,10 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check('Point de remise réservé au privé',split[0].mission.adresse_arrivee.includes('12 rue')&&!JSON.stringify(planner.publicData(split[0])).includes('12 rue'));
  const invalidAfter=planner.build({...c,type_service:'stockage'},[{...v,date_livraison:'2026-11-10'}]);
  L.check('Livraison avant sortie du stockage bloquée',invalidAfter[1].missing.includes('Livraison antérieure à la prise en charge'));
+ const absentVins=planner.build(c,[{...v,vin:'   ',restit_vin:null}])[0];
+ L.check('VIN livraison et restitution obligatoires',absentVins.missing.filter(x=>x.includes('VIN')).length===2);
+ L.check('VIN restitution non exigé sans restitution',planner.missingVins({vin:'VIN',restitution:false}).length===0);
+ L.check('VIN présents sans blocage',planner.missingVins({vin:'VIN',restitution:true,restit_vin:'VIN-RETOUR'}).length===0);
  const p=planner.build(c,[v])[0];L.check('Consignes restitution administratives conservées',p.mission.restit_info==='Clefs secrètes');L.check('Projection publique sans données privées',!JSON.stringify(planner.publicData(p)).includes('SECRET')&&!JSON.stringify(planner.publicData(p)).includes('rue'));
  L.check('Tiret entre horaires',planner.publicData(p).rows.some(r=>r.value.includes('16:00 - 17:00')));
  const clean={...c,type_service:'nettoyage',nettoyage_details:{type_nettoyage:'interieur_exterieur',nombre_vehicules_approx:4,adresse_ville:'Créteil',date_souhaitee:'2026-11-08',date_fin:'2026-11-08',creneau_debut:'09:00',creneau_fin:'12:00'}};
@@ -37,6 +41,11 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  await page.evaluate(async()=>{__source.brouillons=[];__source.vehicules[0].vin=null;await ouvrirPreparationDemande('client-1');});
  await page.locator('.hc-prep-private summary').click();
  L.check(width+' VIN manquant affiché dans les informations privées',await page.locator('.hc-prep-private').innerText().then(t=>t.includes('VIN du véhicule livré')&&t.includes('À compléter dans la demande')));
+ await page.locator('[data-prep-view="preview"]').first().click();
+ L.check(width+' publication désactivée sans VIN',await page.locator('[data-prep-publish]').isDisabled());
+ L.check(width+' motif VIN visible avant publication',await page.locator('.hc-prep-incomplete').innerText().then(t=>t.includes('VIN du véhicule livré (obligatoire)')));
+ await page.evaluate(async()=>{__source.brouillons[0].plan.missing=[];await ouvrirPreparationDemande('client-1');});
+ L.check(width+' ancien brouillon revérifié pour les VIN',await page.locator('.hc-prep-incomplete').innerText().then(t=>t.includes('VIN du véhicule livré (obligatoire)')));
  const filtering=await page.evaluate(()=>{
    _demandesDevisListe=[{id:'a',nom:'Alpha',email:'a@example.test'},{id:'b',nom:'Beta',email:'b@example.test'},{id:'c',nom:'Gamma',email:'a@example.test'}];
    _devisParClient={a:{statut:'accepte',paiement_statut:'en_attente'},b:{statut:'accepte',paiement_statut:'paye'},c:{statut:'envoye',consulte_le:'2026-09-01'}};
