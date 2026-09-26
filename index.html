@@ -3978,6 +3978,12 @@ html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:f
 #modal-completer .completion-fields{padding:0 18px 18px}
 #modal-completer .completion-known{font-size:12px;color:#6f787d;padding:10px 0;border-bottom:1px solid #eee}
 #modal-completer .completion-known summary{cursor:pointer}
+#modal-completer .completion-edit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#modal-completer .completion-edit-actions button{min-height:40px;padding:9px 12px;border:1px solid #d9dedd;border-radius:7px;background:#fff;color:#344049;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;cursor:pointer}
+#modal-completer .completion-edit-actions .completion-edit-save{background:#9F2943;border-color:#9F2943;color:#fff}
+#modal-completer .completion-edit-actions button:disabled{opacity:.6;cursor:wait}
+#modal-completer .completion-pending{display:block;margin-top:8px;font-size:11px;font-weight:500;color:#765418;background:#fff4db;padding:5px 8px;border-radius:5px;width:fit-content}
+#modal-completer .completion-edit-feedback{font-size:12px;line-height:1.5;margin:8px 0 0}
 #modal-completer .completion-edit-cancel{border:0;background:none;color:#a6343a;text-decoration:underline;padding:8px 0;cursor:pointer}
 #modal-completer .completion-edit{float:right;border:1px solid #ddd;background:#fff;color:#a6343a;border-radius:6px;width:36px;min-height:36px;font-size:20px;cursor:pointer;margin-left:8px}
 .hc-completion-confirm{box-sizing:border-box;width:min(520px,calc(100% - 32px));border:0;border-top:4px solid #a6343a;border-radius:14px;padding:28px;color:#202a30;font:15px/1.6 Arial,sans-serif}
@@ -9803,6 +9809,7 @@ function _completerRendre(lignes) {
             var edit=document.createElement('button');edit.type='button';edit.className='completion-edit';edit.textContent='✎';edit.setAttribute('aria-label','Modifier '+_completerLibelleCourt(l));
             edit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();_completerEditions.add(l.cle);_completerRendre(_completerToutesLignes);var field=document.getElementById(_completerChampId(l.cle));if(field){field.closest('details.completion-card').open=true;field.focus();}};term.appendChild(edit);
           }
+          if(l.statut==='transmise'){var pending=document.createElement('span');pending.className='completion-pending';pending.textContent='En attente de validation par HelixCar';value.appendChild(pending);}
           if(_completerEditions.has(l.cle)){value.textContent='';editionsRecues[l.cle]=value;}
           cell.append(term,value);list.appendChild(cell);
         });
@@ -9832,8 +9839,8 @@ function _completerRendre(lignes) {
       etoile.textContent = '*';
       label.appendChild(document.createTextNode(' '));
       label.appendChild(etoile);
-      groupe.appendChild(label);
-      if(_completerEditions.has(l.cle)){var cancelEdit=document.createElement('button');cancelEdit.type='button';cancelEdit.className='completion-edit-cancel';cancelEdit.textContent='Annuler la modification';cancelEdit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();var saved=JSON.parse(sessionStorage.getItem(_completerBrouillonCle())||'{}');delete saved[l.cle];sessionStorage.setItem(_completerBrouillonCle(),JSON.stringify(saved));_completerEditions.delete(l.cle);_completerRendre(_completerToutesLignes);};groupe.appendChild(cancelEdit);}
+      if(!editionsRecues[l.cle])groupe.appendChild(label);
+
 
       if (l.statut === 'a_corriger' && l.commentaire) {
         var motif = document.createElement('div');
@@ -9849,6 +9856,7 @@ function _completerRendre(lignes) {
       if (!estMotorisation) champ.type = (l.cle.indexOf('date') !== -1) ? 'date'
                  : (l.cle.indexOf('tel') !== -1) ? 'tel' : 'text';
       champ.id = _completerChampId(l.cle);
+      if(editionsRecues[l.cle])champ.setAttribute('aria-label',_completerLibelleCourt(l));
       champ.value = l.valeur || '';
       if (brouillon[l.cle] && brouillon[l.cle].base === (l.valeur || '')) champ.value = brouillon[l.cle].valeur;
       champ.required = true;
@@ -9873,11 +9881,43 @@ function _completerRendre(lignes) {
         champ.addEventListener('input',function(){choices.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.dataset.value===champ.value));});});
         groupe.appendChild(choices);
       }
+      if(editionsRecues[l.cle]){
+        var actions=document.createElement('div');actions.className='completion-edit-actions';
+        var cancelEdit=document.createElement('button');cancelEdit.type='button';cancelEdit.textContent='Annuler';
+        cancelEdit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();_completerRetirerBrouillon(l.cle);_completerEditions.delete(l.cle);_completerRendre(_completerToutesLignes);};
+        var saveEdit=document.createElement('button');saveEdit.type='button';saveEdit.className='completion-edit-save';saveEdit.textContent='Valider la modification';
+        saveEdit.onclick=function(){_completerEnvoyerModification(l);};
+        actions.append(cancelEdit,saveEdit);groupe.appendChild(actions);
+        var feedback=document.createElement('p');feedback.className='completion-edit-feedback';feedback.setAttribute('role','status');groupe.appendChild(feedback);
+      }
       (editionsRecues[l.cle]||contenu).appendChild(groupe);
     });
 
   });
   _completerEtatBouton();
+}
+
+function _completerRetirerBrouillon(cle){
+ try{var saved=JSON.parse(sessionStorage.getItem(_completerBrouillonCle())||'{}');delete saved[cle];sessionStorage.setItem(_completerBrouillonCle(),JSON.stringify(saved));}catch(e){}
+}
+async function _completerEnvoyerModification(l){
+ if(_completerEnvoiEnCours||_completerConfirmationEnCours||!_completerPeutModifier(l))return;
+ var champ=document.getElementById(_completerChampId(l.cle)),groupe=champ.closest('.modal-form-group'),feedback=groupe.querySelector('.completion-edit-feedback');
+ if(!_completerChampPret(l)){feedback.textContent='Renseignez une valeur valide avant de confirmer.';champ.reportValidity();champ.focus();return;}
+ var valeur=champ.value.trim();if(valeur===(l.valeur||'')){feedback.textContent='Aucune modification à envoyer.';return;}
+ var generation=_completerGeneration,id=_completerDemandeId;
+ _completerConserverSaisies();_completerEnvoiEnCours=true;_completerEtatBouton();
+ groupe.querySelectorAll('button,input,select').forEach(function(el){el.disabled=true;});feedback.textContent='Envoi en cours…';
+ try{
+  var r=await _sb.rpc('modifier_information_demande',{p_client_id:id,p_cle:l.cle,p_valeur:valeur});
+  if(generation!==_completerGeneration)return;
+  if(!r||r.error||r.data!==1)throw new Error(r&&r.error?r.error.message:'La modification n’a pas été enregistrée.');
+  _completerRetirerBrouillon(l.cle);_completerEditions.delete(l.cle);
+  // Seule la valeur confirmée par le serveur est affichée comme transmise.
+  l.valeur=valeur;l.statut='transmise';_completerRendre(_completerToutesLignes);
+  if(_hcModeIntegre())window.parent.postMessage({type:'hc-completion-enregistree'},window.location.origin);
+ }catch(e){if(generation===_completerGeneration)feedback.textContent='Enregistrement impossible. '+(e.message||'Réessayez.');}
+ finally{_completerEnvoiEnCours=false;if(generation===_completerGeneration){groupe.querySelectorAll('button,input,select').forEach(function(el){el.disabled=false;});_completerEtatBouton();}}
 }
 
 // Fermeture : dans l'espace client, on prévient le cadre parent ; sur
