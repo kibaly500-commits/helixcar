@@ -46,6 +46,26 @@ const L=require('./lib');const plan=require('../assets/preparation-missions.js')
  L.check('Complément sous forme de liste obligatoire',await page.locator('#completer-champ-vehicule_1_motorisation').evaluate(e=>e.tagName==='SELECT'&&e.required));
  await page.locator('#completer-champ-vehicule_1_motorisation').evaluate(e=>{e.value='Électrique';e.dispatchEvent(new Event('input',{bubbles:true}));});
  L.check('Complément sélectionnable',await page.locator('#completer-champ-vehicule_1_motorisation').inputValue()==='Électrique');
+ const received=[{cle:'vehicule_1_vin',libelle:'Véhicule 1 — numéro de châssis (VIN)',statut:'fournie',valeur:'VF123456789012345'},{cle:'vehicule_1_contact_pc_nom',libelle:'Véhicule 1 — nom du contact',statut:'fournie',valeur:'Contact QA'},{cle:'vehicule_1_motorisation',libelle:'Véhicule 1 — motorisation',statut:'attendue',valeur:null},{cle:'vehicule_1_restit_motorisation',libelle:'Véhicule 1 — motorisation du véhicule à restituer',statut:'attendue',valeur:null}];
+ for(const width of [390,1280]){
+  await page.setViewportSize({width,height:1000});
+  await page.evaluate(lines=>{sessionStorage.clear();_completerRendre(lines);closeModal('client');openModal('completer');},received);
+  const choices=page.locator('.completion-choices').first();
+  await choices.getByRole('button',{name:'Diesel',exact:true}).click();
+  L.check(width+' choix motorisation synchronisé',await page.locator('#completer-champ-vehicule_1_motorisation').inputValue()==='Diesel');
+  L.check(width+' une seule sélection active',await choices.locator('[aria-pressed=true]').count()===1);
+  L.check(width+' restitution indépendante',await page.locator('#completer-champ-vehicule_1_restit_motorisation').inputValue()==='');
+  L.check(width+' Motorisation avec majuscule',(await page.locator('#completer-champ-vehicule_1_motorisation-label').innerText()).startsWith('Motorisation'));
+  await page.locator('.completion-known summary').click();
+  L.check(width+' informations reçues structurées',await page.locator('.completion-received section').count()===2 && await page.locator('.completion-received dd').count()===2);
+  L.check(width+' libellés sans répétition véhicule',!(await page.locator('.completion-received').innerText()).includes('Véhicule 1'));
+  L.check(width+' boutons sans débordement',await choices.evaluate(e=>e.scrollWidth<=e.clientWidth));
+  await page.locator('#modal-completer').screenshot({path:'/tmp/hc-completion-'+width+'.png'});
+  await page.evaluate(lines=>_completerRendre(lines),received);
+  L.check(width+' sélection conservée après réouverture',await page.locator('.completion-choices').first().locator('button[data-value="Diesel"]').getAttribute('aria-pressed')==='true');
+ }
+ await page.evaluate(()=>closeModal('completer'));
+
  const p=plan.build({type_service:'convoyage'},[{...vs[0],ville_depart:'Paris',ville_arrivee:'Lyon',date_prise_en_charge:'2026-11-01',date_livraison:'2026-11-01'}])[0];
  L.check('Préparation reprend la motorisation principale',p.motorisation==='Électrique');L.check('Préparation reprend celle de restitution',p.restit_motorisation==='Hybride');
  L.check('Annonce porte la motorisation',plan.publicData(p).rows.some(r=>r.label==='Motorisation'&&r.value==='Électrique'));

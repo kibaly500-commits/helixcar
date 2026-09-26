@@ -3964,6 +3964,22 @@
 #modal-completer .completion-fields{padding:0 18px 18px}
 #modal-completer .completion-known{font-size:12px;color:#6f787d;padding:10px 0;border-bottom:1px solid #eee}
 #modal-completer .completion-known summary{cursor:pointer}
+#modal-completer .completion-received section{padding:0;margin:0;background:transparent;min-height:0}
+#modal-completer .completion-received .completion-section{margin:18px 0 4px}
+#modal-completer .completion-received dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:0}
+#modal-completer .completion-received dl>div{padding:12px 0;border-bottom:1px solid #edf0f1;min-width:0}
+#modal-completer .completion-received dt{font-size:12px;color:#68747b;line-height:1.5}
+#modal-completer .completion-received dd{margin:4px 0 0;font-size:14px;font-weight:600;color:#202a30;overflow-wrap:anywhere;white-space:pre-line}
+#modal-completer .completion-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#modal-completer .completion-choice{font:600 13px Arial,sans-serif;min-height:48px;padding:12px 18px 12px 10px;border:1px solid #d7dcdf;border-radius:8px;background:#fff;color:#293237;text-align:left;cursor:pointer;position:relative;overflow-wrap:anywhere}
+#modal-completer .completion-choice:hover{border-color:#a6343a;background:#fff8f8}
+#modal-completer .completion-choice[aria-pressed=true]{background:#a6343a;border-color:#a6343a;color:#fff}
+#modal-completer .completion-choice[aria-pressed=true]::after{content:'✓';position:absolute;right:10px;top:50%;transform:translateY(-50%)}
+#modal-completer .completion-choice:focus-visible{outline:2px solid #a6343a;outline-offset:3px}
+@media(max-width:600px){#modal-completer .completion-received section{padding:0;margin:0;background:transparent;min-height:0}
+#modal-completer .completion-received .completion-section{margin:18px 0 4px}
+#modal-completer .completion-received dl{grid-template-columns:1fr}#modal-completer .completion-choices{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 #modal-completer .completion-section{font:700 11px Arial,sans-serif;letter-spacing:1.3px;text-transform:uppercase;margin:23px 0 15px;color:#67737a}
 #modal-completer .modal-form-group{margin-bottom:17px}
 #modal-completer .modal-form-group label{display:block;font-size:13px;line-height:1.5;font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:7px;color:#293237}
@@ -9628,6 +9644,10 @@ function _completerLibelle(l) {
 // ont un champ, avec les mêmes composants que le formulaire
 // (.modal-form-group, label, champ). Une rubrique validée n'apparaît
 // jamais comme champ ; son groupe la compte comme renseignée.
+function _completerLibelleCourt(l) {
+  var texte=String(l.libelle || l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/i,'');
+  return texte.charAt(0).toUpperCase()+texte.slice(1);
+}
 function _completerSection(l) {
   var cle = String(l.cle || '');
   if (/restit/.test(cle)) return 'Restitution';
@@ -9740,9 +9760,20 @@ function _completerRendre(lignes) {
     }
     var connues = g.lignes.filter(function (l) { return !_completerEstRestante(l); });
     if (connues.length) {
-      var recap = document.createElement('p');
-      recap.style.cssText = 'font-size:.82rem;color:#555;overflow-wrap:anywhere';
-      recap.textContent = connues.map(function (l) { return String(l.libelle || l.cle) + (l.valeur ? ' : ' + l.valeur : ' — renseigné'); }).join(' · ');
+      var recap = document.createElement('div'); recap.className = 'completion-received';
+      ['Votre véhicule','Prise en charge','Livraison','Restitution'].forEach(function(section){
+        var items = connues.filter(function(l){return _completerSection(l)===section;});
+        if(!items.length)return;
+        var block=document.createElement('section'), heading=document.createElement('h3'), list=document.createElement('dl');
+        heading.className='completion-section'; heading.textContent=section;
+        items.forEach(function(l){
+          var cell=document.createElement('div'),term=document.createElement('dt'),value=document.createElement('dd');
+          term.textContent=_completerLibelleCourt(l);
+          value.textContent=l.valeur || (l.statut==='transmise'?'Transmis — en vérification':'Renseigné');
+          cell.append(term,value);list.appendChild(cell);
+        });
+        block.append(heading,list);recap.appendChild(block);
+      });
       var connus = document.createElement('details'); connus.className = 'completion-known';
       var resume = document.createElement('summary'); resume.textContent = connues.length + ' informations déjà reçues';
       connus.append(resume, recap); contenu.appendChild(connus);
@@ -9758,7 +9789,8 @@ function _completerRendre(lignes) {
 
       var label = document.createElement('label');
       label.htmlFor = _completerChampId(l.cle);
-      label.textContent = String(l.libelle || l.cle).replace(/^Véhicule \d+\s*[—–:-]\s*/, '');
+      label.textContent = _completerLibelleCourt(l);
+      label.id = _completerChampId(l.cle) + '-label';
       label.title = _completerLibelle(l);
       var etoile = document.createElement('span');
       etoile.className = 'field-required';
@@ -9789,6 +9821,21 @@ function _completerRendre(lignes) {
       if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
       champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
+      if(estMotorisation){
+        champ.hidden=true;
+        var choices=document.createElement('div'); choices.className='completion-choices';
+        choices.setAttribute('role','group'); choices.setAttribute('aria-labelledby',label.id);
+        if(l.commentaire&&l.statut==='a_corriger')choices.setAttribute('aria-describedby',champ.id+'-motif');
+        Array.from(champ.options).filter(function(o){return o.value;}).forEach(function(option){
+          var button=document.createElement('button');button.type='button';button.className='completion-choice';
+          button.textContent=option.textContent;button.dataset.value=option.value;
+          button.setAttribute('aria-pressed',String(champ.value===option.value));
+          button.addEventListener('click',function(){champ.value=option.value;champ.dispatchEvent(new Event('input',{bubbles:true}));});
+          choices.appendChild(button);
+        });
+        champ.addEventListener('input',function(){choices.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.dataset.value===champ.value));});});
+        groupe.appendChild(choices);
+      }
       contenu.appendChild(groupe);
     });
 
