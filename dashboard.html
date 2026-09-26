@@ -1830,7 +1830,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="client-missions-sub"></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Partenaire</th><th>Prix TTC</th><th>Statut</th><th>Évaluation</th></tr></thead>
+              <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Partenaire</th><th>Statut</th><th>Évaluation</th></tr></thead>
               <tbody id="client-missions-table">
                 <tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
@@ -3062,7 +3062,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   }
   if (!erreurDevis && !paye && dv && ['envoye','accepte'].includes(dv.statut)) {
     return etat(dv.statut === 'accepte' ? 'Paiement en attente' : 'À consulter','violet',
-      !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : 'Votre devis est disponible dans votre espace client.','devis','devis');
+      !erreurInfos && lignes.some(l=>l.statut==='transmise') ? 'Vos informations sont en vérification. Votre devis est disponible.' : '','devis','devis');
   }
   if (!erreurInfos && lignes.some(_estRestante)) return etat('Informations à compléter','orange',paye ? 'Votre paiement est reçu. Nous préparons votre prestation.' : 'Complétez votre dossier pour préparer la prestation.','completer','informations');
   if (erreurInfos || erreurDevis) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
@@ -3213,16 +3213,16 @@ async function loadMissionsClient() {
   const tbody = document.getElementById('client-missions-table');
   if (!tbody) return;
   const sub = document.getElementById('client-missions-sub');
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
   let missions = [];
   try { missions = await chargerMissionsSuiviClient(); }
   catch (e) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
     return;
   }
   if (sub) sub.textContent = missions.length ? missions.length + ' mission(s)' : '';
   if (!missions.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">'
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">'
       + 'Aucune mission pour le moment. Vos missions apparaîtront ici une fois votre devis payé et vos informations complètes.</td></tr>';
     return;
   }
@@ -3236,7 +3236,6 @@ async function loadMissionsClient() {
       + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
       + '<td>' + escapeHtml(_partenaireMissionClient(m)) + '</td>'
-      + '<td>' + (m.prix_ttc != null ? escapeHtml(m.prix_ttc) + ' €' : '—') + '</td>'
       + '<td><span class="badge badge-progress">' + escapeHtml(_phaseMissionClient(m)) + '</span><br><small>' + (m._paiement === 'paye' ? 'Devis payé' : m._paiement === 'inconnu' ? 'Paiement à vérifier' : 'Devis non payé') + '</small></td>'
       + '<td>' + evaluation + '</td></tr>';
   }).join('');

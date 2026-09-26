@@ -28,6 +28,7 @@ window.supabase={createClient(){return {
   await page.goto(urlFichier('dashboard.html'),{waitUntil:'load'});
   await page.evaluate(async()=>{await loadMissionsClient();await loadMissionsResumeClient();await loadEvaluationsClient();});
   check('A1 : liste de missions issue du serveur',await page.locator('#client-missions-table [data-mission]').count()===2);
+  check('A1bis : aucune colonne de prix dans les missions client', !(await page.locator('#client-missions-table').locator('..').innerText()).includes('Prix TTC') && await page.locator('#client-missions-table tr').first().locator('td').count()===7);
   check('A2 : compteurs réels et exacts',await page.locator('#client-resume-en-cours').textContent()==='1' && await page.locator('#client-resume-terminees').textContent()==='1');
   check('A3 : seule la mission terminée attend une évaluation',await page.locator('#client-evaluations-a-faire [data-mission]').count()===1);
   check('A4 : historique réellement vide au départ',await page.locator('#client-evaluations-historique-vide').count()===1);
