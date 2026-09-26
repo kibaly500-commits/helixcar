@@ -154,6 +154,20 @@ const {lancerNavigateur} = require('./env');
       }));
       await p.screenshot({path:'/tmp/hc-pdf-marge-'+width+'.png'});
     }
+    await p.evaluate(async () => {
+      window.chargerDemandesClient = async () => [{id:'d1',numero_client:'HC-2026-6923',type_service:'nettoyage',statut:'nouveau',created_at:'2026-09-26T20:00:00Z'}];
+      window.chargerDevisClient = async () => [];
+      window.chargerInformationsDemande = async () => [{cle:'notes',statut:'fournie'}];
+      await loadDemandesClient();
+    });
+    for (const width of [390,1440,1920]) {
+      await p.setViewportSize({width,height:900});
+      assert(await p.locator('.hc-demande-card').evaluate(card => {
+        const service=card.querySelector('.detail-val').getBoundingClientRect();
+        const badges=card.querySelector('.hc-completion-note').getBoundingClientRect();
+        return card.scrollWidth <= card.clientWidth + 1 && (innerWidth<1101 || (badges.left-service.right>=0 && badges.left-service.right<40));
+      }), 'Service et statuts regroupés sans débordement à '+width);
+    }
     const index = fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
     const vm = require('vm'), ctx = {};
     vm.createContext(ctx);

@@ -1085,6 +1085,13 @@ body.scroll-verrouille { overflow: hidden; }
  .hc-demande-card{align-content:start}
  .hc-demande-card>.btn.btn-primary{grid-column:1 / -1;grid-row:auto;justify-self:start;margin-top:12px}
 }
+/* Une demande seule garde la pleine largeur, avec ses informations regroupées. */
+@media(min-width:1101px){
+ .hc-demandes-grille[data-plusieurs="false"] .hc-demande-card{grid-template-columns:minmax(0,max-content) minmax(0,1fr);column-gap:24px}
+ .hc-demandes-grille[data-plusieurs="false"] .hc-demande-summary{grid-template-columns:max-content minmax(0,max-content);column-gap:16px}
+ .hc-demandes-grille[data-plusieurs="false"] .hc-demande-card>.hc-completion-note{justify-self:start;justify-content:flex-start;text-align:left;max-width:100%}
+ .hc-demandes-grille[data-plusieurs="false"] .hc-demande-card>.btn{grid-column:1/-1;grid-row:auto;justify-self:start;margin-top:12px}
+}
 .hc-info-etat{display:inline-block;border-radius:5px;padding:5px 9px;font-size:.82rem;font-weight:600}
 .hc-demandes-conseil{margin:0 0 20px;padding:12px 15px;border-left:3px solid var(--red);background:#fff;font-size:.85rem;line-height:1.5;color:#444}
 @media(max-width:600px){.hc-demande-card{padding:16px}.hc-demande-summary .detail-val{min-width:0;overflow-wrap:anywhere}}

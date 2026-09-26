@@ -120,7 +120,7 @@ async function moisFuturComplet(page) {
 
   const rendu = await page.evaluate(() => {
     const a=document.querySelector('[data-jour="10"]'), b=document.querySelector('[data-jour="15"]'), m=document.querySelector('[data-jour="12"]');
-    return {message:document.getElementById('hc-cal-legende').textContent, debut:getComputedStyle(a).backgroundImage, fin:getComputedStyle(b).backgroundImage, milieu:getComputedStyle(m).backgroundColor};
+    return {message:document.getElementById('hc-cal-legende').textContent, debut:getComputedStyle(a).backgroundColor, fin:getComputedStyle(b).backgroundColor, milieu:getComputedStyle(m).backgroundColor};
   });
   L.check('A10b : une période terminée ne demande plus la fin', /Période sélectionnée/.test(rendu.message) && !/Choisissez la date de fin/.test(rendu.message));
   L.check('A10c : début et fin distincts, intervalle rose pâle', rendu.debut !== rendu.fin && rendu.milieu === 'rgb(245, 227, 232)', JSON.stringify(rendu));

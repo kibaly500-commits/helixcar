@@ -21545,10 +21545,6 @@ function _hcRendreCalendrier() {
     var estInterdit = date < borneReelle || (borneMaxMetier && date > borneMaxMetier);
     var estAuj = _hcMemeJour(date, auj);
     var classe = _hcClasseJour(date, periode);
-    if (periode.debut && periode.finLiv && periode.debut < periode.finLiv) {
-      if (_hcMemeJour(date, periode.debut)) classe += ' hc-cal-jour--debut-lie';
-      if (_hcMemeJour(date, periode.finLiv) && !periode.finRestit) classe += ' hc-cal-jour--fin-lie';
-    }
     var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '');
     html += '<button type="button" class="' + classesFinales + '" data-jour="' + j + '"' +
       (estInterdit ? ' disabled aria-disabled="true" tabindex="-1"' : '') + '>' + j + '</button>';
@@ -23826,16 +23822,15 @@ console.log('HelixCar ' + window.HC_VERSION);
 <script src="assets/pr6-delai-mission.js"></script>
 
 <style id="hc-calendrier-retours-20260926">
-.hc-cal-grille { column-gap:0; row-gap:4px; }
+.hc-cal-grille { gap:3px; }
 .hc-cal-jour--p1-borne { background:#9F2943; }
 .hc-cal-jour--fin { background:#C66B82; color:#231017 !important; }
-.hc-cal-jour--p1-inter { background:#F5E3E8; border-radius:0; color:var(--ink); }
-.hc-cal-jour--p2-inter { border-radius:0; }
+.hc-cal-jour--p1-inter { background:#F5E3E8; border-radius:50%; color:var(--ink); }
+.hc-cal-jour--p2-inter { border-radius:50%; }
+.hc-cal-jour--aujourdhui { border-color:transparent; font-weight:800; }
 .hc-cal-legende { flex-direction:row; flex-wrap:wrap; gap:6px 14px; }
 .hc-cal-legende .p1 { background:#9F2943; }
 .hc-cal-legende .fin { background:#C66B82; }
-.hc-cal-jour--debut-lie:not(.hc-cal-jour--double):not(.hc-cal-jour--triple) { border-radius:0; background:radial-gradient(circle closest-side,#9F2943 97%,transparent 100%),linear-gradient(to right,transparent 50%,#F5E3E8 50%); }
-.hc-cal-jour--fin-lie:not(.hc-cal-jour--double):not(.hc-cal-jour--triple) { border-radius:0; background:radial-gradient(circle closest-side,#C66B82 97%,transparent 100%),linear-gradient(to right,#F5E3E8 50%,transparent 50%); }
 .hc-cal-instruction { flex-basis:100%; }
 .hc-cal-jour--double { background:conic-gradient(#9F2943 0 50%,#C66B82 50% 100%) !important; }
 .hc-cal-jour--triple { background:conic-gradient(#9F2943 0 33.333%,#C66B82 33.333% 66.666%,#6B1E3C 66.666% 100%) !important; }
