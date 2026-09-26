@@ -50,7 +50,7 @@
   @media (max-width: 640px) {
     .entete-contenu { grid-template-columns: 1fr; gap: 4px; }
     .entete-contenu .logo-image, .retour-client { grid-column: 1; justify-self: center; }
-    .retour-client { justify-self: end; }
+    .retour-client { justify-self: center; max-width:100%; margin:6px 0 0; }
   }
 
   main {
@@ -748,7 +748,7 @@
     }
     if (devis.statut === 'accepte') {
       var suite = devis.paiement_statut === 'en_attente'
-        ? (stripeQa ? ' Vous pouvez effectuer le paiement de test.' : ' Le paiement vous sera proposé prochainement.')
+        ? (stripeQa ? ' Vous pouvez effectuer le paiement de test.' : !hoteProduction ? ' Choisissez une simulation de paiement ci-dessous.' : ' Le paiement vous sera proposé prochainement.')
         : (devis.paiement_statut === 'paye' ? ' Paiement enregistré.' : '');
       var simulation = (!stripeQa && !hoteProduction && devis.paiement_statut === 'en_attente') ?
         '<section class="paiement-recette" aria-labelledby="titre-paiement-recette"><h2 id="titre-paiement-recette">Simulation de paiement — recette</h2>'+
@@ -837,9 +837,15 @@
     var boutons=Array.from(document.querySelectorAll('[data-scenario]'));boutons.forEach(function(b){b.disabled=true;});
     var sortie=document.getElementById('paiement-recette-resultat');if(sortie)sortie.textContent='Simulation en cours…';
     try{
-      var session=(await authDevis.auth.getSession()).data.session;
-      if(!session)throw new Error('UNAUTHORIZED');
-      var rep=await fetch(URL_PAIEMENT_RECETTE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({devis_id:devisId,scenario:scenario})});
+      var headers={'Content-Type':'application/json'};
+      var demande={scenario:scenario};
+      if(token){demande.token=token;}else{
+        var session=authDevis&&(await authDevis.auth.getSession()).data.session;
+        if(!session)throw new Error('UNAUTHORIZED');
+        headers.Authorization='Bearer '+session.access_token;
+        demande.devis_id=devisId;
+      }
+      var rep=await fetch(URL_PAIEMENT_RECETTE,{method:'POST',headers:headers,body:JSON.stringify(demande)});
       var corps=await rep.json();if(!rep.ok||!corps.ok)throw new Error(corps.message||'Simulation impossible.');
       if(sortie)sortie.textContent=corps.message;
       if(corps.paiement_statut==='paye')setTimeout(chargerEtAfficherDevis,500);

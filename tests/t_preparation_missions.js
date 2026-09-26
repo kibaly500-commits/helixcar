@@ -25,6 +25,8 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  const content=await page.locator('#hc-prep-body').innerText();L.check(width+' aperçu filtré avec prix total',content.includes('250')&&!content.includes('SECRET')&&!content.includes('rue'));
  L.check(width+' créneau de départ conservé',content.includes('09:00 - 11:00'));
  L.check(width+' modèle dans le bon trajet',await page.locator('[aria-label="Livraison"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Peugeot 308')&&!t.includes('Audi A3'))&&await page.locator('[aria-label="Restitution"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Audi A3')&&!t.includes('Peugeot 308')));
+ L.check(width+' flèche centrée sur les villes',await page.locator('.hc-prep-route').first().evaluate(e=>{const city=e.querySelector('.hc-prep-city').getBoundingClientRect(),arrow=e.querySelector('.hc-prep-direction').getBoundingClientRect();return Math.abs(city.y+city.height/2-arrow.y-arrow.height/2)<2;}));
+ L.check(width+' restitution : horaire sous la ville d’arrivée',await page.locator('[aria-label="Restitution"] .hc-prep-route>div').last().innerText().then(t=>t.includes('Dijon')&&t.includes('16:00 - 17:00')));
  L.check(width+' cartes sans débordement',await page.locator('.hc-prep-annonce').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
  await page.locator('#hc-prep-body').screenshot({path:'/tmp/hc-preparation-apercu-'+width+'.png'});
  const absentHour=await page.evaluate(()=>hcPreparationCarteOpportunite({id:'qa-empty-time',preparation_annonce:{category:'convoyage',rows:[{label:'Départ',value:'Paris'},{label:'Arrivée',value:'Lyon'},{label:'Prise en charge',value:'2026-11-08'}]}},{}));
@@ -32,6 +34,22 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' aperçu ne publie pas',await page.evaluate(()=>!__calls.includes('publier_preparation_mission')));
  await page.locator('#hc-prep-close').click();await page.evaluate(()=>ouvrirPreparationDemande('client-1'));L.check(width+' brouillon retrouvé',await page.locator('[data-field="remuneration"]').inputValue()==='250');
  L.check(width+' sans débordement',await page.locator('#modal-preparation-missions .hc-prep-modal').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
+ await page.evaluate(async()=>{__source.brouillons=[];__source.vehicules[0].vin=null;await ouvrirPreparationDemande('client-1');});
+ await page.locator('.hc-prep-private summary').click();
+ L.check(width+' VIN manquant affiché dans les informations privées',await page.locator('.hc-prep-private').innerText().then(t=>t.includes('VIN du véhicule livré')&&t.includes('À compléter dans la demande')));
+ const filtering=await page.evaluate(()=>{
+   _demandesDevisListe=[{id:'a',nom:'Alpha',email:'a@example.test'},{id:'b',nom:'Beta',email:'b@example.test'},{id:'c',nom:'Gamma',email:'a@example.test'}];
+   _devisParClient={a:{statut:'accepte',paiement_statut:'en_attente'},b:{statut:'accepte',paiement_statut:'paye'},c:{statut:'envoye',consulte_le:'2026-09-01'}};
+   const select=document.getElementById('filtre-statut-devis');const out={};
+   for(const key of ['accepte','paye','consulte']){select.value=key;filtrerDemandesDevis('');out[key]=document.getElementById('tbody-demandes-devis').innerText;}
+   select.value='paye';filtrerDemandesDevis('Alpha');out.search=document.getElementById('tbody-demandes-devis').innerText;
+   _filtreDemandesCompteAdmin={email:'a@example.test'};filtrerDemandesDevis('');out.owner=document.getElementById('tbody-demandes-devis').innerText;
+   select.value='';_filtreDemandesCompteAdmin=null;return out;
+ });
+ L.check(width+' filtre accepté exclut payé',filtering.accepte.includes('Alpha')&&!filtering.accepte.includes('Beta'));
+ L.check(width+' filtre payé',filtering.paye.includes('Beta')&&!filtering.paye.includes('Alpha'));
+ L.check(width+' filtre consulté',filtering.consulte.includes('Gamma')&&!filtering.consulte.includes('Beta'));
+ L.check(width+' filtres recherche et compte respectés',filtering.search.includes('Aucune demande')&&filtering.owner.includes('Aucune demande'));
  if(width===1280)await page.screenshot({path:'/tmp/hc-preparation-integree.png',fullPage:true});L.check(width+' sans exception JS',errors.length===0);await page.close();}
  }finally{await browser.close();}process.exitCode=L.results()?1:0;
 })().catch(e=>{console.error(e);process.exitCode=1});

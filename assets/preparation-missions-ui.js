@@ -47,8 +47,7 @@
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
-      h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Restitution</h4></header>'+route(raw('Arrivée'),destination,null,null)+
-        '<div class="hc-prep-return-schedule"><span>Restitution prévue</span><div>'+schedule(raw('Restitution prévue'))+'</div></div>'+
+      h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Restitution</h4></header>'+route(raw('Arrivée'),destination,null,raw('Restitution prévue'))+
         facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     }
     const shared=[['Distance de la mission',raw('Distance')],...(raw('Garde du véhicule')?[['Garde du véhicule',raw('Garde du véhicule')]]:[]),...(!raw('Restitution')?[['Restitution','Non']]:[])];
@@ -82,7 +81,7 @@
       h+='</div>';
       if(p.missing.length)h+='<p class="hc-prep-incomplete">À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';
       const privateLabels={adresse_depart:'Adresse de prise en charge',adresse_arrivee:'Adresse de livraison',contact_depart_nom:'Contact au départ',contact_depart_tel:'Téléphone au départ',contact_arrivee_nom:'Contact à l’arrivée',contact_arrivee_tel:'Téléphone à l’arrivée',immatriculation:'Immatriculation du véhicule',vin:'VIN du véhicule livré',consignes:'Consignes',adresse_restitution:'Adresse de restitution',restit_contact_nom:'Contact à la restitution',restit_contact_tel:'Téléphone à la restitution',restit_immatriculation:'Immatriculation du véhicule à restituer',restit_vin:'VIN du véhicule à restituer',restit_info:'Consignes de restitution'};
-      h+='<details class="hc-prep-private"><summary>Informations privées de la mission</summary><p class="hc-prep-muted">Réservées à l’administration ; communiquées au partenaire retenu après attribution.</p><dl class="hc-prep-facts">'+Object.entries(privateLabels).filter(([k])=>p.mission[k]).map(([k,label])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(p.mission[k])+'</dd></div>').join('')+'</dl></details></section>';
+      h+='<details class="hc-prep-private"><summary>Informations privées de la mission</summary><p class="hc-prep-muted">Réservées à l’administration ; communiquées au partenaire retenu après attribution.</p><dl class="hc-prep-facts">'+Object.entries(privateLabels).filter(([k])=>p.mission[k]||(p.category==='convoyage'&&(k==='vin'||(k==='restit_vin'&&p.mission.restitution)))).map(([k,label])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(p.mission[k]||'À compléter dans la demande')+'</dd></div>').join('')+'</dl></details></section>';
     });
     if(!state.preview&&state.plans.some(p=>!p.saved?.mission_id))h+='<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-prep-save>Enregistrer le brouillon</button><button type="button" class="btn btn-primary" data-prep-view="preview">Voir l’aperçu partenaire</button></div>';
     el('hc-prep-body').innerHTML=h;

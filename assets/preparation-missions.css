@@ -56,3 +56,14 @@
  .hc-prep-return-schedule{padding:0 16px 16px}
  .hc-prep-mission-footer .hc-prep-leg-facts{padding:14px 16px;gap:12px}
 }
+
+/* Une seule grille aligne les libellés, les villes et les horaires. */
+.hc-prep-route{grid-template-rows:auto auto auto auto;gap:4px 10px}
+.hc-prep-route>div{display:contents}
+.hc-prep-route>div:first-child>*{grid-column:1}
+.hc-prep-route>div:last-child>*{grid-column:3}
+.hc-prep-route-label{grid-row:1}
+.hc-prep-city{grid-row:2}
+.hc-prep-route .hc-prep-date{grid-row:3}
+.hc-prep-route .hc-prep-time{grid-row:4}
+.hc-prep-direction{grid-column:2;grid-row:2;align-self:center;justify-self:center;margin:0}

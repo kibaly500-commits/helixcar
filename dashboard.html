@@ -1436,7 +1436,9 @@ body.scroll-verrouille { overflow: hidden; }
                   <th>Trajet</th>
                   <th>Véhicule</th>
                   <th>Date souhaitée</th>
-                  <th>Statut</th>
+                  <th><select id="filtre-statut-devis" aria-label="Filtrer par statut du devis" onchange="filtrerDemandesDevis(document.getElementById('recherche-devis').value)" style="font:inherit;font-size:14px;max-width:170px;padding:7px 24px 7px 8px;border:1px solid #d8dde3;border-radius:5px;background:#fff;color:#29323d">
+                    <option value="">Statut : tous</option><option value="nouveau">Nouvelle demande</option><option value="genere">Devis généré</option><option value="envoye">Devis envoyé</option><option value="consulte">Devis consulté</option><option value="accepte">Devis accepté</option><option value="paye">Devis payé</option><option value="refuse">Devis refusé</option>
+                  </select></th>
                   <th></th>
                 </tr>
               </thead>
@@ -10426,11 +10428,19 @@ function _dateSouhaiteeListe(c) {
   return datesVehicules[0] || null;
 }
 
+function _cleStatutDevis(d) {
+  if(!d)return 'nouveau';
+  if(d.statut==='accepte')return d.paiement_statut==='paye'?'paye':'accepte';
+  if(d.statut==='envoye'&&d.consulte_le)return 'consulte';
+  return d.statut||'nouveau';
+}
 function _rendreTableDemandesDevis(liste) {
+  var choixStatut=(document.getElementById('filtre-statut-devis')||{}).value||'';
+  if(choixStatut)liste=(liste||[]).filter(function(c){return _cleStatutDevis(_devisParClient[String(c.id)])===choixStatut;});
   var tbody = document.getElementById('tbody-demandes-devis');
   if (!tbody) return;
   if (!liste || liste.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px">Aucune demande de devis pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px">Aucune demande correspondant aux filtres.</td></tr>';
     return;
   }
   var html = '';

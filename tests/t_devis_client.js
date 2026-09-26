@@ -16,7 +16,7 @@ try{
    assert.equal(await page.locator('.statut-final strong').textContent(),paiement==='paye'?'Devis payé':'Devis accepté');
    assert.equal(await page.locator('#bouton-accepter-devis').count(),0);
    const retour=page.getByRole('link',{name:'Accéder à mon espace client'});
-   assert.ok(await retour.isVisible());assert.equal(await retour.getAttribute('href'),'dashboard.html');
+   assert.ok(await retour.isVisible());assert.ok(await retour.evaluate(e=>{const r=e.getBoundingClientRect();return Math.abs(r.x+r.width/2-innerWidth/2)<2;}));assert.equal(await retour.getAttribute('href'),'dashboard.html');
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.close();
  });
@@ -75,5 +75,14 @@ try{
  });
  await cas('Acceptation double clic : une décision, état serveur relu',async()=>{
    const page=await browser.newPage();await page.addInitScript(INIT);await page.goto(urlFichier('devis.html')+'#token='+'t'.repeat(64));await page.click('#bouton-accepter-devis');await page.evaluate(()=>{document.getElementById('modal-bouton-confirmer').click();document.getElementById('modal-bouton-confirmer').click();});await page.waitForFunction(()=>window.__devis.statut==='accepte');assert.equal(await page.evaluate(()=>window.__appels.filter(a=>a.body.action==='accept').length),1);await page.close();
+ });
+ for(const scenario of ['success','refused','abandoned','requires_action'])await cas('Simulation par lien sans session : '+scenario,async()=>{
+   const page=await browser.newPage({viewport:{width:390,height:844}});
+   await page.addInitScript(INIT+`window.__session=null;Object.assign(window.__devis,{statut:'accepte',paiement_statut:'en_attente'});window.__sim=[];const originalFetch=window.fetch;window.fetch=async(url,opt)=>{if(!url.includes('paiement-recette'))return originalFetch(url,opt);const body=JSON.parse(opt.body);window.__sim.push({body,authorization:opt.headers.Authorization});const paid=body.scenario==='success';if(paid)window.__devis.paiement_statut='paye';return new Response(JSON.stringify({ok:true,message:'Simulation '+body.scenario,paiement_statut:paid?'paye':'en_attente'}));};`);
+   await page.goto(urlFichier('devis.html')+'#token='+'t'.repeat(64));
+   await page.locator('[data-scenario="'+scenario+'"]').click();
+   const calls=await page.evaluate(()=>window.__sim);assert.equal(calls.length,1);assert.equal(calls[0].body.token,'t'.repeat(64));assert.equal(calls[0].body.scenario,scenario);assert.ok(!calls[0].authorization&&!calls[0].body.devis_id);
+   if(scenario==='success'){await page.waitForFunction(()=>document.querySelector('.statut-final strong')?.textContent==='Devis payé');}else{assert.equal(await page.locator('#paiement-recette-resultat').textContent(),'Simulation '+scenario);}
+   await page.close();
  });
 }finally{await browser.close();}console.log(`\n=== ${pass} PASS / ${fail} FAIL ===`);process.exitCode=fail?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});
