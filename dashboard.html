@@ -2666,8 +2666,9 @@ function rendreAccueilInformationsAdmin(){
   var card=document.createElement('article');card.className='ai-home-dossier';
   var heading=document.createElement('h3');heading.textContent=([d.client.prenom,d.client.nom].filter(Boolean).join(' ')||d.client.email||'Client')+' · '+(d.client.numero_client||'Demande');card.appendChild(heading);
   if(d.erreur){var err=document.createElement('p');err.textContent='Lecture indisponible — actualisez pour vérifier ce dossier.';card.appendChild(err);}
-  var columns=document.createElement('div');columns.className='ai-home-columns';
+  var columns=document.createElement('div');columns.className='ai-home-columns';if(filtre!=='tous')columns.style.gridTemplateColumns='1fr';
   [['transmise','À valider'],['correction','Corrections reçues'],['attente','En attente du client']].forEach(function(pair){
+   if(filtre!=='tous'&&filtre!==pair[0])return;
    var items=lines.filter(function(l){return group(l)===pair[0];});var col=document.createElement('div');var title=document.createElement('h4');title.textContent=pair[1]+' · '+items.length;col.appendChild(title);
    items.forEach(function(l){var item=document.createElement('div');item.className='ai-home-field';var label=document.createElement('strong');label.textContent=l.libelle||l.cle;item.appendChild(label);
     if(l.statut==='transmise'){var value=document.createElement('p');value.textContent='Reçu : '+(l.valeur||'—');item.appendChild(value);if(l.ancienne_valeur&&l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Avant : '+l.ancienne_valeur;item.appendChild(old);}}

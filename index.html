@@ -9736,9 +9736,6 @@ function _completerRendre(lignes) {
 
   var bouton = document.getElementById('completer-envoyer');
   if (bouton) { bouton.style.display = _completerVerrouillee && !aCompleter.length ? 'none' : ''; bouton.textContent = 'Valider mes informations'; }
-  var brouillon = {};
-  try { brouillon = JSON.parse(sessionStorage.getItem(_completerBrouillonCle()) || '{}') || {}; } catch(e) {}
-
   var groupes = _completerGrouper(lignes);
   var premierOuvert = false;
   groupes.forEach(function (g) {

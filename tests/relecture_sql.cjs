@@ -1,4 +1,5 @@
 const fs=require('fs');
+const planner=require('../assets/preparation-missions.js');
 module.exports=async({db,rpc,check,rejected,admin})=>{
  await db.exec(`alter table demande_informations_manquantes add column transmise_le timestamptz;alter table demande_informations_manquantes add column id uuid default gen_random_uuid();
  create or replace function est_proprietaire_demande(p uuid) returns boolean language sql stable as $$select exists(select 1 from clients where id=p and auth_user_id=auth.uid())$$;`);
@@ -11,8 +12,14 @@ module.exports=async({db,rpc,check,rejected,admin})=>{
  select gen_random_uuid(),'${cid}',n,'Peugeot 308','berline','VF12345678901234'||n,'AB-123-C'||n,'Diesel','12 rue Départ','Paris','13 rue Arrivée','Lyon','2026-11-01','2026-11-01','09:00','16:00','Ancien contact','0600000000','Livraison','0600000001',false from generate_series(1,2)n;
  select set_config('request.jwt.claim.sub','${admin}',false);`);
  const before=await rpc('source_preparation_missions',[cid]);
+ const plans=planner.build(before.client,before.vehicules);
+ plans.forEach((p,i)=>{p.remuneration=140+i*10;p.distance=220+i*15;p.public=planner.publicData(p);});
+ const saved=await rpc('enregistrer_preparation_missions',[cid,before.empreinte,JSON.stringify(plans)]);
+ const snapshots=saved.brouillons.map(b=>({id:b.id,plan:b.plan}));
  await db.exec(`update clients set informations_confirmees_le=now() where id='${cid}'`);
  check('Confirmation seule conserve la préparation',before.empreinte===(await rpc('source_preparation_missions',[cid])).empreinte);
+ const restored=await rpc('source_preparation_missions',[cid]);
+ check('Brouillons conservés après confirmation',snapshots.length===2&&snapshots.every(s=>restored.brouillons.some(b=>b.id===s.id&&JSON.stringify(b.plan)===JSON.stringify(s.plan))));
  await db.exec(`update clients set informations_confirmees_le=null where id='${cid}';select set_config('request.jwt.claim.sub','${uid}',false)`);
  let rows=(await db.query('select * from informations_demande($1)',[cid])).rows;
  check('Valeurs source VIN, modèle et adresse visibles',rows.find(r=>r.cle==='vehicule_1_marque_modele').valeur==='Peugeot 308'&&rows.find(r=>r.cle==='vehicule_1_adresse_depart').valeur==='12 rue Départ');

@@ -34,7 +34,7 @@ const L=require('./lib'),{urlFichier}=require('./env');
  L.check(width+' synthèse avant/après sans ouvrir devis',text.includes('VF111111111111111')&&text.includes('VF222222222222222')&&text.includes('Ancien contact')&&text.includes('Véhicule 2 — Motorisation'));
  L.check(width+' compteurs distincts',await admin.locator('#admin-infos-accueil-compteurs strong').allTextContents().then(x=>x.join()==='1,1,1'));
  await admin.locator('#admin-infos-accueil-filtre').evaluate(e=>{e.value='correction';e.dispatchEvent(new Event('change'));});
- L.check(width+' filtre corrections reçues',await admin.locator('.ai-home-dossier').count()===1);
+ L.check(width+' filtre corrections reçues',await admin.locator('.ai-home-dossier').count()===1&&await admin.locator('.ai-home-dossier').innerText().then(t=>t.includes('VF222222222222222')&&!t.includes('Ancien contact')&&!t.includes('Motorisation')));
  L.check(width+' accueil sans débordement',await admin.locator('.ai-home').evaluate(e=>e.scrollWidth<=e.clientWidth));
  await admin.locator('.ai-home').screenshot({path:'/tmp/hc-admin-relecture-'+width+'.png'});
  await admin.close();
