@@ -1430,7 +1430,7 @@ body.scroll-verrouille { overflow: hidden; }
         <div id="devis-alerte-table" class="alert alert-warning" style="margin-bottom:14px;display:none"></div>
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Demandes de devis</div><div class="card-sub">Demandes de convoyage reçues depuis le formulaire client</div></div>
+            <div><div class="card-title">Demandes de devis</div><div class="card-sub">Toutes les prestations · suivi des devis et des informations</div></div>
             <input type="text" id="recherche-devis" placeholder="Rechercher (nom, email, ville…)" oninput="filtrerDemandesDevis(this.value)" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:.85rem;min-width:240px">
           </div>
           <div id="filtre-client-devis" class="filtre-client-devis" hidden>
@@ -1455,11 +1455,14 @@ body.scroll-verrouille { overflow: hidden; }
                   <th><select id="filtre-statut-devis" aria-label="Filtrer par statut du devis" onchange="filtrerDemandesDevis(document.getElementById('recherche-devis').value)" style="font:inherit;font-size:14px;max-width:170px;padding:7px 24px 7px 8px;border:1px solid #d8dde3;border-radius:5px;background:#fff;color:#29323d">
                     <option value="">Statut : tous</option><option value="nouveau">Nouvelle demande</option><option value="genere">Devis généré</option><option value="envoye">Devis envoyé</option><option value="consulte">Devis consulté</option><option value="accepte">Devis accepté</option><option value="paye">Devis payé</option><option value="refuse">Devis refusé</option>
                   </select></th>
+                  <th><select id="filtre-informations-devis" aria-label="Filtrer par état des informations" onchange="filtrerDemandesDevis(document.getElementById('recherche-devis').value)">
+                    <option value="">Informations : toutes</option><option value="a_verifier">À vérifier par HelixCar</option><option value="nouvelles">Informations reçues</option><option value="modifications">Informations modifiées</option><option value="corrections">Corrections reçues</option><option value="attente_client">En attente du client</option><option value="manquantes">Champs manquants</option><option value="a_corriger">Corrections demandées</option><option value="confirmation">Confirmation client attendue</option><option value="complet">Dossier complet</option><option value="indisponible">État indisponible</option>
+                  </select><button type="button" class="hc-actualiser-infos" onclick="_chargerEtatsInformationsDemandes()">Actualiser</button></th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="tbody-demandes-devis">
-                <tr><td colspan="10" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -2804,6 +2807,7 @@ async function deciderInformation(demandeId, cle, decision, motifFourni) {
     .eq('client_id', demandeId)
     .eq('cle', cle);
   if (error) throw new Error(error.message);
+  _chargerEtatsInformationsDemandes();
   return true;
 }
 
@@ -10400,7 +10404,7 @@ function loadDemandesDevis() {
   var tbody = document.getElementById('tbody-demandes-devis');
   var alerte = document.getElementById('devis-alerte-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
 
   var pClients = sbFetchToutePage('clients?order=created_at.desc');
   var pDevis = sbAuthListeDevisTriee()
@@ -10448,7 +10452,8 @@ function loadDemandesDevis() {
     _demandesDevisListe = clients.filter(_estDemandeDeDevis);
 
     _mettreAJourFiltreDemandesCompte();
-    _rendreTableDemandesDevis(_demandesDuCompteAdmin(_demandesDevisListe));
+    filtrerDemandesDevis((document.getElementById('recherche-devis')||{}).value);
+    _chargerEtatsInformationsDemandes();
 
     // CREATION AUTOMATIQUE des missions de nettoyage pretes. Silencieuse
     // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
@@ -10477,7 +10482,7 @@ function loadDemandesDevis() {
     }
   }).catch(function(e) {
     console.error('Erreur loadDemandesDevis:', e);
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#c00;padding:20px">Erreur de chargement (voir la console).</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#c00;padding:20px">Erreur de chargement (voir la console).</td></tr>';
   });
 }
 
@@ -10526,12 +10531,14 @@ function _cleStatutDevis(d) {
   return d.statut||'nouveau';
 }
 function _rendreTableDemandesDevis(liste) {
+  var choixInfos=(document.getElementById('filtre-informations-devis')||{}).value||'';
+  liste=(liste||[]).filter(function(c){return _filtreInfosDemande(c,choixInfos);});
   var choixStatut=(document.getElementById('filtre-statut-devis')||{}).value||'';
   if(choixStatut)liste=(liste||[]).filter(function(c){return _cleStatutDevis(_devisParClient[String(c.id)])===choixStatut;});
   var tbody = document.getElementById('tbody-demandes-devis');
   if (!tbody) return;
   if (!liste || liste.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px">Aucune demande correspondant aux filtres.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Aucune demande correspondant aux filtres.</td></tr>';
     return;
   }
   var html = '';
@@ -10553,6 +10560,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td>' + _escapeHtml(_dv(vehicule)) + '</td>' +
       '<td>' + _dvDate(_dateSouhaiteeListe(c)) + '</td>' +
       '<td>' + _statutDevisBadge(statut, d) + '</td>' +
+      '<td>' + _badgesInfosDemande(c.id) + '</td>' +
       '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirFicheDemande', [c.id]) + '>Ouvrir</button></td>' +
       '</tr>';
   });
@@ -14955,5 +14963,13 @@ function declencherChampFichier(id) {
 </script>
 <script src="assets/preparation-missions.js"></script>
 <script src="assets/preparation-missions-ui.js"></script>
+<style>
+#filtre-informations-devis{font:inherit;font-size:12px;max-width:205px;padding:7px 5px;border:1px solid #d8dde3;border-radius:5px;background:#fff;color:#29323d}
+.hc-etats-infos{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:175px;max-width:245px}
+.hc-etat-info{display:inline-block;font-size:11px;line-height:1.45;padding:4px 7px;border-radius:5px;white-space:normal}
+.hc-etat-info--vert{background:#e8f2ec;color:#286748}.hc-etat-info--orange{background:#fff3e7;color:#85521f}.hc-etat-info--violet{background:#f0e9f4;color:#704482}.hc-etat-info--bleu{background:#eaf1f8;color:#285a86}.hc-etat-info--neutre{background:#f0f1f2;color:#56616c}
+.hc-actualiser-infos{display:block;margin-top:5px;border:0;background:transparent;color:#6c3540;font:inherit;font-size:11px;text-decoration:underline;cursor:pointer}
+</style>
+<script src="assets/admin-demandes-informations.js"></script>
 </body>
 </html>
