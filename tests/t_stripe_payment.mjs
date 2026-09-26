@@ -68,3 +68,14 @@ test('signature invalide, mode réel, montant, devise, métadonnées invalides n
 test('paiement non payé reste en attente',async()=>{const f=fixture();await checkout(req(),f);assert.equal((await webhook(event(f),f)).status,200);assert.equal(f.rpcs,0);assert.equal(f.q.paiement_statut,'en_attente');});
 test('confirmation signée et relue chez Stripe passe par la RPC transactionnelle',async()=>{const f=fixture();await pay(f);assert.equal((await webhook(event(f),f)).status,200);assert.equal(f.rpcs,1);assert.equal(f.q.paiement_statut,'paye');});
 test('échec base renvoyé à Stripe pour nouvelle livraison',async()=>{const f=fixture();await pay(f);f.sb.rpc=async()=>({error:true});assert.equal((await webhook(event(f),f)).status,503);});
+
+test('HC-2026-2184 autorisé uniquement pour son devis et son propriétaire',async()=>{
+ const f=fixture();f.c.email=f.user.email='helixcarpro+stockage-part2609@gmail.com';
+ f.c.id=f.q.client_id='951410e8-7104-4256-b46d-59487e73890a';
+ f.q.id='07bbbfa7-8e6c-437a-a99f-a48e40b18f6f';
+ assert.equal((await checkout(req({devis_id:f.q.id}),f)).status,200);
+ f.c.auth_user_id='other';
+ assert.equal((await checkout(req({devis_id:f.q.id}),f)).status,404);
+ f.c.auth_user_id='user';f.q.id=ID;
+ assert.equal((await checkout(req(),f)).status,403);
+});
