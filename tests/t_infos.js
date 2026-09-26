@@ -109,6 +109,7 @@ window.supabase = { createClient: function () { return {
   rpc: async function (nom, params) {
     if (window.__reseauCoupe) return { data: null, error: { message: 'Failed to fetch' } };
     window.__journal.push({ op: 'rpc', nom, params });
+    if (nom === 'contexte_completion_demande') return { data: { verrouillee: false }, error: null };
     if (nom === 'informations_demande') {
       return { data: (window.__infosParDemande[params.p_client_id] || []).map(l => Object.assign({}, l)), error: null };
     }
@@ -219,13 +220,16 @@ window.emailjs = { init: function () {},
   check('B8a : numéro incomplet refusé avant envoi', refusTelephone.appels === 0 && /numéro de téléphone complet/.test(refusTelephone.texte));
 
   // Enregistrement + double clic
-  const envoi = await page.evaluate(async () => {
+  await page.evaluate(() => {
     document.getElementById('completer-champ-contact_pc_nom').value = 'TEST-QA Dupont';
     document.getElementById('completer-champ-contact_pc_tel').value = '+33600000099';
     window.__journal = [];
     envoyerInformationsCompletees();
     envoyerInformationsCompletees();   // double clic réel
-    await new Promise(r => setTimeout(r, 600));
+  });
+  await page.locator('.hc-completion-confirm [data-confirm]').click();
+  await page.waitForFunction(()=>!_completerEnvoiEnCours && !_completerConfirmationEnCours);
+  const envoi = await page.evaluate(() => {
     return {
       appels: window.__journal.filter(j => j.op === 'rpc' && j.nom === 'repondre_informations_demande').length,
       message: (document.getElementById('completer-message') || {}).textContent || '',
@@ -256,11 +260,15 @@ window.emailjs = { init: function () {},
   });
   await page.goto(urlFichier('index.html') + '?completer=dem-nett', { waitUntil: 'load' });
   await page.waitForTimeout(600);
-  const reseau = await page.evaluate(async () => {
+  await page.evaluate(() => {
     const champ = document.getElementById('completer-champ-contact_pc_nom');
     if (champ) champ.value = 'TEST-QA Reseau';
     window.__reseauCoupe = true;
-    await envoyerInformationsCompletees();
+    envoyerInformationsCompletees();
+  });
+  await page.locator('.hc-completion-confirm [data-confirm]').click();
+  await page.waitForFunction(()=>!_completerEnvoiEnCours && !_completerConfirmationEnCours);
+  const reseau = await page.evaluate(() => {
     window.__reseauCoupe = false;
     return {
       message: (document.getElementById('completer-message') || {}).textContent || '',

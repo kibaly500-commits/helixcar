@@ -111,6 +111,10 @@ const {lancerNavigateur} = require('./env');
     assert.equal(await p.locator('.hc-info-vehicle').getAttribute('open'), null);
     await p.evaluate(async () => {window.chargerInformationsDemande = async () => [];await loadDemandesClient();});
     assert.equal(await p.locator('#client-demandes-liste [data-demande="d1"]').getAttribute('data-etat-demande'),'preparation');
+    await p.evaluate(async () => {window.chargerInformationsDemande = async () => [{cle:'vehicule_1_vin',valeur:'VF123456789012345',statut:'fournie'}];await loadDemandesClient();window.__completion=null;});
+    assert(await p.getByRole('button',{name:'Vérifier mes informations →',exact:true}).isVisible());
+    await p.getByRole('button',{name:'Vérifier mes informations →',exact:true}).click();
+    assert.equal(await p.evaluate(()=>window.__completion),'d1','La relecture reste accessible sur un dossier complet');
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [{id:'d1',numero_client:'PAYÉ',type_service:'convoyage'},{id:'d2',numero_client:'NON PAYÉ',type_service:'stockage'}];
       window.chargerInformationsDemande = async () => [{cle:'vehicule_1_vin',statut:'transmise'}];

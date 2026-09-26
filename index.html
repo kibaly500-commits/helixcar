@@ -9696,7 +9696,7 @@ function _completerEtatBouton() {
     if(barre)barre.value=remplis;
   }
   var guide=document.getElementById('completer-guide');
-  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Tous les blocs sont complets. Cliquez sur « Valider les informations » pour transmettre l’ensemble à notre équipe.';
+  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Tous les blocs sont complets. Cliquez sur « Valider mes informations » pour transmettre l’ensemble à notre équipe.';
 }
 function _completerConserverSaisies() {
   var brouillon = {};
@@ -9733,6 +9733,12 @@ function _completerRendre(lignes) {
   lignes.forEach(function(l){if(_completerPeutModifier(l)&&brouillon[l.cle]&&brouillon[l.cle].base===(l.valeur||''))_completerEditions.add(l.cle);});
   var aCompleter = lignes.filter(_completerEstRestante);
   _completerRubriques = aCompleter;
+  if (!aCompleter.length) {
+    var etat = document.createElement('p');
+    etat.id = 'completer-complet';
+    etat.textContent = lignes.some(function(l){return l.statut==='transmise';}) ? 'Informations transmises — en attente de validation par notre équipe.' : _completerVerrouillee ? 'Votre dossier est complet. Toutes les informations ont été reçues et traitées.' : 'Toutes les informations sont renseignées. Vérifiez-les avant de les confirmer.';
+    zone.appendChild(etat);
+  }
 
   var bouton = document.getElementById('completer-envoyer');
   if (bouton) { bouton.style.display = _completerVerrouillee && !aCompleter.length ? 'none' : ''; bouton.textContent = 'Valider mes informations'; }

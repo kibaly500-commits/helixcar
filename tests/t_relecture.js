@@ -37,6 +37,10 @@ const L=require('./lib'),{urlFichier}=require('./env');
  L.check(width+' filtre corrections reçues',await admin.locator('.ai-home-dossier').count()===1&&await admin.locator('.ai-home-dossier').innerText().then(t=>t.includes('VF222222222222222')&&!t.includes('Ancien contact')&&!t.includes('Motorisation')));
  L.check(width+' accueil sans débordement',await admin.locator('.ai-home').evaluate(e=>e.scrollWidth<=e.clientWidth));
  await admin.locator('.ai-home').screenshot({path:'/tmp/hc-admin-relecture-'+width+'.png'});
+ await admin.evaluate(()=>{document.getElementById('admin-infos-recherche').value='Ancien client';document.getElementById('admin-infos-filtre').value='a_corriger';window.chargerCentreInformationsAdmin=()=>{};});
+ await admin.getByRole('button',{name:'Vérifier les informations',exact:true}).click();
+ L.check(width+' accueil ouvre le bon dossier malgré les anciens filtres',await admin.locator('#admin-infos-detail h2').innerText()==='Client QA'&&await admin.locator('#admin-infos-recherche').inputValue()===''&&await admin.locator('#admin-infos-filtre').inputValue()==='tous');
+ L.check(width+' fiche sélectionnée visible depuis accueil',await admin.locator('#admin-infos-detail').isVisible());
  await admin.close();
  }
  }finally{await browser.close();}process.exitCode=L.results()?1:0;

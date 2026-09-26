@@ -2677,7 +2677,7 @@ function rendreAccueilInformationsAdmin(){
     col.appendChild(item);
    });if(!items.length){var empty=document.createElement('p');empty.className='ai-muted';empty.textContent='Aucune';col.appendChild(empty);}columns.appendChild(col);
   });card.appendChild(columns);
-  var open=document.createElement('button');open.type='button';open.className='btn btn-outline';open.textContent='Vérifier les informations';open.onclick=function(){_adminInfosSelection=d.client.id;showPage('admin-infos');_adminInfosMobileDetail=true;rendreCentreInformationsAdmin();};card.appendChild(open);zone.appendChild(card);
+  var open=document.createElement('button');open.type='button';open.className='btn btn-outline';open.textContent='Vérifier les informations';open.onclick=function(){document.getElementById('admin-infos-recherche').value='';document.getElementById('admin-infos-filtre').value='tous';_adminInfosSelection=d.client.id;showPage('admin-infos');_adminInfosMobileDetail=true;rendreCentreInformationsAdmin();};card.appendChild(open);zone.appendChild(card);
  });if(!zone.children.length)zone.textContent='Aucun dossier pour ce filtre.';
 }
 function rendreCentreInformationsAdmin(){
@@ -3029,8 +3029,8 @@ function ouvrirCompletionDemande(id) {
   const titre = document.getElementById('client-cadre-titre');
   const sous = document.getElementById('client-cadre-sous-titre');
   const retour = document.getElementById('client-cadre-retour');
-  if (titre) titre.textContent = 'Compléter mes informations';
-  if (sous) sous.textContent = 'Seules les informations encore manquantes ou à corriger vous sont demandées.';
+  if (titre) titre.textContent = 'Vérifier mes informations';
+  if (sous) sous.textContent = 'Consultez vos informations, complétez les éléments manquants et utilisez le crayon pour les champs encore modifiables.';
   if (retour) retour.textContent = '← Retour à mes informations';
   showPage('client-nouvelle-demande');
 }
@@ -3184,7 +3184,7 @@ async function loadDemandesClient() {
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
       if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">Voir mon devis →</a>';
       const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
-      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
+      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : !erreurInfos && lignes.length && !lignes.some(_estRestante) && !['en-cours','cloture'].includes(p.groupe) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Vérifier mes informations →</button></p>' : '';
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement+pointRemise
