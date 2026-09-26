@@ -808,13 +808,16 @@
     var documentBouton=document.getElementById('document-paiement-test');
     if(documentBouton)documentBouton.addEventListener('click',async function(){
       documentBouton.disabled=true;
+      var message=document.getElementById('document-message');
+      if(message)message.textContent='Préparation du document…';
       try{
         var session=(await authDevis.auth.getSession()).data.session;
+        if(!session || !session.access_token)throw new Error('Connectez-vous au compte client de ce devis pour ouvrir le document.');
         var r=await fetch(SUPABASE_URL+'/functions/v1/document-paiement-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({devis_id:devis.id})});
         var d=await r.json();if(!r.ok||!d.ok)throw new Error(d.message||'Document indisponible');
         var u=urlPdfValideOuNull(d.url);if(!u)throw new Error('Lien invalide');
         window.location.assign(u);
-      }catch(e){document.getElementById('document-message').textContent=e.message;}finally{documentBouton.disabled=false;}
+      }catch(e){if(message)message.textContent=e.message||'Document indisponible. Réessayez.';}finally{documentBouton.disabled=false;}
     });
     var payer = document.getElementById('bouton-payer-stripe');
     if(payer) payer.addEventListener('click',function(){payerStripe(devis.id);});

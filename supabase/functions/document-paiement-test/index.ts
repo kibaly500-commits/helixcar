@@ -34,8 +34,17 @@ Deno.serve(async req=>{
      if(!a)return reply({ok:false},403);
      await suitePaiementTest(d.id,{sb,jsPDF,env:{RESEND_API_KEY:Deno.env.get('RESEND_API_KEY'),RESEND_FROM:Deno.env.get('RESEND_FROM')}});
    }
-   const {data:f}=await sb.from('documents_paiement_test').select('numero,pdf_path').eq('devis_id',d.id).maybeSingle();
-   if(!f?.pdf_path)return reply({ok:false,message:'Document en cours de préparation.'},409);
+   let {data:f,error:lectureErreur}=await sb.from('documents_paiement_test').select('numero,pdf_path').eq('devis_id',d.id).maybeSingle();
+   if(lectureErreur)throw lectureErreur;
+   if(!f?.pdf_path){
+     // Le webhook peut avoir confirmé le paiement avant de finir la génération.
+     // La RPC recoupe l'événement Stripe test et le dossier QA avant toute écriture.
+     await suitePaiementTest(d.id,{sb,jsPDF,env:{},documentSeulement:true});
+     const result=await sb.from('documents_paiement_test').select('numero,pdf_path').eq('devis_id',d.id).maybeSingle();
+     if(result.error)throw result.error;
+     f=result.data;
+   }
+   if(!f?.pdf_path)return reply({ok:false,message:'Le document n’a pas pu être préparé. Réessayez.'},503);
    const {data:url,error:e}=await sb.storage.from('factures-client-test').createSignedUrl(f.pdf_path,300);
    if(e)throw e;
    return reply({ok:true,numero:f.numero,url:url.signedUrl});

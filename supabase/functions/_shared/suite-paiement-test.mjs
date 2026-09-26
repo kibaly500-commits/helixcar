@@ -4,7 +4,7 @@ const bucket='factures-client-test';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const base64=bytes=>{let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s);};
 async function checked(p){const r=await p;if(r.error)throw new Error('PERSISTENCE_FAILED');return r.data;}
-export async function suitePaiementTest(devisId,{sb,jsPDF,env,fetchFn=fetch,now=()=>Date.now()}){
+export async function suitePaiementTest(devisId,{sb,jsPDF,env,fetchFn=fetch,now=()=>Date.now(),documentSeulement=false}){
  let f=await checked(sb.rpc('preparer_suite_paiement_test',{p_devis_id:devisId}));
  const path=f.id+'/document.pdf';
  let bytes;
@@ -19,6 +19,9 @@ export async function suitePaiementTest(devisId,{sb,jsPDF,env,fetchFn=fetch,now=
    }
  }
  if(!f.pdf_path) await checked(sb.from('documents_paiement_test').update({pdf_path:path}).eq('id',f.id));
+ // Une consultation client peut réparer un PDF absent sans déclencher les e-mails.
+ // Le webhook/worker conserve la responsabilité des notifications idempotentes.
+ if(documentSeulement)return {ok:true,numero:f.numero};
  if(!env.RESEND_API_KEY||!env.RESEND_FROM) throw new Error('EMAIL_CONFIGURATION_MISSING');
  const pending=f.informations_attendues.filter(i=>['attendue','a_corriger'].includes(i.statut));
  const needed=pending.length?'<p>Il reste quelques informations à compléter pour organiser votre convoyage. Retrouvez-les dans votre espace client.</p>':'<p>Votre dossier sera contrôlé par HelixCar avant publication de la mission.</p>';
