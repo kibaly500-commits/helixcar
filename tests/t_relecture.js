@@ -46,15 +46,22 @@ const L=require('./lib'),{urlFichier}=require('./env');
   L.check(width+' nouvelle modification après validation '+value,await page.locator('.completion-known .completion-pending').isVisible()&&await page.evaluate(v=>__lines[0].valeur===v,value));
   L.check(width+' champs manquants toujours bloquants '+value,await page.locator('#completer-envoyer').isDisabled());
  }
+ await page.evaluate(()=>{__lines[0].statut='a_corriger';__lines[0].commentaire='Vérifiez le VIN';_completerRendre(__lines);});
+ L.check(width+' motif du refus visible',(await page.locator('.completion-correction').innerText()).includes('Vérifiez le VIN'));
+ await page.locator('#completer-champ-vehicule_1_vin').fill('VF555555555555555');
+ await page.getByRole('button',{name:'Valider la correction',exact:true}).click();
+ await page.waitForFunction(()=>!_completerEnvoiEnCours);
+ L.check(width+' correction seule transmise',await page.evaluate(()=>__sent.length===4&&__lines[0].statut==='transmise'&&__lines[0].valeur==='VF555555555555555'));
+ L.check(width+' correction en attente et autres champs bloquants',await page.locator('.completion-pending').isVisible()&&await page.locator('#completer-envoyer').isDisabled());
  await page.locator('.completion-choices').getByRole('button',{name:'Diesel',exact:true}).click();
  await page.locator('#completer-envoyer').click();
- L.check(width+' confirmation avant envoi',await page.locator('.hc-completion-confirm').isVisible()&&await page.evaluate(()=>__sent.length===3));
+ L.check(width+' confirmation avant envoi',await page.locator('.hc-completion-confirm').isVisible()&&await page.evaluate(()=>__sent.length===4));
  await page.locator('.hc-completion-confirm').screenshot({path:'/tmp/hc-confirmation-'+width+'.png'});
  await page.locator('.hc-completion-confirm [data-cancel]').click();
- L.check(width+' annulation conserve la saisie',(await page.locator('.completion-known').innerText()).includes('VF444444444444444'));
+ L.check(width+' annulation conserve la saisie',(await page.locator('.completion-known').innerText()).includes('VF555555555555555'));
  await page.locator('#completer-envoyer').click();await page.locator('.hc-completion-confirm [data-confirm]').click();
- await page.waitForFunction(()=>__sent.length===4&&!_completerEnvoiEnCours);
- L.check(width+' envoi limité aux champs autorisés',await page.evaluate(()=>Object.keys(__sent[3]).join()==='vehicule_1_motorisation'));
+ await page.waitForFunction(()=>__sent.length===5&&!_completerEnvoiEnCours);
+ L.check(width+' envoi limité aux champs autorisés',await page.evaluate(()=>Object.keys(__sent[4]).join()==='vehicule_1_motorisation'));
  L.check(width+' dossier verrouillé après confirmation',await page.locator('.completion-edit').count()===0&&await page.locator('#completer-envoyer').isHidden());
  await page.close();
 

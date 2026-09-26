@@ -28,6 +28,16 @@ begin
   if not exists(select 1 from public.demande_informations_manquantes where client_id=cid and cle='vehicule_1_immatriculation' and statut='transmise' and valeur=v and ancienne_valeur=previous and validee_le is null and validee_par is null) then raise exception 'Nouvelle modification ou historique incorrect';end if;
   previous:=v;
  end loop;
+ perform set_config('request.jwt.claim.sub',aid::text,true);
+ update public.demande_informations_manquantes set statut='a_corriger',commentaire='Plaque à vérifier' where client_id=cid and cle='vehicule_1_immatriculation';
+ perform set_config('request.jwt.claim.sub',uid::text,true);
+ perform public.modifier_information_demande(cid,'vehicule_1_immatriculation','QR-456-ST');
+ if not exists(select 1 from public.demande_informations_manquantes where client_id=cid and statut='transmise' and correction_recue and valeur='QR-456-ST' and ancienne_valeur='IJ-789-KL') then raise exception 'Correction refusée ou historique perdu';end if;
+ if exists(select 1 from public.clients where id=cid and informations_confirmees_le is not null) then raise exception 'Correction confirme le dossier incomplet';end if;
+ perform set_config('request.jwt.claim.sub',aid::text,true);
+ update public.demande_informations_manquantes set statut='validee',validee_le=now(),validee_par=aid where client_id=cid and cle='vehicule_1_immatriculation';
+ if not exists(select 1 from public.informations_demande(cid) where cle='vehicule_1_immatriculation' and statut='validee' and valeur='QR-456-ST') then raise exception 'Validation finale incorrecte';end if;
+ perform set_config('request.jwt.claim.sub',uid::text,true);
  begin perform public.repondre_informations_demande(cid,'{}'::jsonb);exception when sqlstate '22023' then refuse:=true;end;
  if not refuse then raise exception 'Validation globale incomplète acceptée';end if;
  refuse:=false;

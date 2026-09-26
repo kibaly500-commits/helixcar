@@ -9881,13 +9881,13 @@ function _completerRendre(lignes) {
         champ.addEventListener('input',function(){choices.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.dataset.value===champ.value));});});
         groupe.appendChild(choices);
       }
-      if(editionsRecues[l.cle]){
+      if(editionsRecues[l.cle]||(l.statut==='a_corriger'&&_completerPeutModifier(Object.assign({},l,{statut:'fournie'})))){
         var actions=document.createElement('div');actions.className='completion-edit-actions';
         var cancelEdit=document.createElement('button');cancelEdit.type='button';cancelEdit.textContent='Annuler';
         cancelEdit.onclick=function(){if(_completerEnvoiEnCours)return;_completerConserverSaisies();_completerRetirerBrouillon(l.cle);_completerEditions.delete(l.cle);_completerRendre(_completerToutesLignes);};
-        var saveEdit=document.createElement('button');saveEdit.type='button';saveEdit.className='completion-edit-save';saveEdit.textContent='Valider la modification';
+        var saveEdit=document.createElement('button');saveEdit.type='button';saveEdit.className='completion-edit-save';saveEdit.textContent=l.statut==='a_corriger'?'Valider la correction':'Valider la modification';
         saveEdit.onclick=function(){_completerEnvoyerModification(l);};
-        actions.append(cancelEdit,saveEdit);groupe.appendChild(actions);
+        if(l.statut!=='a_corriger')actions.appendChild(cancelEdit);actions.appendChild(saveEdit);groupe.appendChild(actions);
         var feedback=document.createElement('p');feedback.className='completion-edit-feedback';feedback.setAttribute('role','status');groupe.appendChild(feedback);
       }
       (editionsRecues[l.cle]||contenu).appendChild(groupe);
@@ -9901,10 +9901,10 @@ function _completerRetirerBrouillon(cle){
  try{var saved=JSON.parse(sessionStorage.getItem(_completerBrouillonCle())||'{}');delete saved[cle];sessionStorage.setItem(_completerBrouillonCle(),JSON.stringify(saved));}catch(e){}
 }
 async function _completerEnvoyerModification(l){
- if(_completerEnvoiEnCours||_completerConfirmationEnCours||!_completerPeutModifier(l))return;
+ if(_completerEnvoiEnCours||_completerConfirmationEnCours||_completerVerrouillee||!_completerPeutModifier(l.statut==='a_corriger'?Object.assign({},l,{statut:'fournie'}):l))return;
  var champ=document.getElementById(_completerChampId(l.cle)),groupe=champ.closest('.modal-form-group'),feedback=groupe.querySelector('.completion-edit-feedback');
  if(!_completerChampPret(l)){feedback.textContent='Renseignez une valeur valide avant de confirmer.';champ.reportValidity();champ.focus();return;}
- var valeur=champ.value.trim();if(valeur===(l.valeur||'')){feedback.textContent='Aucune modification à envoyer.';return;}
+ var valeur=champ.value.trim();if(l.statut!=='a_corriger'&&valeur===(l.valeur||'')){feedback.textContent='Aucune modification à envoyer.';return;}
  var generation=_completerGeneration,id=_completerDemandeId;
  _completerConserverSaisies();_completerEnvoiEnCours=true;_completerEtatBouton();
  groupe.querySelectorAll('button,input,select').forEach(function(el){el.disabled=true;});feedback.textContent='Envoi en cours…';
