@@ -1,6 +1,6 @@
 begin;
 do $$
-declare cid uuid; uid uuid; n integer; refuse boolean:=false;
+declare cid uuid; uid uuid; aid uuid; v text; previous text; n integer; refuse boolean:=false;
 begin
  select u.id into uid from auth.users u where not exists(select 1 from public.admins a where a.auth_user_id=u.id) limit 1;
  perform set_config('request.jwt.claim.sub',uid::text,true);
@@ -15,6 +15,19 @@ begin
  if exists(select 1 from public.clients where id=cid and informations_confirmees_le is not null) then raise exception 'Confirmation globale indue';end if;
  select public.modifier_information_demande(cid,'vehicule_1_immatriculation','EF-456-GH') into n;
  if n<>1 then raise exception 'Rejeu non idempotent';end if;
+ select auth_user_id into aid from public.admins where actif limit 1;
+ if aid is null then raise exception 'Administrateur de test introuvable';end if;
+ previous:='EF-456-GH';
+ foreach v in array array['IJ-789-KL','MN-123-OP'] loop
+  perform set_config('request.jwt.claim.sub',aid::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',aid,'role','authenticated')::text,true);
+  update public.demande_informations_manquantes set statut='validee',validee_le=now(),validee_par=aid where client_id=cid and cle='vehicule_1_immatriculation';
+  perform set_config('request.jwt.claim.sub',uid::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',uid,'role','authenticated')::text,true);
+  perform public.modifier_information_demande(cid,'vehicule_1_immatriculation',v);
+  if not exists(select 1 from public.demande_informations_manquantes where client_id=cid and cle='vehicule_1_immatriculation' and statut='transmise' and valeur=v and ancienne_valeur=previous and validee_le is null and validee_par is null) then raise exception 'Nouvelle modification ou historique incorrect';end if;
+  previous:=v;
+ end loop;
  begin perform public.repondre_informations_demande(cid,'{}'::jsonb);exception when sqlstate '22023' then refuse:=true;end;
  if not refuse then raise exception 'Validation globale incomplète acceptée';end if;
  refuse:=false;

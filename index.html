@@ -9664,7 +9664,7 @@ function _completerGrouper(lignes) {
 }
 function _completerEstManquante(l) { return l.statut === 'attendue' || l.statut === 'a_corriger'; }
 function _completerEstRestante(l) { return _completerEstManquante(l) || _completerEditions.has(l.cle); }
-function _completerPeutModifier(l){return !_completerVerrouillee && l.statut==='fournie' && /^(immatriculation|vin|restit_immatriculation|restit_vin|contact_(pc|liv|sur_place)_(nom|tel)|restit_contact_(nom|tel)|consignes|restit_consignes)$/.test(l.cle.replace(/^vehicule_[0-9]+_/,''));}
+function _completerPeutModifier(l){return !_completerVerrouillee && ['fournie','validee'].includes(l.statut) && /^(immatriculation|vin|restit_immatriculation|restit_vin|contact_(pc|liv|sur_place)_(nom|tel)|restit_contact_(nom|tel)|consignes|restit_consignes)$/.test(l.cle.replace(/^vehicule_[0-9]+_/,''));}
 function _completerLibelle(l) {
   var base = String(l.libelle || l.cle || '');
   var vehicule = /^vehicule_(\d+)_/.exec(l.cle || '');
