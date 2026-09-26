@@ -15,6 +15,12 @@
     const fresh=HCPreparation.build(source.client,source.vehicules,source.point_remise),saved=source.brouillons||[];
     const plans=fresh.map(p=>{const s=saved.find(x=>x.cle===p.key);return s&&(s.empreinte===source.empreinte||s.mission_id)?Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration}):p;});
     saved.filter(s=>s.mission_id&&!plans.some(p=>p.key===s.cle)).forEach(s=>plans.push(Object.assign({},s.plan,{saved:s})));
+    plans.forEach(p=>{
+      if(p.category!=='convoyage')return;
+      const pickupKey=p.kind==='apres_stockage'?'heure_retrait':'heure_prise_en_charge';
+      if(p[pickupKey]==null)p[pickupKey]=p.rows.find(r=>r.label==='Prise en charge')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
+      if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
+    });
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
@@ -24,12 +30,29 @@
     finally{busy=false;}
   };
   function card(a){
-    const rows=a.rows||[],value=label=>display(rows.find(r=>r.label===label)?.value||'À préciser');
-    const route=rows.some(r=>r.label==='Départ');
-    const rest=rows.filter(r=>!['Départ','Arrivée','Prise en charge','Livraison','Véhicule','Transport'].includes(r.label));
-    return '<section class="hc-prep-card hc-prep-annonce"><header class="hc-prep-annonce-head"><span class="hc-prep-kicker">'+esc(a.category==='convoyage'?'CONVOYAGE':a.category||'MISSION')+'</span><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong></header>'+
-      (route?'<div class="hc-prep-route"><div><small>Départ</small><strong>'+value('Départ')+'</strong><span>'+value('Prise en charge')+'</span></div><div><small>Arrivée</small><strong>'+value('Arrivée')+'</strong><span>'+value('Livraison')+'</span></div></div><div class="hc-prep-vehicle"><strong>'+value('Véhicule')+'</strong><span>'+value('Transport')+'</span></div>':'<h4>'+esc(a.title)+'</h4>')+
-      (rest.length?'<dl class="hc-prep-facts">'+rest.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>':'')+'</section>';
+    const rows=a.rows||[],raw=label=>String(rows.find(r=>r.label===label)?.value||'');
+    const facts=items=>'<dl class="hc-prep-leg-facts">'+items.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+display(value||'À préciser')+'</dd></div>').join('')+'</dl>';
+    const schedule=value=>{
+      const date=value.match(/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/)?.[0];
+      const hours=value.match(/\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?/)?.[0];
+      return '<span class="hc-prep-date">'+display(date||'Date à préciser')+'</span><strong class="hc-prep-time'+(hours?'':' hc-prep-unspecified')+'">'+esc(hours||'Heure à préciser')+'</strong>';
+    };
+    const vehicle=value=>{const parts=value.split(' · ');return {model:parts.length>1?parts.slice(1).join(' · '):value,type:parts.length>1?parts[0]:''};};
+    const route=(from,to,start,end)=>'<div class="hc-prep-route"><div><span class="hc-prep-route-label">Départ</span><strong class="hc-prep-city">'+display(from||'Ville à préciser')+'</strong>'+(start!==null?schedule(start):'')+'</div><span class="hc-prep-direction" aria-hidden="true">→</span><div><span class="hc-prep-route-label">Arrivée</span><strong class="hc-prep-city">'+display(to||'Ville à préciser')+'</strong>'+(end!==null?schedule(end):'')+'</div></div>';
+    let h='<section class="hc-prep-card hc-prep-annonce"><div class="hc-prep-mission-summary"><strong>'+esc(a.category==='convoyage'?'Convoyage':a.title)+'</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong></div></div>';
+    if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
+    const delivered=vehicle(raw('Véhicule'));
+    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
+      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')]])+'</section>';
+    if(raw('Restitution')){
+      const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
+      const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
+      h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Restitution</h4></header>'+route(raw('Arrivée'),destination,null,null)+
+        '<div class="hc-prep-return-schedule"><span>Restitution prévue</span><div>'+schedule(raw('Restitution prévue'))+'</div></div>'+
+        facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
+    }
+    const shared=[['Distance de la mission',raw('Distance')],...(raw('Garde du véhicule')?[['Garde du véhicule',raw('Garde du véhicule')]]:[]),...(!raw('Restitution')?[['Restitution','Non']]:[])];
+    return h+'</div><footer class="hc-prep-mission-footer">'+facts(shared)+'</footer></section>';
   }
   window.hcPreparationCarteOpportunite=function(o,options){
     let html=card(o.preparation_annonce);if(options?.partenaire){html+='<div id="opp-msg-'+esc(o.id)+'" class="hc-note" role="status"></div>';
@@ -55,7 +78,7 @@
       if(p.category==='convoyage'){h+=input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind!=='apres_stockage')h+=input(p,i,'heure_prise_en_charge','Heure de prise en charge','time');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de remise au point HelixCar','time');
-        if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de retrait au point HelixCar','time');}
+        if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de prise en charge','time');}
       h+='</div>';
       if(p.missing.length)h+='<p class="hc-prep-incomplete">À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';
       const privateLabels={adresse_depart:'Adresse de prise en charge',adresse_arrivee:'Adresse de livraison',contact_depart_nom:'Contact au départ',contact_depart_tel:'Téléphone au départ',contact_arrivee_nom:'Contact à l’arrivée',contact_arrivee_tel:'Téléphone à l’arrivée',immatriculation:'Immatriculation du véhicule',vin:'VIN du véhicule livré',consignes:'Consignes',adresse_restitution:'Adresse de restitution',restit_contact_nom:'Contact à la restitution',restit_contact_tel:'Téléphone à la restitution',restit_immatriculation:'Immatriculation du véhicule à restituer',restit_vin:'VIN du véhicule à restituer',restit_info:'Consignes de restitution'};
@@ -64,10 +87,13 @@
     if(!state.preview&&state.plans.some(p=>!p.saved?.mission_id))h+='<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-prep-save>Enregistrer le brouillon</button><button type="button" class="btn btn-primary" data-prep-view="preview">Voir l’aperçu partenaire</button></div>';
     el('hc-prep-body').innerHTML=h;
   }
-  function readEdits(){modal.querySelectorAll('[data-field]').forEach(e=>{const p=state.plans[Number(e.dataset.plan)],key=e.dataset.field;p[key]=e.type==='number'?(e.value===''?null:Number(e.value)):e.value;
+  function readEdits(){modal.querySelectorAll('[data-field]').forEach(e=>{
+    const p=state.plans[Number(e.dataset.plan)],key=e.dataset.field;
+    const previous=p[key]??'';
+    p[key]=e.type==='number'?(e.value===''?null:Number(e.value)):e.value;
+    if(e.type==='time'&&e.value===previous)return;
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
-    if(key==='heure_retrait'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
-    if(key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
+    if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
   });}
   async function save(){readEdits();const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
   modal.addEventListener('click',async e=>{
