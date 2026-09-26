@@ -1248,13 +1248,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Dashboard -->
       <div class="page" id="page-admin-dashboard">
-<section class="card ai-home" aria-labelledby="admin-infos-accueil-titre">
- <div class="card-header"><div><h2 id="admin-infos-accueil-titre">Dossiers à traiter</h2><p class="ai-muted">Informations reçues et éléments encore attendus — sans ouvrir les demandes de devis.</p></div><button type="button" class="btn btn-outline" onclick="chargerCentreInformationsAdmin()">Actualiser</button></div>
- <div id="admin-infos-accueil-compteurs" class="ai-stats"></div>
- <label class="ai-muted" for="admin-infos-accueil-filtre">Afficher</label>
- <select id="admin-infos-accueil-filtre" onchange="rendreAccueilInformationsAdmin()"><option value="tous">Tous les dossiers à traiter</option><option value="transmise">Informations à valider</option><option value="correction">Corrections reçues</option><option value="attente">En attente du client</option></select>
- <div id="admin-infos-accueil-liste" aria-live="polite">Chargement des dossiers…</div>
-</section>
+
 
         <div id="alerte-nouvelles-demandes" class="alert alert-warning" style="display:none;margin-bottom:14px;cursor:pointer" onclick="showPage('admin-devis')"></div>
         <!-- Ces cinq chiffres étaient écrits en dur (3, 12, 47, 8,
@@ -2661,37 +2655,9 @@ async function chargerCentreInformationsAdmin(silencieux) {
     if(!_adminInfosSelection && _adminInfosDossiers.length) _adminInfosSelection=_adminInfosDossiers[0].client.id;
     statut.textContent = 'Actualisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' · actualisation automatique';
     rendreCentreInformationsAdmin();
-  } catch(e){if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';var home=document.getElementById('admin-infos-accueil-liste');if(home)home.textContent=statut.textContent;}}
-}
-function rendreAccueilInformationsAdmin(){
- var zone=document.getElementById('admin-infos-accueil-liste'),stats=document.getElementById('admin-infos-accueil-compteurs');if(!zone||!stats)return;
- var counts={transmise:0,correction:0,attente:0};
- function group(l){return l.statut==='transmise'?(l.correction_recue?'correction':'transmise'):'attente';}
- var pending=function(l){return ['transmise','attendue','a_corriger'].includes(l.statut);};
- _adminInfosDossiers.forEach(function(d){d.lignes.filter(pending).forEach(function(l){counts[group(l)]++;});});
- stats.replaceChildren();[['transmise','À valider'],['correction','Corrections reçues'],['attente','En attente du client']].forEach(function(pair){var b=document.createElement('button');b.type='button';b.className='ai-stat';var n=document.createElement('strong');n.textContent=counts[pair[0]];b.append(n,document.createTextNode(pair[1]));b.onclick=function(){document.getElementById('admin-infos-accueil-filtre').value=pair[0];rendreAccueilInformationsAdmin();};stats.appendChild(b);});
- var filtre=document.getElementById('admin-infos-accueil-filtre').value;zone.replaceChildren();
- _adminInfosDossiers.forEach(function(d){
-  var lines=d.lignes.filter(pending);if(!d.erreur&&!lines.some(function(l){return filtre==='tous'||group(l)===filtre;}))return;
-  var card=document.createElement('article');card.className='ai-home-dossier';
-  var heading=document.createElement('h3');heading.textContent=([d.client.prenom,d.client.nom].filter(Boolean).join(' ')||d.client.email||'Client')+' · '+(d.client.numero_client||'Demande');card.appendChild(heading);
-  if(d.erreur){var err=document.createElement('p');err.textContent='Lecture indisponible — actualisez pour vérifier ce dossier.';card.appendChild(err);}
-  var columns=document.createElement('div');columns.className='ai-home-columns';if(filtre!=='tous')columns.style.gridTemplateColumns='1fr';
-  [['transmise','À valider'],['correction','Corrections reçues'],['attente','En attente du client']].forEach(function(pair){
-   if(filtre!=='tous'&&filtre!==pair[0])return;
-   var items=lines.filter(function(l){return group(l)===pair[0];});var col=document.createElement('div');var title=document.createElement('h4');title.textContent=pair[1]+' · '+items.length;col.appendChild(title);
-   items.forEach(function(l){var item=document.createElement('div');item.className='ai-home-field';var label=document.createElement('strong');label.textContent=l.libelle||l.cle;item.appendChild(label);
-    if(l.statut==='transmise'){var value=document.createElement('p');value.textContent='Reçu : '+(l.valeur||'—');item.appendChild(value);if(l.ancienne_valeur&&l.ancienne_valeur!==l.valeur){var old=document.createElement('p');old.className='ai-muted';old.textContent='Avant : '+l.ancienne_valeur;item.appendChild(old);}}
-    if(l.commentaire){var note=document.createElement('p');note.className='ai-correction';note.textContent='Correction demandée : '+l.commentaire;item.appendChild(note);}
-    if(l.statut==='attendue'){var missing=document.createElement('p');missing.textContent='Non renseigné';item.appendChild(missing);}
-    col.appendChild(item);
-   });if(!items.length){var empty=document.createElement('p');empty.className='ai-muted';empty.textContent='Aucune';col.appendChild(empty);}columns.appendChild(col);
-  });card.appendChild(columns);
-  var open=document.createElement('button');open.type='button';open.className='btn btn-outline';open.textContent='Vérifier les informations';open.onclick=function(){document.getElementById('admin-infos-recherche').value='';document.getElementById('admin-infos-filtre').value='tous';_adminInfosSelection=d.client.id;showPage('admin-infos');_adminInfosMobileDetail=true;rendreCentreInformationsAdmin();};card.appendChild(open);zone.appendChild(card);
- });if(!zone.children.length)zone.textContent='Aucun dossier pour ce filtre.';
+  } catch(e){if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}}
 }
 function rendreCentreInformationsAdmin(){
- rendreAccueilInformationsAdmin();
  var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
  if(!liste||!detail)return;
  var filtre=document.getElementById('admin-infos-filtre').value;
@@ -2778,7 +2744,7 @@ async function deciderCentreInformation(id,cle,decision,motif){
  }catch(e){document.getElementById('admin-infos-statut').textContent='Décision non confirmée : '+e.message;}
  finally{_adminInfosBusy=false;rendreCentreInformationsAdmin();}
 }
-setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&(p.classList.contains('active')||document.getElementById('page-admin-dashboard')?.classList.contains('active'))&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
+setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&p.classList.contains('active')&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
 
 var _infosDemandeEnCours = null;
 

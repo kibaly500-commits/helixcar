@@ -15,7 +15,7 @@ function _resumerInfosDemande(lignes, meta, confirme) {
   }
   var labels={corrections:['Corrections reçues · à vérifier','violet'],modifications:['Informations modifiées · à vérifier','violet'],nouvelles:['Informations reçues · à vérifier','bleu'],a_corriger:['Corrections demandées · attente client','orange'],manquantes:['Champs manquants · attente client','orange']};
   var resultat=Object.keys(labels).filter(k=>n[k]).map(k=>({cle:k,texte:labels[k][0]+' ('+n[k]+')',ton:labels[k][1]}));
-  if(!resultat.length)resultat.push(confirme?{cle:'complet',texte:'Dossier complet',ton:'vert'}:{cle:'confirmation',texte:'Champs complets · confirmation client attendue',ton:'neutre'});
+  if(!resultat.length)resultat.push(confirme?{cle:'complet',texte:'Dossier complet',ton:'vert'}:{cle:'confirmation',texte:'Champs complets · confirmation client attendue',ton:'vert'});
   return resultat;
 }
 function _badgesInfosDemande(id) {
