@@ -16,6 +16,11 @@ const server=http.createServer((req,res)=>{
   const page=await browser.newPage({viewport:{width:390,height:844}});
   await page.route('**/*',r=>r.request().url().startsWith('http://127.0.0.1:8765/')?r.continue():r.abort());
   await page.goto('http://127.0.0.1:8765/index.html');
+  await page.setViewportSize({width:320,height:900});
+  console.log(name+' overflow actuel', await page.evaluate(()=>({width:document.documentElement.scrollWidth,culprits:[...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.right>320&&getComputedStyle(e).position!=='fixed'}).slice(0,8).map(e=>e.tagName+'.'+e.className)})));
+  await page.goto('http://127.0.0.1:8765/index-baseline.html');
+  console.log(name+' overflow sauvegarde',await page.evaluate(()=>document.documentElement.scrollWidth));
+  await page.goto('http://127.0.0.1:8765/index.html');
   await page.locator('#services-video').scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>{let v=document.getElementById('services-video');return v.currentTime>.5&&!v.paused;});
   assert(await page.locator('#services-video').evaluate(v=>v.muted&&v.videoWidth===1280));

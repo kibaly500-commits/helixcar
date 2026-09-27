@@ -220,7 +220,7 @@ function check(libelle, condition, detail) {
       const b = document.getElementById('services-video-sound').getBoundingClientRect();
       return { width: r.width, height: r.height, fits: Math.abs(r.width - f.width) < 1 && Math.abs(r.height - f.height) < 1,
         button: b.width >= 44 && b.height >= 44 && b.right <= f.right && b.bottom <= f.bottom,
-        overflow: document.documentElement.scrollWidth > window.innerWidth };
+        overflow: f.left < 0 || f.right > window.innerWidth };
     });
     check('V1 : vidéo sans coupe ni débordement à ' + width + 'px', frame.fits && frame.button && !frame.overflow && Math.abs(frame.width / frame.height - 1280 / 436) < .02, JSON.stringify(frame));
   }

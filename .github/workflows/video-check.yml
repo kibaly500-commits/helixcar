@@ -12,12 +12,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
+      - run: |
+          git fetch --depth=1 origin 490cc419ec66f220a8c02fd778e6b7bbe23cf5cc
+          git show 490cc419ec66f220a8c02fd778e6b7bbe23cf5cc:index.html > index-baseline.html
+      - name: Lecture réelle et commandes Chromium et WebKit
+        run: node tests/verification-video.cjs
       - name: Navigation et cadrage
+        if: always()
         env:
           CI_NO_SANDBOX: '1'
         run: node tests/t_vitrine_navigation.js
-      - name: Lecture réelle et commandes Chromium et WebKit
-        run: node tests/verification-video.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
