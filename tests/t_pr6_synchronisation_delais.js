@@ -6,23 +6,48 @@ const {urlFichier}=require('./env');
   for(const width of [390,1440]){
    const page=await L.newPage(browser);await page.setViewportSize({width,height:1000});
    const animation=await page.evaluate(()=>{
-    const results=[];
-    for(const p of [0,.1,.249,.5,.749,.99,1]){
-     _hcRendreProgressionVitrine(p);
+    // Les rectangles CSS sont arrondis à des fractions de pixel. À la
+    // frontière exacte, ne pas imposer deux seuils contradictoires (.01/.02).
+    // 0.05 px couvre cet arrondi ; les extrémités restent strictement vérifiées.
+    function erreurs(p){
+     const errors=[];
      document.querySelectorAll('.hero2-route,.loyalty-track').forEach(root=>{
       if(!root.offsetWidth)return;
-      const el=root.querySelector('.hc-sync-line'),line=el.getBoundingClientRect(),vertical=el.dataset.direction==='vertical';
-      root.querySelectorAll('.hero2-route-dot,.node-circle').forEach(n=>{
-       const r=n.getBoundingClientRect(),reached=vertical?r.top+r.height/2<=line.top+line.height*p+.02:r.left+r.width/2<=line.left+line.width*p+.02;
-       results.push(n.classList.contains('hc-reached')===reached);
+      const el=root.querySelector('.hc-sync-line'),fill=el.querySelector('.hc-sync-fill').getBoundingClientRect();
+      const vertical=el.dataset.direction==='vertical';
+      root.querySelectorAll('.hero2-route-dot,.node-circle').forEach((n,i)=>{
+       const r=n.getBoundingClientRect(),delta=vertical?r.top+r.height/2-fill.bottom:r.left+r.width/2-fill.right;
+       const reached=n.classList.contains('hc-reached');
+       if((reached?delta>.05:delta<-.05)||(p===0&&i===0&&!reached)||(p===1&&!reached))
+        errors.push({p,i,root:root.className,delta,reached});
       });
      });
      const fill=document.querySelector('.hero2-panel-progress-fill');
-     results.push(Math.abs(parseFloat(fill.style.width)-p*100)<.01);
+     if(Math.abs(parseFloat(fill.style.width)-p*100)>=.01)errors.push({p,progress:fill.style.width});
+     return errors;
     }
-    return results.every(Boolean);
+    const errors=[];
+    const middle=document.querySelectorAll('.loyalty-track .node-circle')[2],saved=middle.style.cssText;
+    // Régression reproduite : une variation de 1/64 px suffisait à faire
+    // échouer l'ancien test alors que la progression était correcte.
+    for(const offset of [0,1/64,-1/64]){
+     middle.style.position='relative';middle.style.left=offset+'px';middle.style.top=offset+'px';
+     for(const p of [0,.1,.249,.5,.749,.99,1]){
+      _hcRendreProgressionVitrine(p);errors.push(...erreurs(p));
+     }
+    }
+    middle.style.cssText=saved;
+    // Contrôles négatifs : une icône allumée trop tôt ou éteinte trop tard
+    // doit toujours être rejetée, malgré la tolérance d'arrondi.
+    const nodes=document.querySelectorAll('.loyalty-track .node-circle');
+    _hcRendreProgressionVitrine(0);nodes[nodes.length-1].classList.add('hc-reached');
+    const premature=erreurs(0).length>0;
+    _hcRendreProgressionVitrine(1);nodes[0].classList.remove('hc-reached');
+    const late=erreurs(1).length>0;_hcRendreProgressionVitrine(1);
+    return {errors,premature,late};
    });
-   L.check('Lignes et icônes synchronisées à chaque seuil, largeur '+width,animation);
+   L.check('Lignes et icônes synchronisées à chaque seuil, largeur '+width,animation.errors.length===0,JSON.stringify(animation.errors));
+   L.check('Le contrôle détecte une icône prématurée ou tardive, largeur '+width,animation.premature&&animation.late);
    await L.fillStep1(page,'particulier');await L.chooseService(page,'convoyage');
    const times=await page.evaluate(()=>{
     const now=Date.parse('2026-09-20T12:30:00Z');
