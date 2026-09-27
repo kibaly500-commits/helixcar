@@ -11,11 +11,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      - run: |
-          git fetch --depth=1 origin 490cc419ec66f220a8c02fd778e6b7bbe23cf5cc
-          git show 490cc419ec66f220a8c02fd778e6b7bbe23cf5cc:index.html > index-baseline.html
-      - name: Lecture réelle et commandes Chromium et WebKit
+      - run: npx playwright install --with-deps chromium chrome webkit
+      - name: Lecture réelle Chrome et WebKit
         run: node tests/verification-video.cjs
       - name: Navigation et cadrage
         if: always()

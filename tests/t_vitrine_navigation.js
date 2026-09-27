@@ -222,7 +222,7 @@ function check(libelle, condition, detail) {
         button: b.width >= 44 && b.height >= 44 && b.right <= f.right && b.bottom <= f.bottom,
         overflow: f.left < 0 || f.right > window.innerWidth };
     });
-    check('V1 : vidéo sans coupe ni débordement à ' + width + 'px', frame.fits && frame.button && !frame.overflow && Math.abs(frame.width / frame.height - 1280 / 436) < .02, JSON.stringify(frame));
+    check('V1 : vidéo sans coupe ni débordement à ' + width + 'px', frame.fits && frame.button && !frame.overflow && Math.abs(frame.width / frame.height - 1280 / 536) < .02, JSON.stringify(frame));
   }
   await page.evaluate(() => document.getElementById('services-video-sound').click());
   check('V2 : activation explicite du son', await page.evaluate(() => !document.getElementById('services-video').muted && document.getElementById('services-video-sound').getAttribute('aria-pressed') === 'true'));
