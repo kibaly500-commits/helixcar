@@ -1,6 +1,6 @@
 // Envoi serveur via notifications_stockage après acceptation et paiement.
 export const STOCKAGE_ACCES_ENVOI_ACTIF = true;
-export const POINT_REMISE_HELIXCAR = 'ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand';
+export const POINT_REMISE_HELIXCAR = '12 rue de l’Université, 93160 Noisy-le-Grand';
 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -15,7 +15,7 @@ export function preparerMailAccesStockage({reference, adresse = POINT_REMISE_HEL
     'Voici les informations pratiques pour votre stockage automobile.',
     ...(depotClient ? [rendezVous('Dépôt de votre véhicule par vos soins', dateDepot, heureDepot)] : []),
     ...(recuperationClient ? [rendezVous('Récupération de votre véhicule par vos soins après stockage', dateRecuperation, heureRecuperation)] : []),
-    'Point de remise HelixCar :\n' + String(adresse).trim(),
+    'Point de remise HelixCar :\n' + String(adresse).trim().replace(/^ALDI\s*[—–,-]\s*(?=12 rue de l’Université)/i, ''),
     'Il s’agit du point de rendez-vous pour la remise de votre véhicule. Votre véhicule sera stocké sur un site distinct.',
     'Cette adresse concerne uniquement le dépôt et/ou la récupération que vous effectuez vous-même, selon les choix de votre demande.',
     'Pour toute question ou modification de rendez-vous, contactez notre équipe.',

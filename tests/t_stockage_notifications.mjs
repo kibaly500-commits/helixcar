@@ -18,7 +18,7 @@ function fixture(depot=true,recovery=true){
 }
 for(const [depot,recovery] of [[true,false],[false,true],[true,true]])test('mail stockage '+depot+'/'+recovery+' et reprise sans doublon',async()=>{
  const f=fixture(depot,recovery);assert.equal((await traiterNotificationsStockage(f.deps)).sent,1);await traiterNotificationsStockage(f.deps);assert.equal(f.deliveries.size,1);
- const body=JSON.parse([...f.deliveries.values()][0]);assert.match(body.text,/ALDI — 12 rue de l’Université/);assert.equal(body.text.includes('Dépôt de votre véhicule'),depot);assert.equal(body.text.includes('Récupération de votre véhicule'),recovery);assert.match(body.subject,/TEST/);
+ const body=JSON.parse([...f.deliveries.values()][0]);assert.match(body.text,/12 rue de l’Université/);assert.doesNotMatch(body.text,/aldi/i);assert.doesNotMatch(body.html,/aldi/i);assert.equal(body.text.includes('Dépôt de votre véhicule'),depot);assert.equal(body.text.includes('Récupération de votre véhicule'),recovery);assert.match(body.subject,/TEST/);
  if(depot)assert.match(body.text,/08\/10\/2026 à 15:30/);if(recovery)assert.match(body.text,/13\/10\/2026 à 16:00/);
 });
 test('panne après acceptation fournisseur : même clé et même corps',async()=>{const f=fixture();f.failSave();assert.equal((await traiterNotificationsStockage(f.deps)).failed,1);await traiterNotificationsStockage(f.deps);assert.equal(f.deliveries.size,1);assert.equal(f.row.fournisseur_id,'resend-qa');});
@@ -27,3 +27,5 @@ test('fenêtre Resend dépassée : rapprochement, jamais de renvoi',async()=>{co
 for(const change of [f=>f.d.paiement_statut='en_attente',f=>f.d.statut='envoye',f=>f.c.email='autre@example.test',f=>f.c.stockage_sortie='helixcar',f=>f.c.type_service='convoyage'])test('dossier non éligible : aucun envoi '+change,async()=>{const f=fixture();change(f);await traiterNotificationsStockage(f.deps);assert.equal(f.deliveries.size,0);assert.equal(f.row.erreur,'DOSSIER_MODIFIE');});
 test('aucun déplacement client : pas de contenu envoyé',async()=>{const f=fixture(false,false);await traiterNotificationsStockage(f.deps);assert.equal(f.deliveries.size,0);});
 test('contenu échappé',()=>{const f=fixture();f.row.snapshot.reference='<img onerror=x>';assert.doesNotMatch(messageStockage(f.row,'qa').html,/<img/);});
+
+test('ancienne adresse fournie : seule l’enseigne disparaît',()=>{const f=fixture();f.row.snapshot.adresse='ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand';const m=messageStockage(f.row,'qa');assert.doesNotMatch(m.text,/aldi/i);assert.doesNotMatch(m.html,/aldi/i);assert.match(m.text,/12 rue de l’Université, 93160 Noisy-le-Grand/);});

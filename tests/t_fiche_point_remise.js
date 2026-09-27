@@ -4,7 +4,7 @@ const L=require('./lib');const {urlFichier}=require('./env');
   const p=await browser.newPage();await p.route('https://**/*',r=>r.abort());
   await p.addInitScript(({assigned,entree,sortie})=>{
    window.__headers=[];window.__rpc=0;
-   window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'AUTH-QA',user:{id:'qa-user',email:'qa@example.test'}}}})},from:()=>{const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:null})};return q;},rpc:async()=>{window.__rpc++;return {data:{adresse:'ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand',arriveeAvantStockage:entree,departApresStockage:sortie}};}})};
+   window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'AUTH-QA',user:{id:'qa-user',email:'qa@example.test'}}}})},from:()=>{const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:null})};return q;},rpc:async()=>{window.__rpc++;return {data:{adresse:'12 rue de l’Université, 93160 Noisy-le-Grand',arriveeAvantStockage:entree,departApresStockage:sortie}};}})};
    window.fetch=async(url,opts)=>{window.__headers.push(opts.headers.Authorization);return Response.json(url.includes('/convoyeurs?')?[{id:'qa-conv'}]:url.includes('/missions?')?[{id:'qa-mission',reference:'QA',convoyeur_id:assigned?'qa-conv':null,adresse_depart:'Adresse client départ',adresse_arrivee:'Adresse client arrivée'}]:[]);};
   },{assigned,entree,sortie});
   await p.goto(urlFichier('fiche-mission.html')+'?mission=QA');

@@ -10,7 +10,7 @@ const {urlFichier}=require('./env');
  }
  for(const args of [{depotClient:true,adresse:''},{adresse:'Test'}]){let rejected=false;try{mail({reference:'QA',...args});}catch(e){rejected=true;}L.check('Pas de mail sans adresse ou sans déplacement client',rejected);}
  const remise=mail({reference:'QA',depotClient:true,recuperationClient:true});
- L.check('Mail : adresse fournie par défaut, remise distincte du stockage',remise.text.includes('ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand')&&remise.text.includes('site distinct')&&!remise.text.includes('Adresse du lieu de stockage'));
+ L.check('Mail : adresse fournie par défaut, remise distincte du stockage',remise.text.includes('12 rue de l’Université, 93160 Noisy-le-Grand')&&!remise.text.includes('ALDI')&&remise.text.includes('site distinct')&&!remise.text.includes('Adresse du lieu de stockage'));
  const browser=await L.launch();
  try{
   for(const width of [390,1280]){
@@ -40,6 +40,7 @@ const {urlFichier}=require('./env');
      await loadDemandesClient();
     },{service,statut,paiement});
     L.check(width+' adresse réservée au stockage accepté et payé : '+service+'/'+statut+'/'+paiement,(await p.locator('[data-point-remise]').count()===1)===visible);
+    if(visible)L.check(width+' adresse sans enseigne',await p.locator('[data-point-remise]').innerText().then(t=>t.includes('12 rue de l’Université, 93160 Noisy-le-Grand')&&!/aldi/i.test(t)));
    }
    await p.evaluate(async()=>{chargerDevisClient=async()=>{throw Error('indisponible');};await loadDemandesClient();});
    L.check(width+' pas d’adresse si paiement invérifiable',await p.locator('[data-point-remise]').count()===0);

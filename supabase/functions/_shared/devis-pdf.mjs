@@ -2,6 +2,8 @@
 // Source : moteur PDF du Dashboard ; rendu identique, données relues serveur.
 export function construirePdfServeur(jsPDF, dossier, devis) {
   const window = { jspdf: { jsPDF } };
+var ROUGE = [229, 72, 77];
+
 function _nettPeriodeTexte(nd, formateurDate) {
   if (!nd || !nd.date_souhaitee) return '';
   var f = formateurDate || function (x) { return x; };
@@ -219,6 +221,29 @@ function _libelleModeTransport(mt) {
   return null;
 }
 
+function _operationDossier(c, prefixe) {
+  if (!_operationAssureeParHelixCar(c, prefixe)) return false;
+
+  // V50.4A — CORRECTIF Objectif 8 : `trajet_commun` vaut NULL non seulement
+  // pour les anciennes demandes/mono (cas d'origine de ce commentaire), mais
+  // aussi pour TOUTE demande multi actuelle : le choix commun/individuel a
+  // été retiré de l'interface (V50.2G, resté masqué en display:none dans le
+  // DOM) et n'est donc plus jamais coché — `trajet_commun` est envoyé `null`
+  // pour toute demande multi avec convoyage. L'ancien test `=== false` ne
+  // correspondait donc plus jamais, et TOUTE demande multi affichait un bloc
+  // dossier « Prise en charge »/« Livraison » global rempli de tirets, alors
+  // que l'organisation est réellement individuelle par véhicule. On exige
+  // désormais une confirmation EXPLICITE (`=== true`) pour traiter une
+  // demande multi comme un trajet dossier commun.
+  var lignesVehicules = c._vehicules && c._vehicules.length;
+  var nb = c.nb_vehicules || lignesVehicules || 1;
+  // Depuis V51, une vraie ligne véhicule est la source opérationnelle même
+  // en mono. Le bloc dossier ne reste actif que pour les anciens dossiers
+  // sans ligne véhicule, ou pour un ancien trajet explicitement commun.
+  if ((nb >= 2 || lignesVehicules) && c.trajet_commun !== true) return false;
+  return true;
+}
+
 function _finStockageEffectiveDossier(c) {
   var finPrevue = c.stockage_date_fin || '';
   if (!finPrevue || !_operationDossier(c, 'liv')) return finPrevue;
@@ -231,15 +256,6 @@ function _finStockageEffectiveVehiculeDash(c, v) {
   var livDate = (v && v.date_livraison) || '';
   if (!finPrevue) return finPrevue;
   return livDate || finPrevue;
-}
-
-function _joursEntreDatesDash(d1, d2) {
-  if (!d1 || !d2) return null;
-  var a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
-  if (isNaN(a) || isNaN(b)) return null;
-  var j = Math.round((b - a) / 86400000);
-  if (j < 0) return -1;
-  return j === 0 ? 1 : j;
 }
 
 function _dvDate(v) {
@@ -367,69 +383,24 @@ function _proDetails(c) {
   return (d && typeof d === 'object') ? d : null;
 }
 
-function _aStockage(c) {
-  var t = _typeServiceDemande(c);
-  return t === 'stockage' || t === 'convoyage_stockage';
-}
-
-function _operationAssureeParHelixCar(c, prefixe) {
-  var t = _typeServiceDemande(c);
-  if (t === 'convoyage' || t === 'convoyage_stockage') return true;
-  if (t === 'stockage') {
-    return (prefixe === 'pc') ? c.stockage_acheminement === 'helixcar'
-                               : c.stockage_sortie === 'helixcar';
-  }
-  return false;
-}
-
-function _operationDossier(c, prefixe) {
-  if (!_operationAssureeParHelixCar(c, prefixe)) return false;
-
-  // V50.4A — CORRECTIF Objectif 8 : `trajet_commun` vaut NULL non seulement
-  // pour les anciennes demandes/mono (cas d'origine de ce commentaire), mais
-  // aussi pour TOUTE demande multi actuelle : le choix commun/individuel a
-  // été retiré de l'interface (V50.2G, resté masqué en display:none dans le
-  // DOM) et n'est donc plus jamais coché — `trajet_commun` est envoyé `null`
-  // pour toute demande multi avec convoyage. L'ancien test `=== false` ne
-  // correspondait donc plus jamais, et TOUTE demande multi affichait un bloc
-  // dossier « Prise en charge »/« Livraison » global rempli de tirets, alors
-  // que l'organisation est réellement individuelle par véhicule. On exige
-  // désormais une confirmation EXPLICITE (`=== true`) pour traiter une
-  // demande multi comme un trajet dossier commun.
-  var lignesVehicules = c._vehicules && c._vehicules.length;
-  var nb = c.nb_vehicules || lignesVehicules || 1;
-  // Depuis V51, une vraie ligne véhicule est la source opérationnelle même
-  // en mono. Le bloc dossier ne reste actif que pour les anciens dossiers
-  // sans ligne véhicule, ou pour un ancien trajet explicitement commun.
-  if ((nb >= 2 || lignesVehicules) && c.trajet_commun !== true) return false;
-  return true;
-}
-
-function _typeServiceDemande(c) {
-  return c.type_service || 'convoyage';
-}
-
 function _aConvoyage(c) {
   var t = _typeServiceDemande(c);
   return t === 'convoyage' || t === 'convoyage_stockage';
 }
 
-var ANTHRACITE = [16, 24, 32];
-
-var ROUGE = [229, 72, 77];
-
-function _formaterMontantEuros(montant) {
-  var s = Number(montant).toLocaleString('fr-FR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-  s = s.replace(/[\u202F\u00A0\u2009]/g, ' ');
-  return s + ' \u20AC';
+function _aStockage(c) {
+  var t = _typeServiceDemande(c);
+  return t === 'stockage' || t === 'convoyage_stockage';
 }
 
-var HELIXCAR_MENTIONS_LEGALES = [];
-
-var HELIXCAR_MENTION_TVA = 'TVA non applicable, art. 293 B du CGI';
+function _joursEntreDatesDash(d1, d2) {
+  if (!d1 || !d2) return null;
+  var a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return null;
+  var j = Math.round((b - a) / 86400000);
+  if (j < 0) return -1;
+  return j === 0 ? 1 : j;
+}
 
 function _stockageAutomatiqueConvoyage(c) {
   if (!c || !_aConvoyage(c) || _aStockage(c)) return null;
@@ -451,6 +422,35 @@ function _stockageAutomatiqueConvoyage(c) {
   var duree = _joursEntreDatesDash(debut, fin);
   return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
 }
+
+function _typeServiceDemande(c) {
+  return c.type_service || 'convoyage';
+}
+
+function _operationAssureeParHelixCar(c, prefixe) {
+  var t = _typeServiceDemande(c);
+  if (t === 'convoyage' || t === 'convoyage_stockage') return true;
+  if (t === 'stockage') {
+    return (prefixe === 'pc') ? c.stockage_acheminement === 'helixcar'
+                               : c.stockage_sortie === 'helixcar';
+  }
+  return false;
+}
+
+var ANTHRACITE = [16, 24, 32];
+
+function _formaterMontantEuros(montant) {
+  var s = Number(montant).toLocaleString('fr-FR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  s = s.replace(/[\u202F\u00A0\u2009]/g, ' ');
+  return s + ' \u20AC';
+}
+
+var HELIXCAR_MENTIONS_LEGALES = [];
+
+var HELIXCAR_MENTION_TVA = 'TVA non applicable, art. 293 B du CGI';
 
 function _construirePdfDevis(c, d, options) {
   options = options || {};
@@ -1550,7 +1550,7 @@ function _construirePdfDevis(c, d, options) {
         doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
         doc.text('TYPE', xTitreTypeV, cur);
         doc.text('MARQUE / MODÈLE', xTitreMarqueV, cur);
-        if (v.immatriculation) doc.text('IMMATRICULATION', xTitreImmatV, cur);
+        doc.text('IMMATRICULATION', xTitreImmatV, cur);
       }
       cur += 5;
 
@@ -1563,9 +1563,9 @@ function _construirePdfDevis(c, d, options) {
       var aMarqueV = doc.splitTextToSize(
         _preCasserMotsLongsPdf(doc, String(_dv(v.marque_modele)), wMarqueV - 4, 10.8, 'bold'), wMarqueV - 4
       ).slice(0, 2);
-      var aImmatV = v.immatriculation ? doc.splitTextToSize(
-        _preCasserMotsLongsPdf(doc, String(v.immatriculation), wImmatV - 6, 10.8, 'bold'), wImmatV - 6
-      ).slice(0, 2) : [];
+      var aImmatV = doc.splitTextToSize(
+        _preCasserMotsLongsPdf(doc, String(v.immatriculation || '').trim() || '—', wImmatV - 6, 10.8, 'bold'), wImmatV - 6
+      ).slice(0, 2);
 
       if (dess) {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(10.8);

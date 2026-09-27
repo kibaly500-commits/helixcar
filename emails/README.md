@@ -4,7 +4,7 @@ Le modèle `stockage-acces.mjs` a été préparé à la demande du propriétaire
 
 **État : envoi automatique branché côté serveur.** La migration `20260920153911_stockage_notifications_et_point_remise.sql` crée une file privée et les déclencheurs ; l’Edge Function `stockage-notifications` traite la file chaque minute. Le modèle seul n’envoie rien. Le parcours de paiement Stripe conserve ses restrictions de recette existantes.
 
-Adresse fournie par le propriétaire le 20 septembre 2026 : **Point de remise HelixCar — ALDI, 12 rue de l’Université, 93160 Noisy-le-Grand**. C’est le rendez-vous de dépôt/récupération, pas le parking de stockage. Elle est utilisée par défaut par le modèle.
+Adresse fournie par le propriétaire le 20 septembre 2026 : **Point de remise HelixCar — 12 rue de l’Université, 93160 Noisy-le-Grand**. C’est le rendez-vous de dépôt/récupération, pas le parking de stockage. Elle est utilisée par défaut par le modèle.
 
 Restriction expressément précisée par le propriétaire : aucune adresse dans le formulaire public, le devis ou les récapitulatifs avant acceptation et paiement. Côté client, le dashboard affiche le point de remise seulement pour une demande avec stockage dont le devis est accepté ET payé. Côté convoyeur, la fonction `point_remise_mission` contrôle l’affectation avant de fournir l’adresse à la fiche et à la confirmation. Les opportunités ouvertes ne reçoivent aucune adresse.
 
@@ -41,7 +41,7 @@ Dépôt de votre véhicule par vos soins : le [date choisie] à [heure choisie].
 
 Récupération de votre véhicule par vos soins après stockage : le [date choisie] à [heure choisie]. *(Si concerné.)*
 
-Point de remise HelixCar : **ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand**
+Point de remise HelixCar : **12 rue de l’Université, 93160 Noisy-le-Grand**
 
 Il s’agit du point de rendez-vous pour la remise de votre véhicule. Votre véhicule sera stocké sur un site distinct.
 

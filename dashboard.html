@@ -3219,7 +3219,7 @@ erreurInfos=true;}
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
       const paiement=devisIndisponibles?'inconnu':dv && dv.paiement_statut==='paye'?'paye':'non-paye';
       const pointRemise= !devisIndisponibles && _aStockage(d) && dv && dv.statut==='accepte' && paiement==='paye'
-        ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>ALDI — 12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
+        ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
@@ -13112,7 +13112,7 @@ function _construirePdfDevis(c, d, options) {
         doc.setTextColor(GRIS_LABEL[0], GRIS_LABEL[1], GRIS_LABEL[2]);
         doc.text('TYPE', xTitreTypeV, cur);
         doc.text('MARQUE / MODÈLE', xTitreMarqueV, cur);
-        if (v.immatriculation) doc.text('IMMATRICULATION', xTitreImmatV, cur);
+        doc.text('IMMATRICULATION', xTitreImmatV, cur);
       }
       cur += 5;
 
@@ -13125,9 +13125,9 @@ function _construirePdfDevis(c, d, options) {
       var aMarqueV = doc.splitTextToSize(
         _preCasserMotsLongsPdf(doc, String(_dv(v.marque_modele)), wMarqueV - 4, 10.8, 'bold'), wMarqueV - 4
       ).slice(0, 2);
-      var aImmatV = v.immatriculation ? doc.splitTextToSize(
-        _preCasserMotsLongsPdf(doc, String(v.immatriculation), wImmatV - 6, 10.8, 'bold'), wImmatV - 6
-      ).slice(0, 2) : [];
+      var aImmatV = doc.splitTextToSize(
+        _preCasserMotsLongsPdf(doc, String(v.immatriculation || '').trim() || '—', wImmatV - 6, 10.8, 'bold'), wImmatV - 6
+      ).slice(0, 2);
 
       if (dess) {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(10.8);
