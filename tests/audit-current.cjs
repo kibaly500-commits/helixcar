@@ -8,5 +8,14 @@ if(name==='t_devis_envoi')s=s.replace("return Promise.resolve({ ok: true, status
 if(name==='t_d01_dashboard')s=s.replace('getSession:async()=>({data:{session:null}})','getSession:async()=>({data:{session:{access_token:"qa",user:{id:"qa-client"}}}})');
 if(name==='t_mission_nettoyage')s=s.replace("const ficheKo = await page.evaluate", "const ficheKo = await page.evaluate").replace("check('B15 : et dit ce qui manque',", "console.log('DIAGNOSTIC FICHE',ficheKo);check('B15 : et dit ce qui manque',");
 if(name==='t_pro')s=s.replace("L.check('A6 : aucune mention", "console.log('DIAGNOSTIC TEXTE',texte);L.check('A6 : aucune mention");
-if(name==='t_lots_de')s=s.replace("const rendu = await page.evaluate(() => {","await page.locator('#hc-cal-suiv').click();const rendu = await page.evaluate(() => {");
+
+if(name==='t_lots_de')s=s.replace("const rendu = await page.evaluate(() => {\n      const jours =", "await page.locator('#hc-cal-suiv').click();const rendu = await page.evaluate(() => {\n      const jours =");
+if(name==='t_mission_nettoyage')s=s.replace("order(){ return api; }, limit(){ return api; },","order(){ return api; }, limit(){ return api; }, range(){ return api; },");
+if(name==='t_devis_envoi'){
+ s=s.replace("return Promise.resolve({ ok: true, status: 200, headers: { get: function(){ return 'items 0-0/0'; } }, text: function(){ return Promise.resolve(JSON.stringify(lignes)); } });", "return Promise.resolve(new Response(JSON.stringify(lignes),{status:200,headers:{'Content-Type':'application/json','Content-Range':'items 0-0/0'}}));");
+ s=s.replace("const errs = [];", "const errs = [];page.on('console',m=>{if(m.type()==='error')console.log('BROWSER ERROR',m.text())});");
+ s=s.replace("check('A5 :", "console.log('DIAG A5',JSON.stringify(await fiche()),await page.evaluate(()=>window.__alertes));check('A5 :");
+ s=s.replace("check('A10 :", "console.log('DIAG A10',JSON.stringify(await fiche()),await page.evaluate(()=>window.__alertes));check('A10 :");
+}
+
 const mod=new Module(file,module);mod.filename=file;mod.paths=Module._nodeModulePaths(path.dirname(file));mod._compile(s,file);

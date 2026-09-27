@@ -32,7 +32,7 @@ const L=require('./lib');const {urlFichier}=require('./env');
     },{role,id,w});
     if(menuIndex>=0)await page.locator('#mobile-menu-items > button').nth(menuIndex).click();
     await page.evaluate(id=>document.getElementById('page-'+id).appendChild(qaLong()),id);
-    const dimensions=await page.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.right>innerWidth+2&&getComputedStyle(e).position!=='fixed';}).slice(0,15).map(e=>({tag:e.tagName,id:e.id,cls:e.className,right:e.getBoundingClientRect().right,text:e.textContent.slice(0,100)}))}));if(dimensions.width>w+2)console.log('AUDIT OVERFLOW',id,w,JSON.stringify(dimensions));
+    const diagnostic=await page.evaluate(()=>{const initial=document.documentElement.scrollWidth;const b=[...document.querySelectorAll('.topbar > button')].find(x=>x.textContent==='Actualiser');if(!b)return {initial};b.style.display='none';const without=document.documentElement.scrollWidth;b.style.display='';return{initial,without}});if(diagnostic.initial>w+2)console.log('AUDIT BUTTON',id,w,JSON.stringify(diagnostic));
     L.check(w+' '+id+' : visible et sans débordement document',await page.evaluate(id=>document.getElementById('page-'+id).getBoundingClientRect().width>0 && document.documentElement.scrollWidth<=innerWidth+2,id));
     const scroll=await page.evaluate(({id,w})=>{
      let e=w<=768?document.scrollingElement:document.querySelector('.main');
