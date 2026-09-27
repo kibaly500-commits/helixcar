@@ -12,9 +12,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium chrome webkit
-      - name: Lecture réelle Chrome et WebKit
-        run: node tests/verification-video.cjs
-      - name: Navigation et cadrage
+      - run: node tests/verification-video.cjs
+      - name: Navigation
         if: always()
         env:
           CI_NO_SANDBOX: '1'
