@@ -1,7 +1,7 @@
-name: Diagnostic animation
+name: Verification animation
 on: [push]
 jobs:
-  diagnostic:
+  animation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,6 +11,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: node tests/diagnostic-animation.cjs
+      - name: Repeter les seuils et controles negatifs
+        run: for i in 1 2 3 4 5; do node tests/t_pr6_synchronisation_delais.js || exit 1; done
         env:
           CI_NO_SANDBOX: '1'
