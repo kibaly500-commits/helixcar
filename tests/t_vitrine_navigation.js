@@ -68,7 +68,7 @@ function check(libelle, condition, detail) {
       espaceDevisConnexion: Math.round(account.left - quote.right),
       espaceConnexionMenu: Math.round(menuTrigger.left - account.right),
       espaceServices: services.getBoundingClientRect().top - bande.getBoundingClientRect().bottom,
-      visuelServicesCharge: showcase.poster.endsWith('helixcar-services-poster.webp') && showcase.muted && showcase.playsInline && getComputedStyle(showcase).objectFit === 'cover',
+      visuelServicesCharge: showcase.poster.endsWith('helixcar-services-poster.webp') && showcase.muted && showcase.playsInline && getComputedStyle(showcase).objectFit === 'contain',
       challengeRadius: parseFloat(getComputedStyle(challenge).borderTopLeftRadius),
       podiumRadius: parseFloat(getComputedStyle(podium).borderTopLeftRadius),
       couleurTexteClient: getComputedStyle(exempleClient).color,
@@ -211,18 +211,19 @@ function check(libelle, condition, detail) {
     Math.abs(mobile.centreLogo - mobile.centreNav) <= 1 && mobile.actions === 2 && mobile.scroll <= mobile.client,
     JSON.stringify(mobile));
 
-  for (const width of [320, 390, 768, 1280]) {
+  for (const width of [320, 390, 768, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     const frame = await page.evaluate(() => {
       const v = document.getElementById('services-video');
       const r = v.getBoundingClientRect();
       const f = v.parentElement.getBoundingClientRect();
       const b = document.getElementById('services-video-sound').getBoundingClientRect();
-      return { width: r.width, height: r.height, fits: Math.abs(r.width - f.width) < 1 && Math.abs(r.height - f.height) < 1,
+      return { width: r.width, height: r.height, uncropped: getComputedStyle(v).objectFit === 'contain',
+        fits: Math.abs(r.width - f.width) < 1 && Math.abs(r.height - f.height) < 1,
         button: b.width >= 44 && b.height >= 44 && b.right <= f.right && b.bottom <= f.bottom,
         overflow: f.left < 0 || f.right > window.innerWidth };
     });
-    check('V1 : vidéo contenue dans le cadre Mercedes à ' + width + 'px', frame.fits && frame.button && !frame.overflow && frame.height <= 430, JSON.stringify(frame));
+    check('V1 : vidéo et logo sans recadrage dans le cadre Mercedes à ' + width + 'px', frame.uncropped && frame.fits && frame.button && !frame.overflow && frame.height <= 430, JSON.stringify(frame));
   }
   await page.evaluate(() => document.getElementById('services-video-sound').click());
   check('V2 : activation explicite du son', await page.evaluate(() => !document.getElementById('services-video').muted && document.getElementById('services-video-sound').getAttribute('aria-pressed') === 'true'));
