@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict');
+const {chromium,webkit}=require('playwright');const {pathToFileURL}=require('node:url');const path=require('node:path');
+(async()=>{for(const [name,engine] of Object.entries({chromium,webkit})){const browser=await engine.launch({headless:true,args:name==='chromium'?['--no-sandbox']:[]});try{
+for(const width of [320,390,768,1280]){const page=await browser.newPage({viewport:{width,height:900}});await page.route('https://**/*',r=>r.abort());await page.goto(pathToFileURL(path.resolve('index.html')).href);
+const d=await page.evaluate(()=>{const f=document.querySelector('footer'),a=f.querySelector('.footer-brand .logo'),im=a.querySelector('img'),r=im.getBoundingClientRect(),fr=f.getBoundingClientRect();const col=Array.from(f.querySelectorAll('.footer-col')).find(c=>c.querySelector('h4').textContent==='Services');const links=Array.from(col.querySelectorAll('a'));
+return {labels:links.map(a=>a.textContent),targets:links.every(a=>!!document.querySelector(a.getAttribute('href'))),src:im.getAttribute('src'),loaded:im.complete&&im.naturalWidth===604,width:r.width,height:r.height,background:getComputedStyle(a).backgroundColor,inside:r.left>=fr.left&&r.right<=fr.right};
+});assert.deepEqual(d.labels,['Convoyage automobile','Stockage automobile','Nettoyage professionnel','Renforcer votre équipe']);assert.equal(d.targets,true);assert.equal(d.src,'assets/logo-helixcar-blanc.png');assert.equal(d.loaded,true);assert.equal(d.background,'rgba(0, 0, 0, 0)');assert.equal(d.inside,true);assert.ok(Math.abs(d.width-180)<1);assert.ok(Math.abs(d.width/d.height-604/119)<.02);console.log('PASS',name,width,JSON.stringify(d));await page.close();}
+}finally{await browser.close();}}})().catch(e=>{console.error(e);process.exitCode=1;});
