@@ -22947,6 +22947,12 @@ document.addEventListener('click', function (e) {
 }
 #modal-client .modal-close{top:12px !important;right:20px !important;}
 @media(max-width:720px){
+  body:not(.hc-integre) #modal-client-form > .modal-close{
+    top:0 !important;right:0 !important;width:44px;height:44px;padding:0;line-height:1;
+  }
+  body:not(.hc-integre) #client-modal-titre{padding-right:56px;min-height:44px;box-sizing:border-box;}
+}
+@media(max-width:720px){
   #modal-client #client-step-indicator{width:100% !important;margin-left:0 !important;margin-right:0 !important;}
 }
 
