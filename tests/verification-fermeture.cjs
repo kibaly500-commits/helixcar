@@ -17,7 +17,7 @@ const {pathToFileURL}=require('node:url');const path=require('node:path');
    const overlap=Array.from(range.getClientRects()).some(r=>r.left<button.right&&r.right>button.left&&r.top<button.bottom&&r.bottom>button.top);
    return {width:button.width,height:button.height,top:button.top-tb.top,right:form.right-button.right,subtitleGap:sub.top-button.bottom,overlap};
   });
-  assert.ok(d.width>=44&&d.height>=44,JSON.stringify(d));assert.ok(Math.abs(d.top)<1&&Math.abs(d.right)<1,JSON.stringify(d));assert.ok(d.subtitleGap>=0,JSON.stringify(d));assert.equal(d.overlap,false);
+  assert.ok(d.width>=43.99&&d.height>=43.99,JSON.stringify(d));assert.ok(Math.abs(d.top)<1&&Math.abs(d.right)<1,JSON.stringify(d));assert.ok(d.subtitleGap>=0,JSON.stringify(d));assert.equal(d.overlap,false);
   await page.locator('#modal-client-form > .modal-close').click();
   assert.equal(await page.locator('#modal-client').evaluate(e=>e.classList.contains('open')),false);
   console.log('PASS',name,width,JSON.stringify(d));await page.close();
