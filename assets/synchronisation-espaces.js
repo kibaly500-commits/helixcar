@@ -190,6 +190,11 @@
   if (topbar) {
     var button = document.createElement('button'); button.className = 'btn btn-sm btn-outline';
     button.textContent = 'Actualiser'; button.title = 'Les données se mettent aussi à jour automatiquement';
-    button.addEventListener('click', function () { request(0); }); topbar.appendChild(button);
+    button.addEventListener('click', function () { request(0); });
+    // Le titre et les actions passent sur deux lignes si nécessaire sur mobile.
+    topbar.style.flexWrap = 'wrap'; topbar.style.gap = '10px';
+    var actions = topbar.querySelector('.topbar-actions') || topbar;
+    actions.style.flexWrap = 'wrap';
+    actions.appendChild(button);
   }
 })();

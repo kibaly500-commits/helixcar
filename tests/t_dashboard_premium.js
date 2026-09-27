@@ -4,7 +4,7 @@ const src=fs.readFileSync(require('path').join(__dirname,'../dashboard.html'),'u
 const section=src.slice(src.indexOf('// Informations manquantes : les valeurs'),src.indexOf('function rendreCentreInformationsAdmin'));
 (async()=>{
  const status={textContent:''},calls=[];
- const ctx={currentRole:'admin',_sbAuthPret:()=>true,document:{getElementById:()=>status},rendreCentreInformationsAdmin:()=>{},
+ const ctx={window:{},currentRole:'admin',_sbAuthPret:()=>true,document:{getElementById:()=>status},rendreCentreInformationsAdmin:()=>{},
  sbAuth:{from:()=>({select(){return this},in(){return this},order(){return this},range:async()=>({data:[],error:null})})},
  sbAuthListeDevisTriee:async()=>[
   {client_id:'paid',statut:'accepte',paiement_statut:'paye'},

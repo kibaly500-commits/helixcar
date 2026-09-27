@@ -1469,8 +1469,8 @@ window.jspdf = { jsPDF: function () {
       nonExpliques.length === 0, nonExpliques.join(' | '));
     check('O3 : et aucune « raison » ne couvre un libellé toujours présent',
       excusesSansObjet.length === 0, excusesSansObjet.join(' | '));
-    check('O4 : les dix-huit disparitions sont exactement celles qui étaient demandées',
-      disparus.length === 18, disparus.length + ' : ' + disparus.join(' | '));
+    check('O4 : les dix-neuf disparitions correspondent aux changements explicitement documentés',
+      disparus.length === 19, disparus.length + ' : ' + disparus.join(' | '));
 
     // Les nouveautés ne sont pas écrasées : l'index actuel en propose
     // strictement PLUS que l'ancien, et les libellés propres au main

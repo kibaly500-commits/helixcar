@@ -391,6 +391,8 @@ function rubriquesVisibles(page, n) {
       (document.getElementById('hc-cal-grille') || {}).getAttribute('data-hc-periode'));
     check('E4-4 : la grille du nettoyage porte bien sa marque', marque === 'nettoyage', String(marque));
 
+    // Un mois futur complet : le test reste valide en fin de mois.
+    await page.locator('#hc-cal-suiv').click();
     // On choisit une période de plusieurs jours et on regarde le rendu.
     const rendu = await page.evaluate(() => {
       const jours = Array.prototype.slice

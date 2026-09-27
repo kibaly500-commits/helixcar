@@ -315,6 +315,22 @@ const futur = dansNJours;
   // Supabase, comme l'indique le dossier de recette.
   // Livraisons PR6 déjà présentes : liste fermée, sans autoriser un dossier entier.
   const PERIMETRE_PR6 = [
+    // PR6 : corrections, suivi des informations, PDF test et synchronisation privée.
+    'assets/admin-demandes-informations.js',
+    'assets/synchronisation-espaces.js',
+    'supabase/migrations/20260926164809_point_remise_sans_enseigne.sql',
+    'supabase/migrations/20260926174317_preparation_complete_confidentialite_client.sql',
+    'supabase/migrations/20260926181205_relecture_client_suivi_admin.sql',
+    'supabase/migrations/20260926182606_empreinte_preparation_sans_verrou_client.sql',
+    'supabase/migrations/20260926212234_email_client_compte_auth_uniquement.sql',
+    'supabase/migrations/20260926220048_activite_demandes_non_lues.sql',
+    'supabase/migrations/20260926221808_activite_demandes_actions_clients.sql',
+    'supabase/migrations/20260926223314_modification_information_individuelle.sql',
+    'supabase/migrations/20260926223957_remodification_information_validee.sql',
+    'supabase/migrations/20260926224737_correction_information_individuelle.sql',
+    'supabase/migrations/20260926233648_document_paiement_test_independant.sql',
+    'supabase/migrations/20260926235036_synchronisation_espaces_privee.sql',
+
     'assets/DejaVu-LICENSE.txt',
     'assets/preparation-missions-ui.js',
     'assets/preparation-missions.css',

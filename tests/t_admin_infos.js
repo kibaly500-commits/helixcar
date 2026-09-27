@@ -22,7 +22,7 @@ for(const width of [320,390,768,1280]){
  if(!await p.locator('#ai-correction-motif').isVisible())throw Error('Motif vide accepté');
  await p.locator('#ai-correction-motif').fill('Précisez le contact présent au départ.');
  await p.getByRole('button',{name:'Enregistrer la correction',exact:true}).click();
- if(!await fiche.getByText('Correction demandée : Précisez le contact présent au départ.').count())throw Error('Correction perdue');
+ if(!await fiche.getByText('Correction demandée au client : Précisez le contact présent au départ.').count())throw Error('Correction perdue');
  if(width<=800){await p.getByRole('button',{name:'← Retour aux dossiers',exact:true}).tap();if(!await p.locator('#admin-infos-liste').isVisible())throw Error('Retour liste bloqué');}
  if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Débordement '+width);
  console.log('PASS '+width+'px : 70 dossiers, ouverture visible, motif obligatoire, correction, retour');

@@ -128,13 +128,13 @@ window.fetch = function (url, options) {
       window.__db.devis_envois.push({ devis_id: corps.devis_id, etape: 'acceptee_prestataire', version: 1, destinataire: 'test-qa-claude-helixcar@example.invalid', renvoi: !!corps.renvoi, created_at: '2026-09-10T10:00:00Z' });
       rep = { ok: true, statut: 'envoye', date_envoi: '2026-09-10T10:00:00Z', version_envoyee: 1 };
     } else rep = { ok: false, code: 'BAD_REQUEST' };
-    return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(rep); } });
+    return Promise.resolve(new Response(JSON.stringify(rep), {status:200, headers:{'Content-Type':'application/json'}}));
   }
   if (url.indexOf('/rest/v1/') !== -1) {
     const u = new URL(url);
     const id = (u.searchParams.get('id') || '').slice(3);
     const lignes = u.pathname.endsWith('/clients') ? (window.__demandesServeur || []).filter(c => c.id === id) : [];
-    return Promise.resolve({ ok: true, status: 200, headers: { get: function(){ return 'items 0-0/0'; } }, text: function(){ return Promise.resolve(JSON.stringify(lignes)); } });
+    return Promise.resolve(new Response(JSON.stringify(lignes), {status:200, headers:{'Content-Type':'application/json','Content-Range':'items 0-0/0'}}));
   }
   return _f.apply(window, arguments);
 };

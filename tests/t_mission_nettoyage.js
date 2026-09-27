@@ -70,7 +70,7 @@ function _table(nom) {
   const req = { filtres: {} };
   const api = {
     select(){ return api; }, eq(c,v){ req.filtres[c]=v; return api; },
-    order(){ return api; }, limit(){ return api; },
+    order(){ return api; }, limit(){ return api; }, range(){ return api; },
     _lignes(){ return (window.__db[nom]||[]).filter(l => Object.entries(req.filtres).every(([k,v]) => String(l[k])===String(v))); },
     then(r){ return Promise.resolve({ data: api._lignes(), error: null }).then(r); },
     insert(v){

@@ -164,6 +164,7 @@ const LIBELLES_ANCIEN_INDEX = [
 // explicitement demandés, soit des remplacements par un dispositif
 // plus riche apporté par le main courant.
 const DISPARUS_EXPLIQUES = [
+  ['Informations complémentaires (optionnel)', 'PR6 : harmonisation du libellé en Informations complémentaires (facultatif), champ conservé.'],
   ['Quelle est votre disponibilité ? *',
     'retrait explicitement demandé (§ 11 du chantier) — la question et ses trois choix'],
   ['Heure souhaitée *',

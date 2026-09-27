@@ -78,7 +78,10 @@ async function ouvrirRubrique(page, cle) {
   const texte = await page.evaluate(() => (document.getElementById('bloc-socle-professionnel') || {}).textContent || '');
   L.check('A5 : aucun message d\'avancement interdit',
     !/demande est complète|Choisissez un type de besoin|information manque|vient de s'ouvrir/i.test(texte));
-  L.check('A6 : aucune mention « Facultatif »', !/Facultatif/i.test(texte));
+  const facultatifs = await page.locator('#bloc-socle-professionnel label').allTextContents();
+  L.check('A6 : seules les informations complémentaires portent la mention facultatif',
+    facultatifs.filter(t => /facultatif/i.test(t)).length === 1 &&
+    facultatifs.filter(t => /facultatif/i.test(t)).every(t => /Informations complémentaires/.test(t)));
   L.check('A7 : ni immatriculation ni VIN ni restitution demandés',
     !/immatriculation|VIN|restitution/i.test(texte), texte.slice(0, 200));
 

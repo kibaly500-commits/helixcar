@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 let pass=0,fail=0;async function cas(n,f){try{await f();console.log('PASS - '+n);pass++;}catch(e){console.log('FAIL - '+n+': '+e.message);fail++;}}
 const ID='11111111-1111-4111-8111-111111111111';
 const INIT=`window.__session={access_token:'TEST-QA-CLAUDE-HELIXCAR-jwt'};window.__appels=[];window.__devis={reference:'TEST-QA-CLAUDE-HELIXCAR',statut:'envoye',prix:450,pdf_disponible:false};window.__retard=0;
-window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:window.__session}}),onAuthStateChange:cb=>{window.__auth=cb;return{data:{subscription:{unsubscribe(){}}}};}}})};
+window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:window.__session}}),onAuthStateChange:cb=>{(window.__authListeners||(window.__authListeners=[])).push(cb);window.__auth=(...args)=>window.__authListeners.forEach(f=>f(...args));return{data:{subscription:{unsubscribe(){}}}};}}})};
 window.fetch=async(url,opt)=>{const b=JSON.parse(opt.body);window.__appels.push({body:b,authorization:opt.headers.Authorization});await new Promise(r=>setTimeout(r,window.__retard));if(b.action==='accept')Object.assign(window.__devis,{statut:'accepte',paiement_statut:'en_attente'});if(b.action==='refuse')window.__devis.statut='refuse';return new Response(JSON.stringify({ok:true,devis:window.__devis}));};`;
 (async()=>{const browser=await lancerNavigateur();
 try{

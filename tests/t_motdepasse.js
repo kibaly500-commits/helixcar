@@ -27,7 +27,7 @@ window._hcRetourVitrine = function (motif) { window.__retours.push(motif || '');
 window.supabase = { createClient: function () { return {
   auth: {
     onAuthStateChange: function (cb) {
-      window.__declencher = cb;
+      (window.__authListeners||(window.__authListeners=[])).push(cb);window.__declencher=(...args)=>window.__authListeners.forEach(f=>f(...args));
       return { data: { subscription: { unsubscribe: function () {} } } };
     },
     getSession: async function () { return { data: { session: window.__session } }; },

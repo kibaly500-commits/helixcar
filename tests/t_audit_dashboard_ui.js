@@ -33,6 +33,13 @@ const L=require('./lib');const {urlFichier}=require('./env');
     if(menuIndex>=0)await page.locator('#mobile-menu-items > button').nth(menuIndex).click();
     await page.evaluate(id=>document.getElementById('page-'+id).appendChild(qaLong()),id);
     L.check(w+' '+id+' : visible et sans débordement document',await page.evaluate(id=>document.getElementById('page-'+id).getBoundingClientRect().width>0 && document.documentElement.scrollWidth<=innerWidth+2,id));
+    L.check(w+' '+id+' : actions du bandeau accessibles',await page.evaluate(()=>{
+      const buttons=[...document.querySelectorAll('.topbar button')];
+      return buttons.length>=2 && buttons.every(button=>{
+        const r=button.getBoundingClientRect();
+        return r.width>0 && r.height>0 && r.left>=0 && r.right<=innerWidth+2 && r.top>=0 && r.bottom<=innerHeight;
+      });
+    }));
     const scroll=await page.evaluate(({id,w})=>{
      let e=w<=768?document.scrollingElement:document.querySelector('.main');
      if(id==='client-nouvelle-demande'&&w>768)e=document.getElementById('page-'+id);
