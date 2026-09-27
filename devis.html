@@ -367,6 +367,8 @@
   var abandonStripe = new URLSearchParams(window.location.search).get('paiement') === 'annule';
   var retourStripe = new URLSearchParams(window.location.search).get('paiement') === 'retour';
   var lecturesStripe = 0;
+  var derniereEmpreinteDevis = null;
+  function empreinteDevis(d) { return JSON.stringify(d, function(k,v){return k==='pdf_url'?undefined:v;}); }
   var HOSTNAME_SUPABASE_ATTENDU = SUPABASE_URL.replace(/^https:\/\//, "");
   var MOTIF_LONGUEUR_MAX = 500;
   var zone = document.getElementById('zone-contenu');
@@ -783,6 +785,7 @@
   }
 
   function afficherDevis(devis) {
+    derniereEmpreinteDevis=empreinteDevis(devis);
     devis.id=devis.id || devisId || (devis.reference==='DEV-2026-0093'?'07bbbfa7-8e6c-437a-a99f-a48e40b18f6f':null);
     if(devis.reference==='DEV-2026-0093' && [
       'helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app',
@@ -867,14 +870,15 @@
   // GET — source de vérité unique, utilisée au chargement initial ET
   // après un accept/refuse réussi (objectif 4 : refresh cohérent).
   // ────────────────────────────────────────────────────────────
-  function chargerEtAfficherDevis() {
+  function chargerEtAfficherDevis(silencieux) {
+    if(silencieux && (document.hidden || enCoursTraitement || !voileModal.hidden))return Promise.resolve();
     var chargement = ++numeroChargement;
     if (!token && !devisId) {
       afficherEtatSimple('⚠️', 'Lien de devis invalide.', 'Le lien que vous avez utilisé ne contient pas les informations nécessaires. Vérifiez qu\'il a été copié en entier depuis votre email.');
       return;
     }
 
-    requeteAuthentifiee({
+    return requeteAuthentifiee({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'get', token: token, devis_id: devisId })
@@ -888,6 +892,7 @@
       })
       .then(function (resultat) {
         if (chargement !== numeroChargement) return;
+        if(silencieux && (document.hidden || enCoursTraitement || !voileModal.hidden))return;
         var corps = resultat.corps;
         if (!corps || corps.ok !== true) {
           var code = corps && corps.code;
@@ -897,14 +902,16 @@
           } else if (code === 'VERSION_OBSOLETE') {
             afficherEtatSimple('🔄', 'Ce devis a été mis à jour.', 'Un nouveau devis vous sera envoyé par e-mail. Cette version ne peut plus être acceptée ni refusée.');
           } else {
+            if(silencieux)return;
             afficherEtatSimple('⚠️', 'Impossible d\'afficher ce devis.', 'Une erreur est survenue. Merci de réessayer dans quelques instants.');
           }
           return;
         }
-        afficherDevis(corps.devis);
+        if(!silencieux || derniereEmpreinteDevis!==empreinteDevis(corps.devis))afficherDevis(corps.devis);
       })
       .catch(function () {
         if (chargement !== numeroChargement) return;
+        if(silencieux)return;
         afficherEtatSimple('📡', 'Problème de connexion.', 'Impossible de contacter HelixCar pour le moment. Vérifiez votre connexion internet et réessayez.');
       });
   }
@@ -938,6 +945,35 @@
   window.addEventListener('pageshow', function (event) {
     if (event.persisted) { zone.textContent = 'Vérification de votre accès…'; chargerEtAfficherDevis(); }
   });
+  var suiviTimer=null,suiviCanal=null,suiviDebounce=null,suiviLecture=false,suiviSession=null,suiviGeneration=0;
+  function pauseSuiviDevis(){
+    ++suiviGeneration;clearTimeout(suiviTimer);clearTimeout(suiviDebounce);
+    if(suiviCanal&&authDevis)authDevis.removeChannel(suiviCanal);suiviCanal=null;
+  }
+  async function actualiserSuiviDevis(){
+    if(document.hidden||navigator.onLine===false)return;
+    if(!suiviLecture){suiviLecture=true;try{await chargerEtAfficherDevis(true);}finally{suiviLecture=false;}}
+    clearTimeout(suiviTimer);suiviTimer=setTimeout(actualiserSuiviDevis,30000);
+  }
+  async function reprendreSuiviDevis(){
+    pauseSuiviDevis();var generation=suiviGeneration;
+    if(document.hidden||navigator.onLine===false)return;
+    if(authDevis&&suiviSession&&authDevis.channel){
+      try{
+        await authDevis.realtime.setAuth(suiviSession.access_token);
+        if(generation!==suiviGeneration)return;
+        suiviCanal=authDevis.channel('hc:user:'+suiviSession.user.id,{config:{private:true}})
+          .on('broadcast',{event:'changed'},function(){clearTimeout(suiviDebounce);suiviDebounce=setTimeout(actualiserSuiviDevis,700);}).subscribe();
+      }catch(e){}
+    }
+    actualiserSuiviDevis();
+  }
+  if(authDevis)authDevis.auth.onAuthStateChange(function(event,session){setTimeout(function(){suiviSession=session;if(session||token)reprendreSuiviDevis();else pauseSuiviDevis();},0);});
+  document.addEventListener('visibilitychange',function(){if(document.hidden)pauseSuiviDevis();else reprendreSuiviDevis();});
+  window.addEventListener('online',reprendreSuiviDevis);
+  window.addEventListener('offline',pauseSuiviDevis);
+  window.addEventListener('pagehide',pauseSuiviDevis);
+  suiviTimer=setTimeout(actualiserSuiviDevis,30000);
   chargerEtAfficherDevis();
 })();
 </script>

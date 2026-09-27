@@ -2603,10 +2603,12 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
 // Informations manquantes : les valeurs et décisions viennent des RPC autorisées.
 var _adminInfosMeta = {}, _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false, _adminInfosMobileDetail = false, _adminInfosCorrection = null;
 async function chargerCentreInformationsAdmin(silencieux) {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   if (currentRole !== 'admin' || !_sbAuthPret() || _adminInfosBusy || (silencieux && _adminInfosCorrection)) return;
   var generation = ++_adminInfosGeneration;
   var statut = document.getElementById('admin-infos-statut');
-  if (!silencieux) statut.textContent = 'Chargement des dossiers…';
+  if (!silencieux) if (!_hcSyncCycle) { statut.textContent = 'Chargement des dossiers…'; }
   try {
     var sources = await Promise.all([
       sbFetchToutePage('clients?select=id,prenom,nom,numero_client,email,marque_modele,immatriculation,ville_depart,ville_arrivee,nb_vehicules&type_service=not.is.null&order=created_at.desc'),
@@ -2618,6 +2620,8 @@ async function chargerCentreInformationsAdmin(silencieux) {
           var res=await sbAuth.from('demande_informations_manquantes')
             .select('client_id,cle,ancienne_valeur,correction_recue,transmise_le').in('statut',['transmise','a_corriger'])
             .order('id',{ascending:true}).range(offset,offset+limite-1);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
           if(res.error) throw new Error('Impossible de lire les informations à vérifier.');
           var page=res.data||[];lignes=lignes.concat(page);
           if(page.length<limite)return lignes;
@@ -2625,6 +2629,8 @@ async function chargerCentreInformationsAdmin(silencieux) {
         }
       })()
     ]);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     // Le paiement est relu depuis le serveur ; une erreur ne devient
     // jamais un paiement confirmé. Aucun statut n'est écrit ici.
     var derniers = {};
@@ -2641,12 +2647,18 @@ async function chargerCentreInformationsAdmin(silencieux) {
       var lot = await Promise.all(clients.slice(i,i+4).map(async function(c){
         try {
           var lignes = await chargerInfosDemandeAdmin(c.id);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
           lignes.forEach(function(l){Object.assign(l,_adminInfosMeta[c.id+':'+l.cle]||{});});
           if(!estPaye(c)) lignes=lignes.filter(function(l){return ['transmise','a_corriger','validee'].includes(l.statut);});
           return {client:c,lignes:lignes};
         }
-        catch(e){return {client:c,lignes:[],erreur:true};}
+        catch(e){
+ if (_hcSyncCycle) return;
+return {client:c,lignes:[],erreur:true};}
       }));
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       dossiers = dossiers.concat(lot);
       if(generation !== _adminInfosGeneration) return;
     }
@@ -2655,7 +2667,9 @@ async function chargerCentreInformationsAdmin(silencieux) {
     if(!_adminInfosSelection && _adminInfosDossiers.length) _adminInfosSelection=_adminInfosDossiers[0].client.id;
     statut.textContent = 'Actualisé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+' · actualisation automatique';
     rendreCentreInformationsAdmin();
-  } catch(e){if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}}
+  } catch(e){
+ if (_hcSyncCycle) return;
+if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}}
 }
 function rendreCentreInformationsAdmin(){
  var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
@@ -2744,7 +2758,7 @@ async function deciderCentreInformation(id,cle,decision,motif){
  }catch(e){document.getElementById('admin-infos-statut').textContent='Décision non confirmée : '+e.message;}
  finally{_adminInfosBusy=false;rendreCentreInformationsAdmin();}
 }
-setInterval(function(){var p=document.getElementById('page-admin-infos');if(p&&p.classList.contains('active')&&!document.hidden&&!_adminInfosBusy)chargerCentreInformationsAdmin(true);},30000);
+// La synchronisation centrale assure les mises à jour du centre informations.
 
 var _infosDemandeEnCours = null;
 
@@ -3144,15 +3158,23 @@ function _badgesSuiviDemandeClient(dv, lignes, erreurInfos, erreurDevis) {
 }
 var _demandesClientGeneration = 0;
 async function loadDemandesClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const zone = document.getElementById('client-demandes-liste');
   if (!zone) return;
   const generation = ++_demandesClientGeneration;
-  zone.textContent = 'Chargement de vos demandes…';
+  if (!_hcSyncCycle) { zone.textContent = 'Chargement de vos demandes…'; }
   let demandes = [], devis = [], devisIndisponibles = false;
   try {
-    const r = await Promise.all([chargerDemandesClient(), chargerDevisClient().catch(function(){devisIndisponibles=true;return [];})]);
+    const r = await Promise.all([chargerDemandesClient(), chargerDevisClient().catch(function(){
+ if (_hcSyncCycle) return;
+devisIndisponibles=true;return [];})]);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     demandes=r[0];devis=r[1];
   } catch(e) {
+ if (_hcSyncCycle) return;
+
     if(generation===_demandesClientGeneration) zone.textContent='Impossible de charger vos demandes pour le moment.';
     return;
   }
@@ -3162,10 +3184,16 @@ async function loadDemandesClient() {
   devis.forEach(function(dv){if(dv.client_id && !devisParDemande[dv.client_id])devisParDemande[dv.client_id]=dv;});
   const resultats=await Promise.all(demandes.map(async function(d){
     let lignes=[],erreurInfos=false;
-    try{lignes=await chargerInformationsDemande(d.id);}catch(e){erreurInfos=true;}
+    try{lignes=await chargerInformationsDemande(d.id);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+}catch(e){
+ if (_hcSyncCycle) return;
+erreurInfos=true;}
     const dv=devisParDemande[d.id];
     return {d,dv,lignes,erreurInfos,presentation:_presentationDemandeClient(d,dv,lignes,erreurInfos,devisIndisponibles)};
   }));
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
   if(generation!==_demandesClientGeneration)return;
   const groupes=[
     {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
@@ -3264,13 +3292,19 @@ function _partenaireMissionClient(m) {
 }
 
 async function loadMissionsClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('client-missions-table');
   if (!tbody) return;
   const sub = document.getElementById('client-missions-sub');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
   let missions = [];
-  try { missions = await chargerMissionsSuiviClient(); }
+  try { missions = await chargerMissionsSuiviClient();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ }
   catch (e) {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
     return;
   }
@@ -3298,6 +3332,8 @@ async function loadMissionsClient() {
 // Résumé réel sur le tableau de bord : compteurs calculés sur les lignes
 // serveur, jamais écrits en dur.
 async function loadMissionsResumeClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const zone = document.getElementById('client-missions-resume');
   if (!zone) return;
   const generation = (zone._generationSuivi || 0) + 1;
@@ -3307,14 +3343,22 @@ async function loadMissionsResumeClient() {
     const [ms, demandes, devis] = await Promise.all([
       chargerMissionsSuiviClient(), chargerDemandesClient(), chargerDevisClient()
     ]);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     missions = ms;
     const parDemande = {};
     devis.forEach(dv => { if (dv.client_id && !parDemande[dv.client_id]) parDemande[dv.client_id] = dv; });
     resultats = await Promise.all(demandes.map(async d => {
       const lignes = await chargerInformationsDemande(d.id);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       return {id:d.id, groupe:_presentationDemandeClient(d, parDemande[d.id], lignes, false, false).groupe};
     }));
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
   } catch (e) {
+ if (_hcSyncCycle) return;
+
     if (zone._generationSuivi === generation) zone.innerHTML = '<div class="fid-note">Impossible de charger le suivi pour le moment.</div>';
     return;
   }
@@ -3335,6 +3379,8 @@ async function loadMissionsResumeClient() {
 }
 
 function loadProfilClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const c = window._currentClient || {};
   const d = (c.demandes || [])[0] || {};
   const mettre = function (id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; };
@@ -3473,16 +3519,22 @@ async function chargerEvaluationsClient() {
 }
 
 async function loadEvaluationsClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const zoneA = document.getElementById('client-evaluations-a-faire');
   const zoneH = document.getElementById('client-evaluations-historique');
   if (!zoneA || !zoneH) return;
-  zoneA.innerHTML = '<div class="fid-note">Chargement…</div>';
-  zoneH.innerHTML = '<div class="fid-note">Chargement…</div>';
+  if (!_hcSyncCycle) { zoneA.innerHTML = '<div class="fid-note">Chargement…</div>'; }
+  if (!_hcSyncCycle) { zoneH.innerHTML = '<div class="fid-note">Chargement…</div>'; }
   let missions = [], evaluations = [];
   try {
     const r = await Promise.all([chargerMissionsClient(), chargerEvaluationsClient()]);
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     missions = r[0]; evaluations = r[1];
   } catch (e) {
+ if (_hcSyncCycle) return;
+
     zoneA.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger vos missions pour le moment.</div>';
     zoneH.innerHTML = '';
     return;
@@ -3605,12 +3657,18 @@ function _majBadgeOpportunitesAdmin(liste) {
   if (n > 0) { b.textContent = String(n); b.style.display = ''; } else { b.textContent = ''; b.style.display = 'none'; }
 }
 async function loadOpportunitesAdmin() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('opportunites-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
   let liste = [];
-  try { liste = await chargerOpportunitesAdmin(); }
+  try { liste = await chargerOpportunitesAdmin();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ }
   catch (e) {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les opportunités pour le moment.</td></tr>';
     return;
   }
@@ -3896,12 +3954,18 @@ async function chargerOpportunitesPartenaire() {
   return data || [];
 }
 async function loadOpportunitesPartenaire() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const zone = document.getElementById('convoyeur-opportunites-liste');
   if (!zone) return;
-  zone.innerHTML = '<div class="fid-note">Chargement…</div>';
+  if (!_hcSyncCycle) { zone.innerHTML = '<div class="fid-note">Chargement…</div>'; }
   let liste = [];
-  try { liste = await chargerOpportunitesPartenaire(); }
+  try { liste = await chargerOpportunitesPartenaire();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ }
   catch (e) {
+ if (_hcSyncCycle) return;
+
     zone.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger les opportunités pour le moment.</div>';
     return;
   }
@@ -3947,11 +4011,17 @@ async function postulerOpportunite(id) {
 
 // ── LOT X01 — DEMANDES DE RECONTACT (table réelle) ET PARAMÈTRES ──
 function loadRecontacts() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('recontacts-table');
   if (!tbody) return;
   const sub = document.getElementById('recontacts-sub');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
-  sbFetchToutePage('recontacts?order=created_at.desc').then(function (rows) {
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
+  _hcSyncTasks.push(sbFetchToutePage('recontacts?order=created_at.desc').then(function (rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     rows = rows || [];
     if (sub) sub.textContent = rows.length ? rows.length + ' demande(s) reçue(s)' : 'Formulaires soumis depuis le site';
     if (!rows.length) {
@@ -3972,11 +4042,17 @@ function loadRecontacts() {
         + '</tr>';
     }).join('');
   }).catch(function () {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les demandes de recontact pour le moment.</td></tr>';
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function loadParametresAdmin() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const email = document.getElementById('param-admin-email');
   const origine = document.getElementById('param-admin-origine');
   const a = window._currentAdmin || {};
@@ -4215,21 +4291,33 @@ function rendreFideliteCarte(donnees) {
 }
 
 async function loadFideliteClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var zone = document.getElementById('client-fidelite-page');
   if (!zone) return;
-  zone.innerHTML = '<div class="card"><div style="font-size:.85rem;color:#666">Chargement…</div></div>';
+  if (!_hcSyncCycle) { zone.innerHTML = '<div class="card"><div style="font-size:.85rem;color:#666">Chargement…</div></div>'; }
   var donnees = null;
-  try { donnees = await chargerFideliteClient(); }
-  catch (e) { zone.innerHTML = '<div class="card">' + _fidHtmlIndisponible() + '</div>'; return; }
+  try { donnees = await chargerFideliteClient();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ }
+  catch (e) {
+ if (_hcSyncCycle) return;
+ zone.innerHTML = '<div class="card">' + _fidHtmlIndisponible() + '</div>'; return; }
   rendreFidelitePage(donnees);
 }
 
 async function loadFideliteCarte() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var zone = document.getElementById('client-fidelite-carte');
   if (!zone) return;
   var donnees = null;
-  try { donnees = await chargerFideliteClient(); }
-  catch (e) { zone.innerHTML = _fidHtmlIndisponible(); return; }
+  try { donnees = await chargerFideliteClient();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ }
+  catch (e) {
+ if (_hcSyncCycle) return;
+ zone.innerHTML = _fidHtmlIndisponible(); return; }
   rendreFideliteCarte(donnees);
 }
 
@@ -4291,16 +4379,22 @@ function _etatInformationsClient(lignes) {
 
 var _hcInfosGeneration = 0;
 async function loadInfosClient() {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const generation = ++_hcInfosGeneration;
   const zone = document.getElementById('client-infos-liste');
   if (!zone) return;
   window._hcInfosARelire = false;
-  zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>';
+  if (!_hcSyncCycle) { zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>'; }
 
   let demandes = [];
   try {
     demandes = await chargerDemandesClient();
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
   } catch (e) {
+ if (_hcSyncCycle) return;
+
     if (generation !== _hcInfosGeneration) return;
     zone.innerHTML = '<div role="alert" style="font-size:.85rem;color:var(--red)">'
       + 'Impossible de charger vos demandes pour le moment.</div>'
@@ -4314,15 +4408,25 @@ async function loadInfosClient() {
   const resultats = await Promise.all(demandes.map(function (d) {
     return chargerInformationsDemande(d.id)
       .then(async function (lignes) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
         let vehicules = [];
         try {
           const v = await sbAuth.from('vehicules').select('position,marque_modele,immatriculation,ville_depart,ville_arrivee').eq('dossier_id', d.id).order('position', {ascending:true});
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
           if (!v.error) vehicules = v.data || [];
-        } catch(e) { /* Les rubriques restent accessibles si l’identité est indisponible. */ }
+        } catch(e) {
+ if (_hcSyncCycle) return;
+ /* Les rubriques restent accessibles si l’identité est indisponible. */ }
         return { d: d, lignes: lignes, vehicules: vehicules };
       })
-      .catch(function () { return { d: d, erreur: true }; });
+      .catch(function () {
+ if (_hcSyncCycle) return;
+ return { d: d, erreur: true }; });
   }));
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
 
   if (generation !== _hcInfosGeneration) return;
   const blocs = [];
@@ -4754,6 +4858,7 @@ function initApp(user) {
 
   // Surveillance des nouvelles demandes de devis (admin uniquement)
   if (user.role === 'admin') demarrerSurveillanceDemandes();
+  window.dispatchEvent(new Event('hc:role-ready'));
 }
 
 function buildNav(role) {
@@ -4910,6 +5015,7 @@ function showPage(id, options) {
   }
   if (!document.getElementById('page-' + id)) return;
   const roleNavigation = id.split('-')[0];
+  if (window.HCSync) window.HCSync.navigation();
   _hcDernierePage = id;
   if (!_hcNavigationInitialisee) {
     // Un rechargement conserve la garde existante, sans allonger l'historique.
@@ -4984,6 +5090,7 @@ function showPage(id, options) {
   if (window.innerWidth <= 768) {
     window.scrollTo(0, 0);
   }
+  window.dispatchEvent(new Event('hc:page'));
 }
 
 // ── MODALS ─────────────────────────────────────────────────
@@ -5413,8 +5520,8 @@ if (sbAuth) {
       if (reinitOuverte) return;
       const cleUser = session.user.id;
       if (window._dernierAuthUserTraite === cleUser) {
-        const infos = document.getElementById('page-client-infos');
-        if (currentRole === 'client' && infos && infos.classList.contains('active')) setTimeout(loadInfosClient, 0);
+        // Un renouvellement de session suit les mêmes protections qu'un signal distant.
+        if (window.HCSync) window.HCSync.request(0);
         return;
       }
       _hcDemandesLecture = null;
@@ -7024,11 +7131,17 @@ async function lancerArchivageFactures() {
 
 // ── CANDIDATURES CONVOYEURS (Supabase) ──────────────────────
 function loadCandidatures() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('candidatures-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
-  sbFetchToutePage('convoyeurs?statut=eq.en_attente&order=created_at.desc')
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
+  _hcSyncTasks.push(sbFetchToutePage('convoyeurs?statut=eq.en_attente&order=created_at.desc')
     .then(function(rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       // (helper défini plus haut : badgesActivites)
       const badge = document.querySelector('#nav-admin-candidatures .nav-badge');
       const cardSub = document.querySelector('#page-admin-candidatures .card-sub');
@@ -7078,8 +7191,12 @@ function loadCandidatures() {
       rows.forEach(function(c) { window._candidaturesData[c.id] = c; });
     })
     .catch(function(e) {
+ if (_hcSyncCycle) return;
+
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-    });
+    }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function openDossierSb(id) {
@@ -7552,21 +7669,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // ── CONVOYEURS ACTIFS (Supabase) ─────────────────────────────
 function loadConvoyeursActifs() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('convoyeurs-actifs-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
-  sbFetchToutePage('convoyeurs?statut=eq.actif&order=nom.asc')
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
+  _hcSyncTasks.push(sbFetchToutePage('convoyeurs?statut=eq.actif&order=nom.asc')
     .then(function(rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       window._convoyeursActifsListe = rows || [];
       window._convoyeursActifsData = {};
       (rows || []).forEach(function(c) { window._convoyeursActifsData[c.id] = c; });
       afficherConvoyeursActifs(window._convoyeursActifsListe);
       const champRecherche = document.getElementById('recherche-convoyeurs');
-      if (champRecherche) champRecherche.value = '';
+      if (champRecherche && !_hcSyncCycle) champRecherche.value = '';
+      if (champRecherche && _hcSyncCycle) filtrerConvoyeursActifs(champRecherche.value);
     })
     .catch(function(e) {
+ if (_hcSyncCycle) return;
+
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-    });
+    }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 // ── ÉTAT RÉEL D'UN PARTENAIRE ───────────────────────────────
@@ -8062,22 +8190,33 @@ function majBadgeCandidatures() {
 }
 
 function chargerClientsAdmin() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var tbody = document.getElementById('clients-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
-  sbFetchToutePage('clients?select=id,numero_client,prenom,nom,societe,email,telephone,type_client,created_at,auth_user_id'
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
+  _hcSyncTasks.push(sbFetchToutePage('clients?select=id,numero_client,prenom,nom,societe,email,telephone,type_client,created_at,auth_user_id'
                    + '&auth_user_id=not.is.null&order=created_at.desc')
     .then(function (rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       _clientsAdminListe = rows || [];
       afficherClientsAdmin(_clientsAdminListe);
       var sub = document.getElementById('clients-count-sub');
       if (sub) sub.textContent = _clientsAdminListe.length + ' compte(s) client';
       var champ = document.getElementById('recherche-clients');
-      if (champ) champ.value = '';
+      if (champ && !_hcSyncCycle) champ.value = '';
+      if (champ && _hcSyncCycle) filtrerClientsAdmin(champ.value);
     })
     .catch(function () {
+ if (_hcSyncCycle) return;
+
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Base clients indisponible — vérifiez la console</td></tr>';
-    });
+    }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function afficherClientsAdmin(rows) {
@@ -8172,11 +8311,17 @@ function _premierJourDuMoisSuivant() {
 }
 
 function chargerAccueilAdmin() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   chargerCentreInformationsAdmin();
   // Chaque compteur est indépendant : si l'un échoue, les autres
   // s'affichent quand même, et celui qui a échoué le dit.
-  _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
+  _hcSyncTasks.push(_compterLignes('convoyeurs?select=id&statut=eq.en_attente')
     .then(function (n) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       _ecrireStat('stat-pending', n);
       // Le badge du menu affichait « 3 » en dur, quel que soit le
       // nombre réel de candidatures en attente.
@@ -8193,28 +8338,44 @@ function chargerAccueilAdmin() {
         al.style.display = n > 0 ? '' : 'none';
       }
     })
-    .catch(function () { _ecrireStat('stat-pending', '—'); });
+    .catch(function () {
+ if (_hcSyncCycle) return;
+ _ecrireStat('stat-pending', '—'); }));
 
-  _compterLignes('convoyeurs?select=id&statut=eq.actif')
-    .then(function (n) { _ecrireStat('stat-convoyeurs', n); })
-    .catch(function () { _ecrireStat('stat-convoyeurs', '—'); });
+  _hcSyncTasks.push(_compterLignes('convoyeurs?select=id&statut=eq.actif')
+    .then(function (n) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ _ecrireStat('stat-convoyeurs', n); })
+    .catch(function () {
+ if (_hcSyncCycle) return;
+ _ecrireStat('stat-convoyeurs', '—'); }));
 
   // Un « client inscrit » est un compte réellement créé, pas une simple
   // demande déposée : c'est la présence d'un auth_user_id qui le dit.
-  _compterLignes('clients?select=id&auth_user_id=not.is.null')
-    .then(function (n) { _ecrireStat('stat-clients', n); })
-    .catch(function () { _ecrireStat('stat-clients', '—'); });
+  _hcSyncTasks.push(_compterLignes('clients?select=id&auth_user_id=not.is.null')
+    .then(function (n) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ _ecrireStat('stat-clients', n); })
+    .catch(function () {
+ if (_hcSyncCycle) return;
+ _ecrireStat('stat-clients', '—'); }));
 
-  _compterLignes('missions?select=id&statut=in.(acceptee,en_cours,proposee,fini)')
-    .then(function (n) { _ecrireStat('stat-missions', n); })
-    .catch(function () { _ecrireStat('stat-missions', '—'); });
+  _hcSyncTasks.push(_compterLignes('missions?select=id&statut=in.(acceptee,en_cours,proposee,fini)')
+    .then(function (n) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ _ecrireStat('stat-missions', n); })
+    .catch(function () {
+ if (_hcSyncCycle) return;
+ _ecrireStat('stat-missions', '—'); }));
 
   // Compte exact des devis réellement acceptés pendant le mois civil.
   // La date d'acceptation est la source de vérité : aucune estimation.
-  sbFetchToutePage('devis?select=prix,statut,date_acceptation&statut=eq.accepte'
+  _hcSyncTasks.push(sbFetchToutePage('devis?select=prix,statut,date_acceptation&statut=eq.accepte'
                    + '&date_acceptation=gte.' + encodeURIComponent(_premierJourDuMois())
                    + '&date_acceptation=lt.' + encodeURIComponent(_premierJourDuMoisSuivant()))
     .then(function (rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       rows = rows || [];
       var total = rows.reduce(function (a, d) { return a + (Number(d.prix) || 0); }, 0);
       _ecrireStat('stat-ca', rows.length.toLocaleString('fr-FR'));
@@ -8223,13 +8384,17 @@ function chargerAccueilAdmin() {
         + ' de devis acceptés';
     })
     .catch(function () {
+ if (_hcSyncCycle) return;
+
       _ecrireStat('stat-ca', '—');
       var sub = document.getElementById('stat-ca-sub');
       if (sub) sub.textContent = 'Table devis indisponible';
-    });
+    }));
 
   chargerInscriptionsRecentes();
   chargerMissionsAccueil();
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 // Un statut technique ('en_attente', 'compte_cree') n'a rien à faire
@@ -8249,12 +8414,18 @@ function _badgeStatutInscription(statut) {
 }
 
 function chargerInscriptionsRecentes() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var tbody = document.getElementById('inscriptions-recentes');
   if (!tbody) return;
-  Promise.all([
+  _hcSyncTasks.push(Promise.all([
     sbFetch('convoyeurs?select=id,prenom,nom,email,statut,created_at&order=created_at.desc&limit=5'),
     sbFetch('clients?select=id,prenom,nom,societe,email,type_client,statut,created_at,auth_user_id&auth_user_id=not.is.null&order=created_at.desc&limit=5')
   ]).then(function (res) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     var lignes = []
       .concat((res[0] || []).map(function (c) { return { type: 'Partenaire', page: 'admin-candidatures', l: c }; }))
       .concat((res[1] || []).map(function (c) { return { type: 'Client', page: 'admin-clients', l: c }; }))
@@ -8277,18 +8448,28 @@ function chargerInscriptionsRecentes() {
         + '<td><button class="btn btn-sm btn-outline" ' + actionHtml('showPage', [x.page]) + '>Voir →</button></td></tr>';
     }).join('');
   }).catch(function () {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Inscriptions indisponibles — vérifiez la console</td></tr>';
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function chargerMissionsAccueil() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var tbody = document.getElementById('missions-accueil');
   if (!tbody) return;
-  Promise.all([
+  _hcSyncTasks.push(Promise.all([
     sbFetch('missions?select=id,reference,ville_depart,ville_arrivee,client_id,convoyeur_id,marque_modele,immatriculation,date_prise_en_charge,prix_ttc,statut&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc&limit=6'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
     sbFetchToutePage('clients?select=id,prenom,nom')
   ]).then(function (res) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     var missions = res[0] || [];
     var conv = {}, cli = {};
     (res[1] || []).forEach(function (c) { conv[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
@@ -8323,8 +8504,12 @@ function chargerMissionsAccueil() {
         + '</tr>';
     }).join('');
   }).catch(function () {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:20px">Missions indisponibles — vérifiez la console</td></tr>';
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 async function notifierMissionTest(id){
@@ -8385,15 +8570,21 @@ async function reglerTarifBrouillon(id) {
 }
 
 function loadMissions() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('missions-table');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
 
-  Promise.all([
+  _hcSyncTasks.push(Promise.all([
     sbFetchToutePage('missions?order=created_at.desc'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
     sbFetchToutePage('clients?select=id,prenom,nom')
   ]).then(function(results) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     const missions = results[0] || [];
     window._missionsTest=new Set(missions.filter(m=>m.devis_source_id).map(m=>m.id));
     const convoyeurs = {};
@@ -8502,8 +8693,12 @@ function loadMissions() {
         + '</tr>';
     }).join('');
   }).catch(function(e) {
+ if (_hcSyncCycle) return;
+
     tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function terminerMission(id) {
@@ -8547,13 +8742,19 @@ function annulerMission(id) {
 
 // ── MISSIONS CÔTÉ CONVOYEUR (Supabase) ───────────────────────
 function loadDashboardMissionsPreview() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const el = document.getElementById('conv-dashboard-missions-preview');
   if (!el) return;
   const conv = window._currentConvoyeur;
   if (!conv) return;
-  el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px">Chargement…</div>';
-  sbFetch('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc&limit=3')
+  if (!_hcSyncCycle) { el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px">Chargement…</div>'; }
+  _hcSyncTasks.push(sbFetch('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc&limit=3')
     .then(function(rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       if (!rows || rows.length === 0) {
         el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px">Aucune mission disponible pour le moment</div>';
         return;
@@ -8575,11 +8776,19 @@ function loadDashboardMissionsPreview() {
       }).join('');
     })
     .catch(function(e) {
+ if (_hcSyncCycle) return;
+
       el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:20px">Erreur de chargement</div>';
-    });
+    }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function loadMissionsConvoyeur() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('conv-missions-table');
   if (!tbody) return;
   const conv = window._currentConvoyeur;
@@ -8587,11 +8796,13 @@ function loadMissionsConvoyeur() {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Session convoyeur introuvable — reconnecte-toi.</td></tr>';
     return;
   }
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
 
   // Missions proposées en priorité à ce convoyeur OU sans convoyeur assigné (ouvertes à tous)
-  sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc')
+  _hcSyncTasks.push(sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc')
     .then(function(rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       const sub = document.getElementById('conv-missions-sub');
       // Un convoyeur ne doit pas se voir proposer un nettoyage, ni un
       // nettoyeur un convoyage : la mission relève d'un métier, et le
@@ -8645,8 +8856,12 @@ function loadMissionsConvoyeur() {
       }).join('');
     })
     .catch(function(e) {
+ if (_hcSyncCycle) return;
+
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-    });
+    }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function accepterMission(id) {
@@ -9118,6 +9333,10 @@ function validerPrestationNettoyage(missionId) {
 }
 
 function loadHistoriqueConvoyeur() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const tbody = document.getElementById('conv-historique-table');
   if (!tbody) return;
   const conv = window._currentConvoyeur;
@@ -9125,10 +9344,12 @@ function loadHistoriqueConvoyeur() {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Session convoyeur introuvable — reconnecte-toi.</td></tr>';
     return;
   }
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
 
-  sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(acceptee,en_cours,restitution_requise,restitution_en_cours,edl_termine,fini,terminee)&order=created_at.desc')
+  _hcSyncTasks.push(sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(acceptee,en_cours,restitution_requise,restitution_en_cours,edl_termine,fini,terminee)&order=created_at.desc')
     .then(function(rows) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
       const sub = document.getElementById('conv-historique-sub');
       if (sub) sub.textContent = (rows || []).length + ' mission(s)';
 
@@ -9146,12 +9367,18 @@ function loadHistoriqueConvoyeur() {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune mission acceptée pour le moment</td></tr>';
         return;
       }
-      return chargerPhotosMissions(rows).then(function () { rendreHistorique(rows); });
+      return chargerPhotosMissions(rows).then(function () {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+ rendreHistorique(rows); });
     })
-    .then(function () {})
+    .then(function () {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+})
     .catch(function(e) {
+ if (_hcSyncCycle) return;
+
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-    });
+    }));
 
   function rendreHistorique(rows) {
       tbody.innerHTML = rows.map(function(m) {
@@ -9192,6 +9419,8 @@ function loadHistoriqueConvoyeur() {
           + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
       }).join('');
   }
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 // ── FACTURATION ──────────────────────────────────────────────
@@ -9225,17 +9454,23 @@ const FACTURE_STATUT_BADGE = {
 
 // --- Côté convoyeur ---
 function loadFacturationConvoyeur() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const conv = window._currentConvoyeur;
   const listEl = document.getElementById('fc-conv-missions-list');
   const histEl = document.getElementById('fc-conv-historique');
   if (!conv || !listEl || !histEl) return;
-  listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Chargement…</p>';
-  histEl.innerHTML = '<tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Chargement…</p>'; }
+  if (!_hcSyncCycle) { histEl.innerHTML = '<tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr>'; }
 
-  Promise.all([
+  _hcSyncTasks.push(Promise.all([
     sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=eq.terminee&order=date_livraison.desc'),
     sbFetchToutePage('factures_convoyeur?convoyeur_id=eq.' + conv.id + '&order=date_generation.desc')
   ]).then(function(results) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     const missionsTerminees = results[0] || [];
     const factures = results[1] || [];
 
@@ -9304,9 +9539,13 @@ function loadFacturationConvoyeur() {
       }).join('');
     }
   }).catch(function(e) {
+ if (_hcSyncCycle) return;
+
     listEl.innerHTML = '<p style="color:var(--red);font-size:.85rem">Erreur de chargement — vérifiez la console</p>';
     console.error('Erreur loadFacturationConvoyeur:', e);
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function recalculerTotalFactureConvoyeur() {
@@ -9363,17 +9602,23 @@ function genererFactureConvoyeur() {
 
 // --- Côté admin ---
 function loadFacturationAdmin() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   const attenteEl = document.getElementById('fc-admin-attente');
   const aPayerEl = document.getElementById('fc-admin-a-payer');
   const payeesEl = document.getElementById('fc-admin-payees');
   if (!attenteEl) return;
-  attenteEl.innerHTML = '<tr><td colspan="6" style="color:#888;font-size:.85rem">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { attenteEl.innerHTML = '<tr><td colspan="6" style="color:#888;font-size:.85rem">Chargement…</td></tr>'; }
 
-  Promise.all([
+  _hcSyncTasks.push(Promise.all([
     sbFetchToutePage('factures_convoyeur?order=date_generation.desc'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
     sbFetchToutePage('missions?select=id,reference')
   ]).then(function(results) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     const factures = results[0] || [];
     const convoyeurs = {};
     (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
@@ -9433,9 +9678,13 @@ function loadFacturationAdmin() {
             + '<td>' + datePaieTxt + '</td></tr>';
         }).join('');
   }).catch(function(e) {
+ if (_hcSyncCycle) return;
+
     attenteEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:14px">Erreur de chargement — vérifiez la console</td></tr>';
     console.error('Erreur loadFacturationAdmin:', e);
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function accepterFactureConvoyeur(factureId) {
@@ -10373,24 +10622,32 @@ function _statutDevisBadge(statut, d) {
 
 // Charge les demandes (clients ayant réellement demandé un convoyage)
 function loadDemandesDevis(silencieux) {
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var tbody = document.getElementById('tbody-demandes-devis');
   var alerte = document.getElementById('devis-alerte-table');
   if (!tbody) return;
-  if(!silencieux) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
+  if(!silencieux) if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>'; }
 
   var pClients = sbFetchToutePage('clients?order=created_at.desc');
   var pDevis = sbAuthListeDevisTriee()
-    .catch(function() { return null; });
+    .catch(function() {
+ if (_hcSyncCycle) return;
+ return null; });
   // Les véhicules d'un dossier vivent dans `vehicules` depuis la phase 3.
   // Sans cette lecture, la fiche et le devis retombaient sur les colonnes
   // mono-véhicule de `clients` : c'était la cause des dossiers affichés
   // comme un seul véhicule générique.
   var pVehicules = sbFetchToutePage('vehicules?order=position.asc')
-    .catch(function() { return []; });
+    .catch(function() {
+ if (_hcSyncCycle) return;
+ return []; });
 
   var pMissionsNett = chargerMissionsParDemande();
 
   return Promise.all([pClients, pDevis, pVehicules, pMissionsNett]).then(function(res) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     var clients = res[0] || [];
     var devis = res[1];
     var vehicules = res[2] || [];
@@ -10431,13 +10688,19 @@ function loadDemandesDevis(silencieux) {
     // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
     // l'index unique empeche tout doublon. Ne bloque jamais l'affichage.
     try {
-      _tenterMissionsNettoyageAuto().then(function (creees) {
+      (_hcSyncCycle ? Promise.resolve(0) : _tenterMissionsNettoyageAuto()).then(function (creees) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
         if (creees) {
           _rendreTableDemandesDevis(_demandesDuCompteAdmin(_demandesDevisListe));
           if (typeof loadMissions === 'function') loadMissions();
         }
-      }).catch(function () {});
-    } catch (e) { console.warn('Missions de nettoyage automatiques :', e); }
+      }).catch(function () {
+ if (_hcSyncCycle) return;
+});
+    } catch (e) {
+ if (_hcSyncCycle) return;
+ console.warn('Missions de nettoyage automatiques :', e); }
 
     // Recalage du compteur à partir des données réellement chargées
     // (source la plus fiable, et gratuite ici puisque déjà en mémoire).
@@ -10453,6 +10716,8 @@ function loadDemandesDevis(silencieux) {
       _appliquerCompteurDemandes(0);
     }
   }).catch(function(e) {
+ if (_hcSyncCycle) return;
+
     console.error('Erreur loadDemandesDevis:', e);
     tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#c00;padding:20px">Erreur de chargement (voir la console).</td></tr>';
   });
@@ -14335,18 +14600,26 @@ function _acqDebutPeriode(valeur) {
 }
 
 function loadAcquisition() {
+  var _hcSyncTasks = [];
+
+  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
+
   var tbody = document.getElementById('acq-tbody');
   var kpis = document.getElementById('acq-kpis');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>';
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">Chargement…</td></tr>'; }
 
   var sel = document.getElementById('acq-periode');
   var debut = _acqDebutPeriode(sel ? sel.value : '30');
 
   var pClients = sbFetchToutePage('clients?order=created_at.desc');
-  var pDevis = sbAuthListeDevisTriee().catch(function() { return []; });
+  var pDevis = sbAuthListeDevisTriee().catch(function() {
+ if (_hcSyncCycle) return;
+ return []; });
 
-  Promise.all([pClients, pDevis]).then(function(res) {
+  _hcSyncTasks.push(Promise.all([pClients, pDevis]).then(function(res) {
+  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+
     var clients = res[0] || [];
     var devis = res[1] || [];
 
@@ -14457,9 +14730,13 @@ function loadAcquisition() {
       }
     }
   }).catch(function(e) {
+ if (_hcSyncCycle) return;
+
     console.error('Erreur loadAcquisition:', e);
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#c00;padding:20px">Erreur de chargement (voir la console).</td></tr>';
-  });
+  }));
+
+  return Promise.allSettled(_hcSyncTasks);
 }
 
 function _acqCarte(titre, valeur, note) {
@@ -14948,5 +15225,6 @@ function declencherChampFichier(id) {
 .hc-actualiser-infos{display:block;margin-top:5px;border:0;background:transparent;color:#6c3540;font:inherit;font-size:11px;text-decoration:underline;cursor:pointer}
 </style>
 <script src="assets/admin-demandes-informations.js"></script>
+<script src="assets/synchronisation-espaces.js"></script>
 </body>
 </html>

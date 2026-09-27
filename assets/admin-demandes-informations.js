@@ -65,5 +65,5 @@ async function _actualiserNouveautesDemandes(){
  if(!p||!p.classList.contains('active')||document.hidden||currentRole!=='admin'||_actualisationDemandesEnCours)return;
  _actualisationDemandesEnCours=true;try{await loadDemandesDevis(true);}finally{_actualisationDemandesEnCours=false;}
 }
-setInterval(_actualiserNouveautesDemandes,30000);
-if(typeof document!=='undefined')document.addEventListener('visibilitychange',function(){if(!document.hidden)_actualiserNouveautesDemandes();});
+// Le rafraîchissement périodique est assuré par HCSync avec protection des saisies.
+// Le retour sur l'onglet passe également par HCSync.
