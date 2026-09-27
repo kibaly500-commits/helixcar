@@ -27,10 +27,10 @@ function check(libelle, condition, detail) {
   check('N3a : l’action du renfort professionnel adopte le libellé validé',
     source.includes('>Renforcer votre équipe</button>')
       && !source.includes('>Organiser un renfort</button>'));
-  check('N3b : le bloc services contient son accroche et le visuel Mercedes',
+  check('N3b : le bloc services contient son accroche et la vidéo HelixCar',
     source.includes('L’automobile, dans toutes ses exigences.')
       && source.includes('Des prestations pensées comme un ensemble cohérent')
-      && source.includes('assets/helixcar-services-mercedes.webp'));
+      && source.includes('assets/helixcar-services.mp4'));
 
   const browser = await lancerNavigateur();
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -47,7 +47,7 @@ function check(libelle, condition, detail) {
     const account = document.querySelector('.nav-account-action').getBoundingClientRect();
     const menuTrigger = document.querySelector('.nav-menu-trigger').getBoundingClientRect();
     const services = document.getElementById('services');
-    const showcase = document.querySelector('.services-showcase img');
+    const showcase = document.querySelector('.services-showcase video');
     const challenge = document.querySelector('.convoyeur-challenge');
     const podium = document.querySelector('.podium-item');
     const exempleClient = document.getElementById('client-email');
@@ -68,7 +68,7 @@ function check(libelle, condition, detail) {
       espaceDevisConnexion: Math.round(account.left - quote.right),
       espaceConnexionMenu: Math.round(menuTrigger.left - account.right),
       espaceServices: services.getBoundingClientRect().top - bande.getBoundingClientRect().bottom,
-      visuelServicesCharge: showcase.complete && showcase.naturalWidth >= 1700,
+      visuelServicesCharge: showcase.poster.endsWith('helixcar-services-poster.webp') && showcase.muted && showcase.playsInline && getComputedStyle(showcase).objectFit === 'cover',
       challengeRadius: parseFloat(getComputedStyle(challenge).borderTopLeftRadius),
       podiumRadius: parseFloat(getComputedStyle(podium).borderTopLeftRadius),
       couleurTexteClient: getComputedStyle(exempleClient).color,
@@ -210,6 +210,24 @@ function check(libelle, condition, detail) {
   check('N14 : sur mobile le logo reste centré, la barre est allégée et ne déborde pas',
     Math.abs(mobile.centreLogo - mobile.centreNav) <= 1 && mobile.actions === 2 && mobile.scroll <= mobile.client,
     JSON.stringify(mobile));
+
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const frame = await page.evaluate(() => {
+      const v = document.getElementById('services-video');
+      const r = v.getBoundingClientRect();
+      const f = v.parentElement.getBoundingClientRect();
+      const b = document.getElementById('services-video-sound').getBoundingClientRect();
+      return { width: r.width, height: r.height, fits: Math.abs(r.width - f.width) < 1 && Math.abs(r.height - f.height) < 1,
+        button: b.width >= 44 && b.height >= 44 && b.right <= f.right && b.bottom <= f.bottom,
+        overflow: document.documentElement.scrollWidth > window.innerWidth };
+    });
+    check('V1 : vidéo sans coupe ni débordement à ' + width + 'px', frame.fits && frame.button && !frame.overflow && Math.abs(frame.width / frame.height - 1280 / 436) < .02, JSON.stringify(frame));
+  }
+  await page.evaluate(() => document.getElementById('services-video-sound').click());
+  check('V2 : activation explicite du son', await page.evaluate(() => !document.getElementById('services-video').muted && document.getElementById('services-video-sound').getAttribute('aria-pressed') === 'true'));
+  await page.evaluate(() => document.getElementById('services-video-sound').click());
+  check('V3 : coupure du son', await page.evaluate(() => document.getElementById('services-video').muted && document.getElementById('services-video-sound').getAttribute('aria-label') === 'Activer le son'));
 
   check('N15 : aucune erreur JavaScript', erreurs.length === 0, erreurs.join(' | '));
   await browser.close();

@@ -718,51 +718,32 @@ html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:f
 
   .services-showcase {
     position: relative;
-    min-height: clamp(260px, 34vw, 430px);
+    aspect-ratio: 1280 / 436;
     margin: 0 0 34px;
     overflow: hidden;
     border-radius: 14px;
-    background: #d9dfe5;
+    background: #090b0d;
     box-shadow: 0 18px 48px rgba(16,24,32,.12);
   }
-
-  .services-showcase img {
+  .services-showcase video {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
-    display: block; object-fit: cover;
+    display: block; object-fit: cover; object-position: center;
   }
-
-  .services-showcase::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(90deg, rgba(11,17,23,.78) 0%, rgba(11,17,23,.45) 29%, rgba(11,17,23,.08) 58%, transparent 76%);
-    pointer-events: none;
+  .services-video-controls {
+    position: absolute; right: 12px; bottom: 12px;
+    display: flex; gap: 6px;
   }
-
-  .services-showcase-caption {
-    position: absolute; z-index: 1;
-    left: clamp(24px, 4vw, 54px); bottom: clamp(24px, 4vw, 48px);
-    max-width: 410px; color: #fff;
+  .services-video-controls button {
+    display: grid; place-items: center; width: 44px; height: 44px;
+    padding: 0; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 50%; background: rgba(9,11,13,.65); color: #fff;
+    cursor: pointer;
   }
-
-  .services-showcase-caption span {
-    display: block; margin-bottom: 12px;
-    font: 600 .68rem/1 'Instrument Sans', sans-serif;
-    letter-spacing: .13em; text-transform: uppercase;
-  }
-
-  .services-showcase-caption span::before {
-    content: ''; display: inline-block; width: 20px; height: 1px;
-    margin-right: 10px; vertical-align: middle; background: var(--accent-light);
-  }
-
-  .services-showcase-caption strong {
-    display: block;
-    font-family: var(--font-display); font-weight: 500;
-    font-size: clamp(1.55rem, 2.6vw, 2.45rem); line-height: 1.12;
-  }
-
-
+  .services-video-controls button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  .services-video-controls svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+  .services-video-controls [hidden] { display: none; }
+  .services-video-caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
   .services-grid {
 
@@ -3596,12 +3577,8 @@ html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:f
     section { padding: 56px 20px; }
 
     .services { padding-top: 42px; }
-    .services-showcase { min-height: 290px; margin-bottom: 26px; }
-    .services-showcase img { object-position: 66% center; }
-    .services-showcase::after {
-      background: linear-gradient(0deg, rgba(11,17,23,.82) 0%, rgba(11,17,23,.38) 40%, rgba(11,17,23,.03) 76%);
-    }
-    .services-showcase-caption { right: 24px; max-width: 320px; }
+    .services-showcase { margin-bottom: 26px; }
+    .services-video-controls { right: 6px; bottom: 6px; gap: 4px; }
     .services-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
     .service-card:nth-child(n) { grid-column: auto; min-height: 225px; margin-top: 0; --service-shift: 0px; }
 
@@ -5834,11 +5811,18 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   </div>
 
   <figure class="services-showcase reveal">
-    <img src="assets/helixcar-services-mercedes.webp" alt="Mercedes-AMG GT graphite dans un paysage montagneux" loading="lazy" decoding="async">
-    <figcaption class="services-showcase-caption">
-      <span>Exigence automobile</span>
-      <strong>Chaque véhicule mérite une prise en charge à sa hauteur.</strong>
-    </figcaption>
+    <video id="services-video" autoplay muted loop playsinline preload="metadata" poster="assets/helixcar-services-poster.webp" aria-label="Film automobile HelixCar">
+      <source src="assets/helixcar-services.mp4" type="video/mp4">
+    </video>
+    <figcaption class="services-video-caption">Chaque véhicule mérite une prise en charge à sa hauteur.</figcaption>
+    <div class="services-video-controls">
+      <button type="button" id="services-video-play" aria-label="Mettre la vidéo en pause">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path data-pause d="M9 5v14M15 5v14"/><path data-play hidden d="m8 5 11 7-11 7Z"/></svg>
+      </button>
+      <button type="button" id="services-video-sound" aria-label="Activer le son" aria-pressed="false">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M11 4 6 8H3v8h3l5 4Z"/><path data-muted d="m16 9 6 6m0-6-6 6"/><path data-audible hidden d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>
+      </button>
+    </div>
   </figure>
 
   <div class="services-grid">
@@ -23891,6 +23875,53 @@ console.log('HelixCar ' + window.HC_VERSION);
 #modal-client .hc-recuperation-resume .veh-sstitre { margin-bottom:8px; }
 #modal-client p.hc-date-origine { margin:9px 0 0 !important; line-height:1.45 !important; }
 </style>
+
+<script>
+(function () {
+  var video = document.getElementById('services-video');
+  var sound = document.getElementById('services-video-sound');
+  var play = document.getElementById('services-video-play');
+  if (!video || !sound || !play) return;
+  video.muted = true;
+  var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var userPaused = motion.matches;
+  var visible = false;
+  function sync() {
+    sound.setAttribute('aria-label', video.muted ? 'Activer le son' : 'Couper le son');
+    sound.setAttribute('aria-pressed', String(!video.muted));
+    sound.querySelector('[data-muted]').toggleAttribute('hidden', !video.muted);
+    sound.querySelector('[data-audible]').toggleAttribute('hidden', video.muted);
+    play.setAttribute('aria-label', video.paused ? 'Lire la vidéo' : 'Mettre la vidéo en pause');
+    play.querySelector('[data-play]').toggleAttribute('hidden', !video.paused);
+    play.querySelector('[data-pause]').toggleAttribute('hidden', video.paused);
+  }
+  function start() {
+    var promise = video.play();
+    if (promise) promise.catch(sync);
+  }
+  if (motion.matches) { video.autoplay = false; video.pause(); }
+  sound.addEventListener('click', function () {
+    video.muted = !video.muted;
+    if (!video.muted) { userPaused = false; start(); }
+    sync();
+  });
+  play.addEventListener('click', function () {
+    userPaused = !video.paused;
+    if (userPaused) video.pause(); else start();
+  });
+  ['play', 'pause', 'volumechange', 'error'].forEach(function (event) { video.addEventListener(event, sync); });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      visible = entries[0].isIntersecting;
+      if (visible && !userPaused && !document.hidden) start(); else video.pause();
+    }, { threshold: 0.15 }).observe(video);
+  } else { visible = true; if (!userPaused) start(); }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) video.pause(); else if (visible && !userPaused) start();
+  });
+  sync();
+})();
+</script>
 
 </body>
 
