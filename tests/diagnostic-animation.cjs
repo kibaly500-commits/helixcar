@@ -1,10 +1,12 @@
 const L=require('./lib');
 (async()=>{
  const browser=await L.launch();let failures=0;
- try {for(let repeat=0;repeat<20;repeat++){
+ try {for(let repeat=0;repeat<3;repeat++){
   const page=await L.newPage(browser);await page.setViewportSize({width:390,height:1000});
   const errors=await page.evaluate(()=>{
    const errors=[];
+   for(const offset of [0,.005,.01,.015625,.02,.03,-.005,-.01,-.015625]){
+   const middle=document.querySelectorAll('.loyalty-track .node-circle')[2];middle.style.position='relative';middle.style.top=offset+'px';
    for(const p of [0,.1,.249,.5,.749,.99,1]){
     _hcRendreProgressionVitrine(p);
     document.querySelectorAll('.hero2-route,.loyalty-track').forEach(root=>{
@@ -13,10 +15,10 @@ const L=require('./lib');
      root.querySelectorAll('.hero2-route-dot,.node-circle').forEach((n,i)=>{
       const r=n.getBoundingClientRect(),center=vertical?r.top+r.height/2:r.left+r.width/2,end=vertical?line.top+line.height*p:line.left+line.width*p;
       const expected=center<=end+.02,actual=n.classList.contains('hc-reached');
-      if(actual!==expected)errors.push({p,i,root:root.className,center,end,delta:center-end,actual,expected,line:line.toJSON(),node:r.toJSON(),rootRect:root.getBoundingClientRect().toJSON(),transform:getComputedStyle(root).transform,parentTransform:getComputedStyle(root.parentElement).transform});
+      if(actual!==expected)errors.push({offset,p,i,root:root.className,center,end,delta:center-end,actual,expected,line:line.toJSON(),node:r.toJSON(),rootRect:root.getBoundingClientRect().toJSON(),transform:getComputedStyle(root).transform,parentTransform:getComputedStyle(root.parentElement).transform});
      });
     });
-   }return errors;
+   }}return errors;
   });
   failures+=errors.length;if(errors.length)console.log('GEOMETRY',repeat,JSON.stringify(errors));
   await page.close();
