@@ -118,6 +118,13 @@ async function moisFuturComplet(page) {
   L.check('A10 : et rien au-delà des bornes',
     g.inter.indexOf(9) === -1 && g.inter.indexOf(16) === -1, JSON.stringify(g.inter));
 
+  const rendu = await page.evaluate(() => {
+    const a=document.querySelector('[data-jour="10"]'), b=document.querySelector('[data-jour="15"]'), m=document.querySelector('[data-jour="12"]');
+    return {message:document.getElementById('hc-cal-legende').textContent, debut:getComputedStyle(a).backgroundColor, fin:getComputedStyle(b).backgroundColor, milieu:getComputedStyle(m).backgroundColor};
+  });
+  L.check('A10b : une période terminée ne demande plus la fin', /Période sélectionnée/.test(rendu.message) && !/Choisissez la date de fin/.test(rendu.message));
+  L.check('A10c : début et fin distincts, intervalle rose pâle', rendu.debut !== rendu.fin && rendu.milieu === 'rgb(245, 227, 232)', JSON.stringify(rendu));
+
   let v = await valeurs(page, ['stock-debut', 'stock-fin']);
   L.check('A11 : les deux champs sont réellement renseignés',
     /-10$/.test(v['stock-debut']) && /-15$/.test(v['stock-fin']), JSON.stringify(v));

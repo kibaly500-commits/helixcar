@@ -13,7 +13,18 @@
 # sont préfixés TEST-QA et utilisent des adresses en .test.
 set -u
 BIN=/usr/lib/postgresql/16/bin
-BASE=/var/lib/postgresql/verif
+if [ ! -x "$BIN/psql" ] || ! id postgres >/dev/null 2>&1; then
+  echo "BLOQUÉ — PostgreSQL 16 et utilisateur de recette postgres indisponibles. Aucune commande SQL exécutée."
+  exit 2
+fi
+# Nom de la base JETABLE. Paramétrable pour que deux campagnes puissent
+# tourner en même temps sur la même machine (HC_RLS_DB=verif_lot1).
+DB="${HC_RLS_DB:-verif}"
+if [[ ! "$DB" =~ ^verif(_[a-z0-9_]+)?$ ]]; then
+  echo "BLOQUÉ — le nom de base de recette doit être verif ou verif_<suffixe>."
+  exit 2
+fi
+BASE="/var/lib/postgresql/$DB"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PASS=0; FAIL=0; ECHECS=()
 
@@ -25,7 +36,7 @@ check() { # libellé, attendu, obtenu
 sql() { # exécute du SQL et renvoie la sortie brute
   printf '%s\n' "$1" > "$BASE/req.sql"
   chown postgres:postgres "$BASE/req.sql"
-  su postgres -c "psql -U postgres -d verif -qAt -f $BASE/req.sql" 2>&1
+  su postgres -c "psql -U postgres -d $DB -qAt -f $BASE/req.sql" 2>&1
 }
 
 # Exécute du SQL EN TANT QU'ADMINISTRATEUR. Depuis que
@@ -41,21 +52,30 @@ $1
 commit;" | tail -n +2
 }
 
-appliquer() { # applique un fichier de migration
-  cp "$REPO/$1" "$BASE/mig.sql"; chown postgres:postgres "$BASE/mig.sql"
-  su postgres -c "psql -U postgres -d verif -v ON_ERROR_STOP=1 -q -f $BASE/mig.sql" 2>&1 | grep -iE '^psql.*error' | head -2
+appliquer() {
+  if [ ! -f "$REPO/$1" ]; then echo "Migration introuvable : $1"; return 1; fi
+  cp "$REPO/$1" "$BASE/mig.sql" || return 1
+  chown postgres:postgres "$BASE/mig.sql" || return 1
+  local sortie
+  if ! sortie=$(su postgres -c "psql -U postgres -d $DB -v ON_ERROR_STOP=1 -q -f $BASE/mig.sql" 2>&1); then
+    printf '%s\n' "$sortie" | tail -5
+    return 1
+  fi
 }
 
 # ── Démarrage du cluster jetable ──
 if ! su postgres -c "psql -U postgres -tAc 'select 1'" >/dev/null 2>&1; then
-  rm -rf "$BASE/data"; mkdir -p "$BASE" /var/run/postgresql
-  chown postgres:postgres "$BASE" /var/run/postgresql
-  su postgres -c "PATH=$BIN:\$PATH initdb -D $BASE/data -U postgres --auth=trust" >/dev/null 2>&1
-  su postgres -c "PATH=$BIN:\$PATH pg_ctl -D $BASE/data -o '-k /var/run/postgresql -c listen_addresses=' -l $BASE/pg.log start" >/dev/null 2>&1
+  CLUSTER=/var/lib/postgresql/verif
+  rm -rf "$CLUSTER/data"; mkdir -p "$CLUSTER" "$BASE" /var/run/postgresql
+  chown postgres:postgres "$CLUSTER" "$BASE" /var/run/postgresql
+  su postgres -c "PATH=$BIN:\$PATH initdb -D $CLUSTER/data -U postgres --auth=trust" >/dev/null 2>&1
+  su postgres -c "PATH=$BIN:\$PATH pg_ctl -D $CLUSTER/data -o '-k /var/run/postgresql -c listen_addresses=' -l $CLUSTER/pg.log start" >/dev/null 2>&1
   sleep 2
 fi
+# Le répertoire de travail de CETTE base (fichiers SQL temporaires).
+mkdir -p "$BASE"; chown postgres:postgres "$BASE"
 
-su postgres -c "psql -U postgres -qc 'drop database if exists verif' -c 'create database verif'" >/dev/null 2>&1
+su postgres -c "psql -U postgres -qc 'drop database if exists $DB' -c 'create database $DB'" >/dev/null 2>&1
 
 # ── Socle : l'état AVANT ce lot ──
 appliquer tests/pg/00_socle_supabase.sql
@@ -85,9 +105,9 @@ check "A1 : l'ancien dashboard lit toujours les candidatures" "2" \
 check "A2 : l'ancien dashboard lit toujours les missions" "2" \
   "$(sql "begin; select public.devenir_anon(); select count(*) from public.missions; commit;" | tail -1)"
 check "A3 : validation d'une candidature (PATCH statut) toujours possible" "UPDATE 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir_anon(); update public.convoyeurs set statut='actif' where id='aaaaaaaa-0000-0000-0000-000000000002'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir_anon(); update public.convoyeurs set statut='actif' where id='aaaaaaaa-0000-0000-0000-000000000002'; commit;\"" 2>&1 | grep -E '^UPDATE')"
 check "A4 : création d'une mission toujours possible" "INSERT 0 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir_anon(); insert into public.missions (reference,statut) values ('TEST-QA-M3','en_attente'); commit;\"" 2>&1 | grep -E '^INSERT')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir_anon(); insert into public.missions (reference,statut) values ('TEST-QA-M3','en_attente'); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "A5 : le partenaire historique a été rattaché à son compte" "1" \
   "$(sql "select count(*) from public.convoyeurs where id='aaaaaaaa-0000-0000-0000-000000000002' and auth_user_id='44444444-4444-4444-4444-444444444444';")"
 check "A6 : diagnostic — aucun partenaire actif sans compte lié" "0" \
@@ -126,13 +146,13 @@ check "B3 : l'administrateur authentifié voit toutes les candidatures" "2" \
 check "B4 : l'administrateur authentifié voit toutes les missions" "3" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); select count(*) from public.missions; commit;" | tail -1)"
 check "B5 : le dépôt public d'une candidature reste possible" "INSERT 0 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir_anon(); insert into public.convoyeurs (prenom,nom,email,statut) values ('TEST-QA','Nouveau','nouveau@helixcar.test','en_attente'); commit;\"" 2>&1 | grep -E '^INSERT')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir_anon(); insert into public.convoyeurs (prenom,nom,email,statut) values ('TEST-QA','Nouveau','nouveau@helixcar.test','en_attente'); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "B6 : un client authentifié ne lit aucune candidature" "0" \
   "$(sql "begin; select public.devenir('33333333-3333-3333-3333-333333333333','client@helixcar.test'); select count(*) from public.convoyeurs; commit;" | tail -1)"
 check "B7 : un client authentifié ne lit aucune décision" "0" \
   "$(sql "begin; select public.devenir('33333333-3333-3333-3333-333333333333','client@helixcar.test'); select count(*) from public.convoyeur_decisions; commit;" | tail -1)"
 check "B8 : l'administrateur peut supprimer une candidature" "DELETE 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); delete from public.convoyeurs where email='nouveau@helixcar.test'; commit;\"" 2>&1 | grep -E '^DELETE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); delete from public.convoyeurs where email='nouveau@helixcar.test'; commit;\"" 2>&1 | grep -E '^DELETE')"
 
 echo
 echo "── C. PARTENAIRE NON BLOQUÉ ──"
@@ -154,7 +174,7 @@ check "C5 : un partenaire actif ne peut PAS se bloquer/débloquer lui-même" "re
 check "C6 : un partenaire actif ne peut PAS changer son statut" "reserve-admin" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.convoyeurs set statut='en_attente' where auth_user_id=auth.uid(); commit;" | grep -qE 'Modification réservée' && echo reserve-admin || echo passe)"
 check "C7 : mais il peut mettre à jour ses propres coordonnées" "UPDATE 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.convoyeurs set telephone='+33600000002' where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.convoyeurs set telephone='+33600000002' where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE')"
 
 echo
 echo "── D. PARTENAIRE BLOQUÉ ──"
@@ -177,11 +197,11 @@ check "D6 : il ne lit AUCUNE décision" "0" \
 # s'exécute : le refus est donc silencieux (UPDATE 0), pas une exception.
 # Ce qui doit être prouvé est que l'état ne change pas.
 check "D7 : sa tentative de déblocage ne modifie AUCUNE ligne" "UPDATE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.convoyeurs set bloque=false where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.convoyeurs set bloque=false where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE')"
 check "D8 : il reste bloqué après sa tentative" "t" \
   "$(sql "select bloque from public.convoyeurs where id='aaaaaaaa-0000-0000-0000-000000000001';")"
 check "D9 : il ne peut PAS accepter une mission" "UPDATE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set statut='acceptee' where reference='TEST-QA-M2'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set statut='acceptee' where reference='TEST-QA-M2'; commit;\"" 2>&1 | grep -E '^UPDATE')"
 check "D10 : ses décisions sont EXACTEMENT conservées" "oui" \
   "$(sql "select decision from public.convoyeur_decisions where convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' and activite='convoyage';")"
 
@@ -220,11 +240,11 @@ check "G8 : les rubriques diffèrent selon le service" "3" \
   "$(sql "begin; select public.devenir('66666666-6666-6666-6666-666666666666','clientB@helixcar.test'); select count(*) from public.informations_demande('cccccccc-0000-0000-0000-00000000000B'); commit;" | tail -1)"
 
 check "G9 : le client ne peut PAS modifier sa demande (prix, statut, devis)" "UPDATE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); update public.clients set statut='validee', prix_interne=1 where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE|^ERROR' | head -1)"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); update public.clients set statut='validee', prix_interne=1 where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^UPDATE|^ERROR' | head -1)"
 check "G10 : et sa demande reste intacte" "nouveau|990.00" \
   "$(sql "select statut||'|'||prix_interne from public.clients where id='cccccccc-0000-0000-0000-00000000000A';")"
 check "G11 : le client ne peut PAS supprimer sa demande" "DELETE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); delete from public.clients where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^DELETE|^ERROR' | head -1)"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test'); delete from public.clients where auth_user_id=auth.uid(); commit;\"" 2>&1 | grep -E '^DELETE|^ERROR' | head -1)"
 check "G12 : un dépôt anonyme ne permet PAS de relire la demande" "refuse" \
   "$(sql "begin; select public.devenir_anon(); insert into public.clients (numero_client,email,type_service,statut) values ('TEST-QA-REPR','r@helixcar.test','convoyage','nouveau') returning id; commit;" | grep -qiE 'row-level security|error' && echo refuse || echo passe)"
 
@@ -874,7 +894,7 @@ check "Y4 : toute mission existante reste un convoyage" "0" \
 check "Y4b : et il y en a bien" "true" \
   "$(sql "select (count(*) > 0)::text from public.missions;")"
 check "Y5 : une mission de nettoyage peut être créée" "INSERT 0 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); insert into public.missions (id,reference,statut,type_mission,client_id,prestation,adresse_intervention,ville_intervention,contact_nom,contact_tel,date_intervention,prix_ttc) values ('bbbbbbbb-0000-0000-0000-0000000000c1','TEST-QA-NET-1','en_attente','nettoyage','dddddddd-0000-0000-0000-0000000000a1','Nettoyage intérieur et extérieur','3 rue des Lilas','Lyon','TEST-QA Martin','+33600000020','2026-11-02',400); commit;\"" 2>&1 | grep -E '^INSERT')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); insert into public.missions (id,reference,statut,type_mission,client_id,prestation,adresse_intervention,ville_intervention,contact_nom,contact_tel,date_intervention,prix_ttc) values ('bbbbbbbb-0000-0000-0000-0000000000c1','TEST-QA-NET-1','en_attente','nettoyage','dddddddd-0000-0000-0000-0000000000a1','Nettoyage intérieur et extérieur','3 rue des Lilas','Lyon','TEST-QA Martin','+33600000020','2026-11-02',400); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "Y6 : un type de mission INVENTÉ est refusé" "refuse" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
    insert into public.missions (reference,statut,type_mission) values ('TEST-QA-PIRATE','en_attente','pirate'); commit;" \
@@ -891,7 +911,7 @@ check "Y8 : un AUTRE partenaire ne l'est pas" "f" \
    select public.est_partenaire_de_mission('bbbbbbbb-0000-0000-0000-0000000000c1'); commit;" | tail -1)"
 
 check "Y9 : le partenaire dépose une photo de SA mission" "INSERT 0 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into public.mission_photos (mission_id,etape,chemin) values ('bbbbbbbb-0000-0000-0000-0000000000c1','avant','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into public.mission_photos (mission_id,etape,chemin) values ('bbbbbbbb-0000-0000-0000-0000000000c1','avant','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "Y10 : et il la relit" "1" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
 check "Y11 : un AUTRE partenaire ne voit AUCUNE de ces photos" "0" \
@@ -909,7 +929,7 @@ check "Y14 : une étape inventée est refusée" "refuse" \
      values ('bbbbbbbb-0000-0000-0000-0000000000c1','pendant','missions/x/y.jpg'); commit;" \
    | grep -qiE 'violates check constraint|error' && echo refuse || echo passe)"
 check "Y15 : un partenaire ne peut PAS supprimer une photo déjà déposée" "DELETE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); delete from public.mission_photos; commit;\"" 2>&1 | grep -E '^DELETE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); delete from public.mission_photos; commit;\"" 2>&1 | grep -E '^DELETE')"
 check "Y16 : l'administrateur les voit toutes" "1" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test'); select count(*) from public.mission_photos; commit;" | tail -1)"
 
@@ -932,7 +952,7 @@ check "Y19 : le bucket des photos est PRIVÉ" "f" \
 check "Y20 : il n'accepte que des images" "3" \
   "$(sql "select array_length(allowed_mime_types,1) from storage.buckets where id='missions-photos';")"
 check "Y21 : le partenaire dépose un fichier dans le dossier de SA mission" "INSERT 0 1" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into storage.objects (bucket_id,name) values ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); insert into storage.objects (bucket_id,name) values ('missions-photos','missions/bbbbbbbb-0000-0000-0000-0000000000c1/avant-1.jpg'); commit;\"" 2>&1 | grep -E '^INSERT')"
 check "Y22 : mais PAS dans le dossier d'une autre mission" "refuse" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    insert into storage.objects (bucket_id,name)
@@ -1054,7 +1074,7 @@ check "Z17 : il ne peut pas s'arracher la mission d'un collègue" "aaaaaaaa-0000
     where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;
    select convoyeur_id::text from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d2';" | tail -1)"
 check "Z17b : ... et l'écriture ne touche RIEN plutôt que de réussir à moitié" "UPDATE 0" \
-  "$(su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set convoyeur_id='aaaaaaaa-0000-0000-0000-000000000001' where id='bbbbbbbb-0000-0000-0000-0000000000d2'; commit;\"" 2>&1 | grep -E '^UPDATE')"
 check "Z18 : la création d'une mission lui est interdite" "refuse" \
   "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
    insert into public.missions (reference,statut,prix_ttc,convoyeur_id)
@@ -1220,7 +1240,7 @@ check "Z25 : un validateur envoyé par l'appelant est écrasé" "11111111-1111-1
 check "Z26 : un partenaire BLOQUÉ ne modifie plus rien du tout" "UPDATE 0" \
   "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
    update public.convoyeurs set bloque=true where id='aaaaaaaa-0000-0000-0000-000000000001'; commit;" >/dev/null;
-   su postgres -c "psql -U postgres -d verif -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set statut='en_cours' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+   su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test'); update public.missions set statut='en_cours' where id='bbbbbbbb-0000-0000-0000-0000000000d1'; commit;\"" 2>&1 | grep -E '^UPDATE')"
 check "Z26b : et la mission garde son statut" "fini" \
   "$(sql "select statut from public.missions where id='bbbbbbbb-0000-0000-0000-0000000000d1';" | tail -1)"
 sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
@@ -1895,8 +1915,8 @@ select public.creer_mission_nettoyage_si_prete('eeeeeeee-0000-0000-0000-00000000
 commit;" > "$BASE/course$g.sql"
   chown postgres:postgres "$BASE/course$g.sql"
 done
-su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course1.sql" >/dev/null 2>&1 &
-su postgres -c "psql -U postgres -d verif -qAt -f $BASE/course2.sql" >/dev/null 2>&1 &
+su postgres -c "psql -U postgres -d $DB -qAt -f $BASE/course1.sql" >/dev/null 2>&1 &
+su postgres -c "psql -U postgres -d $DB -qAt -f $BASE/course2.sql" >/dev/null 2>&1 &
 wait
 
 check "U21 : les deux missions concurrentes sont bien creees" "2" \
@@ -2419,6 +2439,251 @@ check "W-B1-25 : 104 se rejoue sans erreur" "" "$errB1b"
 check "W-B1-26 : une seule signature par fonction" "2" \
   "$(sql "select count(*) from pg_proc
      where proname in ('roles_utilisateur','ajouter_role_partenaire');")"
+
+
+echo
+echo "── VID. LOT V01 : LA VIDÉO DE CANDIDATURE EN DEUX PHASES ──"
+# Le bucket et les colonnes vidéo viennent de la migration 03, jamais
+# appliquée jusqu'ici par ce script ; 93 relève la limite du bucket.
+errVid03=$(appliquer migrations/03_videos_candidature.sql)
+check "VID-0 : 03 s'applique sans erreur sur le socle" "" "$errVid03"
+errVid93=$(appliquer migrations/93_bucket_video_300mo.sql)
+check "VID-0b : 93 s'applique sans erreur" "" "$errVid93"
+check "VID-0c : le bucket est PRIVÉ et limité à 314 572 800 octets" "false|314572800" \
+  "$(sql "select public::text || '|' || file_size_limit from storage.buckets where id='candidatures-videos';")"
+
+sql "insert into public.convoyeurs (id, prenom, nom, email, activites, statut, video_upload_jeton_hash)
+     values ('a0a0a0a0-0000-4000-8000-000000000101', 'TEST-QA-CLAUDE-HELIXCAR', 'Video',
+             'video-v01@helixcar.test', '{convoyage,renfort}', 'video_attendue', repeat('a', 64))
+     on conflict (id) do nothing;" >/dev/null
+check "VID-1 : la candidature de recette existe, en attente de vidéo" "video_attendue" \
+  "$(sql "select statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# ── REPRODUCTION DU DÉFAUT DE PRODUCTION (avant 105) ──
+# L'ancienne action « autoriser » écrivait chemin + MIME + taille en
+# laissant la date d'envoi nulle. Exactement ce que la contrainte de 03
+# refuse : code 23514, convoyeurs_video_coherente.
+ANCIENNE=$(sql "update public.convoyeurs
+     set video_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/x.mov',
+         video_mime='video/quicktime', video_taille_octets=225024410,
+         video_duree_secondes=119, video_envoyee_le=null
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1)
+check "VID-2 : REPRODUCTION — l'ancienne écriture partielle est refusée par la base" "1" \
+  "$(printf '%s' "$ANCIENNE" | grep -c 'convoyeurs_video_coherente' || true)"
+check "VID-3 : ... et la ligne n'a pas bougé" "" \
+  "$(sql "select coalesce(video_chemin,'') from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# SECOND DÉFAUT, LATENT : sans session, le garde-fou de 90 refuse le
+# changement de statut que la confirmation doit faire. La fonction
+# serveur (service_role, auth.uid() nul) aurait donc échoué juste après.
+GARDE_AVANT=$(sql "update public.convoyeurs set statut='en_attente'
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1)
+check "VID-4 : REPRODUCTION — avant 105, la finalisation sans session est refusée par le garde-fou de 90" "1" \
+  "$(printf '%s' "$GARDE_AVANT" | grep -ci 'réservée à un administrateur\|reservee a un administrateur' || true)"
+sql "update public.convoyeurs set statut='video_attendue' where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null 2>&1
+
+# ── CORRECTIF ──
+errVid105=$(appliquer migrations/105_video_envoi_en_deux_phases.sql)
+check "VID-5 : 105 s'applique sans erreur" "" "$errVid105"
+check "VID-6 : les six colonnes d'envoi en cours existent" "6" \
+  "$(sql "select count(*) from information_schema.columns where table_name='convoyeurs'
+     and column_name in ('video_envoi_chemin','video_envoi_mime','video_envoi_taille_octets',
+                         'video_envoi_duree_secondes','video_envoi_commence_le','video_upload_jeton_consomme_le');")"
+check "VID-7 : la contrainte de 03 est TOUJOURS là, intacte" "1" \
+  "$(sql "select count(*) from pg_constraint where conname='convoyeurs_video_coherente'
+     and pg_get_constraintdef(oid) ilike '%video_envoyee_le IS NOT NULL%';")"
+check "VID-8 : l'écriture partielle reste refusée APRÈS 105 (rien n'a été relâché)" "1" \
+  "$(sql "update public.convoyeurs
+     set video_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/x.mov',
+         video_mime='video/quicktime', video_taille_octets=225024410, video_envoyee_le=null
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_coherente' || true)"
+
+# PHASE 1 — ce que la fonction serveur écrit désormais : l'envoi en
+# cours, dans ses colonnes. La contrainte de 03 n'est pas concernée.
+PHASE1=$(su postgres -c "psql -U postgres -d $DB -c \"update public.convoyeurs
+     set video_envoi_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov',
+         video_envoi_mime='video/quicktime', video_envoi_taille_octets=225024410,
+         video_envoi_duree_secondes=119, video_envoi_commence_le=now()
+   where id='a0a0a0a0-0000-4000-8000-000000000101';\"" 2>&1 | grep -E '^UPDATE|ERROR')
+check "VID-9 : PHASE 1 — l'envoi en cours s'enregistre sans violer aucune contrainte" "UPDATE 1" "$PHASE1"
+check "VID-10 : ... les colonnes FINALES sont restées nulles (vidéo pas déclarée reçue)" "|||" \
+  "$(sql "select coalesce(video_chemin,'')||'|'||coalesce(video_mime,'')||'|'||coalesce(video_taille_octets::text,'')||'|'||coalesce(video_envoyee_le::text,'')
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-11 : un envoi en cours sans MIME est refusé lui aussi (cohérence de 105)" "1" \
+  "$(sql "update public.convoyeurs set video_envoi_mime=null where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_envoi_coherent' || true)"
+check "VID-11b : un envoi en cours de plus de 120 s est refusé" "1" \
+  "$(sql "update public.convoyeurs set video_envoi_duree_secondes=121 where id='a0a0a0a0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'convoyeurs_video_envoi_duree_plafond' || true)"
+
+# PHASE 2 — finalisation par la fonction SQL, sans session (service).
+check "VID-12 : une taille réelle différente de la taille annoncée ne finalise RIEN" "TAILLE_INCOHERENTE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 1000) ->> 'code';")"
+check "VID-12b : ... la ligne est toujours un envoi en cours" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov|" \
+  "$(sql "select coalesce(video_envoi_chemin,'')||'|'||coalesce(video_chemin,'') from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-13 : PHASE 2 — la finalisation avec la taille réelle réussit" "FINALISEE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 225024410) ->> 'code';")"
+check "VID-14 : les QUATRE colonnes finales sont écrites ENSEMBLE, cohérentes" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov|video/quicktime|225024410|119.00|true" \
+  "$(sql "select video_chemin||'|'||video_mime||'|'||video_taille_octets||'|'||video_duree_secondes||'|'||(video_envoyee_le is not null)::text
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-15 : l'envoi en cours est vidé" "0" \
+  "$(sql "select count(*) from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101'
+     and (video_envoi_chemin is not null or video_envoi_mime is not null or video_envoi_taille_octets is not null
+          or video_envoi_duree_secondes is not null or video_envoi_commence_le is not null);")"
+check "VID-16 : la candidature passe en attente d'étude (jamais validée automatiquement)" "en_attente" \
+  "$(sql "select statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-17 : le jeton est consommé, son empreinte conservée pour l'idempotence" "true|true" \
+  "$(sql "select (video_upload_jeton_consomme_le is not null)::text||'|'||(video_upload_jeton_hash is not null)::text
+     from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-18 : la date d'envoi est celle de la finalisation (maintenant), pas une date fournie" "true" \
+  "$(sql "select (now() - video_envoyee_le < interval '1 minute')::text from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-19 : rejouer la finalisation est IDEMPOTENT (DEJA_FINALISEE, rien réécrit)" "DEJA_FINALISEE|candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select (public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 225024410)) ->> 'code'
+     || '|' || video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-20 : finaliser une candidature sans envoi en cours ni vidéo -> AUCUN_ENVOI" "AUCUN_ENVOI" \
+  "$(sql "select public.finaliser_video_candidature('aaaaaaaa-0000-0000-0000-000000000001', null) ->> 'code';")"
+check "VID-21 : finaliser une candidature inexistante -> INTROUVABLE" "INTROUVABLE" \
+  "$(sql "select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-0000000009ff', null) ->> 'code';")"
+
+# REMPLACEMENT : un nouvel envoi en cours n'efface pas la vidéo reçue
+# tant qu'il n'est pas finalisé ; à la finalisation, l'ancien chemin
+# est renvoyé pour que le fichier devenu orphelin soit supprimé.
+sql "update public.convoyeurs
+     set video_envoi_chemin='candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4',
+         video_envoi_mime='video/mp4', video_envoi_taille_octets=7000,
+         video_envoi_duree_secondes=25, video_envoi_commence_le=now()
+   where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null
+check "VID-22 : un remplacement en cours laisse la vidéo reçue INTACTE" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+check "VID-23 : la finalisation du remplacement renvoie l'ancien chemin à nettoyer" "FINALISEE|candidatures/a0a0a0a0-0000-4000-8000-000000000101/f1.mov" \
+  "$(sql "select r ->> 'code' || '|' || (r ->> 'ancien_chemin') from public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', 7000) r;")"
+check "VID-24 : la nouvelle vidéo est en place, le statut n'a pas été rétrogradé" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4|video/mp4|7000|en_attente" \
+  "$(sql "select video_chemin||'|'||video_mime||'|'||video_taille_octets||'|'||statut from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+
+# ── AUTORISATIONS ──
+check "VID-25 : anon ne peut pas exécuter la finalisation" "0" \
+  "$(sql "select count(*) from information_schema.role_routine_grants
+     where routine_name='finaliser_video_candidature' and grantee in ('anon','authenticated','PUBLIC');")"
+FIN_ANON=$(sql "begin; select public.devenir_anon();
+  select public.finaliser_video_candidature('a0a0a0a0-0000-4000-8000-000000000101', null);
+  commit;" 2>&1)
+check "VID-26 : ... vérifié en situation : permission refusée" "1" \
+  "$(printf '%s' "$FIN_ANON" | grep -ci 'permission denied' || true)"
+# Le partenaire propriétaire authentifié ne peut pas écrire les colonnes
+# vidéo lui-même (elles sont réservées à la fonction serveur).
+sql "insert into auth.users (id, email) values ('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test') on conflict do nothing;
+     update public.convoyeurs set auth_user_id='a0a0a0a0-0000-4000-8000-0000000001aa' where id='a0a0a0a0-0000-4000-8000-000000000101';" >/dev/null
+PROPRIO=$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set video_chemin='candidatures/aaaaaaaa-0000-0000-0000-000000000001/vol.mp4'
+   where id='a0a0a0a0-0000-4000-8000-000000000101';
+  commit;" 2>&1)
+check "VID-27 : le propriétaire ne peut pas pointer sa fiche vers la vidéo d'un autre (garde-fou)" "1" \
+  "$(printf '%s' "$PROPRIO" | grep -ci 'gérée par le serveur\|geree par le serveur' || true)"
+check "VID-27b : ... la ligne n'a pas bougé" "candidatures/a0a0a0a0-0000-4000-8000-000000000101/f2.mp4" \
+  "$(sql "select video_chemin from public.convoyeurs where id='a0a0a0a0-0000-4000-8000-000000000101';")"
+PROPRIO2=$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set video_envoyee_le=now() where id='a0a0a0a0-0000-4000-8000-000000000101';
+  commit;" 2>&1)
+check "VID-28 : ... ni se déclarer lui-même « vidéo reçue »" "1" \
+  "$(printf '%s' "$PROPRIO2" | grep -ci 'gérée par le serveur\|geree par le serveur' || true)"
+check "VID-29 : le propriétaire garde ses autres droits (ex. téléphone)" "UPDATE 1" \
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set telephone='+33600000101' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "VID-30 : anon ne peut toujours rien modifier sur convoyeurs (RLS, indépendamment du garde-fou)" "UPDATE 0" \
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir_anon();
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+check "VID-31 : le garde-fou de 90 protège toujours le statut contre le propriétaire" "1" \
+  "$(sql "begin; select public.devenir('a0a0a0a0-0000-4000-8000-0000000001aa','video-v01@helixcar.test');
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;" 2>&1 \
+  | grep -ci 'réservée à un administrateur\|reservee a un administrateur' || true)"
+check "VID-32 : un administrateur peut toujours modifier le statut" "UPDATE 1" \
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+  update public.convoyeurs set statut='actif' where id='a0a0a0a0-0000-4000-8000-000000000101'; commit;\"" 2>&1 | grep -E '^UPDATE')"
+
+errVid105b=$(appliquer migrations/105_video_envoi_en_deux_phases.sql)
+check "VID-33 : 105 se rejoue sans erreur" "" "$errVid105b"
+check "VID-34 : une seule signature pour finaliser_video_candidature" "1" \
+  "$(sql "select count(*) from pg_proc where proname='finaliser_video_candidature';")"
+check "VID-35 : un seul trigger de garde-fou sur convoyeurs" "1" \
+  "$(sql "select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid
+     where c.relname='convoyeurs' and tgname='trg_garde_colonnes_sensibles_convoyeur';")"
+check "VID-36 : aucune politique Storage accordée à anon sur le bucket vidéo" "0" \
+  "$(sql "select count(*) from pg_policies where tablename='objects' and schemaname='storage'
+     and policyname ilike 'candidature video%' and 'anon' = any(roles);")"
+
+
+echo
+echo "── DEV. LOT Q01 : VERSIONS DE DEVIS ET JOURNAL DES ENVOIS ──"
+errDev106=$(appliquer migrations/106_devis_versions_et_journal_envois.sql)
+check "DEV-1 : 106 s'applique sans erreur" "" "$errDev106"
+check "DEV-2 : les dix colonnes d'état existent sur devis" "10" \
+  "$(sql "select count(*) from information_schema.columns where table_name='devis'
+     and column_name in ('version','version_preparee','version_envoyee','version_acceptee','consulte_le',
+                         'envoi_en_cours_depuis','paiement_statut','paiement_confirme_le','annule_le','expire_le');")"
+sql "insert into public.devis (id, reference, client_id, prix, statut)
+     values ('d0d0d0d0-0000-4000-8000-000000000101','TEST-QA-CLAUDE-HELIXCAR-DEV-1',
+             'cccccccc-0000-0000-0000-00000000000A', 450, 'genere') on conflict (id) do nothing;" >/dev/null
+check "DEV-3 : un devis existant ou nouveau démarre en version 1, paiement « aucun »" "1|aucun" \
+  "$(sql "select version||'|'||paiement_statut from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+sql "update public.devis set statut='envoye', version_envoyee=1, date_envoi=now() where id='d0d0d0d0-0000-4000-8000-000000000101';" >/dev/null
+check "DEV-4 : changer le statut sans changer le prix ne change pas la version" "1" \
+  "$(sql "select version from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+sql "update public.devis set prix=500, statut='genere' where id='d0d0d0d0-0000-4000-8000-000000000101';" >/dev/null
+check "DEV-5 : un prix modifié fait une NOUVELLE version (trigger)" "2|1" \
+  "$(sql "select version||'|'||version_envoyee from public.devis where id='d0d0d0d0-0000-4000-8000-000000000101';")"
+check "DEV-6 : un paiement_statut inconnu est refusé" "1" \
+  "$(sql "update public.devis set paiement_statut='bidon' where id='d0d0d0d0-0000-4000-8000-000000000101';" 2>&1 | grep -c 'devis_paiement_statut_valide' || true)"
+# Journal : écrit par le serveur (sans session), lu par l'administrateur seul.
+JOURNAL=$(su postgres -c "psql -U postgres -d $DB -c \"insert into public.devis_envois (devis_id, version, etape, destinataire, envoi_cle, fournisseur)
+  values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'tentative', 'test-qa-claude-helixcar@example.invalid', 'tentative-1', 'resend'),
+         ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'acceptee_prestataire', 'test-qa-claude-helixcar@example.invalid', 'tentative-1', 'resend');\"" 2>&1 | grep -E '^INSERT|ERROR')
+check "DEV-7 : le serveur (sans session) journalise tentative et acceptation séparément" "INSERT 0 2" "$JOURNAL"
+check "DEV-8 : une étape inconnue est refusée" "1" \
+  "$(sql "insert into public.devis_envois (devis_id, version, etape) values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'envoye');" 2>&1 | grep -c 'devis_envois_etape_check' || true)"
+check "DEV-9 : un administrateur lit le journal" "2" \
+  "$(sql "begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+check "DEV-10 : un client authentifié ne lit RIEN du journal" "0" \
+  "$(sql "begin; select public.devenir('55555555-5555-5555-5555-555555555555','clientA@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+check "DEV-11 : un partenaire non plus" "0" \
+  "$(sql "begin; select public.devenir('22222222-2222-2222-2222-222222222222','partenaire@helixcar.test');
+     select count(*) from public.devis_envois; commit;" | tail -1)"
+ANON_J=$(sql "begin; select public.devenir_anon(); select count(*) from public.devis_envois; commit;" 2>&1 | tail -1)
+check "DEV-12 : anon n'a aucun droit sur le journal" "1" \
+  "$(printf '%s' "$ANON_J" | grep -ci 'permission denied' || true)"
+check "DEV-13 : personne n'écrit dans le journal depuis le navigateur (admin compris : aucune politique d'insertion)" "INSERT 0 0|refus" \
+  "$(su postgres -c "psql -U postgres -d $DB -c \"begin; select public.devenir('11111111-1111-1111-1111-111111111111','admin@helixcar.test');
+     insert into public.devis_envois (devis_id, version, etape) values ('d0d0d0d0-0000-4000-8000-000000000101', 1, 'echec'); commit;\"" 2>&1 \
+     | grep -qiE 'row-level security|permission denied' && echo 'INSERT 0 0|refus' || echo 'passe')"
+check "DEV-14 : le journal ne contient aucun jeton ni secret (colonnes)" "0" \
+  "$(sql "select count(*) from information_schema.columns where table_name='devis_envois' and column_name ilike '%token%' or table_name='devis_envois' and column_name ilike '%jeton%';")"
+errDev106b=$(appliquer migrations/106_devis_versions_et_journal_envois.sql)
+check "DEV-15 : 106 se rejoue sans erreur" "" "$errDev106b"
+check "DEV-16 : un seul trigger de version, une seule politique de lecture" "1|1" \
+  "$(sql "select (select count(*) from pg_trigger where tgname='trg_devis_nouvelle_version')||'|'||(select count(*) from pg_policies where tablename='devis_envois');")"
+check "DEV-17 : aucun objet Stripe créé par ce lot" "0" \
+  "$(sql "select count(*) from information_schema.columns where column_name ilike '%stripe%';")"
+
+# ── Sections par lot, dans tests/rls/*.sh ──
+# Chaque lot ajoute SON fichier plutôt que d'allonger celui-ci : deux
+# chantiers menés en parallèle ne se disputent plus la même fin de
+# script. Les fichiers sont exécutés dans l'ordre alphabétique et
+# disposent de check(), sql(), sqlAdmin(), appliquer() et su/psql.
+for f in "$REPO"/tests/rls/*.sh; do
+  [ -f "$f" ] || continue
+  # F01 (112) impose de nouvelles règles de saisie : les anciennes
+  # fixtures des migrations antérieures doivent être créées avant.
+  [[ "$(basename "$f")" = 'f01.sh' || "$(basename "$f")" = 'reprise_finalisation.sh' ]] && continue
+  echo
+  echo "── $(basename "$f") ──"
+  # shellcheck disable=SC1090
+  . "$f"
+done
+
+if [ -f "$REPO/tests/rls/f01.sh" ]; then
+  . "$REPO/tests/rls/f01.sh"
+fi
+
+. "$REPO/tests/rls/reprise_finalisation.sh"
 
 echo
 echo "=== $PASS PASS / $FAIL FAIL ==="

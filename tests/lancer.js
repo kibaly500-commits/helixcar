@@ -27,7 +27,7 @@ const sansSql = args.includes('--sans-sql');
 const iMotif = args.indexOf('--seulement');
 const motif = iMotif !== -1 ? args[iMotif + 1] : null;
 
-const LIGNE_SYNTHESE = /===\s*(\d+)\s+PASS\s*\/\s*(\d+)\s+FAIL\s*===/;
+const resultatSuite = require('./resultat-suite');
 
 function suites() {
   const js = fs.readdirSync(__dirname)
@@ -62,6 +62,7 @@ console.log('');
 
 let totalPass = 0, totalFail = 0;
 const enEchec = [];
+const bloques = [];
 const resultats = [];
 const debutGlobal = Date.now();
 
@@ -75,22 +76,11 @@ for (const s of liste) {
   });
   const secondes = ((Date.now() - debut) / 1000).toFixed(1);
   const sortie = (r.stdout || '') + (r.stderr || '');
-  const m = sortie.match(LIGNE_SYNTHESE);
-
-  let pass = 0, fail = 0, etat;
-  if (m) {
-    pass = parseInt(m[1], 10);
-    fail = parseInt(m[2], 10);
-    // Une suite peut afficher « 0 FAIL » ET sortir en erreur : on ne
-    // croit pas la ligne sur parole, on regarde aussi le code de sortie.
-    etat = (fail === 0 && r.status === 0) ? 'OK' : 'ÉCHEC';
-    if (fail === 0 && r.status !== 0) fail = 1;   // incohérence = échec
-  } else if (s.facultative && r.status !== 0 && /introuvable|not found|command not found|initdb/i.test(sortie)) {
-    etat = 'IGNORÉE';
-  } else {
-    // Pas de ligne de synthèse : plantage, timeout, sortie tronquée.
-    etat = 'ÉCHEC';
-    fail = 1;
+  let {pass, fail, etat} = resultatSuite(sortie, r.status);
+  if (s.facultative && r.status !== 0 && /BLOQUÉ|introuvable|not found|command not found|initdb/i.test(sortie)) {
+    etat = 'BLOQUÉE';
+    pass = 0; fail = 0;
+    bloques.push(s.nom);
   }
 
   totalPass += pass;
@@ -101,12 +91,12 @@ for (const s of liste) {
   resultats.push({ nom: s.nom, pass, fail, etat, secondes });
 
   console.log(
-    (etat === 'OK' ? '  OK    ' : etat === 'IGNORÉE' ? '  ····  ' : '  ÉCHEC ')
+    (etat === 'OK' ? '  OK    ' : etat === 'BLOQUÉE' ? ' BLOQUÉ ' : '  ÉCHEC ')
     + s.nom.padEnd(24)
     + String(pass).padStart(4) + ' PASS'
     + String(fail).padStart(5) + ' FAIL'
     + '   ' + secondes + 's'
-    + (etat === 'IGNORÉE' ? '   (' + s.facultative + ')' : '')
+    + (etat === 'BLOQUÉE' ? '   (' + s.facultative + ')' : '')
   );
 }
 
@@ -128,4 +118,5 @@ if (enEchec.length) {
 }
 
 // UN SEUL échec suffit à faire échouer l'ensemble.
-process.exit(totalFail === 0 && enEchec.length === 0 ? 0 : 1);
+if(bloques.length)console.log('BLOQUÉ : '+bloques.join(', ')+'. Aucune réussite globale de la campagne complète.');
+process.exit(totalFail || enEchec.length ? 1 : bloques.length ? 2 : 0);

@@ -158,12 +158,13 @@ const LIBELLES_ANCIEN_INDEX = [
   "À"
 ];
 
-// Les onze libellés de l'ancien index qui n'existent plus dans l'index
+// Les seize libellés de l'ancien index qui n'existent plus dans l'index
 // actuel. Chacun a une raison NOMMÉE et vérifiable. Aucun n'est une
 // perte de fonctionnalité historique : ce sont soit des retraits
 // explicitement demandés, soit des remplacements par un dispositif
 // plus riche apporté par le main courant.
 const DISPARUS_EXPLIQUES = [
+  ['Informations complémentaires (optionnel)', 'PR6 : harmonisation du libellé en Informations complémentaires (facultatif), champ conservé.'],
   ['Quelle est votre disponibilité ? *',
     'retrait explicitement demandé (§ 11 du chantier) — la question et ses trois choix'],
   ['Heure souhaitée *',
@@ -190,7 +191,25 @@ const DISPARUS_EXPLIQUES = [
   ['Renfort automobile',
     'ancienne case d\'activité partenaire — devenue les métiers « Renfort », '
     + '« Accueil en concession », « Préparation automobile », « Opérations de parc » '
-    + 'et « Soutien administratif »']
+    + 'et « Soutien administratif »'],
+  ['RC Pro en cours de validité — PDF, JPG ou PNG',
+    'libellé remplacé par un statut dynamique : obligatoire pour le convoyage, '
+    + 'facultative pour les autres métiers'],
+  ['Pièce d\'identité — PDF, JPG ou PNG',
+    'libellé renforcé par un astérisque visible : ce document est obligatoire'],
+  ['Permis de conduire — PDF, JPG ou PNG',
+    'libellé renforcé par un astérisque visible : ce document est obligatoire'],
+  ['VIN (facultatif)',
+    'mention « facultatif » retirée explicitement : le VIN absent reste non bloquant '
+    + 'mais devient une information à compléter dans les espaces client et administrateur'],
+  ['N° de châssis (VIN) — véhicule restitution (facultatif)',
+    'mention « facultatif » retirée explicitement sur le véhicule de restitution'],
+  ['Immatriculation (facultatif)',
+    'mention « facultatif » retirée : l’immatriculation reste non bloquante au devis '
+    + 'mais devient une information attendue avant mission'],
+  ['Plaque *',
+    'libellé remplacé par « Immatriculation — attendue avant mission » : '
+    + 'la donnée ne bloque plus le devis mais bloque le lancement de mission']
 ];
 
 module.exports = { LIBELLES_ANCIEN_INDEX, DISPARUS_EXPLIQUES };

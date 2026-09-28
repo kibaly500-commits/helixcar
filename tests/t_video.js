@@ -65,14 +65,14 @@ async function etatVideo(page) {
   // ── A. Exigence et durée selon les activités ──
   await activites(page, ['nettoyage']);
   let e = await etatVideo(page);
-  L.check('A1 : nettoyage seul -> aucune vidéo demandée', e.requise === false && e.max === 0);
-  L.check('A2 : nettoyage seul -> bloc vidéo masqué', e.groupeVisible === 'none');
-  L.check('A3 : nettoyage seul -> progression non bloquée', e.ok === true);
+  L.check('A1 : nettoyage seul -> vidéo obligatoire (2 minutes)', e.requise === true && e.max === 120);
+  L.check('A2 : nettoyage seul -> bloc vidéo visible', e.groupeVisible !== 'none');
+  L.check('A3 : nettoyage seul sans vidéo -> progression bloquée', e.ok === false);
 
   await activites(page, ['convoyage']);
   e = await etatVideo(page);
   L.check('A4 : convoyage seul -> vidéo obligatoire', e.requise === true);
-  L.check('A5 : convoyage seul -> 1 minute maximum', e.max === 60 && /1 minute maximum/.test(e.texteDuree), e.texteDuree);
+  L.check('A5 : convoyage seul -> 2 minutes maximum', e.max === 120 && /2 minutes maximum/.test(e.texteDuree), e.texteDuree);
   L.check('A6 : convoyage sans vidéo -> progression bloquée', e.ok === false);
 
   await activites(page, ['renfort']);
@@ -161,9 +161,9 @@ async function etatVideo(page) {
   await deposer(page, V90);
   et = await attendreEtat(page, ['prete', 'invalide'], 25000);
   e = await etatVideo(page);
-  L.check('E4 : WebM 90 s REFUSÉ pour le convoyage (max 1 min)',
-    et === 'invalide' && /trop longue/i.test(e.msg), et + ' / ' + e.msg);
-  L.check('E5 : durée dépassée -> progression bloquée', e.ok === false);
+  L.check('E4 : WebM 90 s accepté pour le convoyage (max 2 min)',
+    et === 'prete' && e.ok === true, et + ' / ' + e.msg);
+  L.check('E5 : vidéo de 90 s -> progression débloquée', e.ok === true);
 
   await activites(page, ['renfort']);
   e = await etatVideo(page);
@@ -176,7 +176,7 @@ async function etatVideo(page) {
   L.check('E7 : WebM 150 s refusé même pour le renfort',
     et === 'invalide' && /trop longue/i.test(e.msg), et + ' / ' + e.msg);
 
-  // ── F. Retrait du renfort : la vidéo > 1 min doit être remplacée ──
+  // ── F. Changement de métier : la limite commune reste stable ──
   await activites(page, ['convoyage', 'renfort']);
   await deposer(page, V90);
   et = await attendreEtat(page, ['prete', 'invalide'], 25000);
@@ -185,14 +185,14 @@ async function etatVideo(page) {
 
   await activites(page, ['convoyage']);   // le renfort est retiré
   e = await etatVideo(page);
-  L.check('F2 : renfort retiré, convoyage gardé -> vidéo de 90 s à remplacer',
-    e.etat === 'invalide' && /trop longue/i.test(e.msg), e.etat + ' / ' + e.msg);
-  L.check('F3 : progression de nouveau bloquée', e.ok === false);
+  L.check('F2 : renfort retiré, convoyage gardé -> vidéo de 90 s toujours valide',
+    e.etat === 'prete' && e.ok === true, e.etat + ' / ' + e.msg);
+  L.check('F3 : progression reste débloquée', e.ok === true);
   L.check('F4 : le fichier n\'est pas supprimé en silence', e.nom !== null);
 
   await activites(page, ['convoyage', 'renfort']);   // le renfort revient
   e = await etatVideo(page);
-  L.check('F5 : renfort remis -> la même vidéo redevient valide',
+  L.check('F5 : renfort remis -> la même vidéo reste valide',
     e.etat === 'prete' && e.ok === true, e.etat + ' / ' + e.msg);
 
   // ── G. Remplacement et suppression ──
@@ -247,9 +247,10 @@ async function etatVideo(page) {
   L.check('I2 : vidéo valide -> Continuer débloqué', btn === false);
 
   await activites(page, ['nettoyage']);
+  await page.evaluate(() => convSupprimerVideo());
   await page.waitForTimeout(120);
   btn = await page.evaluate(() => document.getElementById('conv-step-next-btn').disabled);
-  L.check('I3 : nettoyage seul -> Continuer jamais bloqué par la vidéo', btn === false);
+  L.check('I3 : nettoyage seul sans vidéo -> Continuer reste bloqué', btn === true);
 
   // La validation au clic reste un garde-fou
   await activites(page, ['convoyage']);
@@ -280,6 +281,13 @@ async function etatVideo(page) {
       const corps = JSON.parse(route.request().postData() || '{}');
       appels.push({ type: 'fonction', action: corps.action, corps: corps });
       if (corps.action === 'autoriser') {
+        // LOT V01 — le serveur répond « déjà confirmée » : la vidéo a
+        // été finalisée par une confirmation dont la réponse s'est
+        // perdue. Aucun dépôt, aucune seconde confirmation attendus.
+        if (opts.dejaConfirmee) {
+          return route.fulfill({ status: 200, contentType: 'application/json',
+            body: JSON.stringify({ ok: true, deja_confirmee: true, chemin: CHEMIN_SERVEUR }) });
+        }
         if (opts.autoriserKo) {
           return route.fulfill({ status: 403, contentType: 'application/json',
             body: JSON.stringify({ ok: false, code: 'FORBIDDEN', message: "Autorisation d'envoi inconnue ou déjà utilisée." }) });
@@ -376,6 +384,19 @@ async function etatVideo(page) {
   envoi = await lancerEnvoi(page);
   L.check('J13 : confirmation refusée -> envoi considéré comme échoué',
     !!envoi.erreur && /reçue entièrement/i.test(envoi.erreur), JSON.stringify(envoi));
+  await desarmer(page);
+
+  // LOT V01 — idempotence côté navigateur : la confirmation précédente
+  // avait réussi, sa réponse s'est perdue, le candidat relance.
+  await armerInterceptions(page, { dejaConfirmee: true });
+  envoi = await lancerEnvoi(page);
+  L.check('J14 : « déjà confirmée » -> succès, sans dépôt ni seconde confirmation',
+    envoi.ok === true && envoi.deja_confirmee === true && envoi.chemin === CHEMIN_SERVEUR
+    && !appels.some(a => a.type === 'depot') && !appels.some(a => a.action === 'confirmer')
+    && !appels.some(a => a.type === 'reprenable'),
+    JSON.stringify({ envoi, appels: appels.map(a => a.action || a.type) }));
+  L.check('J14b : le jeton à usage unique est oublié côté navigateur',
+    (await page.evaluate(() => _convJetonEnvoi)) === null);
   await desarmer(page);
 
   // ── K. Aucune URL publique nulle part ──
