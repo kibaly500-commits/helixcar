@@ -26,6 +26,8 @@ function json(body: unknown, status: number, headers: Record<string,string>) {
 function dossierQa(client: any) {
   // Dossier de recette explicitement désigné par Hamid le 27/09/2026.
   if (client?.id === "951410e8-7104-4256-b46d-59487e73890a" && client?.numero_client === "HC-2026-2184") return true;
+  // Dossier de recette autorisé par Hamid le 04/10/2026.
+  if (client?.id === "a134dc9a-3b58-488f-9257-d4f68d7295a6" && client?.numero_client === "HC-2026-6218") return true;
   return [client?.numero_client, client?.prenom, client?.nom, client?.email]
     .some((v) => DOSSIERS_QA.some(prefix => String(v || "").toUpperCase().startsWith(prefix)));
 }

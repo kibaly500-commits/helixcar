@@ -51,6 +51,16 @@ for(const scenario of ['success','refused','abandoned','requires_action']){
  const {r}=await call(d,'success');
  check('même référence sur un autre dossier refusée',r.status===403&&d.rpc===0);
 }
+for(const scenario of ['success','refused','abandoned','requires_action']){
+ const d=double({qa:false});d.client.id='a134dc9a-3b58-488f-9257-d4f68d7295a6';d.client.numero_client='HC-2026-6218';d.devis.client_id=d.client.id;
+ const {r,j}=await call(d,scenario);check('HC-2026-6218 autorisé : '+scenario,r.status===200&&j.ok);
+}
+{
+ const d=double({qa:false});d.client.numero_client='HC-2026-6218';const {r}=await call(d,'success');check('HC-2026-6218 autre identifiant refusé',r.status===403&&d.rpc===0);
+}
+{
+ const d=double({qa:false});d.client.id='a134dc9a-3b58-488f-9257-d4f68d7295a6';d.client.numero_client='HC-2026-6218';d.devis.client_id=d.client.id;d.client.auth_user_id='autre';const {r}=await call(d,'success');check('HC-2026-6218 autre propriétaire refusé',r.status===404&&d.rpc===0);
+}
 const TOKEN='qa-secret-link-not-a-real-token';
 const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(TOKEN))).toString('hex');
 function linkFixture(options={}){
