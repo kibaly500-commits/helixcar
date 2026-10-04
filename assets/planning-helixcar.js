@@ -1,5 +1,4 @@
-/* Vue privée de l'administration. Les horaires confirmés ne suivent jamais
- * automatiquement les estimations de trafic. */
+/* Planning manuel privé : réceptions et remises de clés chez HelixCar. */
 (function(){
 'use strict';
 const C=HCPlanningCalcul,esc=v=>escapeHtml(String(v??''));
@@ -7,22 +6,6 @@ let rows=[],records=new Map(),ticket=0;
 const panel=()=>document.getElementById('hc-planning-list');
 const fmt=v=>v?String(v).replace(/(\d{4})-(\d{2})-(\d{2})T?(\d{2}:\d{2})?.*/,(_,y,m,d,h)=>`${d}/${m}/${y}${h?' à '+h:''}`):'À fixer';
 const schedule=p=>p.kind==='avant_stockage'?p.mission.date_livraison:p.mission.date_prise_en_charge;
-async function calculate(clientId,key,margin){
- const s=await sbAuth.auth.getSession();if(!s.data?.session)throw Error('Reconnectez-vous à votre espace administrateur.');
- const response=await fetch('/api/planning-trafic',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+s.data.session.access_token,apikey:SUPABASE_KEY},body:JSON.stringify({clientId,key,margin})});
- let data;try{data=await response.json();}catch{throw Error('Le calcul avec trafic n’est pas encore disponible sur ce déploiement.');}
- if(!response.ok)throw Error(data.error||'Calcul indisponible');return data;
-}
-function summary(e,plan){
- if(!e)return '<p>Estimation non calculée. Les horaires du client restent la référence.</p>';
- const fixed=plan&&schedule(plan);
- const risky=fixed&&((e.kind==='apres_stockage'&&fixed.slice(0,16)>e.suggestion)||(e.kind==='avant_stockage'&&fixed.slice(0,16)<e.suggestion));
- return (risky?'<p class="hc-planning-warning">L’horaire saisi laisse moins de temps que l’estimation. Vérifiez le rendez-vous avant confirmation.</p>':'')+'<p><strong>'+esc(e.km)+' km · '+esc(e.minutes)+' min de route</strong> · battement '+esc(e.margin)+' min (20 min de remise et '+esc(e.margin-20)+' min de sécurité).</p>'
- +'<p>'+esc(e.kind==='avant_stockage'?'Réception conseillée':e.kind==='apres_stockage'?'Remise conseillée':'Arrivée estimée avec battement')+' : <strong>'+esc(fmt(e.suggestion))+'</strong></p>'
- +(e.restitution?'<p>Restitution : '+esc(e.restitution.km)+' km · '+esc(e.restitution.minutes)+' min, après 20 min de remise au client.</p>':'')
- +'<p class="hc-prep-muted">'+esc(e.provider)+' · estimation au '+esc(_dvDateHeure(e.calculatedAt))+' · à actualiser avant le départ.</p>'
- +(e.warnings||[]).map(w=>'<p class="hc-planning-warning">'+esc(w)+'</p>').join('');
-}
 async function action(id,kind){
  const r=records.get(id),response=await sbAuth.rpc('action_planning_helixcar',{p_preparation_id:id,p_action:kind,p_revision:r?.revision||0});
  if(response.error)throw Error(response.error.message);records.set(id,response.data);return response.data;
@@ -54,8 +37,8 @@ function render(){
   +'<p>'+(s?.cles_effectuees_le?'Clés '+(inbound?'reçues':'remises')+' le '+esc(_dvDateHeure(s.cles_effectuees_le)):s?.horaire_confirme?'Horaire confirmé':'Horaire à confirmer')+'</p>'
   +(stale?'<p class="hc-planning-warning">La préparation a changé depuis la confirmation. Vérifiez le rendez-vous.</p>':'')
   +(collisions?'<p class="hc-planning-warning">Un autre rendez-vous confirmé chevauche ces 20 minutes de remise.</p>':'')
-  +'<div class="hc-planning-estimate">'+summary(p.planning_estimate,p)+'</div>'
-  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Ouvrir la préparation</button><button type="button" class="btn btn-outline" data-planning-action="trafic">Actualiser le trafic</button>'
+  +'<p><strong>'+ (inbound?'Votre intervention : réceptionner le véhicule au point HelixCar.':'Votre intervention : remettre le véhicule au convoyeur au point HelixCar.')+'</strong></p>'
+  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Voir / régler les horaires</button>'
   +(!s?.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>Confirmer cet horaire</button><button type="button" class="btn btn-outline" data-planning-action="cles"'+(!s?.horaire_confirme||stale?' disabled':'')+'>'+(inbound?'Clés reçues':'Clés remises')+'</button>':'')+'</div><p class="hc-planning-feedback" role="status"></p></article>';
  }).join('');
 }
@@ -68,16 +51,10 @@ section.addEventListener('click',async e=>{
  try{
   const kind=b.dataset.planningAction;
   if(kind==='ouvrir'){await ouvrirPreparationDemande(r.client_id);return;}
-  if(kind==='trafic'){
-   out.textContent='Calcul du trajet avec trafic…';const data=await calculate(r.client_id,r.cle,r.plan.planning_margin??45);
-   if(!card.isConnected||_hcNavigationRole!=='admin')return;
-   card.querySelector('.hc-planning-estimate').innerHTML=summary(data.estimate,r.plan);
-   out.textContent=data.fingerprint!==r.empreinte?'La demande a changé : rouvrez la préparation.':'Estimation actualisée. Votre rendez-vous confirmé reste inchangé.';return;
-  }
   if(!confirm(kind==='cles'?'Confirmer que la remise physique des clés a eu lieu ?':'Confirmer ce rendez-vous HelixCar ?'))return;
   await action(r.id,kind);render();
  }catch(err){out.textContent=err.message;}finally{b.disabled=false;}
 });
-window.HCPlanning={calculate,summary,load,action};
+window.HCPlanning={load,action};
 window.addEventListener('hc-session-fermee',()=>{++ticket;rows=[];records.clear();panel().textContent='';});
 })();

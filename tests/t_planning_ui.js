@@ -11,7 +11,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
   window.__rows=plans.map((plan,i)=>({id:'p'+i,client_id:c.id,cle:plan.key,empreinte:'hash',plan,clients:{numero_client:'HC-QA'},missions:{convoyeurs:{prenom:'Partenaire',nom:'Test'}}}));
   window.__states=[];window.__calls=[];window.__source={client:c,vehicules:[v],reference:'DEV-QA',empreinte:'hash',point_remise:HCPlanningCalcul.POINT,brouillons:__rows};
   window.__traffic={provider:'Google Maps',kind:'avant_stockage',km:40,minutes:60,margin:45,calculatedAt:new Date().toISOString(),suggestion:'2026-11-08T10:45',warnings:[]};
-  sbFetchToutePage=async path=>path.startsWith('preparations')?__rows:__states;
+  sbFetchToutePage=async path=>path.startsWith('preparations')?[...__rows,{...__rows[0],id:'direct',plan:{...__rows[0].plan,kind:'direct'}},{...__rows[0],id:'cancelled',missions:{statut:'annulee'}}]:__states;
   sbAuth.rpc=async(name,args)=>{
    __calls.push({name,args});if(name==='source_preparation_missions')return {data:__source};
    if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map((plan,i)=>({id:'p'+i,cle:plan.key,empreinte:'hash',plan}));return {data:__source};}
@@ -20,7 +20,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
     if(args.p_action==='confirmer'){state.horaire_confirme=row.plan.kind==='avant_stockage'?row.plan.mission.date_livraison:row.plan.mission.date_prise_en_charge;state.empreinte_confirmee='hash';}else state.cles_effectuees_le=new Date().toISOString();state.revision++;return {data:state};
    }
   };
-  window.fetch=async()=>({ok:!window.__trafficFailed,json:async()=>window.__trafficFailed?{error:'Le calcul avec trafic n’est pas encore connecté.'}:{estimate:__traffic,fingerprint:'hash'}});
+  window.fetch=async()=>{throw Error('Aucun appel externe attendu en planning manuel');};
   window.confirm=()=>true;showPage('admin-planning');
  });
  await page.waitForSelector('[data-planning-id="p0"]');
@@ -29,8 +29,8 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  const first=page.locator('[data-planning-id="p0"]');assert.match(await first.innerText(),/3 rue Exemple, 75001 Paris/);
  assert.equal(await first.locator('[data-planning-action="cles"]').isDisabled(),true);
  await first.locator('[data-planning-action="confirmer"]').click();assert.match(await first.innerText(),/Horaire confirmé/);
- await first.locator('[data-planning-action="trafic"]').click();await page.waitForFunction(()=>document.querySelector('.hc-planning-feedback').textContent.includes('inchangé'));
- assert.equal(await page.evaluate(()=>__states[0].horaire_confirme),'2026-11-08T10:45');
+ assert.equal(await page.locator('[data-planning-action="trafic"]').count(),0);
+ assert.match(await first.innerText(),/Votre intervention : réceptionner/);
  await page.evaluate(()=>{__rows.push({...__rows[0],id:'p2'});__states.push({preparation_id:'p2',horaire_confirme:'2026-11-08T10:50',empreinte_confirmee:'hash'});});
  await page.locator('#hc-planning-refresh').click();assert.match(await first.innerText(),/chevauche/);
  await page.screenshot({path:'/tmp/helixcar-planning-'+width+'.png',fullPage:true});
@@ -41,12 +41,13 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await first.locator('[data-planning-action="ouvrir"]').click();
  assert.equal(await page.locator('[data-field="heure_prise_en_charge"]').count(),0);
  assert.equal(await page.locator('[data-field="heure_remise"]').count(),1);assert.equal(await page.locator('[data-field="heure_retrait"]').count(),1);
- await page.locator('[data-prep-traffic="0"]').click();await page.waitForSelector('[data-prep-apply="0"]');
- assert.equal(await page.locator('[data-field="distance"]').first().inputValue(),'40');
- await page.locator('[data-field="planning_margin"]').first().fill('60');await page.locator('[data-prep-apply="0"]').click();assert.match(await page.locator('#hc-prep-message').innerText(),/battement a changé/);
- await page.locator('[data-field="planning_margin"]').first().fill('45');await page.locator('[data-prep-apply="0"]').click();assert.match(await page.locator('#hc-prep-message').innerText(),/Horaire repris/);
- await page.locator('[data-prep-save]').click();assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_livraison),'2026-11-08T10:45');
- await page.evaluate(()=>{window.__trafficFailed=true;});await page.locator('[data-prep-traffic="0"]').click();assert.match(await page.locator('#hc-prep-message').innerText(),/pas encore connecté/);
+ assert.equal(await page.locator('[data-prep-traffic], [data-prep-apply], [data-field="planning_margin"]').count(),0);
+ await page.locator('[data-field="heure_remise"]').fill('11:15');
+ await page.locator('[data-field="heure_retrait"]').fill('12:30');
+ await page.locator('[data-prep-save]').click();
+ assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_livraison),'2026-11-08T11:15');
+ assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-10T12:30');
+ assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
  await page.evaluate(()=>window.dispatchEvent(new Event('hc-session-fermee')));assert.equal(await page.locator('[data-planning-id]').count(),0);
- assert.deepEqual(errors,[]);await page.close();console.log('PASS planning UI '+width+' : filtres, adresses privées, confirmation, trafic sans déplacement du RDV, conflits, clés, sauvegarde, marge et déconnexion');
+ assert.deepEqual(errors,[]);await page.close();console.log('PASS planning UI '+width+' : filtres, adresses privées, confirmation, conflits, clés, horaires manuels sauvegardés et déconnexion');
  }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
