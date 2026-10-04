@@ -63,15 +63,23 @@
     if(!op || !op.start || !op.end)return {why:why,changes:changes};
     var start=minutes(value(op.start)), end=minutes(value(op.end));
     if(start===null || end===null || end<start)return {why:why,changes:changes};
-    var low=0, high=1439, duration=end-start, invalidDate=false;
+    var low=0, high=1439, duration=end-start, invalidDate=false, lowerPair=null;
     pairs(id).forEach(function(p){
       var a=p.a.date===id?candidate:value(p.a.date), b=p.b.date===id?candidate:value(p.b.date);
       if(!a||!b)return;
       if(b<a){invalidDate=true;return;}
       var days=Math.round((Date.parse(b)-Date.parse(a))/86400000);
-      if(p.b.date===id){var prev=minutes(value(p.a.end));if(prev!==null)low=Math.max(low,prev+p.gap-days*1440);}
+      if(p.b.date===id){var prev=minutes(value(p.a.end));if(prev!==null && prev+p.gap-days*1440>low){low=prev+p.gap-days*1440;lowerPair=p;}}
       if(p.a.date===id){var next=minutes(value(p.b.start));if(next!==null)high=Math.min(high,next-p.gap+days*1440);}
     });
+    if(!invalidDate && low>=1440 && lowerPair){
+      var previous=lowerPair.a, earliest=new Date(candidate+'T00:00:00Z');
+      earliest.setUTCMinutes(low);
+      var dateText=function(date){return date.toLocaleDateString('fr-FR',{day:'numeric',month:'long',timeZone:'UTC'});};
+      var previousDate=dateText(new Date(value(previous.date)+'T00:00:00Z'));
+      var reference=plannedTime(previous,minutes(value(previous.end))).replace(' prévue ', ' prévue le '+previousDate+' ');
+      why=reference.charAt(0).toUpperCase()+reference.slice(1)+'. Avec les '+lowerPair.gap+' minutes nécessaires, la '+op.label+' est possible au plus tôt le '+dateText(earliest)+' à '+clock(earliest.getUTCHours()*60+earliest.getUTCMinutes())+'. Pour la prévoir le '+dateText(new Date(candidate+'T00:00:00Z'))+', avancez l’heure de '+previous.label+'.';
+    }
     if(invalidDate || low+duration>high)return {why:why,changes:changes};
     var adjusted=Math.max(low,Math.min(high-duration,start));
     changes[op.start]=clock(adjusted);changes[op.end]=clock(adjusted+duration);
