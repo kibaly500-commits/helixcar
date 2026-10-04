@@ -1113,6 +1113,7 @@ body.scroll-verrouille { overflow: hidden; }
 </style>
 <link rel="stylesheet" href="assets/preparation-missions.css">
 <link rel="stylesheet" href="assets/planning-helixcar.css">
+<link rel="stylesheet" href="assets/admin-demandes.css">
 </head>
 <body>
 
@@ -1778,6 +1779,7 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CLIENT: Dashboard -->
       <div class="page" id="page-client-dashboard">
+        <div id="client-numero-permanent" class="card" hidden></div>
         <div class="card">
           <div class="card-header">
             <div>
@@ -2078,79 +2080,23 @@ body.scroll-verrouille { overflow: hidden; }
   </div>
 </div>
 
-<!-- Nouvelle mission (admin) -->
-<div class="modal-overlay" id="modal-new-mission">
-  <div class="modal" style="position:relative;max-height:85vh;overflow-y:auto">
-    <button class="modal-close" onclick="closeModal('new-mission')">✕</button>
-    <h3>Créer une nouvelle mission</h3>
-    <p>Renseignez les détails de la mission à publier.</p>
-    <div class="form-group">
-      <label>Client</label>
-      <select id="nm-client"><option value="">— Aucun client lié —</option></select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Adresse complète de départ</label><input type="text" id="nm-depart" placeholder="12 rue de la Paix, 75001 Paris"></div>
-      <div class="form-group"><label>Adresse complète d'arrivée</label><input type="text" id="nm-arrivee" placeholder="8 av. Berthelot, 69007 Lyon"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Contact départ — nom</label><input type="text" id="nm-contact-depart-nom" placeholder="Nom du contact sur place"></div>
-      <div class="form-group"><label>Contact départ — téléphone</label><input type="text" id="nm-contact-depart-tel" placeholder="06 12 34 56 78"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Contact arrivée — nom</label><input type="text" id="nm-contact-arrivee-nom" placeholder="Nom du contact sur place"></div>
-      <div class="form-group"><label>Contact arrivée — téléphone</label><input type="text" id="nm-contact-arrivee-tel" placeholder="06 12 34 56 78"></div>
-    </div>
-    <div class="form-group"><label>Distance (km)</label><input type="number" id="nm-distance" placeholder="463"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-      <div class="form-group"><label>Marque / Modèle</label><input type="text" id="nm-marque" placeholder="BMW 320d"></div>
-      <div class="form-group"><label>Immatriculation</label><input type="text" id="nm-immat" placeholder="AB-123-CD"></div>
-      <div class="form-group"><label>VIN</label><input type="text" id="nm-vin" placeholder="VF1AB12CD…"></div>
-    </div>
-    <div class="form-group"><label>Type de véhicule</label>
-      <select id="nm-type"><option value="standard">Standard</option><option value="luxe">Luxe</option><option value="utilitaire">Utilitaire</option></select>
-    </div>
-    <div class="form-group"><label>Prix TTC (€)</label><input type="number" id="nm-prix-ttc" placeholder="350"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group"><label>Date et heure de prise en charge</label><input type="datetime-local" id="nm-date-pec"></div>
-      <div class="form-group"><label>Date et heure de livraison souhaitée</label><input type="datetime-local" id="nm-date-livraison"></div>
-    </div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin:8px 0">
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem"><input type="checkbox" id="nm-nettoyage"> Nettoyage</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem"><input type="checkbox" id="nm-plateau"> Plateau</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem"><input type="checkbox" id="nm-urgence"> Urgent</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem"><input type="checkbox" id="nm-electrique"> ⚡ Électrique</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem"><input type="checkbox" id="nm-restitution" onchange="document.getElementById('nm-restitution-wrap').style.display=this.checked?'block':'none'"> Restitution</label>
-    </div>
-    <div id="nm-restitution-wrap" style="display:none;margin-bottom:12px;background:var(--gray-light);padding:12px;border-radius:8px">
-      <div class="form-group">
-        <label>Adresse de restitution (laisser vide si identique à l'adresse de départ)</label>
-        <input type="text" id="nm-restitution-adresse" placeholder="Laisser vide = même adresse qu'au départ">
-      </div>
-      <div class="form-group"><label>Marque / Modèle *</label><input type="text" id="nm-restit-marque" placeholder="Ex : BMW Série 3 320d"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group"><label>Plaque d'immatriculation *</label><input type="text" id="nm-restit-immat" placeholder="AB-123-CD"></div>
-        <div class="form-group"><label>VIN *</label><input type="text" id="nm-restit-vin" placeholder="VF1AB12CD…"></div>
-      </div>
-      <div class="form-group">
-        <label>Informations à indiquer sur le véhicule</label>
-        <input type="text" id="nm-restit-info" placeholder="Ex : code d'accès, étage, consigne particulière…">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group"><label>Contact restitution — nom</label><input type="text" id="nm-restit-contact-nom" placeholder="Nom du contact sur place"></div>
-        <div class="form-group"><label>Contact restitution — téléphone</label><input type="text" id="nm-restit-contact-tel" placeholder="06 12 34 56 78"></div>
-      </div>
-    </div>
-    <div class="form-group"><label>Notes</label><textarea id="nm-notes" rows="2" style="width:100%;padding:8px;border:1.5px solid #ddd;border-radius:8px;font-family:inherit"></textarea></div>
-    <div class="form-group">
-      <label>Convoyeur prioritaire</label>
-      <select id="nm-convoyeur"><option value="">— Laisser visible à tous les convoyeurs —</option></select>
-      <div style="font-size:.75rem;color:#888;margin-top:4px">Si tu choisis un convoyeur, la mission lui est proposée en priorité. Sinon, elle reste sans convoyeur assigné (en attente).</div>
-    </div>
-    <div id="nm-error" style="color:var(--red);font-size:.82rem;margin-top:4px;display:none"></div>
-    <button class="btn btn-primary btn-full" style="margin-top:8px" id="nm-submit-btn" onclick="submitNewMission()">Publier la mission</button>
-  </div>
+<!-- Saisie téléphonique réservée à l'administration -->
+<div class="modal-overlay" id="modal-new-mission" role="dialog" aria-modal="true" aria-labelledby="admin-demande-titre">
+ <div class="modal hc-admin-demande">
+  <button class="modal-close" onclick="closeModal('new-mission')" aria-label="Fermer">✕</button>
+  <span class="hc-admin-kicker">ESPACE ADMIN · SAISIE POUR UN CLIENT</span>
+  <h3 id="admin-demande-titre">Créer une mission</h3>
+  <p>Retrouvez votre client, puis renseignez sa demande. Vous préparerez ensuite son devis depuis les demandes de devis.</p>
+  <form id="admin-client-recherche" onsubmit="event.preventDefault(); rechercherClientAdmin()">
+   <label for="admin-numero-client">Numéro client</label>
+   <div class="hc-admin-search"><input id="admin-numero-client" placeholder="CLI-A7K9P" autocomplete="off" maxlength="9" required pattern="[Cc][Ll][Ii]-[A-HJ-NP-Za-hj-np-z2-9]{5}"><button class="btn btn-primary" id="admin-client-chercher">Rechercher</button></div>
+   <small>Le numéro permanent figure dans l’espace du client. Exemple : CLI-A7K9P.</small>
+  </form>
+  <p id="admin-client-message" role="status" aria-live="polite"></p>
+  <div id="admin-client-identite" class="hc-admin-identity" hidden></div>
+  <iframe id="admin-demande-cadre" title="Demande pour le client sélectionné" hidden></iframe>
+ </div>
 </div>
-
 
 <!-- Confirmation validation -->
 <div class="modal-overlay" id="modal-quitter-espace" role="dialog" aria-modal="true" aria-labelledby="quitter-espace-titre">
@@ -2600,6 +2546,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
   const premiere = (demandes || [])[0] || {};
   window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [], profil: premiere };
   currentRole = 'client';
+  if (window.chargerNumeroClient) window.chargerNumeroClient(authUserId);
   const prenom = premiere.prenom || '';
   if (PAGE_TITLES['client-dashboard']) {
     PAGE_TITLES['client-dashboard'][1] = 'Bienvenue' + (prenom ? ' ' + prenom : '');
@@ -5221,6 +5168,7 @@ function openModal(id) {
   _poserVerrouScroll('modal:' + id);
 }
 function closeModal(id) {
+  if (id === 'new-mission' && window.fermerDemandeAdmin) window.fermerDemandeAdmin();
   if (id === 'fiche-demande') { _ficheDemandeActive = null; ++_ficheDemandeGeneration; }
   const el = document.getElementById('modal-' + id);
   reinitialiserAffichageMotsDePasse(el);
@@ -6782,7 +6730,7 @@ function texteFicheClient(c) {
   const lignes = [
     'FICHE CLIENT — ' + (((c.prenom || '') + ' ' + (c.nom || '')).trim() || '—'),
     '='.repeat(50),
-    'N° client : ' + (c.numero_client || '—'),
+    'N° demande : ' + (c.numero_client || '—'),
     'Type : ' + (c.type_client || '—') + (c.societe ? ' — ' + c.societe : '') + (c.siret ? ' (SIRET ' + c.siret + ')' : ''),
     'Email : ' + (c.email || '—'),
     'Téléphone : ' + (c.telephone || '—'),
@@ -8080,145 +8028,6 @@ function refuserConvoyeur(id) {
   });
 }
 
-function openNewMission() {
-  // Reset le formulaire
-  ['nm-depart','nm-arrivee','nm-distance','nm-marque','nm-immat','nm-vin','nm-prix-ttc','nm-date-pec','nm-date-livraison','nm-notes','nm-restitution-adresse','nm-restit-marque','nm-restit-immat','nm-restit-vin','nm-restit-info','nm-restit-contact-nom','nm-restit-contact-tel','nm-contact-depart-nom','nm-contact-depart-tel','nm-contact-arrivee-nom','nm-contact-arrivee-tel'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.value = '';
-  });
-  document.getElementById('nm-restitution-wrap').style.display = 'none';
-  ['nm-nettoyage','nm-plateau','nm-urgence','nm-electrique','nm-restitution'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.checked = false;
-  });
-  document.getElementById('nm-error').style.display = 'none';
-
-  // Charge les clients réels
-  var selClient = document.getElementById('nm-client');
-  selClient.innerHTML = '<option value="">— Aucun client lié —</option>';
-  sbFetchToutePage('clients?order=nom.asc&select=id,prenom,nom,numero_client')
-    .then(function(rows) {
-      (rows || []).forEach(function(c) {
-        var opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = (c.prenom || '') + ' ' + (c.nom || '') + ' (' + c.numero_client + ')';
-        selClient.appendChild(opt);
-      });
-    })
-    .catch(function(e) { console.error('Erreur chargement clients pour sélection:', e); });
-
-  // Charge les convoyeurs actifs dans le select
-  var sel = document.getElementById('nm-convoyeur');
-  sel.innerHTML = '<option value="">— Laisser visible à tous les convoyeurs —</option>';
-  sbFetchToutePage('convoyeurs?statut=eq.actif&order=nom.asc&select=id,prenom,nom')
-    .then(function(rows) {
-      (rows || []).forEach(function(c) {
-        var opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = (c.prenom || '') + ' ' + (c.nom || '');
-        sel.appendChild(opt);
-      });
-    })
-    .catch(function(e) { console.error('Erreur chargement convoyeurs pour sélection:', e); });
-  openModal('new-mission');
-}
-
-function submitNewMission() {
-  var depart  = document.getElementById('nm-depart').value.trim();
-  var arrivee = document.getElementById('nm-arrivee').value.trim();
-  var clientId = document.getElementById('nm-client').value || null;
-  var distance = document.getElementById('nm-distance').value ? parseInt(document.getElementById('nm-distance').value) : null;
-  var contactDepartNom = document.getElementById('nm-contact-depart-nom').value.trim();
-  var contactDepartTel = document.getElementById('nm-contact-depart-tel').value.trim();
-  var contactArriveeNom = document.getElementById('nm-contact-arrivee-nom').value.trim();
-  var contactArriveeTel = document.getElementById('nm-contact-arrivee-tel').value.trim();
-  var marque  = document.getElementById('nm-marque').value.trim();
-  var immat   = document.getElementById('nm-immat').value.trim();
-  var vin     = document.getElementById('nm-vin').value.trim();
-  var type    = document.getElementById('nm-type').value;
-  var prixTtc = document.getElementById('nm-prix-ttc').value ? parseFloat(document.getElementById('nm-prix-ttc').value) : null;
-  var datePec = document.getElementById('nm-date-pec').value || null;
-  var dateLivraison = document.getElementById('nm-date-livraison').value || null;
-  var nettoyage = document.getElementById('nm-nettoyage').checked;
-  var plateau   = document.getElementById('nm-plateau').checked;
-  var urgence   = document.getElementById('nm-urgence').checked;
-  var electrique = document.getElementById('nm-electrique').checked;
-  var restitution = document.getElementById('nm-restitution').checked;
-  var adresseRestitution = document.getElementById('nm-restitution-adresse').value.trim();
-  var restitMarque = document.getElementById('nm-restit-marque').value.trim();
-  var restitImmat = document.getElementById('nm-restit-immat').value.trim();
-  var restitVin = document.getElementById('nm-restit-vin').value.trim();
-  var restitInfo = document.getElementById('nm-restit-info').value.trim();
-  var restitContactNom = document.getElementById('nm-restit-contact-nom').value.trim();
-  var restitContactTel = document.getElementById('nm-restit-contact-tel').value.trim();
-  var notes   = document.getElementById('nm-notes').value.trim();
-  var convoyeurId = document.getElementById('nm-convoyeur').value || null;
-  var errEl = document.getElementById('nm-error');
-
-  if (!depart || !arrivee) {
-    errEl.textContent = 'Merci de renseigner au moins l\'adresse de départ et d\'arrivée.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if (restitution && (!restitMarque || !restitImmat || !restitVin)) {
-    errEl.textContent = 'La restitution est cochée : marque/modèle, plaque d\'immatriculation et VIN du véhicule à restituer sont obligatoires.';
-    errEl.style.display = 'block';
-    return;
-  }
-  errEl.style.display = 'none';
-
-  var reference = 'HC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
-  var btn = document.getElementById('nm-submit-btn');
-  btn.disabled = true; btn.textContent = 'Publication…';
-
-  sbFetch('missions', {
-    method: 'POST',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({
-      reference: reference,
-      client_id: clientId,
-      convoyeur_id: convoyeurId,
-      ville_depart: depart,
-      ville_arrivee: arrivee,
-      adresse_depart: depart,
-      adresse_arrivee: arrivee,
-      distance_km: distance,
-      type_vehicule: type,
-      marque_modele: marque || null,
-      immatriculation: immat || null,
-      vin: vin || null,
-      prix_ttc: prixTtc,
-      date_prise_en_charge: datePec,
-      date_livraison: dateLivraison,
-      nettoyage: nettoyage,
-      plateau: plateau,
-      urgence: urgence,
-      electrique: electrique,
-      restitution: restitution,
-      adresse_restitution: restitution ? (adresseRestitution || null) : null,
-      restit_info: restitution ? (restitInfo || null) : null,
-      restit_marque_modele: restitution ? (restitMarque || null) : null,
-      restit_immatriculation: restitution ? (restitImmat || null) : null,
-      restit_vin: restitution ? (restitVin || null) : null,
-      restit_contact_nom: restitution ? (restitContactNom || null) : null,
-      restit_contact_tel: restitution ? (restitContactTel || null) : null,
-      contact_depart_nom: contactDepartNom || null,
-      contact_depart_tel: contactDepartTel || null,
-      contact_arrivee_nom: contactArriveeNom || null,
-      contact_arrivee_tel: contactArriveeTel || null,
-      notes: notes || null,
-      statut: convoyeurId ? 'proposee' : 'en_attente'
-    })
-  }).then(function() {
-    btn.disabled = false; btn.textContent = 'Publier la mission';
-    closeModal('new-mission');
-    loadMissions();
-    if (clientId) envoyerEmailReservationConfirmee(clientId, reference, depart, arrivee, prixTtc, datePec);
-  }).catch(function(e) {
-    btn.disabled = false; btn.textContent = 'Publier la mission';
-    errEl.textContent = 'Erreur lors de la création (voir la console).';
-    errEl.style.display = 'block';
-  });
-}
-
 function envoyerEmailReservationConfirmee(clientId, reference, depart, arrivee, prixTtc, datePec) {
   if (!window.emailjs) return;
   sbFetch('clients?id=eq.' + clientId + '&select=prenom,nom,email').then(function(rows) {
@@ -8286,12 +8095,17 @@ function chargerClientsAdmin() {
   var tbody = document.getElementById('clients-table');
   if (!tbody) return;
   if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
-  _hcSyncTasks.push(sbFetchToutePage('clients?select=id,numero_client,prenom,nom,societe,email,telephone,type_client,created_at,auth_user_id'
-                   + '&auth_user_id=not.is.null&order=created_at.desc')
+  var numerosClientsAdmin = {};
+  _hcSyncTasks.push(sbFetchToutePage('comptes_clients?select=auth_user_id,numero').then(function(rows) {
+    (rows || []).forEach(function(c) { numerosClientsAdmin[c.auth_user_id] = c.numero; });
+    return sbFetchToutePage('clients?select=id,numero_client,prenom,nom,societe,email,telephone,type_client,created_at,auth_user_id'
+                   + '&auth_user_id=not.is.null&order=created_at.desc');
+  })
     .then(function (rows) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
-      _clientsAdminListe = rows || [];
+      var numeros = numerosClientsAdmin;
+      _clientsAdminListe = (rows || []).map(function(c) { return Object.assign({}, c, { numero_compte: numeros[c.auth_user_id] || '' }); });
       afficherClientsAdmin(_clientsAdminListe);
       var sub = document.getElementById('clients-count-sub');
       if (sub) sub.textContent = _clientsAdminListe.length + ' compte(s) client';
@@ -8331,7 +8145,7 @@ function afficherClientsAdmin(rows) {
              : c.type_client === 'particulier' ? 'Particulier' : '—';
     return '<tr>'
       + '<td><span style="font-family:monospace;font-weight:700;color:var(--blue-mid)">'
-        + escapeHtml(c.numero_client || '—') + '</span></td>'
+        + escapeHtml(c.numero_compte || '—') + '</span></td>'
       + '<td><strong>' + escapeHtml(nom) + '</strong></td>'
       + '<td>' + escapeHtml(c.email || '—') + '</td>'
       + '<td>' + type + '</td>'
@@ -8349,7 +8163,7 @@ function filtrerClientsAdmin(texte) {
   var t = (texte || '').trim().toLowerCase();
   if (!t) { afficherClientsAdmin(_clientsAdminListe); return; }
   afficherClientsAdmin(_clientsAdminListe.filter(function (c) {
-    return [c.numero_client, c.prenom, c.nom, c.societe, c.email, c.telephone]
+    return [c.numero_compte, c.numero_client, c.prenom, c.nom, c.societe, c.email, c.telephone]
       .some(function (v) { return String(v || '').toLowerCase().indexOf(t) !== -1; });
   }));
 }
@@ -11249,7 +11063,7 @@ function _rendreFicheDemande(c) {
       L('Nom', ((c.prenom || '') + ' ' + (c.nom || '')).trim()) +
       L('Société', c.societe) + L('SIRET', c.siret) +
       L('Email', c.email) + L('Téléphone', c.telephone) +
-      L('N° client', c.numero_client));
+      L('N° demande', c.numero_client));
 
     // V77 — schema_version 2 : total approximatif + repartition par
     // categorie. COMPATIBILITE : les structures V74/V75/V76 (mode
@@ -11390,7 +11204,7 @@ function _rendreFicheDemande(c) {
       LP('Nom', ((c.prenom || '') + ' ' + (c.nom || '')).trim()) +
       LP('Société', c.societe) + LP('SIRET', c.siret) +
       LP('Email', c.email) + LP('Téléphone', c.telephone) +
-      LP('N° client', c.numero_client));
+      LP('N° demande', c.numero_client));
 
     // PRESTATION DEMANDÉE + type de partenaire réellement nécessaire.
     html += SP('Prestation demandée',
@@ -11555,7 +11369,7 @@ function _rendreFicheDemande(c) {
   })();
 
   html += _blocFiche('Client',
-    _ligneFiche('Numéro client', c.numero_client) +
+    _ligneFiche('Numéro de demande', c.numero_client) +
     _ligneFiche('Prénom', c.prenom) +
     _ligneFiche('Nom', c.nom) +
     _ligneFiche('Type de client', c.type_client === 'pro' ? 'Professionnel / Entreprise' : 'Particulier') +
@@ -15317,5 +15131,6 @@ function declencherChampFichier(id) {
 </style>
 <script src="assets/admin-demandes-informations.js"></script>
 <script src="assets/synchronisation-espaces.js"></script>
+<script src="assets/admin-demandes.js"></script>
 </body>
 </html>

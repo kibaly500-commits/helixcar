@@ -23,6 +23,7 @@ window.__db = {
     {id:'c2',prenom:'TEST-QA',nom:'Actif',email:'c2@example.invalid',statut:'actif',created_at:'2026-09-01T10:00:00Z'},
     {id:'c3',prenom:'TEST-QA',nom:'Actif2',email:'c3@example.invalid',statut:'actif',created_at:'2026-08-20T10:00:00Z'}
   ],
+  comptes_clients: [{auth_user_id:'u1',numero:'CLI-A7K9P'}],
   clients: [
     {id:'k1',numero_client:'HC-QA-1',prenom:'TEST-QA',nom:'Client',email:'k1@example.invalid',telephone:'+33600000001',type_client:'particulier',statut:'nouveau',created_at:'2026-09-06T10:00:00Z',auth_user_id:'u1'},
     {id:'k2',numero_client:'HC-QA-2',prenom:'TEST-QA',nom:'Client',email:'k1@example.invalid',telephone:'+33600000001',type_client:'particulier',statut:'nouveau',created_at:'2026-09-07T10:00:00Z',auth_user_id:'u1'},
@@ -236,12 +237,13 @@ window.fetch = function(u, o){
     sous: (document.getElementById('clients-count-sub') || {}).textContent || '',
     lignes: document.querySelectorAll('#clients-table tr').length,
   }));
-  check('C1 : la base clients lit Supabase', /HC-QA-1/.test(cli.corps), cli.corps.slice(0, 150));
+  check('C1 : la base clients lit Supabase', /CLI-A7K9P/.test(cli.corps), cli.corps.slice(0, 150));
   check('C2 : un client sans compte n\'y figure pas',
     !/TEST-QA Anonyme/.test(cli.corps), cli.corps.slice(0, 200));
   check('C3 : deux demandes du même compte ne le dédoublent pas',
     cli.lignes === 1, String(cli.lignes));
-  check('C4 : et ses demandes sont comptées', /HC-QA-1/.test(cli.corps) && /2/.test(cli.corps));
+  check('C4 : et ses demandes sont comptées', /CLI-A7K9P/.test(cli.corps) && /2/.test(cli.corps));
+  check('C4b : le numéro de demande ne remplace pas le numéro du compte', !/HC-QA-[12]/.test(cli.corps));
   check('C5 : le compteur « 47 inscrits » inventé a disparu',
     !/47 inscrits/.test(src) && /compte\(s\) client/.test(cli.sous), cli.sous);
   // Km total existe RÉELLEMENT sur les convoyeurs : la colonne y reste

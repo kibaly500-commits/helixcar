@@ -31,9 +31,9 @@ const resultatSuite = require('./resultat-suite');
 
 function suites() {
   const js = fs.readdirSync(__dirname)
-    .filter(f => /^t_.*\.js$/.test(f))
+    .filter(f => /^t_.*\.(js|cjs)$/.test(f))
     .sort()
-    .map(f => ({ nom: f.replace(/\.js$/, ''), cmd: process.execPath, args: [path.join(__dirname, f)] }));
+    .map(f => ({ nom: f.replace(/\.(js|cjs)$/, ''), cmd: process.execPath, args: [path.join(__dirname, f)] }));
 
   const mjs = fs.readdirSync(__dirname)
     .filter(f => /^t_.*\.mjs$/.test(f))

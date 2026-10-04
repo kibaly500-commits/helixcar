@@ -9137,6 +9137,11 @@ function nettOnLieuChange() {
 // exactement celui que l'etape 1 est en train de creer, donc la meme
 // source de verite — jamais une copie parallele.
 var _hcProfilConnecte = null;
+var _hcCompteAdmin = null;
+function _hcNumeroAdmin() {
+  var p = new URLSearchParams(window.location.search);
+  return p.get('admin-client') && p.get('nouvelle-demande') === '1' ? p.get('admin-client') : null;
+}
 
 // ============================================================
 // SESSION CLIENT — un seul moteur de formulaire, deux entrées
@@ -9347,6 +9352,17 @@ async function _hcChargerSessionClient() {
   if (!session || !session.user) return null;
 
   _hcSessionClient = { userId: session.user.id, email: session.user.email || '' };
+  if (_hcNumeroAdmin()) {
+    var compte = await _sb.rpc('rechercher_compte_client_admin', { p_numero: _hcNumeroAdmin() });
+    if (compte.error || !compte.data || !compte.data.profil) {
+      _hcSessionClient = null;
+      throw new Error((compte.error && compte.error.message) || 'Client indisponible.');
+    }
+    _hcCompteAdmin = compte.data;
+    _hcProfilConnecte = compte.data.profil;
+    return _hcSessionClient; // La session reste celle de l'admin, jamais celle du client.
+  }
+
 
   // Profil prérempli depuis la DERNIÈRE demande du compte. On lit la
   // RATTACHEMENT DES DEMANDES EN ATTENTE.
@@ -9416,7 +9432,7 @@ function _hcAppliquerModeConnecte() {
   var pr = _hcProfilConnecte || {};
   mettre('client-prenom', pr.prenom);
   mettre('client-nom', pr.nom);
-  mettre('client-email', _hcSessionClient.email || pr.email);
+  mettre('client-email', _hcCompteAdmin ? pr.email : (_hcSessionClient.email || pr.email));
   mettre('client-tel', pr.telephone);
 
   // Statut du demandeur (particulier / professionnel) et, le cas
@@ -9465,7 +9481,7 @@ function _hcAppliquerModeConnecte() {
   if (boutonDemande && typeof _hcModeIntegre === 'function' && _hcModeIntegre()) {
     boutonDemande.textContent = 'Créer une nouvelle demande →';
   }
-  _hcNote('hc-bandeau-connecte', 'Vous êtes connecté'
+  _hcNote('hc-bandeau-connecte', (_hcCompteAdmin ? 'Vous saisissez une demande pour le client' : 'Vous êtes connecté')
     + ((pr.prenom || pr.nom) ? ' en tant que ' + [pr.prenom, pr.nom].filter(Boolean).join(' ') : '')
     + '. Vos informations de compte sont déjà renseignées.', 'succes');
 }
@@ -9553,7 +9569,7 @@ function _hcActiverModeIntegre() {
 function _hcPrevenirEspaceClient() {
   if (!_hcModeIntegre()) return;
   try {
-    window.parent.postMessage({ type: 'hc-demande-enregistree' }, window.location.origin);
+    window.parent.postMessage({ type: _hcCompteAdmin ? 'hc-admin-demande-enregistree' : 'hc-demande-enregistree' }, window.location.origin);
   } catch (e) {}
 }
 
@@ -10126,7 +10142,12 @@ async function _hcOuvrirCompletionDepuisUrl() {
 // un échec ne doit jamais empêcher le site public de fonctionner.
 document.addEventListener('DOMContentLoaded', function () {
   try {
-    _hcDemarrerDepuisEspaceClient().catch(function () {});
+    _hcDemarrerDepuisEspaceClient().catch(function (e) {
+      if (_hcNumeroAdmin()) {
+        document.body.textContent = 'La demande ne peut pas être ouverte. Revenez à la recherche du client.';
+        if (window.parent !== window) window.parent.postMessage({ type: 'hc-admin-demande-erreur', message: e.message }, window.location.origin);
+      }
+    });
     _hcOuvrirCompletionDepuisUrl().catch(function () {});
   } catch (e) {}
   try { _hcOuvrirConnexionDepuisHash(); } catch (e) {}
@@ -14691,6 +14712,7 @@ document.addEventListener('change', function(e) {
 // Les anciens brouillons partagés n'ont pas de propriétaire fiable.
 var _CLE_BROUILLON_CLIENT = 'helixcar_brouillon_public_v3';
 function _cleBrouillonClient() {
+  if (_hcNumeroAdmin()) return null; // Aucun brouillon partagé entre les clients de l'admin.
   var espace = new URLSearchParams(window.location.search).get('nouvelle-demande') === '1';
   if (!espace) return _CLE_BROUILLON_CLIENT;
   return _hcSessionClient && _hcSessionClient.userId
@@ -15017,7 +15039,7 @@ function _restaurerBrouillonClientSiPresent() {
     var profil = _hcProfilConnecte || {};
     var identite = {
       'client-prenom': profil.prenom, 'client-nom': profil.nom,
-      'client-email': _hcSessionClient.email, 'client-tel': profil.telephone,
+      'client-email': _hcCompteAdmin ? profil.email : _hcSessionClient.email, 'client-tel': profil.telephone,
       'client-type': profil.type_client, 'client-societe': profil.societe,
       'client-siret': profil.siret, 'client-source': profil.source_acquisition,
       'client-source-detail': profil.source_acquisition_detail
@@ -17579,12 +17601,18 @@ async function _submitClientFormInterne() {
   // Déjà généré avant signUp() pour être inclus dans le lien reçu par e-mail.
 
   function inserer(tentativesRestantes) {
-    return _sb.rpc('creer_demande_avec_vehicules', {
+    var depotAdmin = _hcNumeroAdmin();
+    var paramsDepot = {
       p_demande: payload,
       p_vehicules: vehiculesAEnvoyer,
       p_cle_creation: cleCreation,
       p_cle_reclamation: cleReclamation
-    })
+    };
+    if (depotAdmin) {
+      delete paramsDepot.p_cle_reclamation;
+      paramsDepot.p_numero = depotAdmin;
+    }
+    return _sb.rpc(depotAdmin ? 'creer_demande_admin' : 'creer_demande_avec_vehicules', paramsDepot)
       .then(function (res) {
         if (res && res.error) return { error: res.error.message || String(res.error) };
         var retour = res && res.data;
@@ -17670,7 +17698,7 @@ async function _submitClientFormInterne() {
       // été enregistré serait un mensonge de plus.
       var _retourSrv = r.retour;
       var _numeroReel = _retourSrv.numero_client;
-      var html = '<div class="hc-succes-numlabel">Votre numéro client</div>' +
+      var html = '<div class="hc-succes-numlabel">' + (missionReelle ? 'Votre numéro de demande' : 'Référence de votre inscription') + '</div>' +
         '<div class="hc-succes-num">' + _attr(_numeroReel) + '</div>';
       if (parrCode) {
         html += '<div class="hc-succes-parr">Code de parrainage : <b>' + _attr(parrCode) + '</b>' +

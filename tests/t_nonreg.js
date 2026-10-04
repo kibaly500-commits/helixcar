@@ -315,6 +315,10 @@ const futur = dansNJours;
   // Supabase, comme l'indique le dossier de recette.
   // Livraisons PR6 déjà présentes : liste fermée, sans autoriser un dossier entier.
   const PERIMETRE_PR6 = [
+    // Saisie admin par numéro de compte, distinct de la référence de demande.
+    'assets/admin-demandes.css',
+    'assets/admin-demandes.js',
+    'supabase/migrations/20261004221754_numeros_clients_demandes_admin.sql',
     // PR6 : chronologie et corrections des formulaires mobiles, déjà publiées.
     'assets/pr6-chronologie.js',
     'assets/pr6-mobile-form.css',
@@ -374,7 +378,7 @@ const futur = dansNJours;
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
-      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 47,
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 50,
     PERIMETRE.length + ' entrées historiques, ' + PERIMETRE_PR6.length + ' entrées PR6');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.

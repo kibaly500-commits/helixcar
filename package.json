@@ -9,6 +9,7 @@
     "test:sql": "bash tests/t_rls.sh"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "acorn": "8.15.0",
     "acorn-walk": "8.3.4",
     "eslint-scope": "8.4.0",
