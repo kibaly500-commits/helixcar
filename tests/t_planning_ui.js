@@ -36,6 +36,8 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await first.locator('[data-planning-action="confirmer"]').click();assert.match(await first.innerText(),/Horaire confirmé/);
  assert.equal(await page.locator('[data-planning-action="trafic"]').count(),0);
  assert.match(await first.innerText(),/Votre intervention : réceptionner/);
+ assert.match(await first.innerText(),/Prise en charge chez le client/);assert.match(await first.innerText(),/09:00/);assert.match(await first.innerText(),/45 minutes de battement/);
+ const outgoing=page.locator('[data-planning-id="p1"]');assert.match(await outgoing.innerText(),/Livraison attendue chez le client/);assert.match(await outgoing.innerText(),/14:00/);assert.match(await outgoing.innerText(),/8 rue Livraison, 78000 Versailles/);assert.match(await outgoing.innerText(),/− 45 minutes/);
  await page.evaluate(()=>{__rows.push({...__rows[0],id:'p2'});__states.push({preparation_id:'p2',horaire_confirme:'2026-11-08T10:50',empreinte_confirmee:'hash'});});
  await page.locator('#hc-planning-refresh').click();assert.match(await first.innerText(),/chevauche/);
  await page.screenshot({path:'/tmp/helixcar-planning-'+width+'.png',fullPage:true});
@@ -47,6 +49,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.locator('[data-field="heure_prise_en_charge"]').count(),0);
  assert.equal(await page.locator('[data-field="heure_remise"]').count(),1);assert.equal(await page.locator('[data-field="heure_retrait"]').count(),1);
  assert.equal(await page.locator('[data-prep-traffic], [data-prep-apply], [data-field="planning_margin"]').count(),0);
+ assert.match(await page.locator('#hc-prep-body').innerText(),/45 minutes de battement/);
  await page.locator('[data-field="heure_remise"]').fill('11:15');
  await page.locator('[data-field="heure_retrait"]').fill('12:30');
  await page.locator('[data-prep-save]').click();
@@ -57,6 +60,9 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.evaluate(()=>{const c={id:'self',type_service:'stockage',prenom:'Marie',nom:'Client',numero_client:'HC-SELF',nb_vehicules:2,stockage_acheminement:'depot_client',stockage_sortie:'recuperation_client',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10',stockage_heure_entree:'08:30',stockage_heure_sortie:'19:00',devis:[{statut:'accepte',paiement_statut:'paye'}],vehicules:[{id:'v1',marque_modele:'Clio client',immatriculation:'CLIENT-1',livraison_apres_stockage:false,heure_recuperation_client:'16:00'},{id:'v2',marque_modele:'Golf client',immatriculation:'CLIENT-2',vin:'VIN-CLIENT-2',ville_arrivee:'Paris',date_livraison:'2026-11-10',heure_livraison:'20:00',livraison_apres_stockage:true}]};__clients=[c,{...c,id:'unpaid',devis:[]},{...c,id:'cancelled',statut:'annulee'},{...c,id:'direct',type_service:'convoyage'}];});
  await page.locator('#hc-planning-refresh').click();
  const self=page.locator('[data-planning-id^="client:"]');assert.equal(await self.count(),3);
+ assert.equal(await self.locator('[data-planning-action="dossier"]').count(),0);
+ await self.first().locator('summary').click();assert.match(await self.first().innerText(),/Téléphone non renseigné/);
+ assert.doesNotMatch(await page.locator('#page-admin-planning').innerText(),/Générer le devis|Créer le devis|Voir la demande/);
  assert.match(await self.first().innerText(),/Marie Client/);assert.match(await self.first().innerText(),/08:30/);
  await page.locator('#hc-planning-kind').selectOption('apres_stockage');
  assert.equal(await self.count(),1);assert.match(await self.innerText(),/16:00/);assert.doesNotMatch(await self.innerText(),/19:00/);

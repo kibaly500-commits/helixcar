@@ -25,6 +25,17 @@ function bounds(plan,label,fallback){
 }
 function overlap(a,b){return a.start<b.end&&b.start<a.end;}
 function slot(kind,time){const t=instant(time);return kind==='avant_stockage'?{start:t,end:t+20*MINUTE}:{start:t,end:t+20*MINUTE};}
-const api={POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot};
+function guidance(p){
+ if(!['avant_stockage','apres_stockage'].includes(p.kind))return null;
+ const incoming=p.kind==='avant_stockage',label=incoming?'Prise en charge':'Livraison';
+ return {
+  label:incoming?'Prise en charge chez le client':'Livraison attendue chez le client',
+  when:p.rows?.find(r=>r.label===label)?.value||(incoming?p.mission.date_prise_en_charge:p.mission.date_livraison)||'Horaire client à préciser',
+  address:incoming?p.mission.adresse_depart:p.mission.adresse_arrivee,
+  target:incoming?'Votre heure de réception chez HelixCar':'Votre heure de remise au convoyeur chez HelixCar',
+  rule:incoming?'Heure de prise en charge + durée du trajet vérifiée par vous + 45 minutes de battement.':'Heure de livraison attendue − durée du trajet vérifiée par vous − 45 minutes de battement.'
+ };
+}
+const api={POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPlanningCalcul=api;
 })(typeof window==='undefined'?globalThis:window);

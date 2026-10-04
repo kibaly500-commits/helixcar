@@ -98,7 +98,10 @@
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur','time');}
       h+='</div>';
-      if(p.kind==='avant_stockage'||p.kind==='apres_stockage')h+='<p class="hc-prep-muted">Passage par vous au point HelixCar. Fixez votre horaire après vérification du trajet et du trafic. Prévoyez 45 minutes de battement selon les besoins.</p>';
+      if(p.kind==='avant_stockage'||p.kind==='apres_stockage'){
+        const guide=HCPlanningCalcul.guidance(p);
+        h+='<div class="hc-planning-estimate"><p><strong>'+esc(guide.label)+' :</strong> '+display(guide.when)+'</p><p>'+esc(guide.address)+'</p><p><strong>'+esc(guide.target)+'</strong></p><p>'+esc(HCPlanningCalcul.POINT)+'</p><p><strong>Prévoir 45 minutes de battement.</strong> '+esc(guide.rule)+'</p></div>';
+      }
       if(p.missing.length)h+='<p class="hc-prep-incomplete">À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';
       const privateLabels={adresse_depart:'Adresse de prise en charge',adresse_arrivee:'Adresse de livraison',contact_depart_nom:'Contact au départ',contact_depart_tel:'Téléphone au départ',contact_arrivee_nom:'Contact à l’arrivée',contact_arrivee_tel:'Téléphone à l’arrivée',immatriculation:'Immatriculation du véhicule',vin:'VIN du véhicule livré',consignes:'Consignes',adresse_restitution:'Adresse de restitution',restit_contact_nom:'Contact à la restitution',restit_contact_tel:'Téléphone à la restitution',restit_immatriculation:'Immatriculation du véhicule à restituer',restit_vin:'VIN du véhicule à restituer',restit_info:'Consignes de restitution'};
       h+='<details class="hc-prep-private"><summary>Informations privées de la mission</summary><p class="hc-prep-muted">Réservées à l’administration ; communiquées au partenaire retenu après attribution.</p><dl class="hc-prep-facts">'+Object.entries(privateLabels).filter(([k])=>p.mission[k]||(p.category==='convoyage'&&(k==='vin'||(k==='restit_vin'&&p.mission.restitution)))).map(([k,label])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(p.mission[k]||'À compléter dans la demande')+'</dd></div>').join('')+'</dl></details></section>';
