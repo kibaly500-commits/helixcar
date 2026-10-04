@@ -17,7 +17,10 @@ const {urlFichier} = require('./env');
  try {
   const page = await L.newPage(browser);
   await page.setViewportSize({width:390,height:844});
-  await page.evaluate(() => { openModal('client'); });
+  await page.evaluate(() => { openModal('client'); document.getElementById('client-type').value='pro'; toggleClientType(); });
+  // Le parcours particulier tient désormais dans l’écran ; le professionnel
+  // conserve les champs société/SIRET et permet de tester le défilement long.
+  await page.waitForTimeout(400);
   await page.mouse.move(190,450);
   await page.mouse.wheel(0,2500);
   await page.waitForTimeout(250);
@@ -89,6 +92,8 @@ const {urlFichier} = require('./env');
    _hcTransmettreHauteur();
   });
   await page.waitForFunction(()=>document.getElementById('client-demande-cadre').offsetHeight>=3000);
+  L.check('Dashboard : même accès HelixCar aux dates',await cadre.locator('[data-field="stock-debut"]').count()===1);
+  L.check('Dashboard : aucun verrou plein écran du formulaire public',await cadre.evaluate(()=>!document.documentElement.classList.contains('hc-client-mobile-open')));
   await page.evaluate(()=>scrollTo(0,1000));
   await cadre.evaluate(() => {
    const overlay=_hcConstruireDupliquerOverlay();

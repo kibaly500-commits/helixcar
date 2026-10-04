@@ -20887,7 +20887,7 @@ function rendreFichesVehicules() {
         // de CE véhicule, jamais partagé, jamais globalisé. La donnée
         // (stock-fin) est celle du dossier, mais son AFFICHAGE ne
         // concerne que le véhicule dont Livraison=Non ici présent.
-        (function(){ var sf=document.getElementById('stock-fin'); var val=sf?sf.value:''; return val ? '<div style="font-size:.8rem;color:#767b81;margin-top:8px">Fin de stockage prévue : '+_formaterDateFr(val)+'</div>' : ''; })()+
+        (function(){ var sf=document.getElementById('stock-fin'); var val=sf?sf.value:''; return '<div data-hc-stock-fin-rappel style="font-size:.8rem;color:#767b81;margin-top:8px">Date de fin de stockage choisie à l’étape précédente : '+(_formaterDateFr(val)||'À renseigner')+'</div>'; })()+
         '</div>';
     } else if (livIndiv) livraison+=_blocTrajetVehicule(i,'liv',sc.labelLiv,v);
 
@@ -20907,7 +20907,7 @@ function rendreFichesVehicules() {
       '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="non" '+(restActive===false?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Non, uniquement la livraison</span></label></div>'+
       '<div id="veh-restit-'+i+'" style="display:'+(restActive?'block':'none')+';margin-top:10px">'+
       _blocTrajetVehicule(i,'restit','Destination du véhicule récupéré',v)+
-      '<div class="veh-sep"></div><div class="veh-sstitre">Autre véhicule à récupérer</div>'+
+      '<div class="veh-sep"></div><div class="veh-sstitre">Informations du véhicule à récupérer</div>'+
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
@@ -21688,7 +21688,7 @@ function _hcSelectionnerJour(j) {
   champ.value = _hcFormaterYMD(date);
   _hcDeclencherChange(champ);
   _hcFermerCalendrier();
-  try { champ.focus(); } catch (e) {}
+  try { if (window._hcFocusApresDate) _hcFocusApresDate(champ); else champ.focus(); } catch (e) {}
 }
 
 // EFFACER, en mode période : vide UNIQUEMENT les deux bornes de la
@@ -23298,7 +23298,7 @@ document.addEventListener('animationstart', function (e) {
 // version est RÉELLEMENT chargée dans le navigateur (console : tapez
 // HC_VERSION), et d'écarter un cache navigateur ou un déploiement
 // incomplet lors d'une vérification.
-window.HC_VERSION = 'V77.6 — formulaire mobile et dates sécurisées';
+window.HC_VERSION = 'V77.7 — cadrage mobile et sélecteurs HelixCar';
 console.log('HelixCar ' + window.HC_VERSION);
 </script>
 <script id="hc-v50-45-lock-behavior">
@@ -23987,6 +23987,8 @@ console.log('HelixCar ' + window.HC_VERSION);
 }
 </style>
 
+<link rel="stylesheet" href="assets/pr6-mobile-form.css">
+<script src="assets/pr6-mobile-form.js"></script>
 </body>
 
 </html>
