@@ -22333,7 +22333,11 @@ document.addEventListener('click', function (e) {
 #modal-reinit input:-webkit-autofill,
 #modal-reinit input:-webkit-autofill:hover,
 #modal-reinit input:-webkit-autofill:focus,
-#modal-reinit input:-webkit-autofill:active {
+#modal-reinit input:-webkit-autofill:active,
+#modal-completer input:-webkit-autofill,
+#modal-completer input:-webkit-autofill:hover,
+#modal-completer input:-webkit-autofill:focus,
+#modal-completer input:-webkit-autofill:active {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: #3A3F45;
@@ -22343,7 +22347,8 @@ document.addEventListener('click', function (e) {
 /* Firefox : meme intention, propriete standardisee. */
 #modal-client input:autofill,
 #modal-connexion input:autofill,
-#modal-reinit input:autofill {
+#modal-reinit input:autofill,
+#modal-completer input:autofill {
   background-clip: text;
   -webkit-text-fill-color: #3A3F45;
 }
