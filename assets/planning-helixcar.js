@@ -33,12 +33,30 @@ function clientRows(clients){
  return result;
 }
 async function load(){
- const current=++ticket;panel().textContent='Chargement du planning…';
+ const current=++ticket;rows=[];records.clear();panel().textContent='Chargement du planning…';
  try{
   if(_hcNavigationRole!=='admin')return;
   const [data,states,clients]=await Promise.all([sbFetchToutePage('preparations_missions?select=id,client_id,cle,empreinte,plan,mission_id,clients(numero_client),missions!preparations_missions_mission_id_fkey(reference,statut,convoyeurs!missions_convoyeur_id_fkey(prenom,nom))&order=updated_at.desc'),sbFetchToutePage('planning_helixcar?select=*'),sbFetchToutePage('clients?select=*,vehicules(id,marque_modele,immatriculation,livraison_apres_stockage,heure_recuperation_client),devis(statut,paiement_statut)&type_service=eq.stockage&order=created_at.desc')]);
   if(current!==ticket||_hcNavigationRole!=='admin')return;
-  rows=data.filter(r=>['avant_stockage','apres_stockage'].includes(r.plan?.kind)&&!['annule','annulee'].includes(r.missions?.statut));rows.push(...clientRows(clients));records=new Map(states.map(r=>[r.preparation_id,r]));render();
+  const candidates=data.filter(r=>['avant_stockage','apres_stockage'].includes(r.plan?.kind)&&!['annule','annulee'].includes(r.missions?.statut));
+  const passages=clientRows(clients),ids=[...new Set([...candidates,...passages].map(r=>r.client_id))],ready=new Set();
+  // Même contrôle serveur que l'ouverture de la préparation : paiement,
+  // informations fournies/validées, aucune correction en attente.
+  for(let i=0;i<ids.length;i+=4){
+   await Promise.all(ids.slice(i,i+4).map(async id=>{
+    const response=await sbAuth.rpc('source_preparation_missions',{p_client_id:id});
+    if(response.error){
+     if(/Dossier incomplet|Le devis doit être accepté et le paiement confirmé|Demande introuvable/.test(response.error.message||''))return;
+     throw Error('La vérification des dossiers reste à effectuer. Réessayez.');
+    }
+    const source=response.data;
+    if(!source?.client||!Array.isArray(source.vehicules))throw Error('Réponse de vérification indisponible.');
+    if(HCPreparation.build(source.client,source.vehicules,source.point_remise).some(p=>p.missing?.length))return;
+    ready.add(id);
+   }));
+   if(current!==ticket||_hcNavigationRole!=='admin')return;
+  }
+  rows=[...candidates,...passages].filter(r=>ready.has(r.client_id));records=new Map(states.map(r=>[r.preparation_id,r]));render();
  }catch(e){if(current===ticket)panel().textContent='Le planning reste à actualiser. '+e.message;}
 }
 function render(){
@@ -46,7 +64,7 @@ function render(){
  const kind=document.getElementById('hc-planning-kind').value;
  const list=rows.filter(r=>(!day||(records.get(r.id)?.horaire_confirme||schedule(r.plan)||r.plan.date_debut||'').slice(0,10)===day)&&(!kind||r.plan.kind===kind));
  list.sort((a,b)=>String(records.get(a.id)?.horaire_confirme||schedule(a.plan)||a.plan.date_debut).localeCompare(String(records.get(b.id)?.horaire_confirme||schedule(b.plan)||b.plan.date_debut)));
- if(!list.length){panel().innerHTML='<div class="card">Aucun rendez-vous pour cette sélection. Les passages des clients sont repris des demandes payées ; ceux des convoyeurs, de leur préparation enregistrée.</div>';return;}
+ if(!list.length){panel().innerHTML='<div class="card">Aucun rendez-vous pour cette sélection. Seuls les dossiers payés, complets et sans information en attente de validation apparaissent ici.</div>';return;}
  panel().innerHTML=list.map(r=>{
   const p=r.plan,s=records.get(r.id),inbound=p.kind==='avant_stockage',time=schedule(p);
   if(r.clientPassage)return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(inbound?'À réceptionner · Client':'À remettre · Client')+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule à préciser')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients.numero_client||'Dossier')+' · '+esc(r.person)+'</p></div><strong>'+esc(fmt(time))+(time&&!time.includes('T')?' · Heure à préciser':'')+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+(inbound?'Le client vous apporte le véhicule.':'Le client vient récupérer le véhicule auprès de vous.')+'</strong></p><p>Horaire communiqué par le client.</p><button type="button" class="btn btn-outline" data-planning-action="dossier">Voir la demande</button><p class="hc-planning-feedback" role="status"></p></article>';

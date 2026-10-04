@@ -9,12 +9,16 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
   const v={id:'veh1',position:1,marque_modele:'Renault Clio',immatriculation:'AA-123-BB',vin:'VIN',adresse_depart_rue:'3 rue Exemple',code_postal_depart:'75001',ville_depart:'Paris',adresse_arrivee_rue:'8 rue Livraison',code_postal_arrivee:'78000',ville_arrivee:'Versailles',date_prise_en_charge:'2026-11-08',date_livraison:'2026-11-10',heure_prise_en_charge:'09:00',heure_livraison:'14:00'};
   const plans=HCPreparation.build(c,[v],HCPlanningCalcul.POINT);plans[0].mission.date_livraison='2026-11-08T10:45';plans[0].heure_remise='10:45';plans[1].mission.date_prise_en_charge='2026-11-10T12:15';plans[1].heure_retrait='12:15';
   window.__rows=plans.map((plan,i)=>({id:'p'+i,client_id:c.id,cle:plan.key,empreinte:'hash',plan,clients:{numero_client:'HC-QA'},missions:{convoyeurs:{prenom:'Partenaire',nom:'Test'}}}));
-  window.__states=[];window.__calls=[];window.__source={client:c,vehicules:[v],reference:'DEV-QA',empreinte:'hash',point_remise:HCPlanningCalcul.POINT,brouillons:__rows};
+  window.__blocked={};window.__states=[];window.__calls=[];window.__source={client:c,vehicules:[v],reference:'DEV-QA',empreinte:'hash',point_remise:HCPlanningCalcul.POINT,brouillons:__rows};
   window.__traffic={provider:'Google Maps',kind:'avant_stockage',km:40,minutes:60,margin:45,calculatedAt:new Date().toISOString(),suggestion:'2026-11-08T10:45',warnings:[]};
   window.__clients=[];
   sbFetchToutePage=async path=>path.startsWith('clients?')?__clients:path.startsWith('preparations')?[...__rows,{...__rows[0],id:'direct',plan:{...__rows[0].plan,kind:'direct'}},{...__rows[0],id:'cancelled',missions:{statut:'annulee'}}]:__states;
   sbAuth.rpc=async(name,args)=>{
-   __calls.push({name,args});if(name==='source_preparation_missions')return {data:__source};
+   __calls.push({name,args});if(name==='source_preparation_missions'){
+    if(__blocked[args.p_client_id])return {error:{message:__blocked[args.p_client_id]}};
+    const client=__clients.find(c=>c.id===args.p_client_id);
+    return {data:client?{client,vehicules:client.vehicules,point_remise:HCPlanningCalcul.POINT}:__source};
+   }
    if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map((plan,i)=>({id:'p'+i,cle:plan.key,empreinte:'hash',plan}));return {data:__source};}
    if(name==='action_planning_helixcar'){
     const row=__rows.find(x=>x.id===args.p_preparation_id);let state=__states.find(x=>x.preparation_id===row.id);if(!state){state={preparation_id:row.id,revision:0};__states.push(state);}
@@ -50,7 +54,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-10T12:30');
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
  await page.locator('#hc-prep-close').click();
- await page.evaluate(()=>{const c={id:'self',type_service:'stockage',prenom:'Marie',nom:'Client',numero_client:'HC-SELF',nb_vehicules:2,stockage_acheminement:'depot_client',stockage_sortie:'recuperation_client',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10',stockage_heure_entree:'08:30',stockage_heure_sortie:'19:00',devis:[{statut:'accepte',paiement_statut:'paye'}],vehicules:[{id:'v1',marque_modele:'Clio client',immatriculation:'CLIENT-1',livraison_apres_stockage:false,heure_recuperation_client:'16:00'},{id:'v2',marque_modele:'Golf client',immatriculation:'CLIENT-2',livraison_apres_stockage:true}]};__clients=[c,{...c,id:'unpaid',devis:[]},{...c,id:'cancelled',statut:'annulee'},{...c,id:'direct',type_service:'convoyage'}];});
+ await page.evaluate(()=>{const c={id:'self',type_service:'stockage',prenom:'Marie',nom:'Client',numero_client:'HC-SELF',nb_vehicules:2,stockage_acheminement:'depot_client',stockage_sortie:'recuperation_client',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10',stockage_heure_entree:'08:30',stockage_heure_sortie:'19:00',devis:[{statut:'accepte',paiement_statut:'paye'}],vehicules:[{id:'v1',marque_modele:'Clio client',immatriculation:'CLIENT-1',livraison_apres_stockage:false,heure_recuperation_client:'16:00'},{id:'v2',marque_modele:'Golf client',immatriculation:'CLIENT-2',vin:'VIN-CLIENT-2',ville_arrivee:'Paris',date_livraison:'2026-11-10',heure_livraison:'20:00',livraison_apres_stockage:true}]};__clients=[c,{...c,id:'unpaid',devis:[]},{...c,id:'cancelled',statut:'annulee'},{...c,id:'direct',type_service:'convoyage'}];});
  await page.locator('#hc-planning-refresh').click();
  const self=page.locator('[data-planning-id^="client:"]');assert.equal(await self.count(),3);
  assert.match(await self.first().innerText(),/Marie Client/);assert.match(await self.first().innerText(),/08:30/);
@@ -63,6 +67,16 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.evaluate(()=>{__clients[0].nb_vehicules=1;__clients[0].vehicules=[__clients[0].vehicules[0]];__clients[0].vehicules[0].heure_recuperation_client='17:00';__clients[0].stockage_heure_sortie='18:15';});
  await page.locator('#hc-planning-day').fill('');await page.locator('#hc-planning-kind').selectOption('apres_stockage');await page.locator('#hc-planning-refresh').click();assert.equal(await self.count(),1);assert.match(await self.innerText(),/18:15/);assert.doesNotMatch(await self.innerText(),/17:00/);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.locator('#hc-planning-kind').selectOption('');
+ for(const message of ['Dossier incomplet : informations attendues','Dossier incomplet : informations transmises à vérifier','Le devis doit être accepté et le paiement confirmé']){
+  await page.evaluate(message=>{__blocked={'self':message,'client-1':message};},message);
+  await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('Seuls les dossiers'));
+  assert.equal(await page.locator('[data-planning-id]').count(),0);
+ }
+ await page.evaluate(()=>{__blocked={};});await page.locator('#hc-planning-refresh').click();await page.waitForSelector('[data-planning-id="p0"]');assert.equal(await self.count(),2);
+ await page.evaluate(()=>{__blocked={'self':'Network error'};});await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('vérification des dossiers'));
+ assert.equal(await page.locator('[data-planning-id]').count(),0);
+ await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),0);
  await page.evaluate(()=>window.dispatchEvent(new Event('hc-session-fermee')));assert.equal(await page.locator('[data-planning-id]').count(),0);
  assert.deepEqual(errors,[]);await page.close();console.log('PASS planning UI '+width+' : filtres, adresses privées, confirmation, conflits, clés, horaires manuels sauvegardés et déconnexion');
  }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
