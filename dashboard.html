@@ -4484,6 +4484,7 @@ async function loadInfosClient() {
   resultats.forEach(function (r) {
     const d = r.d;
     const entete = '<div class="card-title">' + escapeHtml(d.numero_client || '—') + '</div>'
+      + (d.created_at ? '<div style="font-size:.8rem;color:#666;margin-top:4px">Demande créée le <time datetime="' + escapeHtml(d.created_at) + '">' + escapeHtml(_dvDateHeure(d.created_at)) + '</time></div>' : '')
       + '<div style="font-size:.85rem;color:#555;margin-top:4px">' + escapeHtml(_libelleServiceClient(d.type_service))
       + (d.statut ? ' <span class="badge" style="margin-left:6px">' + escapeHtml(d.statut) + '</span>' : '') + '</div>';
     if (r.erreur) {
