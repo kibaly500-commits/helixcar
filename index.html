@@ -17360,10 +17360,9 @@ async function _submitClientFormInterne() {
   // Le second cas était traité comme le premier : l'écran annonçait un
   // compte créé et un espace client, alors que la demande n'y était pas.
   //
-  // On tente donc réellement d'ouvrir une session avant d'écrire. Si la
-  // confirmation est désactivée, signInWithPassword aboutit et la
-  // demande est rattachée. Si elle est active, elle échoue — et c'est
-  // cette réalité-là que l'écran de succès annoncera.
+  // Une inscription sans session attend la confirmation par e-mail.
+  // Seul un compte déjà existant nécessite une tentative de connexion ;
+  // le rattachement dépend toujours de la session réellement obtenue.
   //
   // Un échec de création NE DOIT JAMAIS faire perdre la demande : si
   // l'adresse est déjà utilisée (client de retour) ou si le service est
@@ -17459,9 +17458,10 @@ async function _submitClientFormInterne() {
           _compteEtat = 'echec';
         }
         _compteSession = !!(rCompte && rCompte.data && rCompte.data.session);
-        if (!_compteSession && (_compteEtat === 'cree' || _compteEtat === 'existe_deja')) {
-          // Pas de session : on tente d'en ouvrir une. Elle n'aboutira
-          // que si la confirmation d'e-mail est désactivée. C'est aussi
+        if (!_compteSession && _compteEtat === 'existe_deja') {
+          // Un nouveau compte sans session attend sa confirmation par e-mail.
+          // On évite une connexion vouée à échouer dans ce cas. Pour un
+          // compte existant, on tente l'authentification. C'est aussi
           // ce qui rend le NOUVEL ESSAI utile avec la même adresse :
           // le compte existe déjà, la session s'ouvre, et la demande
           // part alors rattachée.
@@ -20900,13 +20900,14 @@ function rendreFichesVehicules() {
     // son propre conteneur identifiable (veh-restit-question-i), display
     // initial selon livActive — permet à basculerLivraisonVehicule et
     // _hcEffacerSousVeh de la basculer explicitement.
-    livraison+='<div id="veh-restit-question-'+i+'" style="display:'+((livraisonStockVehicule ? livActive===true : sc.liv)?'block':'none')+'"><div class="veh-sep"></div><div class="veh-sstitre">Une restitution est-elle prévue pour ce véhicule ? <span class="field-required">*</span></div>'+
+    livraison+='<div id="veh-restit-question-'+i+'" style="display:'+((livraisonStockVehicule ? livActive===true : sc.liv)?'block':'none')+'"><div class="veh-sep"></div><div class="veh-sstitre">À cette adresse, faut-il aussi récupérer un autre véhicule ? <span class="field-required">*</span></div>'+
+      '<p class="hc-reprise-explication">Nous déposons le véhicule à livrer et prenons en charge un autre véhicule à transporter.</p>'+
       '<div class="veh-binary-choice" id="veh-'+i+'-restit-active-group">'+
-      '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="oui" '+(restActive===true?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Oui</span></label>'+
-      '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="non" '+(restActive===false?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Non</span></label></div>'+
+      '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="oui" '+(restActive===true?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Oui, un autre véhicule est à récupérer</span></label>'+
+      '<label class="radio-opt"><input type="radio" name="veh-'+i+'-restit-active" value="non" '+(restActive===false?'checked':'')+' onchange="basculerRestitVehicule('+i+')"><span>Non, uniquement la livraison</span></label></div>'+
       '<div id="veh-restit-'+i+'" style="display:'+(restActive?'block':'none')+';margin-top:10px">'+
-      _blocTrajetVehicule(i,'restit','Restitution',v)+
-      '<div class="veh-sep"></div><div class="veh-sstitre">Véhicule à restituer</div>'+
+      _blocTrajetVehicule(i,'restit','Destination du véhicule récupéré',v)+
+      '<div class="veh-sep"></div><div class="veh-sstitre">Autre véhicule à récupérer</div>'+
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
@@ -21571,6 +21572,18 @@ function _hcClasseJour(date, periode) {
   return '';
 }
 
+// Recontrôle les bornes au clic, même si le contexte a changé depuis le rendu.
+function _hcJourAutorise(date) {
+  if (!_hcCalChampActif || !date || isNaN(date.getTime())) return false;
+  var auj = _hcAujourdhui();
+  var minimum = _hcCalPeriode
+    ? (_hcCalSousEtapePeriode === 'fin'
+      ? _hcParserYMD((document.getElementById(_hcCalPeriode.debut) || {}).value) : null)
+    : _hcDateMinimaleChamp(_hcCalChampActif);
+  var maximum = _hcCalPeriode ? null : _hcDateMaximaleChamp(_hcCalChampActif);
+  return date >= auj && (!minimum || date >= minimum) && (!maximum || date <= maximum);
+}
+
 function _hcRendreCalendrier() {
   var overlay = _hcCalOverlay;
   if (!overlay || !_hcCalChampActif) return;
@@ -21587,25 +21600,6 @@ function _hcRendreCalendrier() {
 
   var periode = _hcCalPeriode ? _hcPeriodeBrute(_hcCalPeriode) : _hcPeriodePourChamp(_hcCalChampActif);
 
-  // Date minimale réelle = la plus restrictive entre aujourd'hui et la
-  // date métier minimale applicable au champ/à l'étape en cours
-  // (Objectif 3, section 10). En mode stockage, la borne dépend de
-  // l'étape (début : aucune contrainte métier ; fin : jamais avant le
-  // début déjà choisi).
-  var borneMetier = null;
-  if (_hcCalPeriode) {
-    if (_hcCalSousEtapePeriode === 'fin') {
-      borneMetier = _hcParserYMD((document.getElementById(_hcCalPeriode.debut) || {}).value);
-    }
-  } else {
-    borneMetier = _hcDateMinimaleChamp(_hcCalChampActif);
-  }
-  var borneReelle = (borneMetier && borneMetier > auj) ? borneMetier : auj;
-
-  // Anomalie 2 — borne maximale (jamais appliquée en mode stockage,
-  // qui n'a pas de notion de borne haute).
-  var borneMaxMetier = _hcCalPeriode ? null : _hcDateMaximaleChamp(_hcCalChampActif);
-
   var html = '';
   for (var k = 0; k < decalage; k++) html += '<button type="button" class="hc-cal-jour hc-cal-jour--hors-mois" tabindex="-1" disabled></button>';
   for (var j = 1; j <= nbJoursMois; j++) {
@@ -21617,7 +21611,7 @@ function _hcRendreCalendrier() {
     // "date > borneMaxMetier" (jamais ">=") : le jour de la borne
     // maximale elle-même reste sélectionnable (Anomalie 2 : prise en
     // charge le jour même du début du stockage autorisée).
-    var estInterdit = date < borneReelle || (borneMaxMetier && date > borneMaxMetier);
+    var estInterdit = !_hcJourAutorise(date);
     var estAuj = _hcMemeJour(date, auj);
     var classe = _hcClasseJour(date, periode);
     var classesFinales = 'hc-cal-jour' + (classe ? ' ' + classe : '') + (estAuj ? ' hc-cal-jour--aujourdhui' : '');
@@ -21633,6 +21627,7 @@ function _hcRendreCalendrier() {
 
   Array.prototype.forEach.call(overlay.querySelectorAll('.hc-cal-jour[data-jour]'), function (btn) {
     btn.addEventListener('click', function () {
+      if (btn.disabled) return;
       var j = parseInt(btn.getAttribute('data-jour'), 10);
       _hcSelectionnerJour(j);
     });
@@ -21654,7 +21649,9 @@ function _hcRendreCalendrier() {
 }
 
 function _hcSelectionnerJour(j) {
+  if (!Number.isInteger(j) || j < 1 || j > new Date(_hcCalAnneeAffichee, _hcCalMoisAffiche + 1, 0).getDate()) return;
   var date = new Date(_hcCalAnneeAffichee, _hcCalMoisAffiche, j);
+  if (!_hcJourAutorise(date)) return;
 
   if (_hcCalPeriode) {
     // Mode double-sélection : le calendrier RESTE OUVERT après chaque
@@ -22944,7 +22941,7 @@ document.addEventListener('click', function (e) {
   -webkit-user-select: none;
   user-select: none;
 }
-#modal-client ::selection{background:rgba(158,63,70,.20) !important;color:inherit !important;}
+#modal-client ::selection{background:rgba(80,130,180,.18) !important;color:inherit !important;}
 #modal-client input[type="radio"],#modal-client input[type="checkbox"]{accent-color:var(--accent) !important;}
 /* Les boutons Oui/Non gardent une seule teinte HelixCar, jamais bleu natif. */
 #modal-client label.radio-opt:has(input:checked),#modal-client label.radio-opt.selected{
@@ -23301,7 +23298,7 @@ document.addEventListener('animationstart', function (e) {
 // version est RÉELLEMENT chargée dans le navigateur (console : tapez
 // HC_VERSION), et d'écarter un cache navigateur ou un déploiement
 // incomplet lors d'une vérification.
-window.HC_VERSION = 'V77.5 — progression mobile synchronisée';
+window.HC_VERSION = 'V77.6 — formulaire mobile et dates sécurisées';
 console.log('HelixCar ' + window.HC_VERSION);
 </script>
 <script id="hc-v50-45-lock-behavior">
@@ -23404,12 +23401,12 @@ console.log('HelixCar ' + window.HC_VERSION);
   document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('#modal-client'))setTimeout(clearStaleRequired,0);},true);
   document.addEventListener('click',function(e){if(e.target&&e.target.closest&&e.target.closest('#modal-client'))setTimeout(function(){organizeStep2();lockStepper();clearStaleRequired();},0);});
 
-  var mo=new MutationObserver(function(){clearTimeout(mo._t);mo._t=setTimeout(function(){organizeStep2();lockStepper();clearStaleRequired();},20);});
+  var mo=new MutationObserver(function(){clearTimeout(mo._t);mo._t=setTimeout(function(){mo.disconnect();try{organizeStep2();lockStepper();clearStaleRequired();}finally{var m=document.getElementById('modal-client');if(m)mo.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}},20);});
   function start(){var m=document.getElementById('modal-client');if(m)mo.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});organizeStep2();lockStepper();clearStaleRequired();}
   document.addEventListener('DOMContentLoaded',start);if(document.readyState!=='loading')setTimeout(start,0);
 
   // Point 4 (V57) — équivalent convoyeur, séparé et indépendant.
-  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}},20);});
+  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){moConv.disconnect();try{lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}finally{var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}},20);});
   function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
   document.addEventListener('DOMContentLoaded',startConv);if(document.readyState!=='loading')setTimeout(startConv,0);
 })();
@@ -23965,6 +23962,30 @@ console.log('HelixCar ' + window.HC_VERSION);
   sync();
 })();
 </script>
+
+
+<style id="hc-mobile-form-20261004">
+#modal-client .hc-reprise-explication{font-size:.88rem;line-height:1.5;color:#606772;margin:6px 0 12px;}
+#modal-client [id$="-restit-active-group"]{grid-template-columns:1fr;flex-direction:column;}
+#modal-client [id$="-restit-active-group"] .radio-opt{width:100%;box-sizing:border-box;}
+.hc-cal-jour:disabled{pointer-events:none;color:rgba(16,24,32,.25) !important;background:transparent !important;}
+@media(max-width:720px){
+  /* 16px évite le zoom automatique iOS, sans désactiver le zoom utilisateur. */
+  #modal-client input:not([type="radio"]):not([type="checkbox"]),
+  #modal-client select,#modal-client textarea,#modal-client .hc-select-btn,
+  #modal-convoyeur input:not([type="radio"]):not([type="checkbox"]),
+  #modal-convoyeur select,#modal-convoyeur textarea,#modal-convoyeur .hc-select-btn{
+    font-size:16px !important;min-height:44px;padding-top:10px !important;padding-bottom:10px !important;
+  }
+  #modal-client .modal,#modal-convoyeur .modal{padding:24px 16px;}
+  #modal-client .modal-form-group,#modal-convoyeur .modal-form-group{margin-bottom:14px;}
+  #modal-client .modal-form-group>label,#modal-convoyeur .modal-form-group>label{margin-bottom:6px;}
+  #modal-client .veh-sous-contenu{padding:12px !important;}
+  #modal-client .hc-step2-acc-head{padding:13px 12px !important;}
+  #modal-client .hc-step2-acc-body{padding:8px 12px 14px !important;}
+  #modal-client .radio-opt{min-height:44px;padding:10px 12px;}
+}
+</style>
 
 </body>
 

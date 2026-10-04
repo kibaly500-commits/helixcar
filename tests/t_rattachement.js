@@ -268,9 +268,8 @@ async function deposerCompteSeul(browser, avecSession, refusInscription, session
       && /sbAuth\.rpc\('reclamer_demande'/.test(dashRattachement)
       && /await _hcRattacherClientApresConfirmation\(\);[\s\S]{0,160}await _hcRolesDeLaSession\(\)/.test(dashRattachement),
     'rattachement client absent ou appelé trop tard');
-  check('C2 : une session est RÉELLEMENT tentée avant d\'écrire',
-    c.etat.journal.indexOf('signIn') !== -1
-      && c.etat.journal.indexOf('signIn') < c.etat.journal.lastIndexOf('rpc'),
+  check('C2 : sans session, un nouveau compte attend sa confirmation sans connexion inutile',
+    c.etat.journal.indexOf('signIn') === -1,
     JSON.stringify(c.etat.journal));
   check('C3 : la demande est quand même enregistrée — elle n\'est jamais perdue',
     c.etat.appels.length === 1, JSON.stringify(c.etat.journal));
