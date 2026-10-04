@@ -14,8 +14,8 @@ const L=require('./lib');
  open('veh-0-liv-date');const color=colors();const r={};
  r.maximum=document.querySelector('[data-jour="24"]').disabled;
  r.earlierAllowed=[8,9,10].every(n=>!document.querySelector('[data-jour="'+n+'"]').disabled);
- r.message=document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027');
- _hcSelectionnerJour(25);r.blocked=valueOf('veh-0-liv-date')==='2027-10-21';
+ r.quietOpening=document.getElementById('hc-cal-chrono-note').hidden;
+ _hcSelectionnerJour(25);r.messageAfterAttempt=document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027');r.blocked=valueOf('veh-0-liv-date')==='2027-10-21';
  function valueOf(id){return document.getElementById(id).value;}
  open('veh-0-restit-date');r.sameColors=colors()===color;r.min=document.querySelector('[data-jour="20"]').disabled;
  open('veh-0-pc-date');r.sameColorsPickup=colors()===color;

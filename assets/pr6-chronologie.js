@@ -85,9 +85,24 @@
     _hcCalOverlay.querySelectorAll('[data-jour]').forEach(function(b){
       if (/hc-cal-jour--(p[12]-|double|triple|transition)/.test(b.className)) b.setAttribute('data-hc-repere','true');
     });
-    var id=calendarId(), instructions=[];
-    pairs(id).forEach(function(p){if(!silentLowerBound(p,id) && (value(p.a.date)&&id===p.b.date || value(p.b.date)&&id===p.a.date))instructions.push(message(p,id,false));});
-    calendarNote(instructions.join(' '));
+    calendarNote('');
+    // Un jour interdit reste non sélectionnable. Son conteneur reçoit
+    // uniquement la tentative, pour expliquer le blocage à ce moment-là.
+    if (!_hcCalPeriode) _hcCalOverlay.querySelectorAll('[data-jour]').forEach(function(button) {
+      if (!button.disabled) return;
+      var day=Number(button.dataset.jour), date=new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche,day);
+      var id=calendarId(), candidate=_hcFormaterYMD(date);
+      if(date<_hcAujourdhui() || !issue(id,candidate) || pairs(id).some(function(p){return silentLowerBound(p,id) && value(p.a.date) && candidate<value(p.a.date);})) return;
+      var hit=document.createElement('span');
+      hit.style.display='grid';hit.style.minWidth='0';
+      hit.setAttribute('role','button');hit.setAttribute('tabindex','0');
+      hit.setAttribute('aria-disabled','true');
+      hit.setAttribute('aria-label',_formaterDateFr(candidate)+' : date indisponible, afficher la raison');
+      button.setAttribute('aria-hidden','true');
+      button.parentNode.insertBefore(hit,button);hit.appendChild(button);
+      hit.addEventListener('click',function(){_hcSelectionnerJour(day);});
+      hit.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();_hcSelectionnerJour(day);}});
+    });
   };
   var select=_hcSelectionnerJour;
   window._hcSelectionnerJour=function(j) {

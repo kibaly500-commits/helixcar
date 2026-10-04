@@ -99,7 +99,7 @@ const {urlFichier} = require('./env');
    _hcOuvrirCalendrier(document.getElementById('pro-date-debut'));
    _hcCalAnneeAffichee=2027;_hcCalMoisAffiche=9;_hcRendreCalendrier();
    const r={blocked:document.querySelector('#hc-cal-grille [data-jour="25"]').disabled,
-    message:document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027')};
+    quiet:document.getElementById('hc-cal-chrono-note').hidden};
    _hcSelectionnerJour(25);r.preserved=document.getElementById('pro-date-debut').value==='2027-10-07';
    _hcSelectionnerJour(9);r.staysOpen=_hcCalOverlay.classList.contains('open');
    document.getElementById('hc-cal-ok').click();r.okCloses=!_hcCalOverlay.classList.contains('open');

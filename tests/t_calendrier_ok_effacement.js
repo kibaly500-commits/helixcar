@@ -12,7 +12,7 @@ const L=require('./lib');
  radio('veh-0-restit-active','oui');basculerRestitVehicule(0);val('veh-0-pc-date','2027-10-07');val('veh-0-liv-date','2027-10-21');val('veh-0-restit-date','2027-10-23');
  const key=service+' '+count;
  open('veh-0-liv-date');r[key+' no lower reminder']=!document.getElementById('hc-cal-chrono-note').textContent.includes('prise en charge');
- r[key+' upper reminder']=document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027');
+ r[key+' no automatic reminder']=document.getElementById('hc-cal-chrono-note').hidden;
  const note=document.getElementById('hc-cal-chrono-note').textContent;_hcSelectionnerJour(5);
  r[key+' lower blocked silently']=document.getElementById('veh-0-liv-date').value==='2027-10-21'&&document.getElementById('hc-cal-chrono-note').textContent===note;
  document.querySelector('#hc-cal-grille [data-jour="9"]').click();

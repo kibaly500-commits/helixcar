@@ -11584,9 +11584,12 @@ function _blocHoraire(i, prefixe, v) {
 // devenue valide. On revalide ici les DEUX aspects.
 function verifierHoraireVehiculeEtChrono(i, prefixe) {
   var b = 'veh-' + i + '-' + prefixe;
-  [b + '-heure', b + '-cdeb', b + '-cfin'].forEach(_clearFieldError);
   var pb = _verifierHoraire(i, prefixe);
-  if (pb) _showFieldError(pb.id, pb.msg);
+  var erreurDejaAffichee = pb && document.getElementById(pb.id) && document.getElementById(pb.id).classList.contains('field-error');
+  [b + '-heure', b + '-cdeb', b + '-cfin'].forEach(_clearFieldError);
+  // Une saisie de date ne vaut pas validation d'un horaire encore vide.
+  // Les boutons de validation continuent à signaler les champs requis.
+  if (pb && (pb.msg !== 'Ce champ est obligatoire.' || erreurDejaAffichee)) _showFieldError(pb.id, pb.msg);
   verifierChronologieVehicule(i);
   _majEtatVehicules();
 }
