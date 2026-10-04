@@ -2380,7 +2380,7 @@ html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:f
     transition: all .12s;
   }
   .hc-cal-jour:hover:not(:disabled) { border-color: var(--accent); }
-  .hc-cal-jour:disabled {
+  .hc-cal-jour:disabled:not([data-hc-repere]) {
     color: rgba(16,24,32,.25); cursor: default; pointer-events: none;
   }
   .hc-cal-jour--hors-mois { visibility: hidden; }
@@ -23968,7 +23968,7 @@ console.log('HelixCar ' + window.HC_VERSION);
 #modal-client .hc-reprise-explication{font-size:.88rem;line-height:1.5;color:#606772;margin:6px 0 12px;}
 #modal-client [id$="-restit-active-group"]{grid-template-columns:1fr;flex-direction:column;}
 #modal-client [id$="-restit-active-group"] .radio-opt{width:100%;box-sizing:border-box;}
-.hc-cal-jour:disabled{pointer-events:none;color:rgba(16,24,32,.25) !important;background:transparent !important;}
+.hc-cal-jour:disabled:not([data-hc-repere]){pointer-events:none;color:rgba(16,24,32,.25) !important;background:transparent !important;}
 @media(max-width:720px){
   /* 16px évite le zoom automatique iOS, sans désactiver le zoom utilisateur. */
   #modal-client input:not([type="radio"]):not([type="checkbox"]),
@@ -23989,6 +23989,8 @@ console.log('HelixCar ' + window.HC_VERSION);
 
 <link rel="stylesheet" href="assets/pr6-mobile-form.css">
 <script src="assets/pr6-mobile-form.js"></script>
+<script src="assets/pr6-chronologie.js"></script>
+<style>.hc-chrono-note{font-size:12px;line-height:1.45;color:#686d73;margin:10px 0;text-align:left}.hc-cal-jour[data-hc-repere]:disabled{cursor:default;pointer-events:none}</style>
 </body>
 
 </html>

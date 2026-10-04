@@ -93,6 +93,17 @@ const {urlFichier} = require('./env');
   });
   await page.waitForFunction(()=>document.getElementById('client-demande-cadre').offsetHeight>=3000);
   L.check('Dashboard : même accès HelixCar aux dates',await cadre.locator('[data-field="stock-debut"]').count()===1);
+  const chronologieCadre=await cadre.evaluate(()=>{
+   document.getElementById('pro-date-debut').value='2027-10-07';
+   document.getElementById('pro-date-fin').value='2027-10-23';
+   _hcOuvrirCalendrier(document.getElementById('pro-date-debut'));
+   _hcCalAnneeAffichee=2027;_hcCalMoisAffiche=9;_hcRendreCalendrier();
+   const r={blocked:document.querySelector('#hc-cal-grille [data-jour="25"]').disabled,
+    message:document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027')};
+   _hcSelectionnerJour(25);r.preserved=document.getElementById('pro-date-debut').value==='2027-10-07';
+   _hcFermerCalendrier();return r;
+  });
+  for(const [key,ok] of Object.entries(chronologieCadre))L.check('Dashboard : calendrier cohérent '+key,ok);
   L.check('Dashboard : aucun verrou plein écran du formulaire public',await cadre.evaluate(()=>!document.documentElement.classList.contains('hc-client-mobile-open')));
   await page.evaluate(()=>scrollTo(0,1000));
   await cadre.evaluate(() => {
