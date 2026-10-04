@@ -16,3 +16,7 @@ Les confirmations, la détection des chevauchements et les protections d’accè
 existantes restent en place. Aucun changement de schéma ni de mission existante.
 
 Tests : node tests/t_planning_ui.js et node tests/t_preparation_missions.js.
+
+## Passages directs des clients
+
+Le planning reprend aussi les dépôts et retraits des demandes de stockage payées, sans préparation de mission. Le nom du client, le véhicule et les horaires de la demande sont affichés. Le retrait multi-véhicules utilise exclusivement l’heure de chaque véhicule ; le mono utilise celle du dossier. Un véhicule livré après stockage par un convoyeur ne génère pas de retrait client. Les demandes annulées ou non payées sont exclues. Le bouton Voir la demande ouvre le dossier source. Ces rendez-vous clients sont consultatifs : les confirmations et horodatages des clés existants restent réservés aux préparations de convoyage.

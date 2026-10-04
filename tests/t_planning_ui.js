@@ -11,7 +11,8 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
   window.__rows=plans.map((plan,i)=>({id:'p'+i,client_id:c.id,cle:plan.key,empreinte:'hash',plan,clients:{numero_client:'HC-QA'},missions:{convoyeurs:{prenom:'Partenaire',nom:'Test'}}}));
   window.__states=[];window.__calls=[];window.__source={client:c,vehicules:[v],reference:'DEV-QA',empreinte:'hash',point_remise:HCPlanningCalcul.POINT,brouillons:__rows};
   window.__traffic={provider:'Google Maps',kind:'avant_stockage',km:40,minutes:60,margin:45,calculatedAt:new Date().toISOString(),suggestion:'2026-11-08T10:45',warnings:[]};
-  sbFetchToutePage=async path=>path.startsWith('preparations')?[...__rows,{...__rows[0],id:'direct',plan:{...__rows[0].plan,kind:'direct'}},{...__rows[0],id:'cancelled',missions:{statut:'annulee'}}]:__states;
+  window.__clients=[];
+  sbFetchToutePage=async path=>path.startsWith('clients?')?__clients:path.startsWith('preparations')?[...__rows,{...__rows[0],id:'direct',plan:{...__rows[0].plan,kind:'direct'}},{...__rows[0],id:'cancelled',missions:{statut:'annulee'}}]:__states;
   sbAuth.rpc=async(name,args)=>{
    __calls.push({name,args});if(name==='source_preparation_missions')return {data:__source};
    if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map((plan,i)=>({id:'p'+i,cle:plan.key,empreinte:'hash',plan}));return {data:__source};}
@@ -48,6 +49,20 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_livraison),'2026-11-08T11:15');
  assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-10T12:30');
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
+ await page.locator('#hc-prep-close').click();
+ await page.evaluate(()=>{const c={id:'self',type_service:'stockage',prenom:'Marie',nom:'Client',numero_client:'HC-SELF',nb_vehicules:2,stockage_acheminement:'depot_client',stockage_sortie:'recuperation_client',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10',stockage_heure_entree:'08:30',stockage_heure_sortie:'19:00',devis:[{statut:'accepte',paiement_statut:'paye'}],vehicules:[{id:'v1',marque_modele:'Clio client',immatriculation:'CLIENT-1',livraison_apres_stockage:false,heure_recuperation_client:'16:00'},{id:'v2',marque_modele:'Golf client',immatriculation:'CLIENT-2',livraison_apres_stockage:true}]};__clients=[c,{...c,id:'unpaid',devis:[]},{...c,id:'cancelled',statut:'annulee'},{...c,id:'direct',type_service:'convoyage'}];});
+ await page.locator('#hc-planning-refresh').click();
+ const self=page.locator('[data-planning-id^="client:"]');assert.equal(await self.count(),3);
+ assert.match(await self.first().innerText(),/Marie Client/);assert.match(await self.first().innerText(),/08:30/);
+ await page.locator('#hc-planning-kind').selectOption('apres_stockage');
+ assert.equal(await self.count(),1);assert.match(await self.innerText(),/16:00/);assert.doesNotMatch(await self.innerText(),/19:00/);
+ assert.equal(await self.locator('[data-planning-action="confirmer"], [data-planning-action="cles"]').count(),0);
+ await page.locator('#hc-planning-day').fill('2026-11-08');assert.equal(await self.count(),0);
+ await page.locator('#hc-planning-kind').selectOption('');assert.equal(await self.count(),2);
+ await page.evaluate(()=>{__clients[0].stockage_heure_entree=null;});await page.locator('#hc-planning-refresh').click();assert.match(await self.first().innerText(),/Heure à préciser/);
+ await page.evaluate(()=>{__clients[0].nb_vehicules=1;__clients[0].vehicules=[__clients[0].vehicules[0]];__clients[0].vehicules[0].heure_recuperation_client='17:00';__clients[0].stockage_heure_sortie='18:15';});
+ await page.locator('#hc-planning-day').fill('');await page.locator('#hc-planning-kind').selectOption('apres_stockage');await page.locator('#hc-planning-refresh').click();assert.equal(await self.count(),1);assert.match(await self.innerText(),/18:15/);assert.doesNotMatch(await self.innerText(),/17:00/);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.evaluate(()=>window.dispatchEvent(new Event('hc-session-fermee')));assert.equal(await page.locator('[data-planning-id]').count(),0);
  assert.deepEqual(errors,[]);await page.close();console.log('PASS planning UI '+width+' : filtres, adresses privées, confirmation, conflits, clés, horaires manuels sauvegardés et déconnexion');
  }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
