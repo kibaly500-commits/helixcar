@@ -34,6 +34,20 @@ html, body { background:#f8f9fa; }
 #page-admin-infos .ai-heading{align-items:flex-start}#page-admin-infos .ai-heading h1{overflow-wrap:anywhere}
 }
 
+
+/* Informations client : cartes lisibles et reprise de lecture sans écran vide. */
+#page-client-infos{max-width:1120px}
+.hc-infos-intro{padding:8px 0 24px}.hc-infos-eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#a6343a;font-weight:700}
+.hc-infos-intro h2{font-size:25px;line-height:1.25;margin:9px 0;color:#202a30}.hc-infos-intro p{color:#677078;line-height:1.6;margin:0;max-width:640px}
+#client-infos-liste .card{border:1px solid #e6e4e0;border-radius:16px;padding:24px;box-shadow:0 5px 22px #202a3005;margin-bottom:18px!important}
+#client-infos-liste .card-header{gap:16px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #eeece9;padding-bottom:18px;margin-bottom:18px}
+#client-infos-liste .card-title{font-size:16px}#client-infos-liste .btn-primary{border-radius:9px;min-height:44px;white-space:normal}
+#client-infos-liste .hc-info-vehicle{background:#f8f8f6;border:1px solid #eae9e5;border-radius:10px;padding:12px 16px}
+#client-infos-liste .hc-info-vehicle summary{font-weight:600;line-height:1.6}#client-infos-liste .hc-info-vehicle .detail-val{display:block;line-height:1.9;padding-top:12px;overflow-wrap:anywhere}
+.hc-infos-message{padding:22px 24px;border:1px solid #e5e3df;border-radius:14px;background:#fafaf8;color:#58616a;line-height:1.6;margin-bottom:18px}.hc-infos-message strong{display:block;color:#202a30;font-size:16px;margin-bottom:5px}.hc-infos-message .btn{margin-top:14px;min-height:44px}
+.hc-infos-overview{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}.hc-infos-overview span{padding:10px 15px;border-radius:9px;background:#f1efeb;color:#424a51;font-size:13px}.hc-infos-overview strong{font-size:18px;margin-right:5px;color:#a6343a}
+@media(max-width:600px){#client-infos-liste .card{padding:18px}#client-infos-liste .card-header .btn{width:100%}.hc-infos-intro h2{font-size:22px}.hc-infos-message{padding:18px}}
+
 </style>
 <!-- Mêmes familles que le site public (index.html) : Fraunces pour les
      titres, Instrument Sans pour le texte courant. -->
@@ -1853,11 +1867,13 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
       <!-- CLIENT: Informations à compléter -->
       <div class="page" id="page-client-infos">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Demandes nécessitant des informations</div></div>
-          <div id="client-infos-liste">
-            <div style="font-size:.85rem;color:#666">Chargement…</div>
-          </div>
+        <section class="hc-infos-intro">
+          <span class="hc-infos-eyebrow">Votre dossier</span>
+          <h2>Préparons vos prestations</h2>
+          <p>Retrouvez les précisions à apporter et les informations en cours de vérification.</p>
+        </section>
+        <div id="client-infos-liste" aria-live="polite" aria-busy="true">
+          <div class="hc-infos-message" role="status">Nous préparons le suivi de vos informations…</div>
         </div>
       </div>
 
@@ -2531,6 +2547,7 @@ function _hcInitialesClient(c) {
 }
 
 async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec) {
+  const authGeneration = _hcAuthGeneration;
   if (signOutSiEchec === undefined) signOutSiEchec = true;
   if (!authUserId) return false;
 
@@ -2572,6 +2589,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
     return false;
   }
 
+  if (authGeneration !== _hcAuthGeneration) return false;
   const premiere = (demandes || [])[0] || {};
   window._currentClient = { authUserId: authUserId, email: email, demandes: demandes || [], profil: premiere };
   currentRole = 'client';
@@ -2669,7 +2687,7 @@ return {client:c,lignes:[],erreur:true};}
     rendreCentreInformationsAdmin();
   } catch(e){
  if (_hcSyncCycle) return;
-if(generation===_adminInfosGeneration){statut.textContent='Impossible de charger les dossiers. Utilisez Actualiser pour réessayer.';}}
+if(generation===_adminInfosGeneration){statut.textContent='Le suivi des dossiers est momentanément indisponible. Utilisez Actualiser pour reprendre.';}}
 }
 function rendreCentreInformationsAdmin(){
  var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
@@ -2764,9 +2782,16 @@ var _infosDemandeEnCours = null;
 
 async function chargerInfosDemandeAdmin(demandeId) {
   if (!_sbAuthPret()) return [];
-  const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
-  if (error) throw new Error(error.message);
-  return data || [];
+  for (let tentative = 0; tentative < 2; tentative++) {
+    try {
+      const { data, error } = await sbAuth.rpc('informations_demande', { p_client_id: demandeId });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      if (tentative || !/failed to fetch|network|load failed|timeout|fetch failed/i.test(e.message || '')) throw e;
+      await new Promise(resolve => setTimeout(resolve, 350));
+    }
+  }
 }
 
 async function deciderInformation(demandeId, cle, decision, motifFourni) {
@@ -3047,7 +3072,8 @@ async function chargerDemandesClient() {
     // Attendre la restauration locale de la session avant toute lecture protégée.
     if (sbAuth.auth && sbAuth.auth.getSession) {
       const session = await sbAuth.auth.getSession();
-      if (session.error || !session.data || !session.data.session) throw new Error('Session indisponible. Reconnectez-vous puis réessayez.');
+      if (session.error) throw session.error;
+      if (!session.data || !session.data.session) { const erreur = new Error('Session absente'); erreur.code = 'SESSION_ABSENTE'; throw erreur; }
     }
     for (let tentative = 0; tentative < 2; tentative++) {
       try {
@@ -3061,7 +3087,7 @@ async function chargerDemandesClient() {
         return res.data || [];
       } catch(e) {
         if (!tentative && e.status === 401 && sbAuth.auth && sbAuth.auth.getSession) {
-          const session = await sbAuth.auth.getSession();
+          const session = sbAuth.auth.refreshSession ? await sbAuth.auth.refreshSession() : await sbAuth.auth.getSession();
           if (session.data && session.data.session && !session.error) {
             await new Promise(resolve => setTimeout(resolve, 350));
             continue;
@@ -3175,7 +3201,7 @@ devisIndisponibles=true;return [];})]);
   } catch(e) {
  if (_hcSyncCycle) return;
 
-    if(generation===_demandesClientGeneration) zone.textContent='Impossible de charger vos demandes pour le moment.';
+    if(generation===_demandesClientGeneration) zone.textContent='Le suivi de vos demandes est momentanément indisponible. Utilisez Actualiser pour reprendre.';
     return;
   }
   if(generation!==_demandesClientGeneration) return;
@@ -3305,7 +3331,7 @@ async function loadMissionsClient() {
   catch (e) {
  if (_hcSyncCycle) return;
 
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger vos missions pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Le suivi de vos missions est momentanément indisponible. Utilisez Actualiser pour reprendre.</td></tr>';
     return;
   }
   if (sub) sub.textContent = missions.length ? missions.length + ' mission(s)' : '';
@@ -3359,7 +3385,7 @@ async function loadMissionsResumeClient() {
   } catch (e) {
  if (_hcSyncCycle) return;
 
-    if (zone._generationSuivi === generation) zone.innerHTML = '<div class="fid-note">Impossible de charger le suivi pour le moment.</div>';
+    if (zone._generationSuivi === generation) zone.innerHTML = '<div class="fid-note">Le suivi est momentanément indisponible. Utilisez Actualiser pour reprendre.</div>';
     return;
   }
   if (zone._generationSuivi !== generation) return;
@@ -3535,7 +3561,7 @@ async function loadEvaluationsClient() {
   } catch (e) {
  if (_hcSyncCycle) return;
 
-    zoneA.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger vos missions pour le moment.</div>';
+    zoneA.innerHTML = '<div class="fid-note" style="color:var(--red)">Le suivi de vos missions est momentanément indisponible. Utilisez Actualiser pour reprendre.</div>';
     zoneH.innerHTML = '';
     return;
   }
@@ -3669,7 +3695,7 @@ async function loadOpportunitesAdmin() {
   catch (e) {
  if (_hcSyncCycle) return;
 
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les opportunités pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Les opportunités sont momentanément indisponibles. Utilisez Actualiser pour reprendre.</td></tr>';
     return;
   }
   _majBadgeOpportunitesAdmin(liste);
@@ -3804,7 +3830,7 @@ async function ouvrirOpportuniteAdmin(id) {
   let detail;
   try { detail = await _oppChargerDetail(id); }
   catch (e) {
-    corps.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger cette opportunité.</div>';
+    corps.innerHTML = '<div class="fid-note" style="color:var(--red)">Cette opportunité est momentanément indisponible. Fermez puis rouvrez sa fiche.</div>';
     return;
   }
   _oppCourante = detail;
@@ -3966,7 +3992,7 @@ async function loadOpportunitesPartenaire() {
   catch (e) {
  if (_hcSyncCycle) return;
 
-    zone.innerHTML = '<div class="fid-note" style="color:var(--red)">Impossible de charger les opportunités pour le moment.</div>';
+    zone.innerHTML = '<div class="fid-note" style="color:var(--red)">Les opportunités sont momentanément indisponibles. Utilisez Actualiser pour reprendre.</div>';
     return;
   }
   const b = document.getElementById('badge-convoyeur-opportunites');
@@ -4044,7 +4070,7 @@ function loadRecontacts() {
   }).catch(function () {
  if (_hcSyncCycle) return;
 
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Impossible de charger les demandes de recontact pour le moment.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Les demandes de recontact sont momentanément indisponibles. Utilisez Actualiser pour reprendre.</td></tr>';
   }));
 
   return Promise.allSettled(_hcSyncTasks);
@@ -4180,7 +4206,7 @@ function _fidEtatPalier(o, seuil) {
 
 function _fidHtmlIndisponible() {
   return '<div class="fid-note" style="color:var(--red)">'
-    + 'Impossible de charger votre programme de fidélité pour le moment.</div>';
+    + 'Votre programme de fidélité est momentanément indisponible. Utilisez Actualiser pour reprendre.</div>';
 }
 
 function _fidHtmlResume(o, prefixe) {
@@ -4378,6 +4404,17 @@ function _etatInformationsClient(lignes) {
 }
 
 var _hcInfosGeneration = 0;
+function _hcInfosMessage(zone, titre, texte, reprendre) {
+  const ancien = zone.querySelector('[data-infos-message]');
+  if (ancien) ancien.remove();
+  const message = document.createElement('div');
+  message.className = 'hc-infos-message';
+  message.dataset.infosMessage = '1';
+  message.setAttribute('role', 'status');
+  message.innerHTML = '<strong>' + escapeHtml(titre) + '</strong><span>' + escapeHtml(texte) + '</span>'
+    + (reprendre ? '<br><button class="btn btn-outline"' + actionHtml('loadInfosClient', []) + '>Reprendre le chargement</button>' : '');
+  zone.prepend(message);
+}
 async function loadInfosClient() {
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
 
@@ -4385,7 +4422,16 @@ async function loadInfosClient() {
   const zone = document.getElementById('client-infos-liste');
   if (!zone) return;
   window._hcInfosARelire = false;
-  if (!_hcSyncCycle) { zone.innerHTML = '<div style="font-size:.85rem;color:#666">Chargement…</div>'; }
+  const authGeneration = _hcAuthGeneration;
+  const proprietaire = (window._currentClient || {}).authUserId || window._dernierAuthUserTraite || '';
+  if (zone._hcProprietaire !== proprietaire) {
+    zone.innerHTML = ''; zone._hcInfosRendues = false; zone._hcProprietaire = proprietaire;
+  }
+  zone.setAttribute('aria-busy', 'true');
+  if (!zone._hcInfosRendues) {
+    zone.innerHTML = '';
+    _hcInfosMessage(zone, 'Vos informations', 'Nous préparons le suivi de vos dossiers…', false);
+  }
 
   let demandes = [];
   try {
@@ -4393,12 +4439,14 @@ async function loadInfosClient() {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
   } catch (e) {
- if (_hcSyncCycle) return;
-
-    if (generation !== _hcInfosGeneration) return;
-    zone.innerHTML = '<div role="alert" style="font-size:.85rem;color:var(--red)">'
-      + 'Impossible de charger vos demandes pour le moment.</div>'
-      + '<button class="btn btn-sm"' + actionHtml('loadInfosClient', []) + '>Réessayer</button>';
+    if (generation !== _hcInfosGeneration || authGeneration !== _hcAuthGeneration) return;
+    if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
+    zone.setAttribute('aria-busy', 'false');
+    if (e.code === 'SESSION_ABSENTE') { _hcSessionFermee(); return; }
+    if (!zone._hcInfosRendues) zone.innerHTML = '';
+    _hcInfosMessage(zone, 'Reprenons votre suivi', zone._hcInfosRendues
+      ? 'Les dernières informations affichées restent visibles. La connexion a été interrompue : relancez leur actualisation.'
+      : 'La connexion a été interrompue. Relancez le chargement pour retrouver vos informations.', true);
     return;
   }
 
@@ -4428,7 +4476,8 @@ async function loadInfosClient() {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
 
-  if (generation !== _hcInfosGeneration) return;
+  if (generation !== _hcInfosGeneration || authGeneration !== _hcAuthGeneration || resultats.some(r => !r)) return;
+  zone.setAttribute('aria-busy', 'false');
   const blocs = [];
   let restantesTotal = 0;
   let erreurs = 0;
@@ -4440,7 +4489,7 @@ async function loadInfosClient() {
     if (r.erreur) {
       erreurs++;
       blocs.push('<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '"><div class="card-header"><div>' + entete + '</div></div>'
-        + '<div class="hc-note visible">Impossible de vérifier les informations de cette demande pour le moment. Réessayez dans quelques instants.</div></div>');
+        + '<div class="hc-infos-message">Le suivi de ce dossier reste à actualiser.<br><button class="btn btn-outline"' + actionHtml('loadInfosClient', []) + '>Reprendre le chargement</button></div></div>');
       return;
     }
     const lignes = r.lignes || [];
@@ -4485,11 +4534,14 @@ async function loadInfosClient() {
   });
 
   if (!blocs.length) {
-    zone.innerHTML = '<div style="font-size:.85rem;color:#666" id="client-infos-vide">'
+    zone.innerHTML = '<div class="hc-infos-message" id="client-infos-vide"><strong>Votre dossier est à jour</strong>'
       + 'Aucune information ne manque actuellement. Merci !</div>';
+    zone._hcInfosRendues = true;
     return;
   }
-  zone.innerHTML = blocs.join('');
+  zone.innerHTML = '<div class="hc-infos-overview"><span><strong>' + blocs.length + '</strong> dossier' + (blocs.length > 1 ? 's' : '') + ' à suivre</span>'
+    + '<span><strong>' + restantesTotal + '</strong> information' + (restantesTotal > 1 ? 's' : '') + ' à compléter' + (erreurs ? ' · suivi partiel' : '') + '</span></div>' + blocs.join('');
+  zone._hcInfosRendues = true;
 }
 
 // Vérifie qu'une session Supabase Auth valide correspond bien à un
@@ -5462,8 +5514,26 @@ async function terminerReinitialisation() {
 // exactement quand Supabase a fini d'établir/mettre à jour la session — contrairement à un
 // getSession() ponctuel au chargement, qui pouvait lire une ancienne session encore en
 // mémoire avant que la nouvelle (issue du lien cliqué) ait fini de s'installer.
+var _hcAuthGeneration = 0;
+function _hcSessionFermee() {
+  ++_hcAuthGeneration; ++_hcInfosGeneration; ++_demandesClientGeneration;
+  _hcDemandesLecture = null;
+  window._currentClient = null; window._currentAdmin = null; window._currentConvoyeur = null;
+  window._dernierAuthUserTraite = null; window._hcRolesAutorises = []; window._hcRoleActif = null;
+  currentRole = '';
+  if (window.HCSync) window.HCSync.navigation();
+  document.getElementById('app').classList.remove('visible');
+  const nav = document.getElementById('mobile-bottom-nav'); if (nav) nav.style.display = 'none';
+  const cadre = document.getElementById('client-demande-cadre'); if (cadre) cadre.removeAttribute('src');
+  ['client-infos-liste','client-demandes-liste'].forEach(function(id) {
+    const zone = document.getElementById(id);
+    if (zone) { zone.innerHTML = ''; zone._hcInfosRendues = false; zone._hcProprietaire = null; }
+  });
+  _hcEcranAttente('Retrouvons votre espace', 'Votre session a été fermée. Reconnectez-vous pour retrouver vos dossiers.', true);
+}
 if (sbAuth) {
   sbAuth.auth.onAuthStateChange(function(event, session) {
+    if (event === 'SIGNED_OUT') { _hcSessionFermee(); return; }
     const aSession = !!(session && session.user);
     const modaleReinit = document.getElementById('modal-reinit-mdp');
     const reinitOuverte = !!(modaleReinit && modaleReinit.classList.contains('open'));
@@ -5529,7 +5599,15 @@ if (sbAuth) {
       window._dernierAuthUserTraite = cleUser;
       window._hcAttenteResolue = true;
       // Sortir du callback Auth avant les appels Supabase (verrou de session).
-      setTimeout(function(){ finaliserSessionParUid(session.user.email, session.user.id); }, 0);
+      const authGeneration = ++_hcAuthGeneration;
+      setTimeout(function(){
+        if (authGeneration !== _hcAuthGeneration) return;
+        finaliserSessionParUid(session.user.email, session.user.id).catch(function () {
+          if (authGeneration !== _hcAuthGeneration) return;
+          window._dernierAuthUserTraite = null;
+          _hcEcranAttente('Reprenons votre connexion', 'Votre espace n’a pas encore répondu. Réessayez dans quelques instants.', true);
+        });
+      }, 0);
     }
   });
 }
@@ -8542,7 +8620,7 @@ async function voirEtatsDesLieuxTest(id){
     }
     section.append(gallery);content.append(section);
   }
- }catch{content.textContent='Impossible de charger les rapports. Fermez puis réessayez.';}
+ }catch{content.textContent='Les rapports sont momentanément indisponibles. Fermez puis rouvrez cette fenêtre.';}
 }
 
 async function ouvrirDocumentPaiementTest(id, preparer) {
@@ -11126,7 +11204,7 @@ async function ouvrirFicheDemande(clientId) {
     if (corps && complements.length) corps.insertAdjacentHTML('beforeend', _blocFiche('Compléments validés', complements.map(function(l){return _ligneFiche(l.libelle || l.cle, l.valeur);}).join('')));
   } catch(e) {
     if (generation !== _ficheDemandeGeneration) return;
-    if (corps) corps.textContent = 'Impossible de charger le récapitulatif actualisé. Fermez puis réouvrez cette demande pour réessayer.';
+    if (corps) corps.textContent = 'Le récapitulatif est momentanément indisponible. Fermez puis rouvrez cette demande.';
   }
 }
 function _rendreFicheDemande(c) {
@@ -15014,7 +15092,7 @@ function declencherChampFichier(id) {
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
   'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',
   'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',
-  'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
+  'loadInfosClient', 'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
   'ouvrirPhotosMission', 'ouvrirRibPartenaire', 'ouvrirVideoCandidature', 'previsualiserDevis',
   'refuserConvoyeur', 'renvoyerLienCreationPartenaire', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',

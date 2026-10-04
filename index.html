@@ -10003,7 +10003,7 @@ async function ouvrirCompleterInformations(demandeId) {
   } catch (e) {
     if (generation !== _completerGeneration) return;
     if (zone) zone.innerHTML = '';
-    _completerAfficherMessage('Impossible de charger vos informations pour le moment. Réessayez.');
+    _completerAfficherMessage('Vos informations sont momentanément indisponibles. Fermez puis rouvrez ce formulaire pour reprendre.');
   }
 }
 
