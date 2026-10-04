@@ -39,7 +39,7 @@ async function load(){
   const [data,states,clients]=await Promise.all([sbFetchToutePage('preparations_missions?select=id,client_id,cle,empreinte,plan,mission_id,clients(numero_client),missions!preparations_missions_mission_id_fkey(reference,statut,convoyeurs!missions_convoyeur_id_fkey(prenom,nom))&order=updated_at.desc'),sbFetchToutePage('planning_helixcar?select=*'),sbFetchToutePage('clients?select=*,vehicules(id,marque_modele,immatriculation,livraison_apres_stockage,heure_recuperation_client),devis(statut,paiement_statut)&type_service=eq.stockage&order=created_at.desc')]);
   if(current!==ticket||_hcNavigationRole!=='admin')return;
   const candidates=data.filter(r=>['avant_stockage','apres_stockage'].includes(r.plan?.kind)&&!['annule','annulee'].includes(r.missions?.statut));
-  const passages=clientRows(clients),ids=[...new Set([...candidates,...passages].map(r=>r.client_id))],ready=new Set();
+  const passages=clientRows(clients),ids=[...new Set([...candidates,...passages].map(r=>r.client_id))],ready=new Set(),currentKeys=new Map();
   // Même contrôle serveur que l'ouverture de la préparation : paiement,
   // informations fournies/validées, aucune correction en attente.
   for(let i=0;i<ids.length;i+=4){
@@ -51,12 +51,14 @@ async function load(){
     }
     const source=response.data;
     if(!source?.client||!Array.isArray(source.vehicules))throw Error('Réponse de vérification indisponible.');
-    if(HCPreparation.build(source.client,source.vehicules,source.point_remise).some(p=>p.missing?.length))return;
+    const plans=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise),source.brouillons||[]);
+    if(plans.some(p=>p.missing?.length))return;
+    currentKeys.set(id,new Set(plans.map(p=>p.key)));
     ready.add(id);
    }));
    if(current!==ticket||_hcNavigationRole!=='admin')return;
   }
-  rows=[...candidates,...passages].filter(r=>ready.has(r.client_id));records=new Map(states.map(r=>[r.preparation_id,r]));render();
+  rows=[...candidates,...passages].filter(r=>ready.has(r.client_id)&&(r.clientPassage||r.mission_id||currentKeys.get(r.client_id)?.has(r.cle||r.plan.key)));records=new Map(states.map(r=>[r.preparation_id,r]));render();
  }catch(e){if(current===ticket)panel().textContent='Le planning reste à actualiser. '+e.message;}
 }
 function render(){

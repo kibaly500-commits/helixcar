@@ -13,11 +13,13 @@
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function adopt(source){
-    const fresh=HCPreparation.build(source.client,source.vehicules,source.point_remise),saved=source.brouillons||[];
+    const saved=source.brouillons||[],fresh=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise),saved);
     const plans=fresh.map(p=>{const s=saved.find(x=>x.cle===p.key);
       if(!s||!(s.empreinte===source.empreinte||s.mission_id))return p;
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
       if(!s.mission_id&&p.category==='convoyage'){
+        result.missing=p.missing;
+        result.rows=result.rows.filter(r=>r.label!=='Garde du véhicule').concat(p.rows.filter(r=>r.label==='Garde du véhicule'));
         for(const key of ['motorisation','restit_motorisation']){
           if(p[key]){result[key]=p[key];result.mission[key]=p[key];}
         }

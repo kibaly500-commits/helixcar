@@ -11,6 +11,23 @@
   const firstHour = h => { const x = text(h).match(/^(\d{1,2})[:h](\d{2})/); return x ? x[1].padStart(2,'0')+':'+x[2] : null; };
   const stamp = (d,h) => date(d) && firstHour(h) ? date(d)+'T'+firstHour(h) : null;
   const daysBetween = (a,b) => date(a)&&date(b) ? Math.round((Date.parse(date(b))-Date.parse(date(a)))/86400000) : null;
+  // Horaires métier français, indépendants du fuseau de l'appareil admin.
+  const paris = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  function instant(d,h) {
+    const value=stamp(d,h);if(!value)return null;
+    const target=Date.parse(value+'Z');if(!Number.isFinite(target))return null;
+    const choices=[0,1,2].map(h=>target-h*3600000).filter(t=>{
+      const p=Object.fromEntries(paris.formatToParts(new Date(t)).map(x=>[x.type,x.value]));
+      return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`===value;
+    });
+    return choices.length===1?choices[0]:null;
+  }
+  function elapsedHours(v) {
+    const pickup=v.pc_heure_type==='creneau'?v.pc_creneau_debut:v.heure_prise_en_charge;
+    const delivery=v.liv_heure_type==='creneau'?v.liv_creneau_fin:v.heure_livraison;
+    const start=instant(v.date_prise_en_charge,pickup),end=instant(v.date_livraison,delivery);
+    return start===null||end===null?null:(end-start)/3600000;
+  }
   const address = (v,end) => [v['adresse_'+end+'_rue'],[v['code_postal_'+end],v['ville_'+end]].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   const row = (label,value) => ({label,value:text(value)||'À préciser'});
   const service = {interieur:'Nettoyage intérieur',exterieur:'Nettoyage extérieur',interieur_exterieur:'Nettoyage intérieur et extérieur',preparation_complete:'Préparation complète',conseil:'Prestation à préciser'};
@@ -43,9 +60,11 @@
       const v=c.trajet_commun===true?Object.assign(legacy(c),Object.fromEntries(Object.entries(raw).filter(([,value])=>value!==null&&value!==''))):raw;
       const delta=daysBetween(v.date_prise_en_charge,v.date_livraison);
       const explicit=type==='stockage'||type==='convoyage_stockage';
-      const split=explicit||(delta!==null&&delta>2);
       const before=type!=='stockage'||c.stockage_acheminement==='helixcar';
       const after=type!=='stockage'||(v.livraison_apres_stockage===true||(v.livraison_apres_stockage!==false&&c.stockage_sortie==='helixcar'));
+      const duration=elapsedHours(v),both=before&&after;
+      const invalidStorage=explicit&&date(c.stockage_date_fin)&&date(v.date_livraison)&&date(v.date_livraison)<date(c.stockage_date_fin);
+      const split=both?(duration===null?explicit||delta>2:duration>48||invalidStorage):explicit;
       const base={type_mission:'convoyage',marque_modele:v.marque_modele,type_vehicule:v.type_vehicule,immatriculation:v.immatriculation,vin:v.vin,motorisation:v.motorisation,nb_vehicules:1,
         ville_depart:v.ville_depart,ville_arrivee:v.ville_arrivee,adresse_depart:address(v,'depart'),adresse_arrivee:address(v,'arrivee'),contact_depart_nom:v.pc_contact_nom,contact_depart_tel:v.pc_contact_tel,contact_arrivee_nom:v.liv_contact_nom,contact_arrivee_tel:v.liv_contact_tel,
         date_prise_en_charge:stamp(v.date_prise_en_charge,hour(v,'pc')),date_livraison:stamp(v.date_livraison,hour(v,'liv')),plateau:v.mode_transport==='plateau',consignes:join(v.consignes,c.notes,c.stockage_notes),
@@ -59,9 +78,11 @@
         // appartient à HelixCar et ne fait pas partie de l'annonce partenaire.
         const title='Convoyage automobile';
         const details=[row('Départ',m.ville_depart),row('Arrivée',m.ville_arrivee),row('Prise en charge',join(start,sh)),row('Livraison',join(end,eh)),row('Véhicule',join(v.type_vehicule,v.marque_modele)),row('Transport',m.plateau?'Plateau':'Convoyage par la route')];
-        if(!split&&delta>0)details.push(row('Garde du véhicule',delta+' jour'+(delta>1?'s':'')));
+        if(!split&&duration>0)details.push(row('Garde du véhicule','Par le même convoyeur · '+Math.floor(duration)+' h'+(Math.round(duration%1*60)?' '+Math.round(duration%1*60)+' min':'')));
         if(m.restitution)details.push(row('Restitution',join(v.restit_type_vehicule,v.restit_marque_modele)),row('Trajet de restitution',join(m.ville_arrivee,v.restit_ville)),row('Restitution prévue',join(v.restit_date,hour(v,'restit'))));
         const missing=missingVins(m);if(!m.ville_depart||!m.ville_arrivee)missing.push('Villes du trajet');if(!v.marque_modele)missing.push('Modèle du véhicule');if(!start||!end)missing.push('Dates du trajet');if(daysBetween(start,end)<0)missing.push('Livraison antérieure à la prise en charge');
+        if(both&&duration===null)missing.push('Horaires de prise en charge et livraison nécessaires au calcul des 48 heures');
+        if(both&&duration!==null&&duration<0)missing.push('Livraison antérieure à la prise en charge');
         plans.push({key:(v.id||'principal')+':'+leg,title,category:'convoyage',kind:leg,vehicule_id:v.id||null,position:v.position||1,nb_professionnels:1,date_debut:date(start),date_fin:date(end),zone:join(m.ville_depart,m.ville_arrivee),rows:details,mission:m,missing,stockage:split?join(c.stockage_date_debut||v.date_prise_en_charge,c.stockage_date_fin||v.date_livraison):'',heure_prise_en_charge:firstHour(sh)||'',distance:null,motorisation:v.motorisation||'',restit_motorisation:v.restit_motorisation||''});
       };
       if(split){if(before)add('avant_stockage');if(after)add('apres_stockage');}else add('direct');
@@ -70,5 +91,10 @@
   // Cette projection exclut les champs privés, même s'ils sont ajoutés à une mission.
   function publicData(p){return {title:p.title,category:p.category,rows:p.rows.concat(p.category==='convoyage'?[row('Distance',p.distance==null?'À préciser':p.distance+' km'),row('Motorisation',p.motorisation),...(p.mission.restitution?[row('Motorisation restitution',p.restit_motorisation)]:[])]:[]),remuneration:p.remuneration==null?null:Number(p.remuneration),nb_professionnels:p.nb_professionnels};}
   function missingVins(m){const missing=[];if(!String(m.vin||'').trim())missing.push('VIN du véhicule livré (obligatoire)');if(m.restitution&&!String(m.restit_vin||'').trim())missing.push('VIN du véhicule à restituer (obligatoire)');return missing;}
-  const api={build,publicData,stamp,daysBetween,missingVins};if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPreparation=api;
+  function preservePublished(fresh,saved) {
+    const family=p=>String(p.key||'').split(':')[0];
+    const pinned=new Map(saved.filter(s=>s.mission_id).map(s=>[family(s.plan),s.plan.kind==='direct']));
+    return fresh.filter(p=>!pinned.has(family(p))).concat(saved.filter(s=>pinned.has(family(s.plan))&&(s.mission_id||pinned.get(family(s.plan))===(s.plan.kind==='direct'))).map(s=>s.plan));
+  }
+  const api={build,publicData,stamp,daysBetween,elapsedHours,missingVins,preservePublished};if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPreparation=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -80,6 +80,19 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
   assert.equal(await page.locator('[data-planning-id]').count(),0);
  }
  await page.evaluate(()=>{__blocked={};});await page.locator('#hc-planning-refresh').click();await page.waitForSelector('[data-planning-id="p0"]');assert.equal(await self.count(),2);
+ // Un ancien brouillon de stockage court ne doit plus créer un passage fictif.
+ await page.evaluate(()=>{__source.vehicules[0].heure_livraison='09:00';});
+ await page.locator('#hc-planning-refresh').click();
+ assert.equal(await page.locator('[data-planning-id="p0"], [data-planning-id="p1"]').count(),0);
+ assert.equal(await self.count(),2);
+ await page.evaluate(()=>ouvrirPreparationDemande('client-1'));
+ assert.equal(await page.locator('[data-field="heure_remise"], [data-field="heure_retrait"]').count(),0);
+ assert.match(await page.locator('#hc-prep-body').innerText(),/Par le même convoyeur/);
+ await page.locator('#hc-prep-close').click();
+ // Les missions déjà publiées conservent leur organisation existante.
+ await page.evaluate(()=>{__source.brouillons[0].mission_id='mission-publiee';__rows[0].mission_id='mission-publiee';});
+ await page.locator('#hc-planning-refresh').click();
+ assert.equal(await page.locator('[data-planning-id="p0"], [data-planning-id="p1"]').count(),2);
  await page.evaluate(()=>{__blocked={'self':'Network error'};});await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('vérification des dossiers'));
  assert.equal(await page.locator('[data-planning-id]').count(),0);
  await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),0);

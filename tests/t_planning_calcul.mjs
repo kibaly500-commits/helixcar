@@ -21,8 +21,8 @@ await assert.rejects(estimate({...incoming,mission:{...incoming.mission,adresse_
 await assert.rejects(estimate(incoming,19,route,now),/Battement/);
 await assert.rejects(estimate(incoming,45,route,Date.parse('2027-01-01Z')),/passé/);
 await assert.rejects(estimate({...incoming,mission:{...incoming.mission,plateau:true}},45,route,now),/plateau/);
-const late=P.build(client,[{...vehicle,heure_livraison:'00:30'}],C.POINT)[1];await assert.rejects(estimate(late,45,route,now),/fin du stockage/);
-const returned=P.build({...client,type_service:'convoyage'},[{...vehicle,restitution_concernee:true,restit_adresse_rue:'2 rue Retour',restit_code_postal:'92000',restit_ville:'Nanterre',restit_date:'2026-11-10',restit_heure:'14:30'}],C.POINT)[0];r=await estimate(returned,45,route,now);assert.equal(r.restitution.km,40);assert.ok(r.warnings.some(x=>x.includes('Restitution incompatible')));
+const late=P.build({...client,stockage_date_fin:'2026-11-11'},[{...vehicle,date_livraison:'2026-11-11',heure_livraison:'00:30'}],C.POINT)[1];await assert.rejects(estimate(late,45,route,now),/fin du stockage/);
+const returned=P.build({...client,type_service:'convoyage'},[{...vehicle,date_livraison:'2026-11-09',restitution_concernee:true,restit_adresse_rue:'2 rue Retour',restit_code_postal:'92000',restit_ville:'Nanterre',restit_date:'2026-11-09',restit_heure:'14:30'}],C.POINT)[0];r=await estimate(returned,45,route,now);assert.equal(r.restitution.km,40);assert.ok(r.warnings.some(x=>x.includes('Restitution incompatible')));
 assert.equal(C.overlap(C.slot('avant_stockage','2026-11-08T10:00'),C.slot('apres_stockage','2026-11-08T10:15')),true);
 assert.equal(C.overlap(C.slot('avant_stockage','2026-11-08T10:00'),C.slot('apres_stockage','2026-11-08T10:20')),false);
 assert.equal((await handle({},{})).status,401);
