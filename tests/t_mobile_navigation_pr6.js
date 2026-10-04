@@ -101,7 +101,14 @@ const {urlFichier} = require('./env');
    const r={blocked:document.querySelector('#hc-cal-grille [data-jour="25"]').disabled,
     message:document.getElementById('hc-cal-chrono-note').textContent.includes('23/10/2027')};
    _hcSelectionnerJour(25);r.preserved=document.getElementById('pro-date-debut').value==='2027-10-07';
-   _hcFermerCalendrier();return r;
+   _hcSelectionnerJour(9);r.staysOpen=_hcCalOverlay.classList.contains('open');
+   document.getElementById('hc-cal-ok').click();r.okCloses=!_hcCalOverlay.classList.contains('open');
+   const radio=(name,v)=>document.querySelector('input[name="'+name+'"][value="'+v+'"]').checked=true;
+   radio('type-service','stockage');radio('stock-acheminement','helixcar');radio('stock-sortie','helixcar');
+   document.getElementById('stock-debut').value='2027-10-07';document.getElementById('stock-fin').value='2027-10-23';
+   rendreFichesVehicules();_hcEffacerSousVeh(0,'pc');
+   r.inheritedDate=document.getElementById('veh-0-pc-date').value==='2027-10-07';
+   return r;
   });
   for(const [key,ok] of Object.entries(chronologieCadre))L.check('Dashboard : calendrier cohérent '+key,ok);
   L.check('Dashboard : aucun verrou plein écran du formulaire public',await cadre.evaluate(()=>!document.documentElement.classList.contains('hc-client-mobile-open')));

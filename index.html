@@ -12226,6 +12226,16 @@ function validerVehicule(i) {
   _hcRetourListeVehicules();
 }
 
+// Les dates héritées appartiennent à la période, pas à la fiche effacée.
+function _hcPreserverDateHeritee(champ) {
+  if (!champ || !/^veh-\d+-pc-date$/.test(champ.id) || !_avecStockage() || _acheminementStockage() !== 'helixcar') return false;
+  var debut = (document.getElementById('stock-debut') || {}).value;
+  if (!debut) return false;
+  champ.value = debut;
+  _clearFieldError(champ.id);
+  return true;
+}
+
 function effacerVehicule(i) {
   var aDesDonnees = false;
   ['type','marque','immat','vin','motorisation'].concat(_champsRequisVehicule(i)).forEach(function (s) {
@@ -12237,6 +12247,7 @@ function effacerVehicule(i) {
   var contenu = document.getElementById('veh-contenu-' + i);
   if (contenu) {
     contenu.querySelectorAll('input').forEach(function (el) {
+      if (_hcPreserverDateHeritee(el)) return;
       // Objectif 7 (V50.45) — BUG CONCRET : seuls les checkbox étaient
       // décochés ; les boutons radio (Livraison Oui/Non, Restitution
       // Oui/Non, Mode de transport…) gardaient leur .checked, laissant
@@ -21681,14 +21692,12 @@ function _hcSelectionnerJour(j) {
     return;
   }
 
-  // Comportement standard (inchangé pour tous les autres champs) :
-  // sélection puis fermeture immédiate.
+  // La sélection reste visible ; seul OK termine la sélection.
   var champ = document.getElementById(_hcCalChampActif);
   if (!champ) { _hcFermerCalendrier(); return; }
   champ.value = _hcFormaterYMD(date);
   _hcDeclencherChange(champ);
-  _hcFermerCalendrier();
-  try { if (window._hcFocusApresDate) _hcFocusApresDate(champ); else champ.focus(); } catch (e) {}
+  _hcRendreCalendrier();
 }
 
 // EFFACER, en mode période : vide UNIQUEMENT les deux bornes de la
@@ -22369,6 +22378,7 @@ document.addEventListener('click', function (e) {
   window._hcEffacerSousVeh=function(i,cle){
     var bloc=document.getElementById('veh-'+i+'-sous-'+cle); if(!bloc)return;
     bloc.querySelectorAll('input,textarea,select').forEach(function(el){
+      if(_hcPreserverDateHeritee(el))return;
       if(el.type==='radio'||el.type==='checkbox') el.checked=false;
       else if(el.tagName==='SELECT') el.selectedIndex=0;
       else el.value='';

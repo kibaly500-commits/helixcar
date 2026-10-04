@@ -32,6 +32,10 @@
     }
     return result;
   }
+  // Le plancher prise en charge est déjà expliqué par les jours grisés.
+  function silentLowerBound(pair, id) {
+    return pair.b.date === id && (pair.a.label === 'prise en charge' || pair.a.label === 'début du stockage');
+  }
   function message(pair, id, time) {
     var preceding = pair.a.date === id, other = preceding ? pair.b : pair.a;
     return (preceding ? 'Pour choisir une date après ' : 'Pour choisir une date avant ') +
@@ -81,14 +85,16 @@
       if (/hc-cal-jour--(p[12]-|double|triple|transition)/.test(b.className)) b.setAttribute('data-hc-repere','true');
     });
     var id=calendarId(), instructions=[];
-    pairs(id).forEach(function(p){if(value(p.a.date)&&id===p.b.date || value(p.b.date)&&id===p.a.date)instructions.push(message(p,id,false));});
+    pairs(id).forEach(function(p){if(!silentLowerBound(p,id) && (value(p.a.date)&&id===p.b.date || value(p.b.date)&&id===p.a.date))instructions.push(message(p,id,false));});
     calendarNote(instructions.join(' '));
   };
   var select=_hcSelectionnerJour;
   window._hcSelectionnerJour=function(j) {
     var id=calendarId();
     if (Number.isInteger(j) && j>0 && j<=new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche+1,0).getDate()) {
-      var why=issue(id,_hcFormaterYMD(new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche,j)));
+      var candidate=_hcFormaterYMD(new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche,j));
+      if(pairs(id).some(function(p){return silentLowerBound(p,id) && value(p.a.date) && candidate<value(p.a.date);})) return;
+      var why=issue(id,candidate);
       if (why) {calendarNote(why);return;}
     }
     return select(j);
