@@ -6831,7 +6831,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <div style="display:flex;flex-direction:column;gap:8px" id="service-type-group">
           <label class="radio-opt"><input type="radio" name="type-service" value="stockage" onclick="onChoixService(this.value)"><span>Stockage automobile <button type="button" class="hc-help-btn" data-help="Le stockage peut être associé à une prise en charge et/ou une livraison de votre véhicule par HelixCar." aria-label="Aide sur le stockage automobile">i</button></span></label>
           <label class="radio-opt"><input type="radio" name="type-service" value="convoyage" onclick="onChoixService(this.value)"><span>Convoyage automobile</span></label>
-          <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService(this.value)"><span>Trouver un professionnel automobile</span></label>
+          <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService(this.value)"><span>Recherche d’un professionnel automobile</span></label>
           <!-- LOT F01 (F01-010/011) — option réservée aux entreprises : pour un
                particulier, le bouton radio est réellement désactivé
                (nettSyncOptionService) et l'option grisée ; le serveur
@@ -11087,7 +11087,7 @@ function construireRecapProfessionnel() {
                _recapLigne('Téléphone', g('client-tel'));
   var html = _recapBloc('Client', client, 1);
 
-  html += _recapBloc('Service', _recapLigne('Prestation', 'Trouver un professionnel automobile'), 2);
+  html += _recapBloc('Service', _recapLigne('Prestation', 'Recherche d’un professionnel automobile'), 2);
 
   var besoin = _recapLigne('Besoin', PRO_LIB_CATEGORIE[d.categorie] || '');
   besoin += _recapLigne(d.categorie === 'renfort' ? 'Mission' : 'Spécialité', _proLibelleMetier(d));
