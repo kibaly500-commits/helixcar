@@ -3311,7 +3311,7 @@ async function loadMissionsClient() {
   if (sub) sub.textContent = missions.length ? missions.length + ' mission(s)' : '';
   if (!missions.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">'
-      + 'Aucune mission pour le moment. Vos missions apparaîtront ici une fois votre devis payé et vos informations complètes.</td></tr>';
+      + 'Aucune mission pour le moment. Vos missions apparaîtront ici dès que leur préparation sera finalisée.</td></tr>';
     return;
   }
   tbody.innerHTML = missions.map(function (m) {
