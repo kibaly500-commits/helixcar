@@ -7003,7 +7003,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         </div>
         <!-- V50.3G — champ déplacé ici : n'apparaît que si le client dépose
              lui-même (cf. _heureEntreeStockageApplicable(), inchangée). -->
-        <div class="modal-form-group" id="bloc-stock-heure-entree">
+        <div class="modal-form-group" id="bloc-stock-heure-entree" style="display:none">
           <label>Heure d'entrée prévue <span class="field-required">*</span></label>
           <input id="stock-heure-entree" type="time" readonly onchange="_onChangementHeureEntreeStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
         </div>
@@ -7024,7 +7024,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
              stockage_heure_sortie) — seul le texte visible change. N'apparaît
              que si le client récupère lui-même (cf.
              _heureSortieStockageApplicable(), inchangée). -->
-        <div class="modal-form-group" id="bloc-stock-heure-sortie">
+        <div class="modal-form-group" id="bloc-stock-heure-sortie" style="display:none">
           <label>Heure de récupération prévue <span class="field-required">*</span></label>
           <input id="stock-heure-sortie" type="time" readonly onchange="_verifierHeureRecupStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
         </div>
@@ -13375,13 +13375,13 @@ function _viderBlocGlobal(prefixe) {
 // décision (cf. _scenarioTrajet() : pc = _acheminementStockage() ===
 // 'helixcar' — miroir exact, aucune deuxième source de vérité créée).
 function _heureEntreeStockageApplicable() {
-  return _avecStockage() && _acheminementStockage() !== 'helixcar';
+  return _avecStockage() && _acheminementStockage() === 'depot_client';
 }
 // heure de sortie stockage : uniquement si le CLIENT récupère lui-même
 // après stockage (si HelixCar livre, le client renseigne déjà sa date/
 // heure de livraison dans le bloc Livraison).
 function _heureSortieStockageApplicable() {
-  return _avecStockage() && _sortieStockage() !== 'helixcar';
+  return _avecStockage() && _sortieStockage() === 'recuperation_client';
 }
 // V50.3F — bascule la visibilité des heures stockage et VIDE réellement la
 // valeur DOM devenue inapplicable. Politique retenue : la MÊME que
@@ -13402,10 +13402,12 @@ function _majVisibiliteHeuresStockage() {
   if (!entreeOk) {
     var elE = document.getElementById('stock-heure-entree');
     if (elE) elE.value = '';
+    _clearFieldError('stock-heure-entree');
   }
   if (!sortieOk) {
     var elS = document.getElementById('stock-heure-sortie');
     if (elS) elS.value = '';
+    _clearFieldError('stock-heure-sortie');
   }
 }
 
