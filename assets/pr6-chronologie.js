@@ -158,14 +158,20 @@
   }
   function minutes(v) {var m=/^(\d{2}):(\d{2})$/.exec(v||'');return m?Number(m[1])*60+Number(m[2]):null;}
   function clock(n) {return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
+  function plannedTime(op, fallback) {
+    var start=minutes(value(op.start)), end=minutes(value(op.end));
+    if(op.start!==op.end && start!==null && end!==null)
+      return op.label+' prévue entre '+clock(start)+' et '+clock(end);
+    return op.label+' prévue à '+clock(fallback);
+  }
   function limits(id, basic) {
     var date=dateForTime(id), result={min:0,max:1439,reference:'',label:'',active:false};
     var ctx=date && _hcContexteChamp(date);
     if(!ctx || !/^(vehicule|mono)$/.test(ctx.type))return result;
     pairs(date).forEach(function(p){
       if(!value(p.a.date)||value(p.a.date)!==value(p.b.date))return;
-      if(p.b.date===date){var end=minutes(value(p.a.end));if(end!==null){result.min=Math.max(result.min,end+p.gap);result.reference=p.a.label+' prévue à '+clock(end);result.label=p.b.label;result.active=true;}}
-      if(p.a.date===date){var begin=minutes(value(p.b.start));if(begin!==null){result.max=Math.min(result.max,begin-p.gap);result.upper=p.b.label+' prévue à '+clock(begin);result.active=true;}}
+      if(p.b.date===date){var end=minutes(value(p.a.end));if(end!==null){result.min=Math.max(result.min,end+p.gap);result.reference=plannedTime(p.a,end);result.label=p.b.label;result.active=true;}}
+      if(p.a.date===date){var begin=minutes(value(p.b.start));if(begin!==null){result.max=Math.min(result.max,begin-p.gap);result.upper=plannedTime(p.b,begin);result.active=true;}}
     });
     if(!basic && result.active && _hpContexteActif && _hpContexteActif.mode==='creneau'){
       if(id===_hpContexteActif.idDebut)result.max-=15;
