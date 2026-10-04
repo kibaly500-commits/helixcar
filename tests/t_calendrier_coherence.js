@@ -26,7 +26,7 @@ const L=require('./lib');
  r.hourBlocked=valueOf('veh-0-liv-heure')==='14:00'&&document.getElementById('hp-chrono-note').textContent.includes('14:45');
  _hpAjuster('veh-0-liv-heure','min',1);r.hourAllowed=valueOf('veh-0-liv-heure')==='14:15';_hpFermerPicker();
  v('veh-0-liv-date','2027-10-22');v('veh-0-liv-heure','16:00');
- open('veh-0-liv-date');_hcSelectionnerJour(23);r.sameDayDateBlocked=valueOf('veh-0-liv-date')==='2027-10-22';
+ open('veh-0-liv-date');_hcSelectionnerJour(23);r.sameDayDateAdjusted=valueOf('veh-0-liv-date')==='2027-10-23'&&valueOf('veh-0-liv-heure')==='14:45';
  v('veh-0-liv-heure','14:30');open('veh-0-liv-date');_hcSelectionnerJour(23);r.sameDayDateAllowed=valueOf('veh-0-liv-date')==='2027-10-23';
  radio('veh-0-liv-htype','creneau');v('veh-0-liv-cdeb','14:00');v('veh-0-liv-cfin','14:30');
  _hpOuvrirPicker(document.getElementById('veh-0-liv-cfin'));_hpAjuster('veh-0-liv-cfin','h',1);

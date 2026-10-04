@@ -55,6 +55,28 @@
     }
     return '';
   }
+  // Preview an adjustment without changing fields while drawing the calendar.
+  function datePlan(id, candidate) {
+    var why=issue(id,candidate), changes={};
+    if(!why || _hcCalPeriode)return {why:why,changes:changes};
+    var op=operations(_hcContexteChamp(id)).filter(function(o){return o.date===id;})[0];
+    if(!op || !op.start || !op.end)return {why:why,changes:changes};
+    var start=minutes(value(op.start)), end=minutes(value(op.end));
+    if(start===null || end===null || end<start)return {why:why,changes:changes};
+    var low=0, high=1439, duration=end-start, invalidDate=false;
+    pairs(id).forEach(function(p){
+      var a=p.a.date===id?candidate:value(p.a.date), b=p.b.date===id?candidate:value(p.b.date);
+      if(!a||!b)return;
+      if(b<a){invalidDate=true;return;}
+      var days=Math.round((Date.parse(b)-Date.parse(a))/86400000);
+      if(p.b.date===id){var prev=minutes(value(p.a.end));if(prev!==null)low=Math.max(low,prev+p.gap-days*1440);}
+      if(p.a.date===id){var next=minutes(value(p.b.start));if(next!==null)high=Math.min(high,next-p.gap+days*1440);}
+    });
+    if(invalidDate || low+duration>high)return {why:why,changes:changes};
+    var adjusted=Math.max(low,Math.min(high-duration,start));
+    changes[op.start]=clock(adjusted);changes[op.end]=clock(adjusted+duration);
+    return {why:issue(id,candidate,changes),changes:changes};
+  }
   function note(parent, id, text, before) {
     var el=document.getElementById(id);
     if (!el) {el=document.createElement('p');el.id=id;el.className='hc-chrono-note';el.setAttribute('aria-live','polite');parent.insertBefore(el,before || null);}
@@ -77,7 +99,7 @@
   };
   var allowed=_hcJourAutorise;
   window._hcJourAutorise=function(date) {
-    return allowed(date) && !issue(calendarId(),_hcFormaterYMD(date));
+    return allowed(date) && !datePlan(calendarId(),_hcFormaterYMD(date)).why;
   };
   var render=_hcRendreCalendrier;
   window._hcRendreCalendrier=function() {
@@ -110,10 +132,14 @@
     if (Number.isInteger(j) && j>0 && j<=new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche+1,0).getDate()) {
       var candidate=_hcFormaterYMD(new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche,j));
       if(pairs(id).some(function(p){return silentLowerBound(p,id) && value(p.a.date) && candidate<value(p.a.date);})) return;
-      var why=issue(id,candidate);
+      var plan=datePlan(id,candidate), why=plan.why;
       if (why) {calendarNote(why);return;}
+      if(!allowed(new Date(_hcCalAnneeAffichee,_hcCalMoisAffiche,j)))return;
+      Object.keys(plan.changes).forEach(function(key){document.getElementById(key).value=plan.changes[key];_clearFieldError(key);});
     }
-    return select(j);
+    var result=select(j);
+    if(plan)Object.keys(plan.changes).forEach(function(key){_hpDeclencherEvenements(document.getElementById(key));});
+    return result;
   };
   // Défense à la validation : les dates restent contrôlées même sans horaires
   // (ancien brouillon / valeur restaurée hors du calendrier).

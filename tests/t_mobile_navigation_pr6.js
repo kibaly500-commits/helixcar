@@ -102,7 +102,9 @@ const {urlFichier} = require('./env');
     set('veh-0-pc-date','2027-10-07');set('veh-0-liv-date','2027-10-21');set('veh-0-restit-date','2027-10-21');set('veh-0-liv-heure','16:00');
     const e=document.getElementById('veh-0-restit-heure');e.value='';_hpOuvrirPicker(e);
     const message=document.getElementById('hp-chrono-note').textContent;
-    document.getElementById('hp-ok').click();return message.includes('16:15')&&e.value==='16:15'&&!_hpOverlay.classList.contains('open');
+    document.getElementById('hp-ok').click();const hourOk=message.includes('16:15')&&e.value==='16:15'&&!_hpOverlay.classList.contains('open');
+    set('veh-0-restit-date','2027-10-22');e.value='09:00';_hcOuvrirCalendrier(document.getElementById('veh-0-restit-date'));_hcCalAnneeAffichee=2027;_hcCalMoisAffiche=9;_hcRendreCalendrier();_hcSelectionnerJour(21);
+    const adjusted=e.value==='16:15'&&document.getElementById('veh-0-restit-date').value==='2027-10-21';_hcFermerCalendrier();return hourOk&&adjusted;
    },service);
    L.check('Dashboard '+service+' : restitution proposée et validée à heure compatible',hour);
   }
