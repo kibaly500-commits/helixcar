@@ -21651,9 +21651,8 @@ function _hcRendreCalendrier() {
       (periode.finRestit ? '<span><i class="p2"></i>Restitution</span>' : '');
     if (_hcCalPeriode) {
       var complete = periode.debut && periode.finLiv && periode.finLiv >= periode.debut;
-      legende.innerHTML += '<span class="hc-cal-instruction">' + (complete
-        ? 'Période sélectionnée · Validez avec OK'
-        : _hcCalSousEtapePeriode === 'fin' ? 'Choisissez la date de fin' : 'Choisissez la date de début') + '</span>';
+      if (!complete) legende.innerHTML += '<span class="hc-cal-instruction">' +
+        (_hcCalSousEtapePeriode === 'fin' ? 'Choisissez la date de fin' : 'Choisissez la date de début') + '</span>';
     }
   } else legende.innerHTML = '';
 

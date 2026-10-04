@@ -63,6 +63,7 @@
   function calendarId() {return _hcCalPeriode ? _hcCalPeriode[_hcCalSousEtapePeriode] : _hcCalChampActif;}
   function calendarNote(text) {
     if (!_hcCalOverlay) return;
+    if (_hcCalPeriode && _hcCalPeriode.debut === 'stock-debut') text = '';
     note(_hcCalOverlay.querySelector('.hc-cal'),'hc-cal-chrono-note',text,_hcCalOverlay.querySelector('#hc-cal-actions'));
   }
   var oldMin=_hcDateMinimaleChamp, oldMax=_hcDateMaximaleChamp;
