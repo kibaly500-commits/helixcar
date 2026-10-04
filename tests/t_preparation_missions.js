@@ -46,6 +46,10 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' motif VIN visible avant publication',await page.locator('.hc-prep-incomplete').innerText().then(t=>t.includes('VIN du véhicule livré (obligatoire)')));
  await page.evaluate(async()=>{__source.brouillons[0].plan.missing=[];await ouvrirPreparationDemande('client-1');});
  L.check(width+' ancien brouillon revérifié pour les VIN',await page.locator('.hc-prep-incomplete').innerText().then(t=>t.includes('VIN du véhicule livré (obligatoire)')));
+ await page.evaluate(async()=>{__source.vehicules[0].motorisation='Diesel';__source.vehicules[0].restit_motorisation='Électrique';__source.brouillons[0].plan.motorisation='';__source.brouillons[0].plan.restit_motorisation='Essence';await ouvrirPreparationDemande('client-1');});
+ L.check(width+' motorisations connues sans nouvelle saisie',await page.locator('[data-field="motorisation"], [data-field="restit_motorisation"]').count()===0&&await page.locator('#hc-prep-body').innerText().then(t=>t.includes('Diesel')&&t.includes('Électrique')&&t.includes('Reprise de la demande')));
+ await page.locator('[data-prep-save]').click();
+ L.check(width+' motorisations source conservées malgré ancien brouillon',await page.evaluate(()=>{const p=__source.brouillons[0].plan;return p.motorisation==='Diesel'&&p.restit_motorisation==='Électrique'&&p.mission.motorisation==='Diesel'&&p.mission.restit_motorisation==='Électrique';}));
  const filtering=await page.evaluate(()=>{
    _demandesDevisListe=[{id:'a',nom:'Alpha',email:'a@example.test'},{id:'b',nom:'Beta',email:'b@example.test'},{id:'c',nom:'Gamma',email:'a@example.test'}];
    _devisParClient={a:{statut:'accepte',paiement_statut:'en_attente'},b:{statut:'accepte',paiement_statut:'paye'},c:{statut:'envoye',consulte_le:'2026-09-01'}};

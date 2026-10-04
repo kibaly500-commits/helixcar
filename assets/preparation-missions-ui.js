@@ -18,6 +18,9 @@
       if(!s||!(s.empreinte===source.empreinte||s.mission_id))return p;
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
       if(!s.mission_id&&p.category==='convoyage'){
+        for(const key of ['motorisation','restit_motorisation']){
+          if(p[key]){result[key]=p[key];result.mission[key]=p[key];}
+        }
         for(const [label,key] of [['Prise en charge','date_prise_en_charge'],['Livraison','date_livraison']]){
           if((label==='Prise en charge'&&p.kind!=='apres_stockage')||(label==='Livraison'&&p.kind!=='avant_stockage')){
             result.mission[key]=p.mission[key];const row=result.rows.find(r=>r.label===label);if(row)row.value=p.rows.find(r=>r.label===label).value;
@@ -74,7 +77,10 @@
     }return '<div class="hc-prep-public" data-opportunite="'+esc(o.id)+'">'+html+'</div>';
   };
   function input(p,i,key,label,type='number'){return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'0.1':'0.01')+'"':'')+' value="'+esc(p[key]??'')+'"></label>';}
-  function motor(p,i,key,label){return '<label>'+label+'<select data-plan="'+i+'" data-field="'+key+'">'+['','Essence','Diesel','Hybride','Hybride rechargeable','Électrique','Autre'].map(x=>'<option value="'+esc(x)+'"'+(p[key]===x?' selected':'')+'>'+esc(x||'À préciser')+'</option>').join('')+'</select></label>';}
+  function motor(p,i,key,label){
+    const source=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise).find(x=>x.key===p.key);
+    if(source?.[key])return '<div><span>'+esc(label)+'</span><p><strong>'+esc(p[key])+'</strong></p><small class="hc-prep-muted">Reprise de la demande</small></div>';
+    return '<label>'+label+'<select data-plan="'+i+'" data-field="'+key+'">'+['','Essence','Diesel','Hybride','Hybride rechargeable','Électrique','Autre'].map(x=>'<option value="'+esc(x)+'"'+(p[key]===x?' selected':'')+'>'+esc(x||'À préciser')+'</option>').join('')+'</select></label>';}
   function render(){
     if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
@@ -85,6 +91,7 @@
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>';
+      if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
