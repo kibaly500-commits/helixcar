@@ -15,6 +15,8 @@ const init=source.split('const INIT = `')[1].split('`;')[0];
   await frame.locator('#completer-envoyer').click();
   await frame.locator('.hc-completion-confirm').waitFor({state:'visible',timeout:3000});
   L.check(width+' : confirmation visible dans le Dashboard',await frame.locator('.hc-completion-confirm [data-confirm]').isVisible());
+  const geometry=await frame.locator('.hc-completion-confirm').evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,vw:innerWidth,vh:innerHeight};});
+  L.check(width+' : confirmation centrée et contenue',Math.abs(geometry.x+geometry.w/2-geometry.vw/2)<2&&Math.abs(geometry.y+geometry.h/2-geometry.vh/2)<2&&geometry.x>=0&&geometry.y>=0&&geometry.y+geometry.h<=geometry.vh);
   await frame.locator('.hc-completion-confirm [data-cancel]').click();
   L.check(width+' : annulation conserve la saisie',await frame.locator('#completer-champ-contact_pc_nom').inputValue()==='TEST-QA Contact');
   await frame.locator('#completer-envoyer').click();
