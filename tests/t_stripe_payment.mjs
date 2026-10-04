@@ -79,3 +79,18 @@ test('HC-2026-2184 autorisé uniquement pour son devis et son propriétaire',asy
  f.c.auth_user_id='user';f.q.id=ID;
  assert.equal((await checkout(req(),f)).status,403);
 });
+
+test('DEV-2026-0096 : seul le couple dossier/devis du propriétaire est autorisé',async()=>{
+ const f=fixture();f.c.email=f.user.email='test-owner@example.invalid';
+ f.c.id=f.q.client_id='2f3abee7-7df2-417f-9f02-72bb912b63f5';
+ f.q.id='476ec59f-c51b-4d29-a4fe-541343d85438';
+ assert.equal((await checkout(req({devis_id:f.q.id}),f)).status,200);
+ assert.equal(f.created,1);assert.equal(f.rpcs,0);
+ f.c.auth_user_id='other';
+ assert.equal((await checkout(req({devis_id:f.q.id}),f)).status,404);
+ f.c.auth_user_id='user';f.q.id=ID;
+ assert.equal((await checkout(req(),f)).status,403);
+ f.q.id='476ec59f-c51b-4d29-a4fe-541343d85438';f.c.id=f.q.client_id='other-client';
+ assert.equal((await checkout(req({devis_id:f.q.id}),f)).status,403);
+ assert.equal(f.created,1);assert.equal(f.rpcs,0);
+});

@@ -42,7 +42,8 @@ export async function checkout(req, {sb, stripe, configured}) {
     // Le prénom et le nom saisis ne déterminent jamais les permissions.
     const qaEmail='helixcarpro+qa-final01@gmail.com';
     const compteQa=String(auth.user.email||'').trim().toLowerCase()===qaEmail && String(client.email||'').trim().toLowerCase()===qaEmail;
-    const dossierQaAutorise=client.id==='951410e8-7104-4256-b46d-59487e73890a' && quote.id==='07bbbfa7-8e6c-437a-a99f-a48e40b18f6f';
+    const dossierQaAutorise=(client.id==='951410e8-7104-4256-b46d-59487e73890a' && quote.id==='07bbbfa7-8e6c-437a-a99f-a48e40b18f6f')
+      || (client.id==='2f3abee7-7df2-417f-9f02-72bb912b63f5' && quote.id==='476ec59f-c51b-4d29-a4fe-541343d85438');
     if(!compteQa && !dossierQaAutorise)
       return fail('Paiement de test réservé au parcours QA.',403,headers);
     if(quote.statut!=='accepte'||quote.version_acceptee!==quote.version) return fail('Acceptez la version actuelle du devis avant de payer.',409,headers);
