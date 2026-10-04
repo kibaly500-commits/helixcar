@@ -23,7 +23,7 @@ const L=require('./lib');
  v('veh-0-liv-date','2027-10-25');r.validation=!verifierChronologieVehicule(0)&&!_chronologieVehiculeOk(0);
  v('veh-0-liv-date','2027-10-23');v('veh-0-liv-heure','14:00');v('veh-0-restit-heure','15:00');
  _hpOuvrirPicker(document.getElementById('veh-0-liv-heure'));_hpAjuster('veh-0-liv-heure','h',1);
- r.hourBlocked=valueOf('veh-0-liv-heure')==='14:00'&&document.getElementById('hp-chrono-note').textContent.includes('Horaires incompatibles');
+ r.hourBlocked=valueOf('veh-0-liv-heure')==='14:00'&&document.getElementById('hp-chrono-note').textContent.includes('14:45');
  _hpAjuster('veh-0-liv-heure','min',1);r.hourAllowed=valueOf('veh-0-liv-heure')==='14:15';_hpFermerPicker();
  v('veh-0-liv-date','2027-10-22');v('veh-0-liv-heure','16:00');
  open('veh-0-liv-date');_hcSelectionnerJour(23);r.sameDayDateBlocked=valueOf('veh-0-liv-date')==='2027-10-22';

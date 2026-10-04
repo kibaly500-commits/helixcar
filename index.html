@@ -12018,7 +12018,7 @@ function _viderRestitutionVehicule(i) {
   });
   // Le Type est un select : remis à sa valeur par défaut, pas vidé.
   var selRestitType = document.getElementById('veh-' + i + '-restit-vtype');
-  if (selRestitType) selRestitType.selectedIndex = 0;
+  if (selRestitType) { selRestitType.selectedIndex = 0; if(selRestitType.hcRefreshSelect)selRestitType.hcRefreshSelect(); }
   _clearFieldError('veh-' + i + '-restit-vtype');
   // Type d'horaire remis à « précise » et blocs réaffichés en conséquence.
   var r = document.querySelector('input[name="veh-' + i + '-restit-htype"][value="precise"]');
@@ -12259,7 +12259,7 @@ function effacerVehicule(i) {
       if (el.type === 'checkbox' || el.type === 'radio') el.checked = false; else el.value = '';
       _clearFieldError(el.id);
     });
-    contenu.querySelectorAll('select').forEach(function (el) { el.selectedIndex = 0; });
+    contenu.querySelectorAll('select').forEach(function (el) { el.selectedIndex = 0; if(el.hcRefreshSelect)el.hcRefreshSelect(); });
     // Objectif 7 — l'état VISUEL des sous-accordéons (.termine/.ouvert)
     // n'était jamais réinitialisé : un indicateur pouvait rester vert
     // alors que les données qu'il représentait venaient d'être vidées.
@@ -13332,7 +13332,7 @@ function _viderBlocRestitution() {
     _clearFieldError(id);
   });
   var vt = document.getElementById('client-restit-vtype');
-  if (vt) vt.selectedIndex = 0;
+  if (vt) { vt.selectedIndex = 0; if(vt.hcRefreshSelect)vt.hcRefreshSelect(); }
   // Type d'horaire remis à l'état initial : sinon restit_heure_type
   // restait actif dans le payload.
   var r = document.querySelector('input[name="client-restit-htype"][value="precise"]');
@@ -22382,7 +22382,7 @@ document.addEventListener('click', function (e) {
     bloc.querySelectorAll('input,textarea,select').forEach(function(el){
       if(_hcPreserverDateHeritee(el))return;
       if(el.type==='radio'||el.type==='checkbox') el.checked=false;
-      else if(el.tagName==='SELECT') el.selectedIndex=0;
+      else if(el.tagName==='SELECT') {el.selectedIndex=0;if(el.hcRefreshSelect)el.hcRefreshSelect();}
       else el.value='';
       if(el.id) _clearFieldError(el.id);
       fire(el,'input');
@@ -23373,7 +23373,7 @@ console.log('HelixCar ' + window.HC_VERSION);
   }
 
   function clearStaleRequired(){
-    document.querySelectorAll('#modal-client input[type="date"],#modal-client input[type="time"]').forEach(function(el){
+    document.querySelectorAll('#modal-client input[type="date"],#modal-client input[type="time"],#modal-client select').forEach(function(el){
       if(!el.value)return;var m=document.getElementById(el.id+'-err');
       if(m&&/Ce champ est obligatoire\.?/i.test(m.textContent||''))_clearFieldError(el.id);
     });

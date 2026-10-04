@@ -93,6 +93,19 @@ const {urlFichier} = require('./env');
   });
   await page.waitForFunction(()=>document.getElementById('client-demande-cadre').offsetHeight>=3000);
   L.check('Dashboard : même accès HelixCar aux dates',await cadre.locator('[data-field="stock-debut"]').count()===1);
+  for(const service of ['convoyage','stockage']){
+   const hour=await cadre.evaluate(service=>{
+    const set=(id,v)=>document.getElementById(id).value=v;
+    const radio=(n,v)=>{const e=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(e)e.checked=true;};
+    radio('type-service',service);radio('stock-acheminement','helixcar');radio('stock-sortie','helixcar');set('stock-debut','2027-10-07');set('stock-fin','2027-10-21');set('nb-vehicules','2');rendreFichesVehicules();
+    radio('veh-0-liv-active','oui');radio('veh-0-restit-active','oui');basculerRestitVehicule(0);
+    set('veh-0-pc-date','2027-10-07');set('veh-0-liv-date','2027-10-21');set('veh-0-restit-date','2027-10-21');set('veh-0-liv-heure','16:00');
+    const e=document.getElementById('veh-0-restit-heure');e.value='';_hpOuvrirPicker(e);
+    const message=document.getElementById('hp-chrono-note').textContent;
+    document.getElementById('hp-ok').click();return message.includes('16:15')&&e.value==='16:15'&&!_hpOverlay.classList.contains('open');
+   },service);
+   L.check('Dashboard '+service+' : restitution proposée et validée à heure compatible',hour);
+  }
   const chronologieCadre=await cadre.evaluate(()=>{
    document.getElementById('pro-date-debut').value='2027-10-07';
    document.getElementById('pro-date-fin').value='2027-10-23';

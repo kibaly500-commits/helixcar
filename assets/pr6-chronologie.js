@@ -156,7 +156,80 @@
     } else {pending.forEach(emit);if(closing)close();}
     if(_hpOverlay)note(_hpOverlay.querySelector('#hp-picker'),'hp-chrono-note',why,_hpOverlay.querySelector('.hp-actions'));
   }
+  function minutes(v) {var m=/^(\d{2}):(\d{2})$/.exec(v||'');return m?Number(m[1])*60+Number(m[2]):null;}
+  function clock(n) {return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
+  function limits(id, basic) {
+    var date=dateForTime(id), result={min:0,max:1439,reference:'',label:'',active:false};
+    var ctx=date && _hcContexteChamp(date);
+    if(!ctx || !/^(vehicule|mono)$/.test(ctx.type))return result;
+    pairs(date).forEach(function(p){
+      if(!value(p.a.date)||value(p.a.date)!==value(p.b.date))return;
+      if(p.b.date===date){var end=minutes(value(p.a.end));if(end!==null){result.min=Math.max(result.min,end+p.gap);result.reference=p.a.label+' prévue à '+clock(end);result.label=p.b.label;result.active=true;}}
+      if(p.a.date===date){var begin=minutes(value(p.b.start));if(begin!==null){result.max=Math.min(result.max,begin-p.gap);result.upper=p.b.label+' prévue à '+clock(begin);result.active=true;}}
+    });
+    if(!basic && result.active && _hpContexteActif && _hpContexteActif.mode==='creneau'){
+      if(id===_hpContexteActif.idDebut)result.max-=15;
+      if(id===_hpContexteActif.idFin){
+        var first=limits(_hpContexteActif.idDebut,true), start=minutes(value(_hpContexteActif.idDebut));
+        if(start===null)start=first.min>0?first.min:870;
+        start=Math.max(first.min,Math.min(first.max-15,start));
+        result.min=Math.max(result.min,start+15);
+      }
+    }
+    return result;
+  }
+  var readHour=window._hpLireHeureMinute;
+  window._hpLireHeureMinute=function(id){
+    var raw=readHour(id), bound=limits(id);
+    if(!bound.active || bound.min>bound.max)return raw;
+    var n=raw.h===null?Math.max(870,bound.min):raw.h*60+raw.min;
+    // A blank dependent time starts at the earliest allowed time.
+    if(raw.h===null && bound.min>0)n=bound.min;
+    n=Math.max(bound.min,Math.min(bound.max,n));
+    if(_hpContexteActif && _hpContexteActif.mode==='creneau' && id===_hpContexteActif.idFin){
+      var first=window._hpLireHeureMinute(_hpContexteActif.idDebut);
+      if(first.h!==null)n=Math.max(n,first.h*60+first.min+15);
+    }
+    return {h:Math.floor(n/60),min:n%60};
+  };
+  function candidate(id,type,delta){var hm=_hpLireHeureMinute(id), n=hm.h===null?870:hm.h*60+hm.min;return type==='h'?n+delta*60:(delta>0?Math.floor(n/15)+1:Math.ceil(n/15)-1)*15;}
+  function pickerGuidance(){
+    if(!_hpContexteActif||!_hpOverlay)return;
+    var id=_hpContexteActif.idSimple||_hpContexteActif.idDebut,bound=limits(id), text='';
+    if(bound.active){
+      if(bound.min>bound.max)text='Aucun horaire compatible ce jour-là. Choisissez une autre date.';
+      else if(bound.reference)text=bound.reference.charAt(0).toUpperCase()+bound.reference.slice(1)+'. '+bound.label.charAt(0).toUpperCase()+bound.label.slice(1)+' possible à partir de '+clock(bound.min)+'.';
+      else if(bound.upper)text=bound.upper.charAt(0).toUpperCase()+bound.upper.slice(1)+'. Horaire possible jusqu’à '+clock(bound.max)+'.';
+    }
+    note(_hpOverlay.querySelector('#hp-picker'),'hp-chrono-note',text,_hpOverlay.querySelector('.hp-actions'));
+    _hpOverlay.querySelectorAll('.hp-step-btn').forEach(function(b){
+      var lim=limits(b.dataset.hpId), n=candidate(b.dataset.hpId,b.dataset.hpType,Number(b.dataset.hpDelta));
+      b.disabled=lim.active && (lim.min>lim.max || n<lim.min || n>lim.max);
+    });
+    _hpOverlay.querySelector('#hp-ok').textContent=bound.min>bound.max?'Fermer':'OK';
+  }
+  var renderHour=window._hpRendrePicker;
+  window._hpRendrePicker=function(){renderHour.apply(this,arguments);pickerGuidance();};
   var openHour=window._hpOuvrirPicker;
-  window._hpOuvrirPicker=function(){openHour.apply(this,arguments);var n=document.getElementById('hp-chrono-note');if(n){n.textContent='';n.hidden=true;}};
-  ['_hpAjuster','_hpValiderPicker'].forEach(function(name){var original=window[name];window[name]=function(){return hourTransaction(original,arguments);};});
+  window._hpOuvrirPicker=function(){openHour.apply(this,arguments);pickerGuidance();};
+  var adjustHour=window._hpAjuster;
+  window._hpAjuster=function(id,type,delta){
+    var bound=limits(id), n=candidate(id,type,delta);
+    if(bound.active && (bound.min>bound.max||n<bound.min||n>bound.max)){pickerGuidance();return;}
+    var args=arguments;
+    hourTransaction(function(){
+      // Existing range controls read raw values: seed their displayed valid
+      // suggestions inside the transaction, never while merely opening.
+      if(_hpContexteActif && _hpContexteActif.mode==='creneau')[_hpContexteActif.idDebut,_hpContexteActif.idFin].forEach(function(key){if(limits(key).active){var hm=_hpLireHeureMinute(key);document.getElementById(key).value=clock(hm.h*60+hm.min);}});
+      adjustHour.apply(window,args);
+    },[]);
+    pickerGuidance();
+  };
+  var validateHour=window._hpValiderPicker;
+  window._hpValiderPicker=function(){
+    if(!_hpContexteActif)return validateHour();
+    var ids=_hpContexteActif.mode==='simple'?[_hpContexteActif.idSimple]:[_hpContexteActif.idDebut,_hpContexteActif.idFin];
+    if(ids.some(function(id){var b=limits(id);return b.min>b.max;})){_hpFermerPicker();return;}
+    hourTransaction(function(){ids.forEach(function(id){if(limits(id).active){var hm=_hpLireHeureMinute(id);document.getElementById(id).value=clock(hm.h*60+hm.min);}});validateHour();},[]);
+  };
 })();
