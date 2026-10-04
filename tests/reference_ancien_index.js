@@ -164,6 +164,8 @@ const LIBELLES_ANCIEN_INDEX = [
 // explicitement demandés, soit des remplacements par un dispositif
 // plus riche apporté par le main courant.
 const DISPARUS_EXPLIQUES = [
+  ['Convoyeur', 'Libellé du profil devenu Partenaire HelixCar ; même valeur technique convoyeur et même sélection de profil.'],
+  ['Trouver un professionnel automobile', 'Renommage demandé en Recherche d’un professionnel automobile ; même service professionnel et parcours conservé.'],
   ['Informations complémentaires (optionnel)', 'PR6 : harmonisation du libellé en Informations complémentaires (facultatif), champ conservé.'],
   ['Quelle est votre disponibilité ? *',
     'retrait explicitement demandé (§ 11 du chantier) — la question et ses trois choix'],

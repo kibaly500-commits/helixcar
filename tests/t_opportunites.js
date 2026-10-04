@@ -160,7 +160,7 @@ window.fetch=function(url){
     await page.evaluate(async()=>{__partenaire=[];await loadOpportunitesPartenaire();});
     check('D11 : état vide réel', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Aucune opportunité disponible'));
     await page.evaluate(async()=>{__erreur=true;await loadOpportunitesPartenaire();__erreur=false;});
-    check('D12 : erreur de lecture distincte d’une liste vide', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Impossible de charger'));
+    check('D12 : erreur de lecture distincte d’une liste vide', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Les opportunités sont momentanément indisponibles. Utilisez Actualiser pour reprendre.'));
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

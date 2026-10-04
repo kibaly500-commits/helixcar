@@ -52,13 +52,13 @@ window.supabase={createClient(){return {
   await page.evaluate(()=>loadEvaluationsClient());
   check('C1 : rechargement relit la persistance du double',await page.locator('#client-evaluations-a-faire [data-mission]').count()===0 && (await page.locator('#client-evaluations-historique').textContent()).includes('20/20'));
   await page.evaluate(async()=>{__erreur=true;await loadEvaluationsClient();});
-  check('C2 : lecture en erreur ne prétend pas que tout est vide',(await page.locator('#client-evaluations-a-faire').textContent()).includes('Impossible de charger'));
+  check('C2 : lecture en erreur ne prétend pas que tout est vide',(await page.locator('#client-evaluations-a-faire').textContent()).includes('momentanément indisponible'));
   await page.evaluate(()=>{sbFetchToutePage=async()=>[];loadRecontacts();});
   await page.waitForTimeout(50);
   check('X1 : recontacts sans données → état vide réel',(await page.locator('#recontacts-table').textContent()).includes('Aucune demande de recontact'));
   await page.evaluate(()=>{sbFetchToutePage=async()=>{throw new Error('SQL details');};loadRecontacts();});
   await page.waitForTimeout(50);
-  check('X2 : refus de lecture signalé sans données de démonstration',(await page.locator('#recontacts-table').textContent()).includes('Impossible de charger'));
+  check('X2 : refus de lecture signalé sans données de démonstration',(await page.locator('#recontacts-table').textContent()).includes('momentanément indisponible'));
   check('X3 : aucune exception JavaScript',erreurs.length===0);
  }finally{await browser.close();}
  console.log('=== '+pass+' PASS / '+fail+' FAIL ===');process.exitCode=fail?1:0;

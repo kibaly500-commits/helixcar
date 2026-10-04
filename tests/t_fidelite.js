@@ -304,17 +304,17 @@ async function ouvrirFidelite(page, cas, mouvements) {
 
   // ── D. PANNE SERVEUR : RIEN D'INVENTÉ ──
   const rNul = await ouvrirFidelite(page, null, []);
-  check('D1 : sans ligne serveur, aucun chiffre n\'est affiché, seulement « impossible de charger »',
-    /Impossible de charger/.test(rNul.texte) && rNul.solde === null && rNul.paliers.length === 0, rNul.texte.slice(0, 120));
+  check('D1 : sans ligne serveur, aucun chiffre n\'est affiché, un état indisponible avec une reprise',
+    /momentanément indisponible[\s\S]*Actualiser/.test(rNul.texte) && rNul.solde === null && rNul.paliers.length === 0, rNul.texte.slice(0, 120));
   await page.evaluate(() => { window.__reseauCoupe = true; });
   await page.evaluate(() => showPage('client-fidelite'));
   await page.waitForTimeout(200);
   const rCoupe = await page.evaluate(() => (document.getElementById('client-fidelite-page') || {}).textContent || '');
   await page.evaluate(() => { window.__reseauCoupe = false; });
-  check('D2 : une erreur réseau non plus n\'invente rien', /Impossible de charger/.test(rCoupe) && !/\d/.test(rCoupe.replace(/\s/g, '')), rCoupe.slice(0, 120));
+  check('D2 : une erreur réseau non plus n\'invente rien', /momentanément indisponible[\s\S]*Actualiser/.test(rCoupe) && !/\d/.test(rCoupe.replace(/\s/g, '')), rCoupe.slice(0, 120));
   const rMauvais = await ouvrirFidelite(page, Object.assign({}, CAS[2000], { prochain_seuil: 'bidon' }), []);
   check('D3 : une valeur serveur non entière n\'est pas remplacée par un calcul local',
-    /Impossible de charger/.test(rMauvais.texte) && rMauvais.paliers.length === 0);
+    /momentanément indisponible[\s\S]*Actualiser/.test(rMauvais.texte) && rMauvais.paliers.length === 0);
 
   // ── E. AUCUNE ÉCRITURE, AUCUN ALERT ──
   const journal = await page.evaluate(() => ({

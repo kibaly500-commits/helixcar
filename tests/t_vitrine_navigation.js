@@ -29,7 +29,7 @@ function check(libelle, condition, detail) {
       && !source.includes('>Organiser un renfort</button>'));
   check('N3b : le bloc services contient son accroche et la vidéo HelixCar',
     source.includes('L’automobile, dans toutes ses exigences.')
-      && source.includes('Des prestations pensées comme un ensemble cohérent')
+      && source.includes('Des prestations sur mesure, pour un besoin ponctuel ou un accompagnement au quotidien.')
       && source.includes('assets/helixcar-services.mp4'));
 
   const browser = await lancerNavigateur();

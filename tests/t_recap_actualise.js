@@ -30,7 +30,7 @@ const {lancerNavigateur,urlFichier}=require('./env.js');
   assert(await p.evaluate(()=>_demandesDevisListe[0]._vehicules.length===0),'La source des PDF a été modifiée');
   console.log('PASS validation actualisée sans modifier la source des PDF');
   await p.evaluate(async()=>{__erreur=true;await ouvrirFicheDemande('QA-RECAP');});
-  assert((await p.locator('#fiche-demande-corps').textContent()).includes('Impossible de charger'));
+  assert((await p.locator('#fiche-demande-corps').textContent()).includes('Le récapitulatif est momentanément indisponible. Fermez puis rouvrez cette demande.'));
   assert(!(await p.locator('#fiche-demande-corps').textContent()).includes('0699999999'));
   console.log('PASS échec de relecture sans récapitulatif ancien présenté comme actualisé');
   await p.evaluate(async()=>{__erreur=false;__delay=80;const attente=ouvrirFicheDemande('QA-RECAP');closeModal('fiche-demande');await attente;});

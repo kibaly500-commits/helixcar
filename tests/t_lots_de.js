@@ -117,8 +117,8 @@ function rubriquesVisibles(page, n) {
     const conv = await rubriquesVisibles(page, 2);
     check('D1-8 : le Convoyage garde sa rubrique Livraison, intacte',
       conv.every(v => v && v.indexOf('Livraison') !== -1), JSON.stringify(conv));
-    check('D1-9 : la question de restitution n\'est ni réécrite ni reconditionnée',
-      /Une restitution est-elle prévue pour ce véhicule \?/.test(idx));
+    check('D1-9 : la restitution décrit la récupération d’un autre véhicule',
+      /À cette adresse, faut-il aussi récupérer un autre véhicule \?/.test(idx));
     await page.close();
   }
 

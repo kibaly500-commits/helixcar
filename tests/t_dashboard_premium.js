@@ -19,7 +19,7 @@ const section=src.slice(src.indexOf('// Informations manquantes : les valeurs'),
  assert.deepStrictEqual(calls,['paid','complete']);
  assert.equal(ctx._adminInfosDossiers[0].client.vehicules[0].immatriculation,'AB-123-CD');
  ctx.sbAuthListeDevisTriee=async()=>{throw Error('offline')};await ctx.chargerCentreInformationsAdmin();
- assert(status.textContent.includes('Impossible'));console.log('PASS paid-only, unpaid/refunded excluded, complete hidden, vehicle identity, read failure');
+ assert(status.textContent.includes('indisponible'));console.log('PASS paid-only, unpaid/refunded excluded, complete hidden, vehicle identity, read failure');
  const {lancerNavigateur}=require('./env');const b=await lancerNavigateur();
  try{
  const p=await b.newPage();await p.route('**/*',r=>r.abort());await p.setContent(src);

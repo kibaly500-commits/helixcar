@@ -122,7 +122,7 @@ async function moisFuturComplet(page) {
     const a=document.querySelector('[data-jour="10"]'), b=document.querySelector('[data-jour="15"]'), m=document.querySelector('[data-jour="12"]');
     return {message:document.getElementById('hc-cal-legende').textContent, debut:getComputedStyle(a).backgroundColor, fin:getComputedStyle(b).backgroundColor, milieu:getComputedStyle(m).backgroundColor};
   });
-  L.check('A10b : une période terminée ne demande plus la fin', /Période sélectionnée/.test(rendu.message) && !/Choisissez la date de fin/.test(rendu.message));
+  L.check('A10b : une période terminée ne demande plus la fin', /Début → fin du stockage/.test(rendu.message) && !/Choisissez la date de fin/.test(rendu.message));
   L.check('A10c : début et fin distincts, intervalle rose pâle', rendu.debut !== rendu.fin && rendu.milieu === 'rgb(245, 227, 232)', JSON.stringify(rendu));
 
   let v = await valeurs(page, ['stock-debut', 'stock-fin']);
@@ -196,14 +196,14 @@ async function moisFuturComplet(page) {
   L.check('B11 : seule la fin a changé',
     /-08$/.test(v['pro-date-debut']) && /-20$/.test(v['pro-date-fin']), JSON.stringify(v));
 
-  // Un nouveau début postérieur à la fin ne laisse pas une période absurde.
+  // La chronologie bloque un début postérieur à la fin, sans effacer la période existante.
   await page2.evaluate(() => _hcFermerCalendrier());
   await ouvrir(page2, 'pro-date-debut');
   await moisFuturComplet(page2);
   await cliquerJour(page2, 25);
   v = await valeurs(page2, ['pro-date-debut', 'pro-date-fin']);
-  L.check('B12 : un début postérieur à l\'ancienne fin vide cette fin',
-    /-25$/.test(v['pro-date-debut']) && v['pro-date-fin'] === '', JSON.stringify(v));
+  L.check('B12 : un début postérieur à la fin est bloqué sans perdre les dates',
+    /-08$/.test(v['pro-date-debut']) && /-20$/.test(v['pro-date-fin']), JSON.stringify(v));
 
   await page2.evaluate(() => document.getElementById('hc-cal-effacer').click());
   await page2.waitForTimeout(60);
