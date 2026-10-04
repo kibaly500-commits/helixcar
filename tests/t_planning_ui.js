@@ -30,6 +30,10 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  });
  await page.waitForSelector('[data-planning-id="p0"]');
  assert.equal(await page.locator('[data-planning-id]').count(),2);
+
+ await page.evaluate(()=>{window.__savedTime=__rows[0].plan.mission.date_livraison;__rows[0].plan.mission.date_livraison='2026-11-08';});
+ await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="p0"]').count(),0);
+ await page.evaluate(()=>{__rows[0].plan.mission.date_livraison=__savedTime;});await page.locator('#hc-planning-refresh').click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const first=page.locator('[data-planning-id="p0"]');assert.match(await first.innerText(),/3 rue Exemple, 75001 Paris/);
  assert.equal(await first.locator('[data-planning-action="cles"]').isDisabled(),true);
@@ -41,9 +45,13 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.evaluate(()=>{__rows.push({...__rows[0],id:'p2'});__states.push({preparation_id:'p2',horaire_confirme:'2026-11-08T10:50',empreinte_confirmee:'hash'});});
  await page.locator('#hc-planning-refresh').click();assert.match(await first.innerText(),/chevauche/);
  await page.screenshot({path:'/tmp/helixcar-planning-'+width+'.png',fullPage:true});
- await first.locator('[data-planning-action="cles"]').click();assert.match(await first.innerText(),/Clés reçues le/);
+ await first.locator('[data-planning-action="cles"]').click();assert.equal(await first.count(),0);
+ await page.locator('#hc-planning-state').selectOption('archives');assert.match(await first.innerText(),/Archivé · Clés reçues/);assert.equal(await first.locator('[data-planning-action="cles"]').count(),0);
  await page.locator('#hc-planning-refresh').click();assert.match(await first.innerText(),/Clés reçues le/);
- await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),1);
+ await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),0);
+ await page.locator('#hc-planning-state').selectOption('actifs');assert.equal(await page.locator('[data-planning-id]').count(),1);
+ await outgoing.locator('[data-planning-action="confirmer"]').click();await outgoing.locator('[data-planning-action="cles"]').click();assert.equal(await outgoing.count(),0);
+ await page.locator('#hc-planning-state').selectOption('archives');assert.match(await outgoing.innerText(),/Archivé · Clés remises/);
  await page.locator('#hc-planning-kind').selectOption('');
  await first.locator('[data-planning-action="ouvrir"]').click();
  assert.equal(await page.locator('[data-field="heure_prise_en_charge"]').count(),0);
@@ -57,6 +65,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-10T12:30');
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
  await page.locator('#hc-prep-close').click();
+ await page.locator('#hc-planning-state').selectOption('actifs');
  await page.evaluate(()=>{const c={id:'self',type_service:'stockage',prenom:'Marie',nom:'Client',numero_client:'HC-SELF',nb_vehicules:2,stockage_acheminement:'depot_client',stockage_sortie:'recuperation_client',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10',stockage_heure_entree:'08:30',stockage_heure_sortie:'19:00',devis:[{statut:'accepte',paiement_statut:'paye'}],vehicules:[{id:'v1',marque_modele:'Clio client',immatriculation:'CLIENT-1',livraison_apres_stockage:false,heure_recuperation_client:'16:00'},{id:'v2',marque_modele:'Golf client',immatriculation:'CLIENT-2',vin:'VIN-CLIENT-2',ville_arrivee:'Paris',date_livraison:'2026-11-10',heure_livraison:'20:00',livraison_apres_stockage:true}]};__clients=[c,{...c,id:'unpaid',devis:[]},{...c,id:'cancelled',statut:'annulee'},{...c,id:'direct',type_service:'convoyage'}];});
  await page.locator('#hc-planning-refresh').click();
  const self=page.locator('[data-planning-id^="client:"]');assert.equal(await self.count(),3);
@@ -69,17 +78,17 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await self.locator('[data-planning-action="confirmer"], [data-planning-action="cles"]').count(),0);
  await page.locator('#hc-planning-day').fill('2026-11-08');assert.equal(await self.count(),0);
  await page.locator('#hc-planning-kind').selectOption('');assert.equal(await self.count(),2);
- await page.evaluate(()=>{__clients[0].stockage_heure_entree=null;});await page.locator('#hc-planning-refresh').click();assert.match(await self.first().innerText(),/Heure à préciser/);
+ await page.evaluate(()=>{__clients[0].stockage_heure_entree=null;});await page.locator('#hc-planning-refresh').click();assert.equal(await self.count(),0);
  await page.evaluate(()=>{__clients[0].nb_vehicules=1;__clients[0].vehicules=[__clients[0].vehicules[0]];__clients[0].vehicules[0].heure_recuperation_client='17:00';__clients[0].stockage_heure_sortie='18:15';});
  await page.locator('#hc-planning-day').fill('');await page.locator('#hc-planning-kind').selectOption('apres_stockage');await page.locator('#hc-planning-refresh').click();assert.equal(await self.count(),1);assert.match(await self.innerText(),/18:15/);assert.doesNotMatch(await self.innerText(),/17:00/);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.locator('#hc-planning-kind').selectOption('');
  for(const message of ['Dossier incomplet : informations attendues','Dossier incomplet : informations transmises à vérifier','Le devis doit être accepté et le paiement confirmé']){
   await page.evaluate(message=>{__blocked={'self':message,'client-1':message};},message);
-  await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('Seuls les dossiers'));
+  await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('Aucun rendez-vous'));
   assert.equal(await page.locator('[data-planning-id]').count(),0);
  }
- await page.evaluate(()=>{__blocked={};});await page.locator('#hc-planning-refresh').click();await page.waitForSelector('[data-planning-id="p0"]');assert.equal(await self.count(),2);
+ await page.evaluate(()=>{__blocked={};__states=[];__clients[0].stockage_heure_entree='08:30';});await page.locator('#hc-planning-refresh').click();await page.waitForSelector('[data-planning-id="p0"]');assert.equal(await self.count(),2);
  // Un ancien brouillon de stockage court ne doit plus créer un passage fictif.
  await page.evaluate(()=>{__source.vehicules[0].heure_livraison='09:00';});
  await page.locator('#hc-planning-refresh').click();
@@ -89,6 +98,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.locator('[data-field="heure_remise"], [data-field="heure_retrait"]').count(),0);
  assert.match(await page.locator('#hc-prep-body').innerText(),/Par le même convoyeur/);
  await page.locator('#hc-prep-close').click();
+ await page.locator('#hc-planning-state').selectOption('actifs');
  // Les missions déjà publiées conservent leur organisation existante.
  await page.evaluate(()=>{__source.brouillons[0].mission_id='mission-publiee';__rows[0].mission_id='mission-publiee';});
  await page.locator('#hc-planning-refresh').click();

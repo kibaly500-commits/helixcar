@@ -5,6 +5,7 @@ const C=HCPlanningCalcul,esc=v=>escapeHtml(String(v??''));
 let rows=[],records=new Map(),ticket=0;
 const panel=()=>document.getElementById('hc-planning-list');
 const fmt=v=>v?String(v).replace(/(\d{4})-(\d{2})-(\d{2})T?(\d{2}:\d{2})?.*/,(_,y,m,d,h)=>`${d}/${m}/${y}${h?' à '+h:''}`):'À fixer';
+const hasTime=r=>/T\d{2}:\d{2}/.test(schedule(r.plan)||'');
 const schedule=p=>p.kind==='avant_stockage'?p.mission.date_livraison:p.mission.date_prise_en_charge;
 async function action(id,kind){
  const r=records.get(id),response=await sbAuth.rpc('action_planning_helixcar',{p_preparation_id:id,p_action:kind,p_revision:r?.revision||0});
@@ -58,15 +59,16 @@ async function load(){
    }));
    if(current!==ticket||_hcNavigationRole!=='admin')return;
   }
-  rows=[...candidates,...passages].filter(r=>ready.has(r.client_id)&&(r.clientPassage||r.mission_id||currentKeys.get(r.client_id)?.has(r.cle||r.plan.key)));records=new Map(states.map(r=>[r.preparation_id,r]));render();
+  rows=[...candidates,...passages].filter(r=>ready.has(r.client_id)&&hasTime(r)&&(r.clientPassage||r.mission_id||currentKeys.get(r.client_id)?.has(r.cle||r.plan.key)));records=new Map(states.map(r=>[r.preparation_id,r]));render();
  }catch(e){if(current===ticket)panel().textContent='Le planning reste à actualiser. '+e.message;}
 }
 function render(){
  const day=document.getElementById('hc-planning-day').value;
  const kind=document.getElementById('hc-planning-kind').value;
- const list=rows.filter(r=>(!day||(records.get(r.id)?.horaire_confirme||schedule(r.plan)||r.plan.date_debut||'').slice(0,10)===day)&&(!kind||r.plan.kind===kind));
+ const archived=document.getElementById('hc-planning-state').value==='archives';
+ const list=rows.filter(r=>Boolean(records.get(r.id)?.cles_effectuees_le)===archived&&(!day||(records.get(r.id)?.horaire_confirme||schedule(r.plan)||r.plan.date_debut||'').slice(0,10)===day)&&(!kind||r.plan.kind===kind));
  list.sort((a,b)=>String(records.get(a.id)?.horaire_confirme||schedule(a.plan)||a.plan.date_debut).localeCompare(String(records.get(b.id)?.horaire_confirme||schedule(b.plan)||b.plan.date_debut)));
- if(!list.length){panel().innerHTML='<div class="card">Aucun rendez-vous pour cette sélection. Seuls les dossiers payés, complets et sans information en attente de validation apparaissent ici.</div>';return;}
+ if(!list.length){panel().innerHTML=archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les réceptions et remises effectuées sont disponibles dans Archives.</div>';return;}
  panel().innerHTML=list.map(r=>{
   const p=r.plan,s=records.get(r.id),inbound=p.kind==='avant_stockage',time=schedule(p);
   if(r.clientPassage)return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(inbound?'À réceptionner · Client':'À remettre · Client')+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule à préciser')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients.numero_client||'Dossier')+' · '+esc(r.person)+'</p></div><strong>'+esc(fmt(time))+(time&&!time.includes('T')?' · Heure à préciser':'')+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+(inbound?'Le client vous apporte le véhicule.':'Le client vient récupérer le véhicule auprès de vous.')+'</strong></p><p>Horaire communiqué par le client.</p><details class="hc-prep-private"><summary>Coordonnées du client</summary><p>'+esc(r.person)+' · '+esc(r.phone||'Téléphone non renseigné')+'</p></details><p class="hc-planning-feedback" role="status"></p></article>';
@@ -77,13 +79,13 @@ function render(){
   });
   const guide=C.guidance(p);
   const who=r.missions?.convoyeurs,partner=who?[who.prenom,who.nom].filter(Boolean).join(' '):'Partenaire à attribuer';
-  return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(inbound?'À réceptionner':'À remettre')+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||r.missions?.reference||'Dossier')+' · '+esc(partner)+'</p></div><strong>'+esc(fmt(s?.horaire_confirme||time))+'</strong></div>'
+  return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(s?.cles_effectuees_le?(inbound?'Archivé · Clés reçues':'Archivé · Clés remises'):(inbound?'À réceptionner':'À remettre'))+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||r.missions?.reference||'Dossier')+' · '+esc(partner)+'</p></div><strong>'+esc(fmt(s?.horaire_confirme||time))+'</strong></div>'
   +'<div class="hc-planning-estimate"><p><strong>'+esc(guide.label)+' :</strong> '+esc(guide.when.replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'))+'</p><p>'+esc(guide.address)+'</p><p><strong>'+esc(guide.target)+' :</strong> '+esc(fmt(time))+'</p><p>'+esc(C.POINT)+'</p><p><strong>Prévoir 45 minutes de battement.</strong> '+esc(guide.rule)+'</p></div>'
   +'<p>'+(s?.cles_effectuees_le?'Clés '+(inbound?'reçues':'remises')+' le '+esc(_dvDateHeure(s.cles_effectuees_le)):s?.horaire_confirme?'Horaire confirmé':time?'Horaire à confirmer':inbound?'Votre heure de réception reste à fixer':'Votre heure de remise au convoyeur reste à fixer')+'</p>'
   +(stale?'<p class="hc-planning-warning">La préparation a changé depuis la confirmation. Vérifiez le rendez-vous.</p>':'')
   +(collisions?'<p class="hc-planning-warning">Un autre rendez-vous confirmé chevauche ces 20 minutes de remise.</p>':'')
   +'<p><strong>'+ (inbound?'Votre intervention : réceptionner le véhicule au point HelixCar.':'Votre intervention : remettre le véhicule au convoyeur au point HelixCar.')+'</strong></p>'
-  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Voir / régler les horaires</button>'
+  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">'+(r.mission_id||s?.cles_effectuees_le?'Consulter la mission':'Préparer les horaires')+'</button>'
   +(!s?.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>Confirmer cet horaire</button><button type="button" class="btn btn-outline" data-planning-action="cles"'+(!s?.horaire_confirme||stale?' disabled':'')+'>'+(inbound?'Clés reçues':'Clés remises')+'</button>':'')+'</div><p class="hc-planning-feedback" role="status"></p></article>';
  }).join('');
 }
