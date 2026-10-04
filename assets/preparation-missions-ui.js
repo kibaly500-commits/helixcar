@@ -9,7 +9,7 @@
   modal.innerHTML='<div class="modal hc-prep-modal"><div class="hc-prep-head"><div><div id="hc-prep-ref" class="hc-prep-muted"></div><h3>Préparer les missions</h3></div><button type="button" class="btn btn-outline" id="hc-prep-close">Fermer</button></div><div id="hc-prep-message" role="status" aria-live="polite"></div><div id="hc-prep-body"></div></div>';
   document.body.append(modal);
   const el=id=>document.getElementById(id);
-  window.addEventListener('hc-session-fermee',()=>{++generation;state=null;el('hc-prep-body').textContent='';closeModal('preparation-missions');});
+  window.addEventListener('hc-session-fermee',()=>{++generation;state=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function adopt(source){
@@ -40,7 +40,7 @@
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
-    if(busy)return;const ticket=++generation;busy=true;openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
+    if(busy)return;const ticket=++generation;busy=true;state=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
     try{const source=await rpc('source_preparation_missions',{p_client_id:clientId});if(ticket!==generation)return;adopt(source);render();}
     catch(e){if(ticket===generation){el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}

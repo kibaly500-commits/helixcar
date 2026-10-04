@@ -63,6 +63,23 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' filtre payé',filtering.paye.includes('Beta')&&!filtering.paye.includes('Alpha'));
  L.check(width+' filtre consulté',filtering.consulte.includes('Gamma')&&!filtering.consulte.includes('Beta'));
  L.check(width+' filtres recherche et compte respectés',filtering.search.includes('Aucune demande')&&filtering.owner.includes('Aucune demande'));
+ const failedSwitch=await page.evaluate(async()=>{
+   await ouvrirPreparationDemande('client-1');
+   const previous=document.getElementById('hc-prep-ref').textContent;
+   const original=sbAuth.rpc;let rejectRequest;
+   sbAuth.rpc=()=>new Promise(resolve=>{rejectRequest=()=>resolve({error:{message:'Dossier incomplet : informations attendues'}});});
+   const request=ouvrirPreparationDemande('other-client');
+   const loading=document.getElementById('hc-prep-ref').textContent;
+   rejectRequest();await request;
+   const result={previous,loading,reference:document.getElementById('hc-prep-ref').textContent,body:document.getElementById('hc-prep-body').textContent,message:document.getElementById('hc-prep-message').textContent};
+   sbAuth.rpc=original;await ouvrirPreparationDemande('client-1');
+   result.recovered=document.getElementById('hc-prep-ref').textContent;
+   window.dispatchEvent(new Event('hc-session-fermee'));
+   result.signedOut=document.getElementById('hc-prep-ref').textContent;return result;
+ });
+ L.check(width+' changement de dossier : ancienne référence retirée dès le chargement',failedSwitch.previous.includes('DEV-QA')&&failedSwitch.loading==='');
+ L.check(width+' dossier refusé : ni ancienne référence ni ancienne préparation',failedSwitch.reference===''&&failedSwitch.body===''&&failedSwitch.message.includes('Dossier incomplet'));
+ L.check(width+' reprise correcte et référence effacée à la fermeture de session',failedSwitch.recovered.includes('DEV-QA')&&failedSwitch.signedOut==='');
  if(width===1280)await page.screenshot({path:'/tmp/hc-preparation-integree.png',fullPage:true});L.check(width+' sans exception JS',errors.length===0);await page.close();}
  }finally{await browser.close();}process.exitCode=L.results()?1:0;
 })().catch(e=>{console.error(e);process.exitCode=1});
