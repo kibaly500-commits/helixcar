@@ -60,11 +60,20 @@
     if (button && !button.disabled) button.focus({preventScroll:true});
   };
 
+  // Fond indépendant de visualViewport : Safari révèle une partie du
+  // viewport de mise en page sous sa barre translucide lorsque le clavier
+  // réduit la zone de saisie. Cette surface doit rester opaque en entier.
+  var backdrop = document.createElement('div');
+  backdrop.id = 'hc-client-mobile-backdrop';
+  backdrop.hidden = true;
+  backdrop.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(backdrop);
   var locked = false, pageY = 0, frame = 0;
   function updateViewport() {
     frame = 0;
     var mobile = window.matchMedia('(max-width:720px)').matches;
     var publicOpen = mobile && modal.classList.contains('open') && !document.body.classList.contains('hc-integre');
+    backdrop.hidden = !publicOpen;
     if (publicOpen && !locked) {
       pageY = window.scrollY; locked = true;
       document.body.style.setProperty('--hc-page-y', -pageY + 'px');

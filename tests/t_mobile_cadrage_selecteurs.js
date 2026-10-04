@@ -16,6 +16,13 @@ const L=require('./lib');
   r=await p.locator('#modal-client').evaluate(e=>({top:e.getBoundingClientRect().top,height:e.getBoundingClientRect().height,scroll:e.scrollHeight}));
   L.check('Clavier : cadre suit la hauteur et le décalage visibles',r.top===24&&r.height===390,JSON.stringify(r));
   L.check('Clavier : contenu reste défilable',r.scroll>r.height);
+  for (const id of ['client-prenom','client-nom','client-email','client-tel','client-password']) {
+   await p.locator('#'+id).focus();
+   const fond=await p.locator('#hc-client-mobile-backdrop').evaluate(e=>{const r=e.getBoundingClientRect();return {shown:!e.hidden,top:r.top,bottom:r.bottom,color:getComputedStyle(e).backgroundColor};});
+   L.check(id+' : fond opaque derrière toute la zone clavier',fond.shown&&fond.top<=0&&fond.bottom>=844&&fond.color==='rgb(244, 245, 246)',JSON.stringify(fond));
+  }
+  L.check('Champs arrondis',await p.locator('#client-prenom').evaluate(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)>=16));
+  L.check('Panneau arrondi',await p.locator('#modal-client>.modal').evaluate(e=>parseFloat(getComputedStyle(e).borderTopLeftRadius)>=22));
   await p.evaluate(()=>{Object.defineProperty(window,'visualViewport',{configurable:true,value:window.__vv});window.dispatchEvent(new Event('resize'));});
   await L.fillStep1(p,'particulier');await L.chooseService(p,'convoyage');
   await p.evaluate(()=>{
@@ -47,6 +54,7 @@ const L=require('./lib');
   await p.waitForTimeout(80);
   L.check('Stockage : rappel actualisé',await p.locator('[data-hc-stock-fin-rappel]').first().textContent().then(t=>t.includes('24/10/2027')));
   await p.evaluate(()=>closeModal('client'));await p.waitForTimeout(80);
+  L.check('Fermeture : fond de protection retiré',await p.locator('#hc-client-mobile-backdrop').evaluate(e=>e.hidden));
   L.check('Fermeture : page déverrouillée',await p.evaluate(()=>!document.documentElement.classList.contains('hc-client-mobile-open')));
   await ctx.close();
  }finally{await b.close();}
