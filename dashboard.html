@@ -1112,6 +1112,7 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-info-vehicle{margin-top:12px;border-top:1px solid var(--gray-light);padding:12px 0}.hc-info-vehicle>summary{cursor:pointer;min-height:44px;overflow-wrap:anywhere}
 </style>
 <link rel="stylesheet" href="assets/preparation-missions.css">
+<link rel="stylesheet" href="assets/planning-helixcar.css">
 </head>
 <body>
 
@@ -1544,6 +1545,11 @@ body.scroll-verrouille { overflow: hidden; }
            mission ; l'administrateur relit, corrige, envoie ; puis étudie
            les candidatures et sélectionne. Deux états publics seulement :
            « À pourvoir » et « Pourvue / clôturée » (décision C03). -->
+      <div class="page" id="page-admin-planning">
+        <div class="card"><h2>Réceptions et remises de clés</h2><p>Point HelixCar · 12 rue de l’Université, 93160 Noisy-le-Grand</p><p>Trafic estimé, rendez-vous confirmés et suivi des clés. Battement par défaut : 45 minutes, dont 20 minutes de remise.</p></div>
+        <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
+        <div id="hc-planning-list" aria-live="polite"></div>
+      </div>
       <div class="page" id="page-admin-opportunites">
         <div class="card">
           <div class="card-header">
@@ -2260,6 +2266,7 @@ const NAVS = {
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
     { id: 'admin-missions',     icon: '🚗', label: 'Missions' },
+    { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
     { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
@@ -4984,6 +4991,7 @@ const PAGE_TITLES = {
   'admin-acquisition':   ['Acquisition', 'D\'où viennent vos demandes de convoyage'],
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
   'admin-facturation':   ['Facturation', 'Validation et paiement des convoyeurs'],
+  'admin-planning': ['Planning HelixCar', 'Horaires, trafic et remises de clés'],
   'admin-opportunites':  ['Opportunités de missions', 'Besoins publiés aux partenaires, candidatures et attribution'],
   'admin-parametres':    ['Paramètres', 'Votre compte administrateur'],
   'admin-archivage':     ['Archivage', 'Libère l\'espace de stockage Supabase en rapatriant les fichiers de mission sur ton ordinateur'],
@@ -5129,6 +5137,7 @@ function showPage(id, options) {
   if (id === 'admin-recontact') { loadRecontacts(); }
   if (id === 'admin-parametres') { loadParametresAdmin(); }
   if (id === 'admin-opportunites') { loadOpportunitesAdmin(); }
+  if (id === 'admin-planning' && window.HCPlanning) { window.HCPlanning.load(); }
   if (id === 'convoyeur-opportunites') { loadOpportunitesPartenaire(); }
   if (id === 'admin-facturation') { loadFacturationAdmin(); }
   if (id === 'admin-devis') { loadDemandesDevis(); }
@@ -5517,6 +5526,7 @@ async function terminerReinitialisation() {
 // mémoire avant que la nouvelle (issue du lien cliqué) ait fini de s'installer.
 var _hcAuthGeneration = 0;
 function _hcSessionFermee() {
+  window.dispatchEvent(new Event('hc-session-fermee'));
   ++_hcAuthGeneration; ++_hcInfosGeneration; ++_demandesClientGeneration;
   _hcDemandesLecture = null;
   window._currentClient = null; window._currentAdmin = null; window._currentConvoyeur = null;
@@ -15295,6 +15305,8 @@ function declencherChampFichier(id) {
 })();
 </script>
 <script src="assets/preparation-missions.js"></script>
+<script src="assets/planning-calcul.js"></script>
+<script src="assets/planning-helixcar.js"></script>
 <script src="assets/preparation-missions-ui.js"></script>
 <style>
 #filtre-informations-devis{font:inherit;font-size:12px;max-width:205px;padding:7px 5px;border:1px solid #d8dde3;border-radius:5px;background:#fff;color:#29323d}
