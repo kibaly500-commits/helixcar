@@ -3117,7 +3117,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   if (lignes.some(l=>l.statut==='transmise')) return etat('Informations en vérification','bleu','Vos informations ont été transmises. Nous vérifions votre dossier.',null,'verification');
   if (!lignes.every(l=>['validee','fournie'].includes(l.statut))) return etat('Suivi momentanément indisponible','neutre','Actualisez la page pour retrouver les informations de cette demande.',null,'indisponible');
   if (dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Retrouvez votre devis dans les détails de la demande.');
-  return etat('Demande reçue','neutre','Nous étudions votre demande.',null,'devis-preparation');
+  return etat('Demande reçue','neutre','Votre dossier est complet. Nous préparons votre devis et vous informerons par e-mail dès qu’il sera disponible.',null,'devis-preparation');
 }
 // Le devis et les informations avancent indépendamment. Ces badges ne
 // modifient aucun statut et ne conditionnent jamais l’accès au devis.
@@ -3185,7 +3185,8 @@ erreurInfos=true;}
   ];
   zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
     const selection=resultats.filter(r=>(g.etats||[g.cle]).includes(r.presentation.groupe)).sort(function(a,b){
-      return (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0) || String(a.d.id).localeCompare(String(b.d.id));
+      const ecart = (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0);
+      return (g.cle==='demandes' ? -ecart : ecart) || String(a.d.id).localeCompare(String(b.d.id));
     });
     // La rubrique « Prestations en préparation » reste un repère permanent
     // du parcours client, même tant qu'aucun dossier n'y est encore classé.

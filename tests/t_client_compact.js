@@ -50,6 +50,30 @@ const {lancerNavigateur} = require('./env');
     assert(await p.getByText('Consulter mon devis', {exact:true}).isVisible());
     assert(await p.getByText('Document de paiement TEST', {exact:true}).isVisible());
     await details.locator('summary').click();
+    // Ordre client et message avant envoi du devis, sur mobile et ordinateur.
+    for (const width of [390,1440]) {
+      await p.setViewportSize({width,height:950});
+      await p.evaluate(async () => {
+        window.chargerDemandesClient = async () => [
+          {id:'ancien',created_at:'2026-09-13T14:00:00Z'},
+          {id:'recent',created_at:'2026-10-09T14:00:00Z'},
+          {id:'milieu',created_at:'2026-10-08T14:00:00Z'}
+        ];
+        window.chargerDevisClient = async () => [];
+        window.chargerInformationsDemande = async id => [{statut:id==='ancien'?'attendue':id==='milieu'?'transmise':'fournie'}];
+        await loadDemandesClient();
+      });
+      const demandes=p.locator('[data-groupe-demandes="demandes"]');
+      assert.deepEqual(await demandes.locator('.hc-demande-card').evaluateAll(cards=>cards.map(c=>c.dataset.demande)),['recent','milieu','ancien']);
+      assert.equal(await demandes.locator('.hc-demandes-compteur').textContent(),'3');
+      assert.equal(await demandes.locator('[data-demande="recent"] .hc-demande-message').first().textContent(),'Votre dossier est complet. Nous préparons votre devis et vous informerons par e-mail dès qu’il sera disponible.');
+      assert.equal(await demandes.getByText('Voir mon devis →',{exact:true}).count(),0);
+      assert.match(await demandes.locator('[data-demande="milieu"] .hc-demande-message').first().textContent(),/Nous vérifions votre dossier/);
+      assert.match(await demandes.locator('[data-demande="ancien"] .hc-demande-message').first().textContent(),/Complétez votre dossier/);
+      await p.evaluate(async()=>{window.chargerDevisClient=async()=>[{id:'devis-recent',client_id:'recent',statut:'envoye',prix:2000}];await loadDemandesClient();});
+      assert.equal(await demandes.locator('[data-demande="recent"]').count(),0);
+      assert.equal(await p.locator('[data-groupe-demandes="devis"] [data-demande="recent"] > a').textContent(),'Voir mon devis →');
+    }
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [
         {id:'d1',numero_client:'HC-2026-6320',type_service:'professionnel',statut:'nouveau'},
