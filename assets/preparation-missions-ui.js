@@ -103,6 +103,11 @@
     const source=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise).find(x=>x.key===p.key);
     if(source?.[key])return '<div><span>'+esc(label)+'</span><p><strong>'+esc(p[key])+'</strong></p><small class="hc-prep-muted">Reprise de la demande</small></div>';
     return '<label>'+label+'<select data-plan="'+i+'" data-field="'+key+'">'+['','Essence','Diesel','Hybride','Hybride rechargeable','Électrique','Autre'].map(x=>'<option value="'+esc(x)+'"'+(p[key]===x?' selected':'')+'>'+esc(x||'À préciser')+'</option>').join('')+'</select></label>';}
+  function vehicleRow(p,i,r){
+    const key=r.label==='Véhicule'?'marque_modele':r.label==='Restitution'?'restit_marque_modele':null;
+    if(!key)return '<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>';
+    return '<div><dt>'+esc(r.label)+'</dt><dd><span>'+display(r.value)+'</span> <button type="button" class="hc-prep-edit-vehicle" data-edit-vehicle="'+i+'" data-vehicle-key="'+key+'" aria-label="Modifier la marque et le modèle du véhicule'+(key==='restit_marque_modele'?' à restituer':'')+'" title="Modifier la marque et le modèle"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/></svg></button></dd></div>';
+  }
   function render(){
     if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
@@ -113,7 +118,7 @@
       if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked)h+='<p class="hc-prep-muted">Mission déjà créée</p>';else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
-      h+='<dl class="hc-prep-facts">'+p.rows.map(r=>'<div><dt>'+esc(r.label)+'</dt><dd>'+display(r.value)+'</dd></div>').join('')+'</dl>';
+      h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
@@ -146,6 +151,27 @@
     if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}
     if(busy||!state)return;busy=true;b.disabled=true;
     try{
+      if(b.hasAttribute('data-edit-vehicle')){
+        readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];
+        if(!p||p.saved?.mission_id||!['marque_modele','restit_marque_modele'].includes(key))return;
+        const box=document.createElement('div');box.className='hc-prep-vehicle-editor';
+        box.innerHTML='<label>Marque et modèle<input type="text" maxlength="160" data-vehicle-value value="'+esc(p.mission[key]||'')+'"></label><button type="button" class="btn btn-outline" data-cancel-vehicle>Annuler</button><button type="button" class="btn btn-primary" data-save-vehicle="'+i+'" data-vehicle-key="'+key+'">Enregistrer</button>';
+        modal.querySelectorAll('.hc-prep-vehicle-editor').forEach(x=>x.remove());b.closest('dd').append(box);box.querySelector('input').focus();
+      }
+      if(b.hasAttribute('data-cancel-vehicle'))b.closest('.hc-prep-vehicle-editor').remove();
+      if(b.hasAttribute('data-save-vehicle')){
+        const p=state.plans[Number(b.dataset.saveVehicle)],key=b.dataset.vehicleKey;
+        if(!p||p.saved?.mission_id||!['marque_modele','restit_marque_modele'].includes(key))return;
+        const value=b.closest('.hc-prep-vehicle-editor').querySelector('input').value.trim();
+        if(!value||value.length>160)throw Error('Renseignez la marque et le modèle du véhicule (160 caractères maximum).');
+        readEdits();
+        state.plans.filter(x=>!x.saved?.mission_id&&String(x.key).split(':')[0]===String(p.key).split(':')[0]).forEach(x=>{
+          const label=key==='marque_modele'?'Véhicule':'Restitution',r=x.rows.find(r=>r.label===label);if(!r)return;
+          const previous=x.mission[key]||'',prefix=previous&&r.value.endsWith(previous)?r.value.slice(0,-previous.length):'';
+          x.mission[key]=value;r.value=prefix+value;
+        });
+        await save();render();note('Marque et modèle corrigés dans les missions en préparation.');
+      }
       if(b.hasAttribute('data-prep-save')){await save();render();note('Brouillon enregistré. Rien n’est publié.');}
       if(b.dataset.prepView==='admin'){state.preview=false;render();note('');}
       if(b.dataset.prepView==='preview'){await save();state.preview=true;render();note('');}

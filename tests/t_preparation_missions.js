@@ -27,9 +27,17 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' total du devis visible en admin',await page.locator('.hc-prep-budget').innerText().then(t=>/9\s*876,54/.test(t)));
  L.check(width+' devis payé exact du dossier',await page.evaluate(()=>['id:dv1','client_id:client-1','statut:accepte','paiement_statut:paye'].every(f=>__filters.some(x=>x.join(':')===f))));
  await page.locator('.hc-prep-budget').screenshot({path:'/tmp/hc-budget-admin-'+width+'.png'});
+ await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').click();
+ await page.locator('[data-vehicle-value]').fill('Peugeot 3008 corrigée');
+ await page.locator('[data-save-vehicle]').click();
+ L.check(width+' correction véhicule enregistrée',await page.evaluate(()=>__source.brouillons[0].plan.mission.marque_modele==='Peugeot 3008 corrigée'&&__source.brouillons[0].annonce.rows.some(r=>r.label==='Véhicule'&&r.value.includes('3008 corrigée'))));
+ await page.evaluate(()=>ouvrirPreparationDemande('client-1'));
+ L.check(width+' correction conservée après réouverture',await page.locator('#hc-prep-body').innerText().then(t=>t.includes('3008 corrigée')));
+ await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').click();await page.locator('[data-vehicle-value]').fill('Peugeot 308');await page.locator('[data-save-vehicle]').click();
  L.check(width+' horaire client conservé sans nouvelle saisie',await page.locator('[data-field="heure_prise_en_charge"]').count()===0&&await page.locator('#hc-prep-body').innerText().then(t=>t.includes('09:00 - 11:00')));
  await page.locator('[data-field="remuneration"]').fill('250');await page.locator('[data-field="distance"]').fill('465');await page.locator('[data-field="motorisation"]').selectOption('Hybride');await page.locator('[data-field="restit_motorisation"]').selectOption('Essence');await page.locator('[data-prep-view="preview"]').first().click();
  L.check(width+' total client absent de l’aperçu et des plans enregistrés',await page.locator('.hc-prep-budget').count()===0&&await page.evaluate(()=>!JSON.stringify(__source.brouillons).includes('9876.54')));
+ L.check(width+' aucun crayon dans aperçu partenaire',await page.locator('[data-edit-vehicle]').count()===0);
  const content=await page.locator('#hc-prep-body').innerText();L.check(width+' aperçu filtré avec prix total',content.includes('250')&&!content.includes('SECRET')&&!content.includes('rue'));
  L.check(width+' créneau de départ conservé',content.includes('09:00 - 11:00'));
  L.check(width+' modèle dans le bon trajet',await page.locator('[aria-label="Livraison"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Peugeot 308')&&!t.includes('Audi A3'))&&await page.locator('[aria-label="Restitution"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Audi A3')&&!t.includes('Peugeot 308')));
@@ -68,6 +76,15 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
    __source=original;await ouvrirPreparationDemande('client-1');return {text,hour,price};
  });
  L.check(width+' ancien brouillon recalculé sans perdre le prix',!repaired.text.includes('18/11/2026')&&repaired.text.includes('10/11/2026')&&repaired.hour===''&&repaired.price==='123');
+ await page.evaluate(async()=>{window.__beforeVehicleTest=JSON.parse(JSON.stringify(__source));__source.brouillons=[];__source.vehicules[0].date_livraison='2026-11-14';await ouvrirPreparationDemande('client-1');});
+ await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').first().click();await page.locator('[data-vehicle-value]').fill('Peugeot 3008');await page.locator('[data-save-vehicle]').click();
+ L.check(width+' même correction sur les deux trajets du véhicule',await page.evaluate(()=>__source.brouillons.length===2&&__source.brouillons.every(b=>b.plan.mission.marque_modele==='Peugeot 3008')));
+ await page.locator('[data-edit-vehicle][data-vehicle-key="restit_marque_modele"]').click();await page.locator('[data-vehicle-value]').fill('Renault Clio II');await page.locator('[data-save-vehicle]').click();
+ L.check(width+' restitution corrigée séparément',await page.evaluate(()=>__source.brouillons.every(b=>b.plan.mission.marque_modele==='Peugeot 3008')&&__source.brouillons.find(b=>b.plan.kind==='apres_stockage').plan.mission.restit_marque_modele==='Renault Clio II'));
+ await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').first().click();await page.locator('[data-vehicle-value]').fill('');await page.locator('[data-save-vehicle]').click();
+ L.check(width+' modèle vide refusé',await page.locator('#hc-prep-message').innerText().then(t=>t.includes('Renseignez la marque')));
+ await page.locator('[data-cancel-vehicle]').click();
+ await page.evaluate(async()=>{__source=__beforeVehicleTest;await ouvrirPreparationDemande('client-1');});
  const filtering=await page.evaluate(()=>{
    _demandesDevisListe=[{id:'a',nom:'Alpha',email:'a@example.test'},{id:'b',nom:'Beta',email:'b@example.test'},{id:'c',nom:'Gamma',email:'a@example.test'}];
    _devisParClient={a:{statut:'accepte',paiement_statut:'en_attente'},b:{statut:'accepte',paiement_statut:'paye'},c:{statut:'envoye',consulte_le:'2026-09-01'}};
