@@ -77,8 +77,8 @@ const {lancerNavigateur} = require('./env');
     await p.evaluate(async () => {
       window.chargerDemandesClient = async () => [
         {id:'d1',numero_client:'HC-2026-6320',type_service:'professionnel',statut:'nouveau'},
-        {id:'d2',numero_client:'HC-2026-8594',type_service:'stockage',statut:'nouveau'},
-        {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau'},
+        {id:'d2',numero_client:'HC-2026-8594',type_service:'stockage',statut:'nouveau',created_at:'2026-09-13T14:00:00Z'},
+        {id:'d3',numero_client:'HC-2026-5049',type_service:'convoyage',statut:'nouveau',created_at:'2026-10-09T14:00:00Z'},
         {id:'d4',numero_client:'HC-2026-4479',type_service:'stockage',statut:'nouveau'}];
       window.chargerDevisClient = async () => [{id:'q4',client_id:'d4',statut:'accepte',paiement_statut:'en_attente',prix:120},{id:'q3',client_id:'d3',statut:'accepte',paiement_statut:'paye'},{id:'q2',client_id:'d2',statut:'accepte',paiement_statut:'paye'}];
       window.chargerInformationsDemande = async id => [{cle:'vehicule_1_vin',statut:id==='d1'?'transmise':id==='d2'?'attendue':'validee'}];
@@ -102,6 +102,7 @@ const {lancerNavigateur} = require('./env');
     assert.equal(await p.getByText('Reçue',{exact:true}).count(),0);
     for (const width of [390,1440]) {
       await p.setViewportSize({width,height:950});
+      assert.deepEqual(await p.locator('[data-groupe-demandes="preparation"] .hc-demande-card').evaluateAll(cards=>cards.map(c=>c.dataset.demande)),['d3','d2']);
       assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert(await p.locator('.hc-demande-card').evaluateAll(cards=>cards.every((card,i)=>{
         const s=getComputedStyle(card),r=card.getBoundingClientRect();

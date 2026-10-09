@@ -3186,7 +3186,7 @@ erreurInfos=true;}
   zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
     const selection=resultats.filter(r=>(g.etats||[g.cle]).includes(r.presentation.groupe)).sort(function(a,b){
       const ecart = (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0);
-      return (g.cle==='demandes' ? -ecart : ecart) || String(a.d.id).localeCompare(String(b.d.id));
+      return (['demandes','preparation'].includes(g.cle) ? -ecart : ecart) || String(a.d.id).localeCompare(String(b.d.id));
     });
     // La rubrique « Prestations en préparation » reste un repère permanent
     // du parcours client, même tant qu'aucun dossier n'y est encore classé.
