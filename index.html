@@ -5511,6 +5511,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
   } catch (e) {}
 })();
 </script>
+<style>.hc-retour-destination{display:flex;align-items:flex-start;gap:10px;margin:14px 0;font-size:.86rem;line-height:1.5;cursor:pointer}.hc-retour-destination input{width:18px;height:18px;flex-shrink:0;margin-top:2px;accent-color:#ac3945}.hc-retour-resume{padding:12px;background:#f4f5f4;border-radius:6px;font-size:.85rem;line-height:1.5}</style>
 </head>
 
 <body>
@@ -8242,7 +8243,7 @@ var CHAMPS_VEHICULE = [
   'livraison_apres_stockage',
   'liv_contact_nom','liv_contact_tel','date_livraison',
   'heure_livraison','liv_heure_type','liv_creneau_debut','liv_creneau_fin',
-  'restitution_concernee','restit_adresse_rue','restit_code_postal','restit_ville',
+  'restitution_concernee','restit_destination','restit_adresse_rue','restit_code_postal','restit_ville',
   'restit_contact_nom','restit_contact_tel','restit_date',
   'restit_heure','restit_heure_type','restit_creneau_debut','restit_creneau_fin',
   'restit_contraintes','heure_recuperation_client',
@@ -11589,6 +11590,28 @@ function _restaurerTrajetGlobal() {
 // active se trouve plus bas dans le fichier.
 // Bloc trajet d'un véhicule. Astérisques sur ce qui est réellement
 // nécessaire au devis ; contact et téléphone restent facultatifs.
+function _hcRetourDestination(i, changement) {
+  var caseRetour=document.getElementById('veh-'+i+'-restit-retour');if(!caseRetour)return;
+  var champs=['rue','cp','ville'].map(function(k){return document.getElementById('veh-'+i+'-restit-'+k);});
+  if(changement&&caseRetour.checked)caseRetour.dataset.manuelle=JSON.stringify(champs.map(function(e){return e.value;}));
+  if(!caseRetour.checked&&changement){
+    var ancienne=JSON.parse(caseRetour.dataset.manuelle||'["","",""]');champs.forEach(function(e,j){e.value=ancienne[j]||'';});
+  }
+  var zone=document.getElementById('veh-'+i+'-restit-adresse-zone'),resume=document.getElementById('veh-'+i+'-restit-retour-resume');
+  zone.hidden=caseRetour.checked;resume.hidden=!caseRetour.checked;
+  if(caseRetour.checked){
+    var valeurs;
+    if(_avecStockage())valeurs=['Point de stockage HelixCar','93160','Noisy-le-Grand'];
+    else valeurs=['rue','cp','ville'].map(function(k,j){var e=document.getElementById(_trajetCommun()?['client-from-rue','client-from-cp','client-from'][j]:'veh-'+i+'-pc-'+k);return e?(e.value||'').trim():'';});
+    champs.forEach(function(e,j){e.value=valeurs[j];});
+    resume.textContent=_avecStockage()?'Destination : point de stockage HelixCar — Noisy-le-Grand.':('Retour à l’adresse de départ : '+(valeurs.filter(Boolean).join(', ')||'renseignez d’abord la prise en charge.'));
+  }
+  if(changement){champs.forEach(function(e){e.dispatchEvent(new Event('input',{bubbles:true}));});_majEtatVehicules();}
+}
+document.addEventListener('input',function(e){
+  if(!/^(veh-\d+-pc-(rue|cp|ville)|client-from(-rue|-cp)?)$/.test(e.target.id||''))return;
+  document.querySelectorAll('[data-hc-retour-destination]:checked').forEach(function(el){_hcRetourDestination(Number(el.dataset.hcRetourDestination),false);});
+});
 function _blocTrajetVehicule(i, prefixe, titre, v) {
   var map = {
     pc:     ['adresse_depart_rue','code_postal_depart','ville_depart','date_prise_en_charge','heure_prise_en_charge'],
@@ -11600,6 +11623,7 @@ function _blocTrajetVehicule(i, prefixe, titre, v) {
   var b = 'veh-' + i + '-' + prefixe;
 
   return '<div class="veh-sep"></div><div class="veh-sstitre">' + titre + '</div>' +
+    (prefixe==='restit'?'<label class="hc-retour-destination"><input type="checkbox" id="veh-'+i+'-restit-retour" data-hc-retour-destination="'+i+'" data-manuelle="'+_attr(JSON.stringify(v._restit_adresse_manuelle||[v.restit_adresse_rue||'',v.restit_code_postal||'',v.restit_ville||'']))+'"'+(['depart','stockage'].indexOf(v.restit_destination)>=0?' checked':'')+' onchange="_hcRetourDestination('+i+',true)"><span>'+(_avecStockage()?'Ramener ce véhicule au point de stockage HelixCar — Noisy-le-Grand':'Ramener ce véhicule à l’adresse de départ du véhicule livré')+'</span></label><p id="veh-'+i+'-restit-retour-resume" class="hc-retour-resume" hidden></p><div id="veh-'+i+'-restit-adresse-zone">':'')+
     '<div class="modal-form-group"><label>Adresse' + R + '</label>' +
     '<input type="text" id="' + b + '-rue" value="' + val(0) + '"></div>' +
     '<div class="modal-row">' +
@@ -11607,7 +11631,7 @@ function _blocTrajetVehicule(i, prefixe, titre, v) {
       '<input type="text" id="' + b + '-cp" maxlength="5" inputmode="numeric" value="' + val(1) + '"></div>' +
       '<div class="modal-form-group"><label>Ville' + R + '</label>' +
       '<input type="text" id="' + b + '-ville" value="' + val(2) + '"></div>' +
-    '</div>' +
+    '</div>' + (prefixe==='restit'?'</div>':'') +
     '<div class="modal-row">' +
       '<div class="modal-form-group"><label>Contact <span class="field-optional-hint">(facultatif)</span></label>' +
       '<input type="text" id="' + b + '-contact" value="' + _attr(v[prefixe + '_contact_nom']) + '"></div>' +
@@ -12073,6 +12097,8 @@ function _guiderEntreeEtapeVehicules() {
 // active se trouve plus bas dans le fichier.
 // N'affecte que le véhicule i : ni ses données PC/LIV, ni les autres véhicules.
 function _viderRestitutionVehicule(i) {
+  var retour=document.getElementById('veh-'+i+'-restit-retour');
+  if(retour){retour.checked=false;retour.dataset.manuelle='["","",""]';_hcRetourDestination(i,false);}
   ['restit-rue','restit-cp','restit-ville','restit-contact','restit-tel',
    'restit-date','restit-heure','restit-cdeb','restit-cfin',
    'restit-consignes',
@@ -21072,7 +21098,7 @@ function rendreFichesVehicules() {
     html+='<div class="veh-actions"><button type="button" class="veh-btn-effacer" onclick="effacerVehicule('+i+')">Effacer ce véhicule</button><button type="button" class="btn btn-primary veh-btn-valider" onclick="validerVehicule('+i+')" disabled aria-disabled="true">Valider ce véhicule</button></div></div></div>';
   }
   conteneur.innerHTML=html; conteneur.style.display='block';
-  for (var k=0;k<n;k++) _majBarreVehicule(k);
+  for (var k=0;k<n;k++) {_hcRetourDestination(k,false);_majBarreVehicule(k);}
   _majProgressionVehicules(); _ouvrirPremierIncomplet(); _initialiserAutocompletionAdressesClient();
 }
 
@@ -21080,6 +21106,7 @@ function _lireFichesVehicules() {
   var out=[], n=_nbVehicules();
   for (var i=0;i<n;i++) {
     var base=document.getElementById('veh-'+i+'-type'); if(!base){out.push(null);continue;}
+    _hcRetourDestination(i,false);
     function g(s){var el=document.getElementById('veh-'+i+'-'+s); return el?(el.value||'').trim():'';}
     var aRestit=_vehiculeARestitutionSpecifique(i), restDecision=document.querySelector('input[name="veh-'+i+'-restit-active"]:checked'), modeEl=document.querySelector('input[name="veh-'+i+'-mode"]:checked');
     var livActive=_vehiculeLivraisonApresStockage(i);
@@ -21097,6 +21124,8 @@ function _lireFichesVehicules() {
       // véhicule, jamais lue si non applicable.
       heure_recuperation_client:(livActive===false?g('recup-heure'):''),
       adresse_arrivee_rue:livActive===true?g('liv-rue'):'',code_postal_arrivee:livActive===true?g('liv-cp'):'',ville_arrivee:livActive===true?g('liv-ville'):'',liv_contact_nom:livActive===true?g('liv-contact'):'',liv_contact_tel:livActive===true?g('liv-tel'):'',date_livraison:livActive===true?g('liv-date'):'',heure_livraison:livActive===true?h('liv','heure'):'',liv_heure_type:livActive===true?h('liv','type'):'',liv_creneau_debut:livActive===true?h('liv','cdeb'):'',liv_creneau_fin:livActive===true?h('liv','cfin'):'',
+      restit_destination:aRestit&&((document.getElementById('veh-'+i+'-restit-retour')||{}).checked)?(_avecStockage()?'stockage':'depart'):'adresse',
+      _restit_adresse_manuelle:JSON.parse(((document.getElementById('veh-'+i+'-restit-retour')||{}).dataset||{}).manuelle||'["","",""]'),
       restitution_concernee:restDecision ? (restDecision.value==='oui') : null,restit_adresse_rue:aRestit?g('restit-rue'):'',restit_code_postal:aRestit?g('restit-cp'):'',restit_ville:aRestit?g('restit-ville'):'',restit_contact_nom:aRestit?g('restit-contact'):'',restit_contact_tel:aRestit?g('restit-tel'):'',restit_date:aRestit?g('restit-date'):'',restit_heure:aRestit?h('restit','heure'):'',restit_heure_type:aRestit?h('restit','type'):'',restit_creneau_debut:aRestit?h('restit','cdeb'):'',restit_creneau_fin:aRestit?h('restit','cfin'):'',restit_contraintes:aRestit?g('restit-consignes'):'',
       // V55 — identité du VÉHICULE À RESTITUER, distincte de l'identité
       // principale (type_vehicule/marque_modele/immatriculation/vin).
