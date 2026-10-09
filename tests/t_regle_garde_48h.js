@@ -25,3 +25,11 @@ assert.equal(P.elapsedHours({...v,date_prise_en_charge:'2026-10-25',heure_prise_
 assert.equal(P.elapsedHours({...v,date_prise_en_charge:'2026-03-29',heure_prise_en_charge:'02:30'}),null);
 const mixed=P.build(c,[v,{...v,id:'v2',heure_livraison:'08:46'}]);assert.equal(mixed.length,3);
 console.log('PASS Règle 48 h : seuils, créneaux, fuseau Paris, stockage mixte, restitution et missions publiées');
+
+const multi=P.build({...c,stockage_date_debut:'2026-11-04',stockage_date_fin:'2026-11-18'},[
+ {...v,id:'early',date_prise_en_charge:'2026-11-04',date_livraison:'2026-11-10'},
+ {...v,id:'late',date_prise_en_charge:'2026-11-04',date_livraison:'2027-02-05'}]);
+assert.deepEqual(multi.filter(p=>p.kind==='apres_stockage').map(p=>[p.date_debut,p.date_fin]),[['2026-11-10','2026-11-10'],['2027-02-05','2027-02-05']]);
+assert.ok(multi.every(p=>!p.missing.includes('Livraison antérieure à la prise en charge')));
+assert.equal(build({date_livraison:'2026-10-07',heure_livraison:'15:30'}).length,1);
+console.log('PASS sorties individuelles avant/après fin prévue et garde courte sans découpage artificiel');

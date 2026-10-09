@@ -19,6 +19,20 @@
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
       if(!s.mission_id&&p.category==='convoyage'){
         result.missing=p.missing;
+        // Réactualise aussi les dates calculées d'un ancien brouillon.
+        // Une heure saisie pour une autre journée doit être revalidée.
+        for(const [dateKey,hourKey,label,missionKey] of [
+          ['date_debut',p.kind==='apres_stockage'?'heure_retrait':'heure_prise_en_charge','Prise en charge','date_prise_en_charge'],
+          ['date_fin','heure_remise','Livraison','date_livraison']
+        ]){
+          const internal=(label==='Prise en charge'&&p.kind==='apres_stockage')||(label==='Livraison'&&p.kind==='avant_stockage');
+          if(internal&&result[dateKey]!==p[dateKey]){
+            result[hourKey]='';result.mission=Object.assign({},result.mission,{[missionKey]:null});
+            result.rows=result.rows.map(r=>r.label===label?p.rows.find(x=>x.label===label):r);
+          }
+          result[dateKey]=p[dateKey];
+        }
+        result.stockage=p.stockage;
         result.rows=result.rows.filter(r=>r.label!=='Garde du véhicule').concat(p.rows.filter(r=>r.label==='Garde du véhicule'));
         for(const key of ['motorisation','restit_motorisation']){
           if(p[key]){result[key]=p[key];result.mission[key]=p[key];}

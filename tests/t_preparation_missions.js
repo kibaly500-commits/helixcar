@@ -3,13 +3,13 @@ const v={id:'veh-1',position:1,type_vehicule:'berline',marque_modele:'Peugeot 30
 const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',societe:'SECRET-SOCIETE',notes:'SECRET-NOTE',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-13',stockage_acheminement:'helixcar',stockage_sortie:'helixcar'};
 (async()=>{
  for(const [days,count] of [[0,1],[1,1],[2,1],[3,2],[5,2]]){const x=planner.build(c,[{...v,date_livraison:'2026-11-'+String(8+days).padStart(2,'0')}]);L.check('Seuil automatique '+days+' jours',x.length===count);if(days>2)L.check('Restitution sur le trajet final seulement',!x[0].mission.restitution&&x[1].mission.restitution);}
- for(const [inMode,outMode,n] of [['client','client',0],['helixcar','client',1],['client','helixcar',1],['helixcar','helixcar',2]]){const x=planner.build({...c,type_service:'stockage',stockage_acheminement:inMode,stockage_sortie:outMode},[v]);L.check('Stockage '+inMode+'/'+outMode,x.length===n);}
+ for(const [inMode,outMode,n] of [['client','client',0],['helixcar','client',1],['client','helixcar',1],['helixcar','helixcar',1]]){const x=planner.build({...c,type_service:'stockage',stockage_acheminement:inMode,stockage_sortie:outMode},[v]);L.check('Stockage '+inMode+'/'+outMode,x.length===n);}
  const override=planner.build({...c,type_service:'stockage'},[{...v,livraison_apres_stockage:false}]);L.check('Choix individuel sans livraison respecté',override.length===1&&override[0].kind==='avant_stockage');
  const split=planner.build(c,[{...v,date_livraison:'2026-11-14'}],'12 rue de l’Université, 93160 Noisy-le-Grand');
  L.check('Deux trajets présentés comme convoyages',split.every(p=>p.title==='Convoyage automobile'&&!JSON.stringify(planner.publicData(p)).includes('stockage')));
  L.check('Point de remise réservé au privé',split[0].mission.adresse_arrivee.includes('12 rue')&&!JSON.stringify(planner.publicData(split[0])).includes('12 rue'));
- const invalidAfter=planner.build({...c,type_service:'stockage'},[{...v,date_livraison:'2026-11-10'}]);
- L.check('Livraison avant sortie du stockage bloquée',invalidAfter[1].missing.includes('Livraison antérieure à la prise en charge'));
+ const earlyExit=planner.build({...c,type_service:'stockage',stockage_date_fin:'2026-11-18'},[{...v,date_livraison:'2026-11-14'}]);
+ L.check('Sortie individuelle avant fin prévue du dossier',earlyExit[1].date_debut==='2026-11-14'&&!earlyExit[1].missing.includes('Livraison antérieure à la prise en charge'));
  const absentVins=planner.build(c,[{...v,vin:'   ',restit_vin:null}])[0];
  L.check('VIN livraison et restitution obligatoires',absentVins.missing.filter(x=>x.includes('VIN')).length===2);
  L.check('VIN restitution non exigé sans restitution',planner.missingVins({vin:'VIN',restitution:false}).length===0);
@@ -54,6 +54,20 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' motorisations connues sans nouvelle saisie',await page.locator('[data-field="motorisation"], [data-field="restit_motorisation"]').count()===0&&await page.locator('#hc-prep-body').innerText().then(t=>t.includes('Diesel')&&t.includes('Électrique')&&t.includes('Reprise de la demande')));
  await page.locator('[data-prep-save]').click();
  L.check(width+' motorisations source conservées malgré ancien brouillon',await page.evaluate(()=>{const p=__source.brouillons[0].plan;return p.motorisation==='Diesel'&&p.restit_motorisation==='Électrique'&&p.mission.motorisation==='Diesel'&&p.mission.restit_motorisation==='Électrique';}));
+ const repaired=await page.evaluate(async()=>{
+   const original=JSON.parse(JSON.stringify(__source));
+   __source.client.type_service='stockage';__source.client.stockage_date_debut='2026-11-04';__source.client.stockage_date_fin='2026-11-18';
+   __source.vehicules[0].date_prise_en_charge='2026-11-04';__source.vehicules[0].date_livraison='2026-11-10';
+   const plans=HCPreparation.build(__source.client,__source.vehicules);
+   const post=plans.find(p=>p.kind==='apres_stockage');post.date_debut='2026-11-18';post.heure_retrait='09:00';post.mission.date_prise_en_charge='2026-11-18T09:00:00';post.rows.find(r=>r.label==='Prise en charge').value='2026-11-18 · 09:00';post.remuneration=123;
+   __source.brouillons=[{id:'old',cle:post.key,empreinte:'hash',plan:post}];
+   await ouvrirPreparationDemande('client-1');
+   const cards=[...document.querySelectorAll('#hc-prep-body>.hc-prep-card')];const text=cards[1].innerText;
+   const hour=cards[1].querySelector('[data-field="heure_retrait"]').value;
+   const price=cards[1].querySelector('[data-field="remuneration"]').value;
+   __source=original;await ouvrirPreparationDemande('client-1');return {text,hour,price};
+ });
+ L.check(width+' ancien brouillon recalculé sans perdre le prix',!repaired.text.includes('18/11/2026')&&repaired.text.includes('10/11/2026')&&repaired.hour===''&&repaired.price==='123');
  const filtering=await page.evaluate(()=>{
    _demandesDevisListe=[{id:'a',nom:'Alpha',email:'a@example.test'},{id:'b',nom:'Beta',email:'b@example.test'},{id:'c',nom:'Gamma',email:'a@example.test'}];
    _devisParClient={a:{statut:'accepte',paiement_statut:'en_attente'},b:{statut:'accepte',paiement_statut:'paye'},c:{statut:'envoye',consulte_le:'2026-09-01'}};
