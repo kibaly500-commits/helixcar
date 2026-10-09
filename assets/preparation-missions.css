@@ -67,3 +67,5 @@
 .hc-prep-route .hc-prep-date{grid-row:3}
 .hc-prep-route .hc-prep-time{grid-row:4}
 .hc-prep-direction{grid-column:2;grid-row:2;align-self:center;justify-self:center;margin:0}
+
+.hc-prep-budget{display:grid;gap:6px;margin:16px 0;padding:16px 20px;background:#fff;border:1px solid #d8dde3;border-radius:8px;color:#20252c}.hc-prep-budget>span{font-size:14px}.hc-prep-budget>strong{font-size:22px;font-weight:600}.hc-prep-budget>small{font-size:13px;color:#5b626b;line-height:1.5}

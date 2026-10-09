@@ -1,7 +1,7 @@
 /* Intégration du plan dans la fiche de demande. Aucune mutation à l'ouverture. */
 (function () {
   'use strict';
-  let state=null,busy=false,generation=0;
+  let state=null,busy=false,generation=0,totalDevis=null;
   const esc=v=>escapeHtml(v==null?'':String(v));
   const display=v=>esc(String(v??'').replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'));
   const money=v=>v==null?'À définir':Number(v).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
@@ -9,7 +9,7 @@
   modal.innerHTML='<div class="modal hc-prep-modal"><div class="hc-prep-head"><div><div id="hc-prep-ref" class="hc-prep-muted"></div><h3>Préparer les missions</h3></div><button type="button" class="btn btn-outline" id="hc-prep-close">Fermer</button></div><div id="hc-prep-message" role="status" aria-live="polite"></div><div id="hc-prep-body"></div></div>';
   document.body.append(modal);
   const el=id=>document.getElementById(id);
-  window.addEventListener('hc-session-fermee',()=>{++generation;state=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
+  window.addEventListener('hc-session-fermee',()=>{++generation;state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function adopt(source){
@@ -42,8 +42,14 @@
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
-    if(busy)return;const ticket=++generation;busy=true;state=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
-    try{const source=await rpc('source_preparation_missions',{p_client_id:clientId});if(ticket!==generation)return;adopt(source);render();}
+    if(busy)return;const ticket=++generation;busy=true;state=null;totalDevis=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
+    try{const source=await rpc('source_preparation_missions',{p_client_id:clientId});if(ticket!==generation)return;
+      // Lecture admin du devis exact ; le total reste hors des plans et annonces.
+      let montant=null;
+      try{const r=await sbAuth.from('devis').select('prix').eq('id',source.devis_id).eq('client_id',clientId).eq('statut','accepte').eq('paiement_statut','paye').maybeSingle();
+        const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
+      }catch(_){}
+      if(ticket!==generation)return;totalDevis=montant;adopt(source);render();}
     catch(e){if(ticket===generation){el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}
   };
@@ -86,6 +92,7 @@
   function render(){
     if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
+    if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>Pour l’ensemble de la demande · Avant rémunération des partenaires et autres frais.</small></aside>';
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
