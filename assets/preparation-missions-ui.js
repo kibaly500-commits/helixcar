@@ -53,6 +53,7 @@
       if(p[pickupKey]==null)p[pickupKey]=p.rows.find(r=>r.label==='Prise en charge')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
       if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
     });
+    plans.forEach(p=>{if(p.retour_helixcar)p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];});
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
@@ -115,7 +116,7 @@
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
-      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked)h+='<p class="hc-prep-muted">Mission déjà créée</p>';else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
+      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Réception — convoyeur → HelixCar :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>Remise — HelixCar → client :</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
@@ -126,6 +127,10 @@
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur','time');}
       h+='</div>';
+      if(p.retour_helixcar){
+        const d=p.retour_helixcar.demande;
+        h+='<section class="hc-prep-internal"><h4>Retour du véhicule récupéré chez HelixCar</h4><p><strong>'+esc(p.mission.restit_marque_modele||'Véhicule à récupérer')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</strong></p><p>'+esc(HCPlanningCalcul.POINT)+'</p><div class="hc-prep-fields">'+input(p,i,'retour_reception','1. Réception — convoyeur → HelixCar','datetime-local')+input(p,i,'retour_remise','2. Remise — HelixCar → client','datetime-local')+'</div><p>Retour du convoyeur : livraison du premier véhicule + durée du trajet retour vérifiée par vous + 45 minutes de battement.</p><p><strong>Récupération souhaitée par le client :</strong> '+display(HCPlanningCalcul.retourDemande(p))+'</p><p>Personne attendue : '+esc(d.contact||[state.source.client.prenom,state.source.client.nom].filter(Boolean).join(' ')||'Client')+' · '+esc(d.telephone||state.source.client.telephone||'Téléphone à compléter')+'</p><p>Ces deux rendez-vous seront suivis séparément dans votre planning. Seul le retour du convoyeur figure dans l’annonce partenaire.</p></section>';
+      }
       if(p.kind==='avant_stockage'||p.kind==='apres_stockage'){
         const guide=HCPlanningCalcul.guidance(p);
         h+='<div class="hc-planning-estimate"><p><strong>'+esc(guide.label)+' :</strong> '+display(guide.when)+'</p><p>'+esc(guide.address)+'</p><p><strong>'+esc(guide.target)+'</strong></p><p>'+esc(HCPlanningCalcul.POINT)+'</p><p><strong>Prévoir 45 minutes de battement.</strong> '+esc(guide.rule)+'</p></div>';
@@ -144,8 +149,15 @@
     if(e.type==='time'&&e.value===previous)return;
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
-  });}
-  async function save(){readEdits();const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
+  });
+    state.plans.forEach(p=>{
+      if(!p.retour_helixcar)return;
+      p.mission.date_restitution_depart=p.retour_reception||null;
+      const row=p.rows.find(r=>r.label==='Restitution prévue');if(row)row.value=p.retour_reception?p.retour_reception.replace('T',' · '):'Réception chez HelixCar à fixer';
+      p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];
+    });
+  }
+  async function save(){readEdits();const errors=state.plans.flatMap(p=>HCPlanningCalcul.retourErrors(p,false));if(errors.length)throw Error(errors.join(' · '));const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
   modal.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}

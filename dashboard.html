@@ -10399,9 +10399,9 @@ function _detailVehicule(c, v, idx) {
 
   if (v.restitution_concernee) {
     ln('Restitution', [v.restit_adresse_rue, [v.restit_code_postal, v.restit_ville].filter(Boolean).join(' ')].filter(Boolean).join(', ') || 'Oui');
-    ln('Contact restitution', [v.restit_contact_nom, v.restit_contact_tel].filter(Boolean).join(' — '));
-    ln('Date restitution', _dvDate(v.restit_date));
-    ln('Horaire restitution', _horaireVehicule(v, 'restit'));
+    ln(v.restit_recuperation_client?'Personne qui récupère le véhicule':'Contact restitution', [v.restit_contact_nom, v.restit_contact_tel].filter(Boolean).join(' — '));
+    ln(v.restit_recuperation_client?'Récupération client chez HelixCar':'Date restitution', _dvDate(v.restit_date));
+    ln(v.restit_recuperation_client?'Horaire de récupération client':'Horaire restitution', _horaireVehicule(v, 'restit'));
     // V55 — identité du VÉHICULE À RESTITUER, propre à CE véhicule
     // (colonnes restit_* de la table vehicules). Distincte de
     // l'identité principale du véhicule affichée plus haut, et des
@@ -13569,7 +13569,7 @@ function _construirePdfDevis(c, d, options) {
         var adrRestitV = _adresseCompleteOuVille(v.restit_adresse_rue, v.restit_code_postal, v.restit_ville);
         var dateRestitV = _monoPdf ? c.date_restitution : v.restit_date;
         var horaireRestitV = _phraseHoraireFr(_monoPdf ? _horaireDossier(c, 'restit') : _horaireVehicule(v, 'restit'));
-        _dessinerLigneCombineeV(_ligneOperationVCombinee('Restitution', adrRestitV, dateRestitV, horaireRestitV));
+        _dessinerLigneCombineeV(_ligneOperationVCombinee(v.restit_recuperation_client?'Récupération client chez HelixCar':'Restitution', adrRestitV, dateRestitV, horaireRestitV));
       }
       return cur - y0 + 3.5 + (_etirementCartePdf * 0.42);
     };

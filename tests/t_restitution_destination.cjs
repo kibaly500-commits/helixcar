@@ -32,18 +32,21 @@ const {PGlite}=require('@electric-sql/pglite');
   const p=await L.newPage(browser);await p.setViewportSize({width,height:1000});await L.fillStep1(p,'particulier');await L.chooseService(p,'convoyage');
   const r=await p.evaluate(()=>{
    const el=id=>document.getElementById(id),set=(id,v)=>el(id).value=v;
+   const choice=v=>{el('veh-0-restit-destination').value=v;_hcRetourDestination(0,true);};
    const radio=(name,v)=>document.querySelector('input[name="'+name+'"][value="'+v+'"]').checked=true;
    set('nb-vehicules','2');rendreFichesVehicules();
    for(let i=0;i<2;i++){radio('veh-'+i+'-restit-active','oui');basculerRestitVehicule(i);set('veh-'+i+'-pc-rue','Départ '+i);set('veh-'+i+'-pc-cp','75001');set('veh-'+i+'-pc-ville','Paris');}
    set('veh-0-restit-rue','Adresse manuelle');set('veh-0-restit-cp','69001');set('veh-0-restit-ville','Lyon');set('veh-0-restit-contact','Contact intact');set('veh-0-restit-heure','16:30');
-   const r={defaultUnchecked:!el('veh-0-restit-retour').checked};el('veh-0-restit-retour').click();
-   r.destination=_lireFichesVehicules()[0].restit_adresse_rue==='Départ 0';r.isolation=!el('veh-1-restit-retour').checked&&el('veh-1-restit-rue').value==='';
+   const r={defaultUnchecked:el('veh-0-restit-destination').value==='adresse'};choice('depart');
+   r.destination=_lireFichesVehicules()[0].restit_adresse_rue==='Départ 0';r.isolation=el('veh-1-restit-destination').value==='adresse'&&el('veh-1-restit-rue').value==='';
    set('veh-0-pc-rue','Départ corrigé');el('veh-0-pc-rue').dispatchEvent(new Event('input',{bubbles:true}));r.followSource=el('veh-0-restit-rue').value==='Départ corrigé';
    const payload=_normaliserVehiculePourEnvoi(_lireFichesVehicules()[0]);r.payload=payload.restit_destination==='depart'&&!('_restit_adresse_manuelle' in payload);
-   rendreFichesVehicules();r.persist=el('veh-0-restit-retour').checked;el('veh-0-restit-retour').click();r.restore=el('veh-0-restit-rue').value==='Adresse manuelle'&&el('veh-0-restit-cp').value==='69001';r.keepOther=el('veh-0-restit-contact').value==='Contact intact'&&el('veh-0-restit-heure').value==='16:30';
-   el('veh-0-restit-retour').click();radio('veh-0-restit-active','non');basculerRestitVehicule(0);radio('veh-0-restit-active','oui');basculerRestitVehicule(0);r.noGhost=!el('veh-0-restit-retour').checked&&el('veh-0-restit-rue').value==='';
+   rendreFichesVehicules();r.persist=el('veh-0-restit-destination').value==='depart';choice('adresse');r.restore=el('veh-0-restit-rue').value==='Adresse manuelle'&&el('veh-0-restit-cp').value==='69001';r.keepOther=el('veh-0-restit-contact').value==='Contact intact'&&el('veh-0-restit-heure').value==='16:30';
+   choice('depart');radio('veh-0-restit-active','non');basculerRestitVehicule(0);radio('veh-0-restit-active','oui');basculerRestitVehicule(0);r.noGhost=el('veh-0-restit-destination').value==='adresse'&&el('veh-0-restit-rue').value==='';
    radio('type-service','stockage');radio('stock-acheminement','helixcar');radio('stock-sortie','helixcar');rendreFichesVehicules();
-   radio('veh-0-restit-active','oui');basculerRestitVehicule(0);el('veh-0-restit-retour').click();const storage=_normaliserVehiculePourEnvoi(_lireFichesVehicules()[0]);r.storage=storage.restit_destination==='stockage'&&storage.restit_ville==='Noisy-le-Grand';r.private=!el('veh-restit-0').textContent.includes('Université')&&!JSON.stringify(storage).includes('Université');r.hidden=el('veh-0-restit-adresse-zone').hidden;
+   radio('veh-0-restit-active','oui');basculerRestitVehicule(0);choice('stockage');const storage=_normaliserVehiculePourEnvoi(_lireFichesVehicules()[0]);r.storage=storage.restit_destination==='stockage'&&storage.restit_ville==='Noisy-le-Grand';r.private=!el('veh-restit-0').textContent.includes('Université')&&!JSON.stringify(storage).includes('Université');r.hidden=el('veh-0-restit-adresse-zone').hidden;r.newSemantics=storage.restit_recuperation_client&&el('veh-0-restit-label-date').textContent.includes('récupération');
+   radio('type-service','convoyage');rendreFichesVehicules();choice('stockage');r.convoyageStorage=_lireFichesVehicules()[0].restit_recuperation_client;
+   radio('type-service','stockage');rendreFichesVehicules();choice('depart');r.storageOrigin=_lireFichesVehicules()[0].restit_destination==='depart'&&!_lireFichesVehicules()[0].restit_recuperation_client;
    return r;
   });
   for(const [k,v] of Object.entries(r))assert(v,width+' '+k);assert.deepEqual(p.jsErrors,[]);console.log('PASS formulaire '+width+'px : '+Object.keys(r).join(', '));
