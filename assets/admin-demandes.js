@@ -74,7 +74,9 @@
       var r = await sbAuth.from('comptes_clients').select('numero').eq('auth_user_id', uid).maybeSingle();
       if (r.error || !r.data || currentRole !== 'client' || !window._currentClient || window._currentClient.authUserId !== uid) return;
       var code = document.createElement('strong'); code.textContent = r.data.numero;
-      zone.replaceChildren(document.createTextNode('Votre numéro client'), code, document.createTextNode('À communiquer lors de vos demandes par téléphone.'));
+      var titre = document.createElement('span'); titre.className = 'hc-client-numero-label'; titre.textContent = 'Numéro client';
+      var aide = document.createElement('small'); aide.textContent = 'Votre référence pour nos échanges.';
+      zone.replaceChildren(titre, code, aide);
       zone.hidden = false;
     } catch (e) { /* Le parcours existant reste disponible. */ }
   };

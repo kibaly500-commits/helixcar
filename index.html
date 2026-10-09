@@ -2836,6 +2836,10 @@ html.hc-confirmation-attente #hc-confirmation-attente { display:flex; position:f
     font-size: .88rem; color: rgba(16,24,32,.55); margin: 0 0 30px;
   }
 
+  .hc-succes-compte { display:flex;align-items:center;justify-content:center;gap:12px;margin:0 0 22px; }
+  .hc-succes-compte span { font-size:12px;color:#727b80; }
+  .hc-succes-compte strong { font-size:15px;font-weight:600;letter-spacing:.025em;background:#f1f3f2;border-radius:6px;padding:6px 10px;color:#27343d; }
+  .hc-succes-compte-note { font-size:12px;line-height:1.5;color:#727b80;margin:0 0 18px; }
   .hc-succes-numlabel {
     font-size: .7rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: .16em; color: rgba(16,24,32,.45); margin-bottom: 8px;
@@ -9486,6 +9490,27 @@ function _hcAppliquerModeConnecte() {
     + '. Vos informations de compte sont déjà renseignées.', 'succes');
 }
 
+// Lecture du numéro réellement attribué, sans confondre numéro de compte et demande.
+// Avant activation, une preuve aléatoire ne permet de lire que le numéro de
+// l'inscription dont elle provient. Elle ne rattache aucune demande.
+async function _hcLireNumeroClientInscription(utilisateur, preuve, etatCompte) {
+  try {
+    if (_hcCompteAdmin) return _hcCompteAdmin.numero;
+    var session = await _sb.auth.getSession();
+    var uid = session && session.data && session.data.session && session.data.session.user.id;
+    var retour;
+    if (uid) {
+      retour = await _sb.from('comptes_clients').select('numero').eq('auth_user_id', uid).maybeSingle();
+      return !retour.error && retour.data ? retour.data.numero : null;
+    }
+    if (etatCompte === 'cree' && utilisateur && utilisateur.id) {
+      retour = await _sb.rpc('lire_numero_client_inscription', {p_user_id:utilisateur.id,p_preuve:preuve});
+      return !retour.error && typeof retour.data === 'string' ? retour.data : null;
+    }
+  } catch (e) { /* Une lecture indisponible ne doit pas annuler la demande enregistrée. */ }
+  return null;
+}
+
 // Entrée « Faire une nouvelle demande » depuis l'espace client :
 // index.html?nouvelle-demande=1 . On ouvre le parcours à la question
 // « Comment pouvons-nous vous accompagner ? ».
@@ -9505,12 +9530,24 @@ function _hcModeIntegre() {
 function _hcBornesCadreVisibles() {
   var zone = { haut: 0, bas: window.innerHeight };
   try {
-    if (_hcModeIntegre() && window.parent.innerWidth <= 768 && window.frameElement) {
+    if (_hcModeIntegre() && window.frameElement) {
       var cadre = window.frameElement.getBoundingClientRect();
       var viewport = window.parent.visualViewport;
       var haut = viewport ? viewport.offsetTop : 0;
       var bas = haut + (viewport ? viewport.height : window.parent.innerHeight);
-      zone.haut = Math.max(0, haut - cadre.top);
+      // Sur ordinateur aussi, la modale admin peut masquer une partie du
+      // cadre. Le viewport du cadre seul ne décrit pas sa zone visible.
+      var parent = window.frameElement.parentElement;
+      while (parent) {
+        var style = window.parent.getComputedStyle(parent);
+        if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+          var limites = parent.getBoundingClientRect();
+          haut = Math.max(haut, limites.top + parent.clientTop);
+          bas = Math.min(bas, limites.top + parent.clientTop + parent.clientHeight);
+        }
+        parent = parent.parentElement;
+      }
+      zone.haut = Math.min(window.innerHeight, Math.max(0, haut - cadre.top));
       zone.bas = Math.max(zone.haut, Math.min(window.innerHeight, bas - cadre.top));
     }
   } catch (e) {}
@@ -9524,6 +9561,15 @@ function _hcAdapterOverlaysIntegres() {
     var bas = Math.max(0, window.innerHeight - zone.bas) + 'px';
     if (overlay.style.top !== haut) overlay.style.top = haut;
     if (overlay.style.bottom !== bas) overlay.style.bottom = bas;
+    var panneau = overlay.querySelector('.hc-cal, .hp-picker');
+    if (panneau && panneau.style.position === 'fixed') {
+      var hauteurMax = Math.max(80, zone.bas - zone.haut - 16) + 'px';
+      if (panneau.style.maxHeight !== hauteurMax) panneau.style.maxHeight = hauteurMax;
+      if (panneau.style.overflowY !== 'auto') panneau.style.overflowY = 'auto';
+      if (panneau.style.boxSizing !== 'border-box') panneau.style.boxSizing = 'border-box';
+      var top = Math.max(zone.haut + 8, Math.min(parseFloat(panneau.style.top) || 0, zone.bas - panneau.offsetHeight - 8)) + 'px';
+      if (panneau.style.top !== top) panneau.style.top = top;
+    }
   });
 }
 var _hcHauteurTransmise = 0;
@@ -9554,7 +9600,7 @@ function _hcActiverModeIntegre() {
   } catch (e) {}
   window.addEventListener('resize', _hcTransmettreHauteur);
   try {
-    window.parent.addEventListener('scroll', _hcAdapterOverlaysIntegres, { passive: true });
+    window.parent.addEventListener('scroll', _hcAdapterOverlaysIntegres, { passive: true, capture: true });
     window.parent.addEventListener('resize', _hcAdapterOverlaysIntegres);
     if (window.parent.visualViewport) window.parent.visualViewport.addEventListener('resize', _hcAdapterOverlaysIntegres);
   } catch (e) {}
@@ -17650,7 +17696,7 @@ async function _submitClientFormInterne() {
   }
 
   inserer(5)
-    .then(function(r) {
+    .then(async function(r) {
       if (!r || r.error) {
         // Le détail technique reste dans la console du navigateur, à
         // l'usage du développeur. Le client, lui, lit une phrase qu'il
@@ -17698,7 +17744,11 @@ async function _submitClientFormInterne() {
       // été enregistré serait un mensonge de plus.
       var _retourSrv = r.retour;
       var _numeroReel = _retourSrv.numero_client;
-      var html = '<div class="hc-succes-numlabel">' + (missionReelle ? 'Votre numéro de demande' : 'Référence de votre inscription') + '</div>' +
+      var _numeroCompte = await _hcLireNumeroClientInscription(utilisateur, cleReclamation, _compteEtat);
+      var htmlCompte = /^CLI-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(_numeroCompte || '')
+        ? '<div class="hc-succes-compte"><span>Numéro client</span><strong>' + _attr(_numeroCompte) + '</strong></div>'
+        : (_compteEtat === 'cree' ? '<p class="hc-succes-compte-note">Retrouvez votre numéro client dans votre espace après activation.</p>' : '');
+      var html = htmlCompte + '<div class="hc-succes-numlabel">' + (missionReelle ? 'Votre numéro de demande' : 'Référence de votre inscription') + '</div>' +
         '<div class="hc-succes-num">' + _attr(_numeroReel) + '</div>';
       if (parrCode) {
         html += '<div class="hc-succes-parr">Code de parrainage : <b>' + _attr(parrCode) + '</b>' +
@@ -23531,12 +23581,15 @@ console.log('HelixCar ' + window.HC_VERSION);
   // champ concerné, dans la zone visible du cadre.
   function ancrer(champ, panneau) {
     if (!document.body.classList.contains('hc-integre') || !champ || !panneau) return;
+    var zone = _hcBornesCadreVisibles();
+    panneau.style.maxHeight = Math.max(80, zone.bas - zone.haut - 16) + 'px';
+    panneau.style.overflowY = 'auto';
+    panneau.style.boxSizing = 'border-box';
     var r = champ.getBoundingClientRect();
     var largeur = panneau.offsetWidth || 300;
     var hauteur = panneau.offsetHeight || 300;
     var gauche = Math.max(8, Math.min(r.left, window.innerWidth - largeur - 8));
     var haut = r.bottom + 8;
-    var zone = _hcBornesCadreVisibles();
     if (haut + hauteur > zone.bas - 8) haut = r.top - hauteur - 8;
     haut = Math.max(zone.haut + 8, Math.min(haut, zone.bas - hauteur - 8));
     panneau.style.position = 'fixed';
