@@ -94,4 +94,11 @@ for(const [name,change,code] of [
  const d=linkFixture();d.archives.length=0;Object.assign(d.devis,{acceptation_token_hash:hash,version_envoyee:1,date_expiration_token:new Date(Date.now()+3600000).toISOString()});
  const {r}=await call(d,'refused',{token:TOKEN,jwt:''});check('ancien lien envoyé et valide accepté',r.status===200);
 }
+for (const [id,numero] of [['7de067e0-b9a8-4c2e-a5c1-b35a2c7850b8','HC-2026-3575'],['cb7a6716-554f-46e1-abac-9bafe3dff2d5','HC-2026-1227']]) {
+ const fixture=()=>{const d=double({qa:false});Object.assign(d.client,{id,numero_client:numero});d.devis.client_id=id;return d;};
+ for(const scenario of ['success','refused','abandoned','requires_action']){const d=fixture();const {r,j}=await call(d,scenario);check(numero+' autorisé '+scenario,r.status===200&&j.ok);}
+ {const d=fixture();d.client.id='autre';d.devis.client_id='autre';const {r}=await call(d,'success');check(numero+' autre dossier refusé',r.status===403&&d.rpc===0);}
+ {const d=fixture();d.client.auth_user_id='autre';const {r}=await call(d,'success');check(numero+' autre propriétaire refusé',r.status===404&&d.rpc===0);}
+ {const d=fixture();d.devis.statut='envoye';const {r}=await call(d,'success');check(numero+' non accepté refusé',r.status===409&&d.rpc===0);}
+}
 console.log('\n=== '+pass+' PASS / '+fail+' FAIL ===');process.exit(fail?1:0);

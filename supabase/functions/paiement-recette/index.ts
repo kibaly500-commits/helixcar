@@ -28,6 +28,9 @@ function dossierQa(client: any) {
   if (client?.id === "951410e8-7104-4256-b46d-59487e73890a" && client?.numero_client === "HC-2026-2184") return true;
   // Dossier de recette autorisé par Hamid le 04/10/2026.
   if (client?.id === "a134dc9a-3b58-488f-9257-d4f68d7295a6" && client?.numero_client === "HC-2026-6218") return true;
+  // Deux dossiers de recette multi-véhicules autorisés par Hamid le 10/10/2026.
+  if (client?.id === "7de067e0-b9a8-4c2e-a5c1-b35a2c7850b8" && client?.numero_client === "HC-2026-3575") return true;
+  if (client?.id === "cb7a6716-554f-46e1-abac-9bafe3dff2d5" && client?.numero_client === "HC-2026-1227") return true;
   return [client?.numero_client, client?.prenom, client?.nom, client?.email]
     .some((v) => DOSSIERS_QA.some(prefix => String(v || "").toUpperCase().startsWith(prefix)));
 }
