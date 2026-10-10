@@ -393,15 +393,6 @@ function _aStockage(c) {
   return t === 'stockage' || t === 'convoyage_stockage';
 }
 
-function _joursEntreDatesDash(d1, d2) {
-  if (!d1 || !d2) return null;
-  var a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
-  if (isNaN(a) || isNaN(b)) return null;
-  var j = Math.round((b - a) / 86400000);
-  if (j < 0) return -1;
-  return j === 0 ? 1 : j;
-}
-
 function _stockageAutomatiqueConvoyage(c) {
   if (!c || !_aConvoyage(c) || _aStockage(c)) return null;
 
@@ -421,6 +412,26 @@ function _stockageAutomatiqueConvoyage(c) {
   var fin = fins[fins.length - 1];
   var duree = _joursEntreDatesDash(debut, fin);
   return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
+}
+
+function _joursEntreDatesDash(d1, d2) {
+  if (!d1 || !d2) return null;
+  var a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return null;
+  var j = Math.round((b - a) / 86400000);
+  if (j < 0) return -1;
+  return j === 0 ? 1 : j;
+}
+
+function _stockageRestitutionsDevis(c) {
+  var periodes = ((c && c._vehicules) || []).filter(function (v) {
+    return v.restitution_concernee && v.restit_destination === 'stockage'
+      && _joursEntreDatesDash(v.date_livraison, v.restit_date) > 2;
+  });
+  if (!periodes.length) return null;
+  var debut = periodes.map(function (v) { return v.date_livraison; }).sort()[0];
+  var fin = periodes.map(function (v) { return v.restit_date; }).sort().pop();
+  return { debut: debut, fin: fin, duree: _joursEntreDatesDash(debut, fin) };
 }
 
 function _typeServiceDemande(c) {
@@ -1087,7 +1098,8 @@ function _construirePdfDevis(c, d, options) {
   // ══ STOCKAGE — mêmes codes graphiques que les autres blocs ══
   // Le stockage automatique d'un convoyage long réutilise volontairement
   // CE bloc, sans variante graphique : le PDF reste identique à la maquette.
-  var _stockageAutoPdf = _stockageAutomatiqueConvoyage(c);
+  var _stockageRetourPdf = _stockageRestitutionsDevis(c);
+  var _stockageAutoPdf = _stockageAutomatiqueConvoyage(c) || (!_aStockage(c) && _stockageRetourPdf);
   if (_aStockage(c) || _stockageAutoPdf) {
     // V50.4A — Objectifs 5/6/11 : durée réelle MONO uniquement (jamais en
     // multi — chaque véhicule a la sienne, affichée plus bas dans la
@@ -1153,6 +1165,10 @@ function _construirePdfDevis(c, d, options) {
       // limitant ce recalcul aux seules prolongations. Même fonction
       // _joursEntreDatesDash() inchangée.
       _jAfficheStock = _joursEntreDatesDash(c.stockage_date_debut, _finGlobaleMultiStock);
+    }
+    if (_stockageRetourPdf && (!_finAfficheeStock || _stockageRetourPdf.fin > _finAfficheeStock)) {
+      _finAfficheeStock = _stockageRetourPdf.fin;
+      _jAfficheStock = _joursEntreDatesDash(_debutAfficheStock, _finAfficheeStock);
     }
     // V50.4D — Objectif 8 : logique V50.3H stricte, même règle métier que
     // le formulaire client (miroir de _heureEntreeStockageApplicable() /
@@ -2103,7 +2119,7 @@ function _construirePdfDevis(c, d, options) {
         var adrRestitV = _adresseCompleteOuVille(v.restit_adresse_rue, v.restit_code_postal, v.restit_ville);
         var dateRestitV = _monoPdf ? c.date_restitution : v.restit_date;
         var horaireRestitV = _phraseHoraireFr(_monoPdf ? _horaireDossier(c, 'restit') : _horaireVehicule(v, 'restit'));
-        _dessinerLigneCombineeV(_ligneOperationVCombinee('Restitution', adrRestitV, dateRestitV, horaireRestitV));
+        _dessinerLigneCombineeV(_ligneOperationVCombinee(v.restit_recuperation_client?'Récupération client chez HelixCar':'Restitution', adrRestitV, dateRestitV, horaireRestitV));
       }
       return cur - y0 + 3.5 + (_etirementCartePdf * 0.42);
     };
@@ -2247,7 +2263,7 @@ function _construirePdfDevis(c, d, options) {
     // Même source de vérité que le bloc récapitulatif situé plus haut :
     // dès qu'un convoyage long fait apparaître du stockage sur le devis,
     // cette prestation doit également être nommée dans la liste finale.
-    if (_stockageAutomatiqueConvoyage(c)) prestations.push('Stockage automobile');
+    if (_stockageAutomatiqueConvoyage(c) || _stockageRestitutionsDevis(c)) prestations.push('Stockage automobile');
   }
   var livraisonDemandee = _operationAssureeParHelixCar(c, 'liv')
     || !!(c._vehicules && c._vehicules.some(function (v) {
