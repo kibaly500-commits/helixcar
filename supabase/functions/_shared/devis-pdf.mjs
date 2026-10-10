@@ -258,19 +258,6 @@ function _finStockageEffectiveVehiculeDash(c, v) {
   return livDate || finPrevue;
 }
 
-function _dvDate(v) {
-  if (!v) return '—';
-  try {
-    // Une date civile n'est pas un instant UTC : 2026-09-21 doit rester
-    // le 21 septembre, même si le navigateur se trouve hors de France.
-    var civil = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
-    if (civil) return civil[3] + '/' + civil[2] + '/' + civil[1];
-    var d = new Date(v);
-    if (isNaN(d.getTime())) return String(v);
-    return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
-  } catch (e) { return String(v); }
-}
-
 function _preCasserMotsLongsPdf(doc, texte, largeurMax, taille, style) {
   if (taille) { doc.setFont('helvetica', style || 'normal'); doc.setFontSize(taille); }
   var mots = String(texte).split(' ');
@@ -289,6 +276,19 @@ function _preCasserMotsLongsPdf(doc, texte, largeurMax, taille, style) {
     if (courant) morceaux.push(courant);
     return morceaux.join(' ');
   }).join(' ');
+}
+
+function _dvDate(v) {
+  if (!v) return '—';
+  try {
+    // Une date civile n'est pas un instant UTC : 2026-09-21 doit rester
+    // le 21 septembre, même si le navigateur se trouve hors de France.
+    var civil = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+    if (civil) return civil[3] + '/' + civil[2] + '/' + civil[1];
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+  } catch (e) { return String(v); }
 }
 
 function _rueSeule(rue) {
@@ -1957,7 +1957,7 @@ function _construirePdfDevis(c, d, options) {
           // V50.4J — Objectif 7/13 : Livraison combinée (adresse + date +
           // heure/créneau) en une seule ligne — plus de « Date de
           // livraison » séparée.
-          _dessinerLigneCombineeV(_ligneOperationVCombinee('Livraison', adrArriveeEff, _livAppliqueeV, horaireLivEff));
+          // La livraison est présentée après sa période de stockage.
         // V50.4H — Objectifs 8/9/10/11/12/14/15 : AVEC STOCKAGE, l'information
         // « Stockage pris en compte : début → fin (durée) » représente à
         // elle seule la phase d'entrée (que ce soit HelixCar qui achemine
@@ -2001,6 +2001,7 @@ function _construirePdfDevis(c, d, options) {
           }
         }
 
+          _dessinerLigneCombineeV(_ligneOperationVCombinee('Livraison', adrArriveeEff, _livAppliqueeV, horaireLivEff));
 
           if (_modeLigneV) {
             if (dess) {
@@ -2118,6 +2119,13 @@ function _construirePdfDevis(c, d, options) {
         // partagée) — seul « RESTITUTION PRÉVUE » ci-dessus reste en
         // rouge/gras comme repère de sous-section. Aucune heure inventée :
         // omise si absente (Objectif 8, « si aucune heure... »).
+        // Même règle que la période globale, limitée au véhicule récupéré :
+        // séjour à Noisy strictement supérieur à deux jours, sans nouvelle date.
+        var stockageRetourV = _stockageRestitutionsDevis(Object.assign({}, c, { _vehicules: [v] }));
+        if (stockageRetourV) {
+          _dessinerLigneCombineeV('Stockage du véhicule récupéré : ' + _dvDate(stockageRetourV.debut) +
+            ' au ' + _dvDate(stockageRetourV.fin) + ' (' + stockageRetourV.duree + ' jours)');
+        }
         var adrRestitV = _adresseCompleteOuVille(v.restit_adresse_rue, v.restit_code_postal, v.restit_ville);
         var dateRestitV = _monoPdf ? c.date_restitution : v.restit_date;
         var horaireRestitV = _phraseHoraireFr(_monoPdf ? _horaireDossier(c, 'restit') : _horaireVehicule(v, 'restit'));
