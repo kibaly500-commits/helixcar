@@ -12647,6 +12647,17 @@ function _hcCopierVehiculeVers(source, cible) {
       }
     }
   });
+  // Copier aussi le choix sémantique : une adresse Noisy seule ne signifie
+  // pas « récupération client ». Les mémoires restent propres à la copie.
+  var srcDestination = document.getElementById('veh-' + source + '-restit-destination');
+  var dstDestination = document.getElementById('veh-' + cible + '-restit-destination');
+  if (srcDestination && dstDestination && _vehiculeARestitutionSpecifique(cible)) {
+    dstDestination.value = srcDestination.value;
+    dstDestination.dataset.precedent = srcDestination.value;
+    dstDestination.dataset.manuelle = srcDestination.dataset.manuelle || '["","",""]';
+    _hcRetourDestination(cible, false);
+    if (typeof dstDestination.hcRefreshSelect === 'function') dstDestination.hcRefreshSelect();
+  }
   var srcMode = document.querySelector('input[name="veh-' + source + '-mode"]:checked');
   if (srcMode) {
     var dstMode = document.querySelector('input[name="veh-' + cible + '-mode"][value="' + srcMode.value + '"]');
@@ -20730,9 +20741,12 @@ function basculerLivraisonVehicule(i) {
         var el = document.getElementById('veh-' + i + '-' + s);
         if (el) { el.value = ''; _clearFieldError(el.id); }
       });
-    ['restit-rue','restit-cp','restit-ville','restit-contact','restit-tel',
-     'restit-date','restit-heure','restit-cdeb','restit-cfin']
-      .forEach(function (s) { _clearFieldError('veh-' + i + '-' + s); });
+    document.querySelectorAll('input[name="veh-' + i + '-restit-active"]').forEach(function (radio) {
+      radio.checked = false;
+    });
+    _viderRestitutionVehicule(i);
+    var blocRetour = document.getElementById('veh-restit-' + i);
+    if (blocRetour) blocRetour.style.display = 'none';
   } else {
     // Livraison désormais assurée par HelixCar pour ce véhicule :
     // l'heure de récupération client n'a plus lieu d'être — même
@@ -20814,7 +20828,7 @@ function _livraisonSansObjet() {
 function _vehiculeARestitutionSpecifique(i) {
   // Sans objet : la question n'est pas posee, donc aucune reponse
   // heritee d'un scenario precedent ne peut etre lue.
-  if (_livraisonSansObjet()) return false;
+  if (_livraisonSansObjet() || _vehiculeLivraisonApresStockage(i) !== true) return false;
   var r = document.querySelector('input[name="veh-' + i + '-restit-active"]:checked');
   return !!(r && r.value === 'oui');
 }
@@ -21156,7 +21170,7 @@ function _lireFichesVehicules() {
       restit_destination:aRestit?g('restit-destination'):'adresse',
       restit_recuperation_client:aRestit&&g('restit-destination')==='stockage',
       _restit_adresse_manuelle:JSON.parse(((document.getElementById('veh-'+i+'-restit-destination')||{}).dataset||{}).manuelle||'["","",""]'),
-      restitution_concernee:restDecision ? (restDecision.value==='oui') : null,restit_adresse_rue:aRestit?g('restit-rue'):'',restit_code_postal:aRestit?g('restit-cp'):'',restit_ville:aRestit?g('restit-ville'):'',restit_contact_nom:aRestit?g('restit-contact'):'',restit_contact_tel:aRestit?g('restit-tel'):'',restit_date:aRestit?g('restit-date'):'',restit_heure:aRestit?h('restit','heure'):'',restit_heure_type:aRestit?h('restit','type'):'',restit_creneau_debut:aRestit?h('restit','cdeb'):'',restit_creneau_fin:aRestit?h('restit','cfin'):'',restit_contraintes:aRestit?g('restit-consignes'):'',
+      restitution_concernee:livActive!==true||_livraisonSansObjet()?false:(restDecision ? (restDecision.value==='oui') : null),restit_adresse_rue:aRestit?g('restit-rue'):'',restit_code_postal:aRestit?g('restit-cp'):'',restit_ville:aRestit?g('restit-ville'):'',restit_contact_nom:aRestit?g('restit-contact'):'',restit_contact_tel:aRestit?g('restit-tel'):'',restit_date:aRestit?g('restit-date'):'',restit_heure:aRestit?h('restit','heure'):'',restit_heure_type:aRestit?h('restit','type'):'',restit_creneau_debut:aRestit?h('restit','cdeb'):'',restit_creneau_fin:aRestit?h('restit','cfin'):'',restit_contraintes:aRestit?g('restit-consignes'):'',
       // V55 — identité du VÉHICULE À RESTITUER, distincte de l'identité
       // principale (type_vehicule/marque_modele/immatriculation/vin).
       // Même convention que les autres champs de restitution : lues
