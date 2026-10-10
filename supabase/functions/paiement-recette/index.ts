@@ -37,6 +37,9 @@ function dossierQa(client: any) {
   // Deux nouveaux dossiers V18 autorisés par Hamid le 10/10/2026.
   if (client?.id === "c3cc5da3-b0be-4305-9c45-d0969fa05ae9" && client?.numero_client === "HC-2026-1770") return true;
   if (client?.id === "413201e5-4640-4994-85aa-20adf864d053" && client?.numero_client === "HC-2026-8829") return true;
+  // Recette avec adresses réelles autorisée par Hamid le 10/10/2026.
+  if (client?.id === "b132e873-15eb-4dde-abea-0336667eb8f7" && client?.numero_client === "HC-2026-2739") return true;
+  if (client?.id === "e5dc548f-8a8f-4d5d-aa1f-3a63ca47aded" && client?.numero_client === "HC-2026-7316") return true;
   return [client?.numero_client, client?.prenom, client?.nom, client?.email]
     .some((v) => DOSSIERS_QA.some(prefix => String(v || "").toUpperCase().startsWith(prefix)));
 }
