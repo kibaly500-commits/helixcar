@@ -34,7 +34,7 @@
   const service = {interieur:'Nettoyage intérieur',exterieur:'Nettoyage extérieur',interieur_exterieur:'Nettoyage intérieur et extérieur',preparation_complete:'Préparation complète',conseil:'Prestation à préciser'};
   const metier = {jockey:'Jockey automobile',accueil_preparation:'Accueil en concession',soutien_administratif:'Soutien administratif',mecanique:'Mécanique',carrosserie:'Carrosserie',diagnostic:'Diagnostic',autre:'Spécialité à préciser',conseil:'Métier à préciser'};
   function legacy(c) {return Object.assign({},c,{id:null,position:1,pc_contact_nom:c.contact_pc_nom,pc_contact_tel:c.contact_pc_tel,liv_contact_nom:c.contact_liv_nom,liv_contact_tel:c.contact_liv_tel,restitution_concernee:c.restitution,restit_adresse_rue:c.adresse_restit_rue,restit_code_postal:c.code_postal_restit,restit_ville:c.ville_restit,restit_date:c.date_restitution,restit_heure:c.heure_restitution,restit_contraintes:c.contraintes_restit});}
-  function build(c,vehicles,pointAdresse) {
+  function build(c,vehicles,pointAdresse,exceptions={}) {
     const point=pointAdresse||'Point de remise HelixCar';
     const type=c.type_service||'convoyage', plans=[];
     if(type==='professionnel'||type==='nettoyage') {
@@ -67,7 +67,12 @@
       // Comme le devis : la sortie effective dépend du véhicule, pas de la fin prévue du dossier.
       const storageEnd=v.date_livraison||c.stockage_date_fin;
       const storageStart=explicit?(c.stockage_date_debut||v.date_prise_en_charge):v.date_prise_en_charge;
-      const split=both?(duration===null?explicit||delta>2:duration>48):explicit;
+      const policy=exceptions[v.id||'principal']||{};
+      const longBefore=both&&delta>5,returnDays=daysBetween(v.date_livraison,v.restit_date);
+      const longReturn=!!v.restitution_concernee&&!v.restit_recuperation_client&&v.restit_destination!=='stockage'&&returnDays>5;
+      const split=both?(longBefore&&!policy.before):explicit;
+      const splitReturn=longReturn&&!policy.return;
+      const organisation={version:2,beforeDays:both?delta:null,returnDays:v.restitution_concernee?returnDays:null,depotClient:!before,retraitClient:!after,retourClient:!!v.restit_recuperation_client,longBefore,longReturn,before:!!policy.before,return:!!policy.return};
       const base={type_mission:'convoyage',marque_modele:v.marque_modele,type_vehicule:v.type_vehicule,immatriculation:v.immatriculation,vin:v.vin,motorisation:v.motorisation,nb_vehicules:1,
         ville_depart:v.ville_depart,ville_arrivee:v.ville_arrivee,adresse_depart:address(v,'depart'),adresse_arrivee:address(v,'arrivee'),contact_depart_nom:v.pc_contact_nom,contact_depart_tel:v.pc_contact_tel,contact_arrivee_nom:v.liv_contact_nom,contact_arrivee_tel:v.liv_contact_tel,
         date_prise_en_charge:stamp(v.date_prise_en_charge,hour(v,'pc')),date_livraison:stamp(v.date_livraison,hour(v,'liv')),plateau:v.mode_transport==='plateau',consignes:join(v.consignes,c.notes,c.stockage_notes),
@@ -83,17 +88,29 @@
         const details=[row('Départ',m.ville_depart),row('Arrivée',m.ville_arrivee),row('Prise en charge',join(start,sh)),row('Livraison',join(end,eh)),row('Véhicule',join(v.type_vehicule,v.marque_modele)),row('Transport',m.plateau?'Plateau':'Convoyage par la route')];
         if(!split&&duration>0)details.push(row('Garde du véhicule','Par le même convoyeur · '+Math.floor(duration)+' h'+(Math.round(duration%1*60)?' '+Math.round(duration%1*60)+' min':'')));
         if(m.restitution)details.push(row('Restitution',join(v.restit_type_vehicule,v.restit_marque_modele)),row('Trajet de restitution',join(m.ville_arrivee,v.restit_ville)),row('Restitution prévue',v.restit_recuperation_client?'Réception chez HelixCar à fixer':join(v.restit_date,hour(v,'restit'))));
-        const gardeRetour=m.restitution&&!v.restit_recuperation_client&&daysBetween(v.date_livraison,v.restit_date)>0;
+        const gardeRetour=m.restitution&&!v.restit_recuperation_client&&!splitReturn&&daysBetween(v.date_livraison,v.restit_date)>0;
         if(gardeRetour)details.push(row('Garde du véhicule récupéré',join('Chez le même convoyeur',v.date_livraison+' au '+v.restit_date,'incluse dans la rémunération totale')));
-        const retour=m.restitution&&v.restit_recuperation_client?{demande:{date:v.restit_date,heure:v.restit_heure,type:v.restit_heure_type,debut:v.restit_creneau_debut,fin:v.restit_creneau_fin,contact:v.restit_contact_nom,telephone:v.restit_contact_tel}}:null;
-        if(retour){m.restit_contact_nom='HelixCar';m.restit_contact_tel=null;}
+        const retour=m.restitution&&(v.restit_recuperation_client||splitReturn)?{demande:{date:v.restit_date,heure:v.restit_heure,type:v.restit_heure_type,debut:v.restit_creneau_debut,fin:v.restit_creneau_fin,contact:v.restit_contact_nom,telephone:v.restit_contact_tel}}:null;
+        if(retour){m.restit_contact_nom='HelixCar';m.restit_contact_tel=null;
+          if(splitReturn){retour.transfert=true;retour.demande={date:previousDay(v.restit_date),heure:'',contact:'Convoyeur de la mission suivante'};m.adresse_restitution=point;m.date_restitution_depart=null;
+            details.find(r=>r.label==='Trajet de restitution').value=join(m.ville_arrivee,'Noisy-le-Grand');details.find(r=>r.label==='Restitution prévue').value='Retour à Noisy à fixer';}}
+
         const missing=missingVins(m);if(!m.ville_depart||!m.ville_arrivee)missing.push('Villes du trajet');if(!v.marque_modele)missing.push('Modèle du véhicule');if(!start||!end)missing.push('Dates du trajet');if(daysBetween(start,end)<0)missing.push('Livraison antérieure à la prise en charge');
         if(post&&daysBetween(storageStart,start)<0)missing.push('Récupération la veille impossible : le véhicule doit être disponible chez HelixCar');
-        if(both&&duration===null)missing.push('Horaires de prise en charge et livraison nécessaires au calcul des 48 heures');
+        if(both&&duration===null)missing.push('Horaires de prise en charge et livraison à compléter');
         if(both&&duration!==null&&duration<0)missing.push('Livraison antérieure à la prise en charge');
-        plans.push({...(post?{retrait_veille:true}:{}),... (retour?{retour_helixcar:retour,retour_reception:'',retour_remise:retour.demande.type==='creneau'?'':stamp(v.restit_date,v.restit_heure)}:{}),key:(v.id||'principal')+':'+leg,title,category:'convoyage',kind:leg,vehicule_id:v.id||null,position:v.position||1,nb_professionnels:1,date_debut:date(start),date_fin:date(gardeRetour?v.restit_date:end),zone:join(m.ville_depart,m.ville_arrivee),rows:details,mission:m,missing,stockage:split?join(storageStart,after?previousDay(storageEnd):storageEnd):'',heure_prise_en_charge:firstHour(sh)||'',distance:null,motorisation:v.motorisation||'',restit_motorisation:v.restit_motorisation||''});
+        plans.push({organisation,...(post?{retrait_veille:true}:{}),... (retour?{retour_helixcar:retour,retour_reception:'',retour_remise:retour.demande.type==='creneau'?'':(splitReturn?'':stamp(v.restit_date,v.restit_heure))}:{}),key:(v.id||'principal')+':'+leg,title,category:'convoyage',kind:leg,vehicule_id:v.id||null,position:v.position||1,nb_professionnels:1,date_debut:date(start),date_fin:date(gardeRetour?v.restit_date:end),zone:join(m.ville_depart,m.ville_arrivee),rows:details,mission:m,missing,stockage:split?join(storageStart,after?previousDay(storageEnd):storageEnd):'',heure_prise_en_charge:firstHour(sh)||'',distance:null,motorisation:v.motorisation||'',restit_motorisation:v.restit_motorisation||''});
       };
       if(split){if(before)add('avant_stockage');if(after)add('apres_stockage');}else add('direct');
+      if(splitReturn&&after){
+        const rv={...v,id:v.id,marque_modele:v.restit_marque_modele,type_vehicule:v.restit_type_vehicule,immatriculation:v.restit_immatriculation,vin:v.restit_vin,motorisation:v.restit_motorisation,
+          date_prise_en_charge:v.date_livraison,date_livraison:v.restit_date,heure_livraison:v.restit_heure,liv_heure_type:v.restit_heure_type,liv_creneau_debut:v.restit_creneau_debut,liv_creneau_fin:v.restit_creneau_fin,
+          adresse_arrivee_rue:v.restit_adresse_rue,code_postal_arrivee:v.restit_code_postal,ville_arrivee:v.restit_ville,liv_contact_nom:v.restit_contact_nom,liv_contact_tel:v.restit_contact_tel,restitution_concernee:false,livraison_apres_stockage:true};
+        const outgoing=build({type_service:'stockage',stockage_acheminement:'depot_client',stockage_sortie:'helixcar',stockage_date_debut:v.date_livraison,stockage_date_fin:v.restit_date},[rv],point)[0];
+        outgoing.key=(v.id||'principal')+':restitution_apres_stockage';outgoing.organisation=organisation;outgoing.restitution_secondaire=true;outgoing.title='Restitution après stockage à Noisy';
+        const incoming=plans.find(p=>p.vehicule_id===(v.id||null)&&p.retour_helixcar?.transfert);outgoing.parent_retour_key=incoming?.key;
+        plans.push(outgoing);
+      }
     });return plans;
   }
   // Cette projection exclut les champs privés, même s'ils sont ajoutés à une mission.
@@ -102,7 +119,7 @@
   function preservePublished(fresh,saved) {
     const family=p=>String(p.key||'').split(':')[0];
     const pinned=new Map(saved.filter(s=>s.mission_id).map(s=>[family(s.plan),s.plan.kind==='direct']));
-    return fresh.filter(p=>!pinned.has(family(p))).concat(saved.filter(s=>pinned.has(family(s.plan))&&(s.mission_id||pinned.get(family(s.plan))===(s.plan.kind==='direct'))).map(s=>s.plan));
+    return fresh.filter(p=>!pinned.has(family(p))).concat(saved.filter(s=>pinned.has(family(s.plan))&&(s.mission_id||s.plan.organisation?.version===2||pinned.get(family(s.plan))===(s.plan.kind==='direct'))).map(s=>s.plan));
   }
   const api={build,publicData,stamp,daysBetween,elapsedHours,missingVins,preservePublished};if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPreparation=api;
 })(typeof window==='undefined'?globalThis:window);

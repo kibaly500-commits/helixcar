@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const P=require('../assets/preparation-missions.js'),C=require('../assets/planning-calcul.js');
-const c={type_service:'stockage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar',stockage_date_debut:'2026-11-18',stockage_date_fin:'2026-11-22'};
-const v={id:'v1',position:1,marque_modele:'Clio',vin:'VIN-TEST',ville_depart:'Paris',ville_arrivee:'Lyon',date_prise_en_charge:'2026-11-18',heure_prise_en_charge:'09:00',date_livraison:'2026-11-22',heure_livraison:'11:00',livraison_apres_stockage:true};
+const c={type_service:'stockage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar',stockage_date_debut:'2026-11-14',stockage_date_fin:'2026-11-22'};
+const v={id:'v1',position:1,marque_modele:'Clio',vin:'VIN-TEST',ville_depart:'Paris',ville_arrivee:'Lyon',date_prise_en_charge:'2026-11-14',heure_prise_en_charge:'09:00',date_livraison:'2026-11-22',heure_livraison:'11:00',livraison_apres_stockage:true};
 test('départ de Noisy la veille, heure vierge, livraison client intacte',()=>{
  const before=JSON.stringify({c,v}),plans=P.build(c,[v]);assert.equal(plans.length,2);const post=plans[1];assert.equal(post.date_debut,'2026-11-21');assert.equal(post.mission.date_prise_en_charge,null);assert.equal(post.heure_prise_en_charge,'');assert.equal(post.mission.date_livraison,'2026-11-22T11:00');assert.equal(post.retrait_veille,true);assert.match(C.guidance(post).rule,/veille/);assert.equal(JSON.stringify({c,v}),before);
 });

@@ -39,12 +39,12 @@ function guidance(p){
 function retourErrors(p,required){
  const r=p.retour_helixcar;if(!r)return [];
  const errors=[],receipt=p.retour_reception,hand=p.retour_remise,d=r.demande||{};
- if(required&&(!receipt||!hand))errors.push('Renseignez la réception du convoyeur et la récupération client');
+ if(required&&(!receipt||!hand))errors.push('Renseignez la réception à Noisy et le rendez-vous de sortie');
  try{
   const rt=receipt?instant(receipt.slice(0,16)):null,ht=hand?instant(hand.slice(0,16)):null;
   if(rt!==null){const delivery=bounds(p,'Livraison',p.mission.date_livraison);if(rt<=Math.max(...delivery))errors.push('La réception chez HelixCar doit suivre la livraison du premier véhicule');}
-  if(rt!==null&&ht!==null&&ht<=rt)errors.push('La récupération client doit suivre la réception du convoyeur');
-  if(ht!==null){
+  if(rt!==null&&ht!==null&&ht<=rt)errors.push('La sortie de Noisy doit suivre la réception du convoyeur');
+  if(ht!==null&&!r.transfert){
    const begin=d.type==='creneau'?d.debut:d.heure,end=d.type==='creneau'?d.fin:d.heure;
    if(!d.date||!begin||!end)errors.push('Complétez le rendez-vous souhaité par le client');
    else if(ht<instant(d.date+'T'+begin.slice(0,5))||ht>instant(d.date+'T'+end.slice(0,5)))errors.push('La remise doit respecter la date et le créneau demandés par le client');

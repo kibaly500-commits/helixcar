@@ -13,9 +13,12 @@
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function adopt(source){
-    const saved=source.brouillons||[],fresh=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise),saved);
+    const saved=source.brouillons||[],exceptions={};
+    saved.forEach(s=>{if(s.empreinte===source.empreinte&&s.plan.organisation)exceptions[s.plan.vehicule_id||'principal']=s.plan.organisation;});
+    const fresh=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise,exceptions),saved);
     const plans=fresh.map(p=>{const s=saved.find(x=>x.cle===p.key);
       if(!s||!(s.empreinte===source.empreinte||s.mission_id))return p;
+      if(!s.mission_id&&JSON.stringify(s.plan.organisation)!==JSON.stringify(p.organisation))return p;
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
       if(!s.mission_id&&p.category==='convoyage'){
         result.missing=p.missing;
@@ -114,10 +117,25 @@
     if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
     if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>Pour l’ensemble de la demande · Avant rémunération des partenaires et autres frais.</small></aside>';
+    if(!state.preview){
+      h+='<section class="hc-prep-internal"><h4>Organisation des véhicules</h4><p>Jusqu’à 5 jours inclus : même convoyeur. Au-delà : stockage à Noisy et mission séparée. Chaque dérogation concerne uniquement la période choisie.</p>';
+      const seen=new Set();state.plans.forEach(p=>{const id=p.vehicule_id||'principal';if(seen.has(id)||!p.organisation)return;seen.add(id);
+        const family=state.plans.filter(x=>(x.vehicule_id||'principal')===id),locked=family.some(x=>x.saved?.mission_id),o=p.organisation;
+        h+='<div class="hc-prep-return-step"><h5>Véhicule '+esc(p.position)+' · '+esc(p.mission.marque_modele)+'</h5>';
+        if(o.depotClient)h+='<p>Le client dépose le véhicule à Noisy. Un convoyeur le récupère la veille de la livraison, à l’heure que vous fixez.</p>';
+        if(o.retraitClient)h+='<p>Le client récupère le véhicule à Noisy : aucune mission de livraison ensuite.</p>';
+        for(const [key,label,days,long] of [['before','Avant la livraison',o.beforeDays,o.longBefore],['return','Avant la restitution',o.returnDays,o.longReturn]]){
+          if(days==null)continue;
+          h+='<p><strong>'+label+' : '+esc(days)+' jour(s).</strong> '+(key==='return'&&o.retourClient?'Retour à Noisy puis récupération par le client, sans nouvelle mission.':long?(o[key]?'Dérogation : garde par le même convoyeur.':'Plus de 5 jours : passage à Noisy et mission séparée.'):'Seuil de 5 jours non dépassé.')+'</p>';
+          if(long&&!locked)h+='<button type="button" class="btn btn-outline" data-garde-vehicle="'+esc(id)+'" data-garde-period="'+key+'">'+(o[key]?'Rétablir le passage à Noisy':'Autoriser la garde par le même convoyeur')+'</button>';
+        }
+        h+='<p><strong>'+family.length+' mission(s) à organiser</strong></p><ol>'+family.map(x=>'<li>'+esc(x.mission.ville_depart)+' → '+esc(x.mission.ville_arrivee)+(x.mission.restitution?' → '+esc(x.retour_helixcar?'Noisy-le-Grand':x.rows.find(r=>r.label==='Trajet de restitution')?.value?.split(' · ').slice(1).join(' · ')||'restitution'):'')+'</li>').join('')+'</ol>'+(locked?'<p>Découpage verrouillé : une mission est déjà publiée.</p>':'')+'</div>';
+      });h+='</section>';
+    }
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
-      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>Récupération par le client à Noisy :</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
+      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
@@ -128,7 +146,9 @@
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
-      if(p.retour_helixcar){
+      if(p.retour_helixcar?.transfert){
+        h+='<section class="hc-prep-internal hc-prep-return"><h4>Retour à Noisy avant une nouvelle mission</h4><p>Après la livraison, ce convoyeur ramène le véhicule récupéré à Noisy. Sa mission se termine à votre réception.</p><p><strong>Livraison précédente :</strong> '+display(p.rows.find(r=>r.label==='Livraison')?.value)+'</p><div class="hc-prep-fields">'+input(p,i,'retour_reception','Date et heure de réception à Noisy','datetime-local')+'</div><p>Prévoyez la durée du trajet retour et 45 minutes de marge. Le départ suivant est à régler dans la mission de restitution ci-dessous.</p></section>';
+      }else if(p.retour_helixcar){
         const d=p.retour_helixcar.demande;
         const livraison=p.rows.find(r=>r.label==='Livraison')?.value||p.mission.date_livraison;
         h+='<section class="hc-prep-internal hc-prep-return"><h4>Retour à Noisy et récupération par le client</h4><p><strong>'+esc(p.mission.restit_marque_modele||'Véhicule à récupérer')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</strong></p>';
@@ -155,6 +175,9 @@
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
   });
+    state.plans.filter(p=>p.parent_retour_key).forEach(p=>{
+      const parent=state.plans.find(x=>x.key===p.parent_retour_key);if(parent)parent.retour_remise=p.mission.date_prise_en_charge||'';
+    });
     state.plans.forEach(p=>{
       if(!p.retour_helixcar)return;
       p.mission.date_restitution_depart=p.retour_reception||null;
@@ -168,6 +191,16 @@
     if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}
     if(busy||!state)return;busy=true;b.disabled=true;
     try{
+      if(b.hasAttribute('data-garde-vehicle')){
+        readEdits();const id=b.dataset.gardeVehicle,key=b.dataset.gardePeriod;
+        const family=state.plans.filter(p=>(p.vehicule_id||'principal')===id);
+        if(!['before','return'].includes(key)||family.some(p=>p.saved?.mission_id))throw Error('Découpage déjà publié : modification impossible.');
+        const exceptions={};state.plans.forEach(p=>{if(p.organisation)exceptions[p.vehicule_id||'principal']={...p.organisation};});
+        exceptions[id][key]=!exceptions[id][key];
+        const fresh=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise,exceptions);
+        state.plans=state.plans.filter(p=>(p.vehicule_id||'principal')!==id).concat(fresh.filter(p=>(p.vehicule_id||'principal')===id)).sort((a,b)=>a.position-b.position);
+        render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
+      }
       if(b.hasAttribute('data-edit-vehicle')){
         readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];
         if(!p||p.saved?.mission_id||!['marque_modele','restit_marque_modele'].includes(key))return;
@@ -183,9 +216,12 @@
         if(!value||value.length>160)throw Error('Renseignez la marque et le modèle du véhicule (160 caractères maximum).');
         readEdits();
         state.plans.filter(x=>!x.saved?.mission_id&&String(x.key).split(':')[0]===String(p.key).split(':')[0]).forEach(x=>{
-          const label=key==='marque_modele'?'Véhicule':'Restitution',r=x.rows.find(r=>r.label===label);if(!r)return;
-          const previous=x.mission[key]||'',prefix=previous&&r.value.endsWith(previous)?r.value.slice(0,-previous.length):'';
-          x.mission[key]=value;r.value=prefix+value;
+          const returned=p.restitution_secondaire||key==='restit_marque_modele';
+          if(!returned&&x.restitution_secondaire)return;
+          const target=returned&&!x.restitution_secondaire?'restit_marque_modele':'marque_modele';
+          const label=target==='marque_modele'?'Véhicule':'Restitution',r=x.rows.find(r=>r.label===label);if(!r)return;
+          const previous=x.mission[target]||'',prefix=previous&&r.value.endsWith(previous)?r.value.slice(0,-previous.length):'';
+          x.mission[target]=value;r.value=prefix+value;
         });
         await save();render();note('Marque et modèle corrigés dans les missions en préparation.');
       }

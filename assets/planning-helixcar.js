@@ -24,20 +24,20 @@ function syncRetourStates(){
  }
 }
 function returnRows(data){
- return data.filter(r=>r.plan?.retour_helixcar&&r.plan?.mission?.restitution&&!['annule','annulee'].includes(r.missions?.statut)).flatMap(r=>['retour_reception','retour_remise'].map(kind=>({...r,id:r.id+':'+kind,baseId:r.id,returnEvent:true,plan:{...r.plan,kind}})));
+ return data.filter(r=>r.plan?.retour_helixcar&&r.plan?.mission?.restitution&&!['annule','annulee'].includes(r.missions?.statut)).flatMap(r=>(r.plan.retour_helixcar.transfert?['retour_reception']:['retour_reception','retour_remise']).map(kind=>({...r,id:r.id+':'+kind,baseId:r.id,returnEvent:true,plan:{...r.plan,kind}})));
 }
 function returnCard(r){
  const p=r.plan,incoming=p.kind==='retour_reception',state=retourRecords.get(r.baseId)||{},s=records.get(r.id)||{},time=schedule(p);
  const confirmed=s.horaire_confirme&&s.horaire_confirme.slice(0,16)===time?.slice(0,16);
  const who=r.missions?.convoyeurs,d=p.retour_helixcar.demande||{};
  const person=incoming?(who?[who.prenom,who.nom].filter(Boolean).join(' '):'Convoyeur à attribuer'):(d.contact||'Client');
- const status=state.remise_effectuee_le?'Véhicule remis au client':state.reception_effectuee_le?'Chez HelixCar — en attente de récupération client':'En attente de réception du convoyeur';
+ const status=p.retour_helixcar.transfert?(state.reception_effectuee_le?'Chez HelixCar — prochaine livraison dans une mission séparée':'En attente du retour à Noisy'):state.remise_effectuee_le?'Véhicule remis au client':state.reception_effectuee_le?'Chez HelixCar — en attente de récupération client':'En attente de réception du convoyeur';
  const other=rows.find(x=>x.baseId===r.baseId&&x.id!==r.id);
  const conflict=confirmed&&!s.cles_effectuees_le&&rows.some(x=>{
   const otherState=records.get(x.id);if(x.id===r.id||!otherState?.horaire_confirme||otherState.cles_effectuees_le)return false;
   try{return C.overlap(C.slot(p.kind,time.slice(0,16)),C.slot(x.plan.kind,otherState.horaire_confirme.slice(0,16)));}catch{return false;}
  });
- return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+esc(incoming?'Réception — convoyeur → HelixCar':'Remise — HelixCar → client')+'</span><h3>'+esc(p.mission.restit_marque_modele||'Véhicule récupéré')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||'Dossier')+' · '+esc(person)+'</p></div><strong>'+esc(fmt(time))+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+esc(status)+'</strong></p><p>'+esc(incoming?'Vous réceptionnez le véhicule et les clés du convoyeur.':'Vous remettez le véhicule et les clés au client.')+'</p><p>'+esc(incoming?'Récupération client prévue : ':'Réception du convoyeur prévue : ')+esc(fmt(other&&schedule(other.plan)))+'</p>'
+ return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+esc(incoming?'Réception — convoyeur → HelixCar':'Remise — HelixCar → client')+'</span><h3>'+esc(p.mission.restit_marque_modele||'Véhicule récupéré')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||'Dossier')+' · '+esc(person)+'</p></div><strong>'+esc(fmt(time))+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+esc(status)+'</strong></p><p>'+esc(incoming?'Vous réceptionnez le véhicule et les clés du convoyeur.':'Vous remettez le véhicule et les clés au client.')+'</p><p>'+esc(p.retour_helixcar.transfert?'Départ du prochain convoyeur : ':incoming?'Récupération client prévue : ':'Réception du convoyeur prévue : ')+esc(fmt(p.retour_helixcar.transfert?p.retour_remise:other&&schedule(other.plan)))+'</p>'
  +(conflict?'<p class="hc-planning-warning">Un autre rendez-vous confirmé chevauche ces 20 minutes de remise.</p>':'')
  +(!incoming?'<p>Rendez-vous souhaité : '+esc(C.retourDemande(p).replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'))+' · '+esc(d.telephone||'Téléphone à compléter')+'</p>':'')
  +'<p>'+(s.cles_effectuees_le?'Effectué le '+esc(_dvDateHeure(s.cles_effectuees_le)):confirmed?'Horaire confirmé':'Horaire à confirmer')+'</p><div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Voir la préparation</button>'
