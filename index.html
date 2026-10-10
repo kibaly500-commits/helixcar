@@ -12348,7 +12348,7 @@ function effacerVehicule(i) {
 
   var contenu = document.getElementById('veh-contenu-' + i);
   if (contenu) {
-    contenu.querySelectorAll('input').forEach(function (el) {
+    contenu.querySelectorAll('input,textarea').forEach(function (el) {
       if (_hcPreserverDateHeritee(el)) return;
       // Objectif 7 (V50.45) — BUG CONCRET : seuls les checkbox étaient
       // décochés ; les boutons radio (Livraison Oui/Non, Restitution
@@ -12359,6 +12359,11 @@ function effacerVehicule(i) {
       _clearFieldError(el.id);
     });
     contenu.querySelectorAll('select').forEach(function (el) { el.selectedIndex = 0; if(el.hcRefreshSelect)el.hcRefreshSelect(); });
+    var destination = document.getElementById('veh-' + i + '-restit-destination');
+    if (destination) {
+      destination.dataset.precedent = 'adresse';
+      destination.dataset.manuelle = '["","",""]';
+    }
     // Objectif 7 — l'état VISUEL des sous-accordéons (.termine/.ouvert)
     // n'était jamais réinitialisé : un indicateur pouvait rester vert
     // alors que les données qu'il représentait venaient d'être vidées.
@@ -12371,9 +12376,21 @@ function effacerVehicule(i) {
     var blocIdentite = document.getElementById('veh-' + i + '-sous-identite');
     if (blocIdentite) blocIdentite.classList.add('ouvert');
   }
+  // Une suppression explicite doit aussi oublier les valeurs hors du DOM.
+  // Sinon la fusion non vide les réinjecte au prochain rendu/rechargement.
+  delete _memoireVehicules[i];
+  if (_avecStockage() && _sortieStockage() === 'helixcar') {
+    ['veh-liv-spec-','veh-recup-client-','veh-restit-question-'].forEach(function (prefixe) {
+      var bloc = document.getElementById(prefixe + i);
+      if (bloc) bloc.style.display = 'none';
+    });
+  }
+  ['pc','liv','restit'].forEach(function (prefixe) { _synchroniserAffichageHoraire('veh-' + i + '-' + prefixe); });
   basculerRestitVehicule(i);
   _majBarreVehicule(i);
   _majProgressionVehicules();
+  if (_hcCalChampActif && _hcCalChampActif.indexOf('veh-' + i + '-') === 0) _hcFermerCalendrier();
+  _sauvegarderBrouillonClient();
 }
 
 // Masque les blocs globaux dès que l'information appartient au véhicule.
@@ -13815,7 +13832,6 @@ function _synchroniserPriseEnChargeAvecDebutStockage() {
   if (!_avecStockage()) return;
   if (_acheminementStockage() !== 'helixcar') return; // CAS 7 : dépôt client, on ne crée aucune PC artificielle
   var debutStock = (document.getElementById('stock-debut') || {}).value;
-  if (!debutStock) return;
 
   function synchroniser(id) {
     var champ = document.getElementById(id);
@@ -13823,7 +13839,8 @@ function _synchroniserPriseEnChargeAvecDebutStockage() {
     // diffère réellement — évite tout événement parasite et toute
     // boucle (la fonction n'est jamais réappelée par son propre change).
     if (champ && champ.value !== debutStock) {
-      champ.value = debutStock;
+      champ.value = debutStock || '';
+      _hcOublierDateEffacee(champ);
       _clearFieldError(id);
     }
   }
@@ -21324,7 +21341,8 @@ function _hcPeriodeVehicule(i) {
   function v(id) { return (document.getElementById(id) || {}).value || ''; }
   if (_avecStockage()) {
     debut = _hcParserYMD(_acheminementStockage() === 'helixcar' ? v('veh-' + i + '-pc-date') : v('stock-debut'));
-    finLiv = _hcParserYMD(_vehiculeLivraisonApresStockage(i) ? v('veh-' + i + '-liv-date') : v('stock-fin'));
+    // La fin prévue du stockage n'est pas une livraison sélectionnée.
+    finLiv = _hcParserYMD(_vehiculeLivraisonApresStockage(i) === true ? v('veh-' + i + '-liv-date') : '');
   } else {
     debut = _hcParserYMD(v('veh-' + i + '-pc-date'));
     finLiv = _hcParserYMD(v('veh-' + i + '-liv-date'));
@@ -21450,7 +21468,18 @@ function _hcDateMinimaleChamp(id) {
   return null;
 }
 
+function _hcOublierDateEffacee(champ) {
+  if (!champ || champ.value) return;
+  var m = /^veh-(\d+)-(pc|liv|restit)-date$/.exec(champ.id);
+  if (m && _memoireVehicules[m[1]]) {
+    var cle = {pc:'date_prise_en_charge',liv:'date_livraison',restit:'restit_date'}[m[2]];
+    delete _memoireVehicules[m[1]][cle];
+  }
+  if (_memoireGlobale && Object.prototype.hasOwnProperty.call(_memoireGlobale, champ.id)) _memoireGlobale[champ.id] = '';
+}
+
 function _hcDeclencherChange(champ) {
+  _hcOublierDateEffacee(champ);
   var evt = (typeof Event === 'function') ? new Event('change', { bubbles: true }) : null;
   if (evt) champ.dispatchEvent(evt);
 }
@@ -21764,8 +21793,11 @@ function _hcRendreCalendrier() {
 
   var legende = overlay.querySelector('#hc-cal-legende');
   if (_hcCalPeriode || periode.debut || periode.finLiv || periode.finRestit) {
-    legende.innerHTML = (_hcCalPeriode ? '<span class="hc-cal-instruction">' + _hcCalPeriode.legende + '</span>' : '') + '<span><i class="p1"></i>' + (_hcCalPeriode ? 'Début' : 'Prise en charge') + '</span>' +
-      '<span><i class="fin"></i>' + (_hcCalPeriode ? 'Fin' : 'Livraison') + '</span>' +
+    var contexteLegende = _hcContexteChamp(_hcCalChampActif);
+    var debutHerite = !_hcCalPeriode && contexteLegende && contexteLegende.type === 'vehicule' && _avecStockage();
+    legende.innerHTML = (_hcCalPeriode ? '<span class="hc-cal-instruction">' + _hcCalPeriode.legende + '</span>' : '') +
+      ((_hcCalPeriode || periode.debut) ? '<span><i class="p1"></i>' + (_hcCalPeriode ? 'Début' : debutHerite ? 'Début du stockage' : 'Prise en charge') + '</span>' : '') +
+      ((_hcCalPeriode || periode.finLiv) ? '<span><i class="fin"></i>' + (_hcCalPeriode ? 'Fin' : 'Livraison') + '</span>' : '') +
       (periode.finRestit ? '<span><i class="p2"></i>Restitution</span>' : '');
     if (_hcCalPeriode) {
       var complete = periode.debut && periode.finLiv && periode.finLiv >= periode.debut;
@@ -21841,7 +21873,7 @@ function _hcEffacerPeriode() {
 function _hcEffacerActionBar() {
   if (_hcCalPeriode) { _hcEffacerPeriode(); return; }
   var champ = document.getElementById(_hcCalChampActif);
-  if (champ && champ.value) {
+  if (champ) {
     champ.value = '';
     _hcDeclencherChange(champ);
   }
@@ -23574,7 +23606,7 @@ console.log('HelixCar ' + window.HC_VERSION);
     if (mono) champs.push(mono);
     document.querySelectorAll('input[id^="veh-"][id$="-pc-date"]').forEach(function (el) { champs.push(el); });
     champs.forEach(function (champ) {
-      if (actif && debut) champ.value = debut;
+      if (actif) { champ.value = debut; _hcOublierDateEffacee(champ); }
       champ.disabled = !!actif;
       champ.readOnly = true;
       champ.classList.toggle('hc-date-verrouillee', !!actif);
