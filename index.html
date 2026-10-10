@@ -11610,8 +11610,14 @@ function _hcRetourDestination(i, changement) {
     resume.textContent=stockage?'Nous ramenons le véhicule récupéré à notre point de stockage de Noisy-le-Grand. Vous viendrez ensuite le récupérer sur place. L’adresse exacte vous sera communiquée.':'Retour à l’adresse de prise en charge du premier véhicule : '+(valeurs.filter(Boolean).join(', ')||'renseignez d’abord la prise en charge.');
   }
   var titre=document.getElementById('veh-'+i+'-restit-rdv-titre');titre.hidden=!stockage;
-  var labels={contact:stockage?'Nom et prénom':'Contact à destination',tel:stockage?'Téléphone':'Téléphone du contact',date:stockage?'Date souhaitée de récupération chez HelixCar':'Date de remise à destination',horaire:stockage?'Heure ou créneau souhaité de récupération chez HelixCar':'Horaire de remise à destination'};
+  var labels={contact:stockage?'Nom et prénom':'Contact à destination',tel:stockage?'Téléphone':'Téléphone du contact',date:stockage?'Date souhaitée de récupération chez HelixCar':'Date de remise à destination',horaire:stockage?'Heure souhaitée de récupération chez HelixCar':'Horaire de remise à destination'};
   Object.keys(labels).forEach(function(k){document.getElementById('veh-'+i+'-restit-label-'+k).textContent=labels[k];});
+  // Une récupération sur place se réserve à une heure unique.
+  var precise=document.querySelector('input[name="veh-'+i+'-restit-htype"][value="precise"]');
+  if(precise){
+    precise.parentElement.parentElement.style.display=stockage?'none':'flex';
+    if(stockage){precise.checked=true;basculerHoraire(i,'restit');}
+  }
   if(changement){champs.forEach(function(e){e.dispatchEvent(new Event('input',{bubbles:true}));});_majEtatVehicules();}
 }
 document.addEventListener('input',function(e){
