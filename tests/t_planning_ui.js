@@ -41,7 +41,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  assert.equal(await page.locator('[data-planning-action="trafic"]').count(),0);
  assert.match(await first.innerText(),/Votre intervention : réceptionner/);
  assert.match(await first.innerText(),/Prise en charge chez le client/);assert.match(await first.innerText(),/09:00/);assert.match(await first.innerText(),/45 minutes de battement/);
- const outgoing=page.locator('[data-planning-id="p1"]');assert.match(await outgoing.innerText(),/Livraison attendue chez le client/);assert.match(await outgoing.innerText(),/14:00/);assert.match(await outgoing.innerText(),/8 rue Livraison, 78000 Versailles/);assert.match(await outgoing.innerText(),/− 45 minutes/);
+ const outgoing=page.locator('[data-planning-id="p1"]');assert.match(await outgoing.innerText(),/Livraison attendue chez le client/);assert.match(await outgoing.innerText(),/14:00/);assert.match(await outgoing.innerText(),/8 rue Livraison, 78000 Versailles/);assert.match(await outgoing.innerText(),/Récupération la veille de la livraison/);
  await page.evaluate(()=>{__rows.push({...__rows[0],id:'p2'});__states.push({preparation_id:'p2',horaire_confirme:'2026-11-08T10:50',empreinte_confirmee:'hash'});});
  await page.locator('#hc-planning-refresh').click();assert.match(await first.innerText(),/chevauche/);
  await page.screenshot({path:'/tmp/helixcar-planning-'+width+'.png',fullPage:true});

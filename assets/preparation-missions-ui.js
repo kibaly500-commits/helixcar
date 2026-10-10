@@ -33,7 +33,8 @@
           result[dateKey]=p[dateKey];
         }
         result.stockage=p.stockage;
-        result.rows=result.rows.filter(r=>r.label!=='Garde du véhicule').concat(p.rows.filter(r=>r.label==='Garde du véhicule'));
+        result.retrait_veille=p.retrait_veille;
+        result.rows=result.rows.filter(r=>!['Garde du véhicule','Garde du véhicule récupéré'].includes(r.label)).concat(p.rows.filter(r=>['Garde du véhicule','Garde du véhicule récupéré'].includes(r.label)));
         for(const key of ['motorisation','restit_motorisation']){
           if(p[key]){result[key]=p[key];result.mission[key]=p[key];}
         }
@@ -89,7 +90,7 @@
       h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Restitution</h4></header>'+route(raw('Arrivée'),destination,null,raw('Restitution prévue'))+
         facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     }
-    const shared=[['Distance de la mission',raw('Distance')],...(raw('Garde du véhicule')?[['Garde du véhicule',raw('Garde du véhicule')]]:[]),...(!raw('Restitution')?[['Restitution','Non']]:[])];
+    const shared=[['Distance de la mission',raw('Distance')],...(raw('Garde du véhicule')?[['Garde du véhicule',raw('Garde du véhicule')]]:[]),...(raw('Garde du véhicule récupéré')?[['Garde du véhicule récupéré',raw('Garde du véhicule récupéré')]]:[]),...(!raw('Restitution')?[['Restitution','Non']]:[])];
     return h+'</div><footer class="hc-prep-mission-footer">'+facts(shared)+'</footer></section>';
   }
   window.hcPreparationCarteOpportunite=function(o,options){
@@ -125,7 +126,7 @@
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
-        if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur','time');}
+        if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
       if(p.retour_helixcar){
         const d=p.retour_helixcar.demande;

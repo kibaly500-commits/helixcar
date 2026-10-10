@@ -9,7 +9,7 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check('Deux trajets présentés comme convoyages',split.every(p=>p.title==='Convoyage automobile'&&!JSON.stringify(planner.publicData(p)).includes('stockage')));
  L.check('Point de remise réservé au privé',split[0].mission.adresse_arrivee.includes('12 rue')&&!JSON.stringify(planner.publicData(split[0])).includes('12 rue'));
  const earlyExit=planner.build({...c,type_service:'stockage',stockage_date_fin:'2026-11-18'},[{...v,date_livraison:'2026-11-14'}]);
- L.check('Sortie individuelle avant fin prévue du dossier',earlyExit[1].date_debut==='2026-11-14'&&!earlyExit[1].missing.includes('Livraison antérieure à la prise en charge'));
+ L.check('Sortie individuelle avant fin prévue du dossier',earlyExit[1].date_debut==='2026-11-13'&&!earlyExit[1].missing.includes('Livraison antérieure à la prise en charge'));
  const absentVins=planner.build(c,[{...v,vin:'   ',restit_vin:null}])[0];
  L.check('VIN livraison et restitution obligatoires',absentVins.missing.filter(x=>x.includes('VIN')).length===2);
  L.check('VIN restitution non exigé sans restitution',planner.missingVins({vin:'VIN',restitution:false}).length===0);

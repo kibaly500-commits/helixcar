@@ -33,7 +33,7 @@ function guidance(p){
   when:p.rows?.find(r=>r.label===label)?.value||(incoming?p.mission.date_prise_en_charge:p.mission.date_livraison)||'Horaire client à préciser',
   address:incoming?p.mission.adresse_depart:p.mission.adresse_arrivee,
   target:incoming?'Votre heure de réception chez HelixCar':'Votre heure de remise au convoyeur chez HelixCar',
-  rule:incoming?'Heure de prise en charge + durée du trajet vérifiée par vous + 45 minutes de battement.':'Heure de livraison attendue − durée du trajet vérifiée par vous − 45 minutes de battement.'
+  rule:incoming?'Heure de prise en charge + durée du trajet vérifiée par vous + 45 minutes de battement.':'Récupération la veille de la livraison. Heure de remise au convoyeur à fixer par HelixCar.'
  };
 }
 function retourErrors(p,required){
