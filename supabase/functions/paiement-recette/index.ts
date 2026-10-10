@@ -34,6 +34,9 @@ function dossierQa(client: any) {
   // Nouvelle recette organisation interne du 10/10/2026 : stockage 5 et convoyage 3 véhicules.
   if (client?.id === "fdd2fb4d-aeff-4ab4-987c-edac185f540e" && client?.numero_client === "HC-2026-6723") return true;
   if (client?.id === "0fc57de0-9b48-45aa-baa5-ba3eb0951d9e" && client?.numero_client === "HC-2026-9627") return true;
+  // Deux nouveaux dossiers V18 autorisés par Hamid le 10/10/2026.
+  if (client?.id === "c3cc5da3-b0be-4305-9c45-d0969fa05ae9" && client?.numero_client === "HC-2026-1770") return true;
+  if (client?.id === "413201e5-4640-4994-85aa-20adf864d053" && client?.numero_client === "HC-2026-8829") return true;
   return [client?.numero_client, client?.prenom, client?.nom, client?.email]
     .some((v) => DOSSIERS_QA.some(prefix => String(v || "").toUpperCase().startsWith(prefix)));
 }
