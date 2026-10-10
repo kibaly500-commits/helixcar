@@ -831,8 +831,8 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
   <h2 id="suc-title">État des lieux validé !</h2>
   <p id="suc-msg">L'état des lieux au départ a été enregistré et signé. Vous pouvez démarrer la mission.</p>
   <div style="margin-top:16px;background:var(--gl);border-radius:9px;padding:13px;text-align:left;font-size:.78rem;color:#555;line-height:1.7">
-    📧 Rapport envoyé automatiquement à HelixCar et au client.<br>
-    📱 <span id="sms-note">SMS de confirmation envoyé au client.</span>
+    Rapport enregistré dans le dossier HelixCar.<br>
+    📱 <span id="sms-note">Les notifications sont suivies séparément.</span>
   </div>
   <div style="margin-top:12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:9px;padding:13px;text-align:left;font-size:.78rem;color:#C2410C;line-height:1.9">
     📄 <strong>Lettre de voiture — action requise</strong><br>
@@ -897,11 +897,13 @@ const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function sbFetch(path, options) {
+async function sbFetch(path, options) {
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Reconnectez-vous à votre espace convoyeur.');
   options = options || {};
   const headers = Object.assign({
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + session.access_token,
     'Content-Type': 'application/json'
   }, options.headers || {});
   return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, { headers }))
@@ -915,20 +917,33 @@ function sbFetch(path, options) {
 }
 
 async function uploadEdlFile(dataUrl, path) {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const resp = await fetch(SUPABASE_URL + '/storage/v1/object/edl/' + path, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': blob.type || 'image/png'
-    },
-    body: blob
-  });
-  if (!resp.ok) { throw new Error('Upload échoué : ' + (await resp.text())); }
-  return SUPABASE_URL + '/storage/v1/object/public/edl/' + path;
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Session expirée. Vos saisies restent sur cet appareil.');
+  const blob=await (await fetch(dataUrl)).blob();
+  const prive=currentMission && currentMission.devis_source_id;
+  if(prive){
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    path=path.replace(/\.(jpg|png)$/,'-'+hash+'.$1');
+    const {error}=await sbAuth.storage.from('edl-test').upload(path,blob,{contentType:blob.type,upsert:false});
+    if(error){
+      const existing=await sbAuth.storage.from('edl-test').createSignedUrl(path,60);
+      if(existing.error)throw new Error('Photo non enregistrée. Réessayez avec une connexion stable.');
+    }
+    return 'edl-test/'+path;
+  }
+  const resp=await fetch(SUPABASE_URL+'/storage/v1/object/edl/'+path,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':blob.type||'image/png'},body:blob});
+  if(!resp.ok)throw new Error('Upload échoué');
+  return SUPABASE_URL+'/storage/v1/object/public/edl/'+path;
 }
+async function urlPhotoEdl(value){
+ if(typeof value!=='string')return '';
+ if(value.startsWith('edl-test/')){
+   const {data,error}=await sbAuth.storage.from('edl-test').createSignedUrl(value.slice(9),300);
+   if(error)throw error;return data.signedUrl;
+ }
+ try{const u=new URL(value);return u.origin===SUPABASE_URL?u.href:'';}catch{return '';}
+}
+function edlHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 // Affiche, à côté de chaque case photo, la photo de la phase précédente pour comparaison
 // (arrivée → compare avec départ ; restitution_arrivee → compare avec restitution_depart)
@@ -950,16 +965,14 @@ async function chargerPhotosPrecedentesPourComparaison() {
     }
     if (!rec.photos) return;
     const photosPrec = rec.photos;
-    Object.keys(photosPrec).forEach(function(key) {
-      if (key.indexOf('_degat') !== -1) return; // on ne compare que les photos principales, pas les gros plans de dégâts
-      const slotEl = document.getElementById('sl-' + key);
-      if (!slotEl) return;
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin-bottom:6px;text-align:center';
-      wrap.innerHTML = '<div style="font-size:.6rem;color:#888;font-weight:800;letter-spacing:.05em;margin-bottom:3px">📷 RÉFÉRENCE (' + (phasePrecedente === 'restitution_depart' ? 'RESTITUTION DÉPART' : 'DÉPART') + ')</div>' +
-        '<img src="' + photosPrec[key] + '" style="width:100%;border-radius:6px;border:1.5px solid #ddd;display:block">';
-      slotEl.insertBefore(wrap, slotEl.firstChild);
-    });
+    for(const key of Object.keys(photosPrec)) {
+      if(key.includes('_degat'))continue;
+      const slotEl=document.getElementById('sl-'+key);if(!slotEl)continue;
+      const wrap=document.createElement('div');wrap.style.cssText='margin-bottom:6px;text-align:center';
+      const label=document.createElement('div');label.textContent='Photo de référence — '+phasePrecedente;label.style.fontSize='.7rem';
+      const img=document.createElement('img');img.src=await urlPhotoEdl(photosPrec[key]);img.alt='Photo de la phase précédente';img.style.cssText='width:100%;border-radius:6px';
+      wrap.append(label,img);slotEl.insertBefore(wrap,slotEl.firstChild);
+    }
   } catch (e) { console.error('Erreur chargement photos de référence:', e); }
 }
 
@@ -969,7 +982,7 @@ const convoyeurSessionReady = (async function() {
   try {
     const { data: { session } } = await sbAuth.auth.getSession();
     if (session && session.user && session.user.email) {
-      const rows = await sbFetch('convoyeurs?email=eq.' + encodeURIComponent(session.user.email) + '&order=created_at.desc&limit=1');
+      const rows = await sbFetch('convoyeurs?auth_user_id=eq.' + encodeURIComponent(session.user.id) + '&order=created_at.desc&limit=1');
       window._currentConvoyeur = (rows || [])[0] || null;
     }
   } catch (e) { console.error('Session convoyeur EDL : erreur', e); }
@@ -1029,7 +1042,7 @@ async function validateMissionCode() {
       return;
     }
     const conv = window._currentConvoyeur;
-    if (conv && mission.convoyeur_id && mission.convoyeur_id !== conv.id) {
+    if (!conv || !mission.convoyeur_id || mission.convoyeur_id !== conv.id) {
       errorEl.textContent = "Cette mission ne t'est pas assignée.";
       errorEl.style.display = 'block';
       return;
@@ -1074,9 +1087,10 @@ async function validateMissionCode() {
     document.getElementById('screen-code').style.display = 'none';
     document.getElementById('step-1').style.display = 'block';
     document.querySelector('.hdr .logo').insertAdjacentHTML('afterend',
-      `<span style="font-size:.72rem;background:rgba(245,197,24,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${missionCode}</span>`
+      `<span style="font-size:.72rem;background:rgba(245,197,24,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${edlHtml(missionCode)}</span>`
     );
     if (PHASE === 'arrivee' || PHASE === 'restitution_arrivee') chargerPhotosPrecedentesPourComparaison();
+    await restaurerBrouillonEdl();
     updProg();
   } catch (e) {
     console.error(e);
@@ -1130,11 +1144,11 @@ let sd=false;
 function gp(e){const r=sc.getBoundingClientRect(),w=sc.width/r.width,h=sc.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*w,y:(e.touches[0].clientY-r.top)*h};return{x:(e.clientX-r.left)*w,y:(e.clientY-r.top)*h};}
 sc.addEventListener('mousedown',e=>{sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)});
 sc.addEventListener('mousemove',e=>{if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();sigHas=true});
-sc.addEventListener('mouseup',()=>sd=false);
+sc.addEventListener('mouseup',()=>{sd=false;planifierSauvegardeEdl();});
 sc.addEventListener('touchstart',e=>{e.preventDefault();sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)},{passive:false});
 sc.addEventListener('touchmove',e=>{e.preventDefault();if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();sigHas=true},{passive:false});
-sc.addEventListener('touchend',()=>sd=false);
-function clearSig(){sx.clearRect(0,0,sc.width,sc.height);sigHas=false;}
+sc.addEventListener('touchend',()=>{sd=false;planifierSauvegardeEdl();});
+function clearSig(){sx.clearRect(0,0,sc.width,sc.height);sigHas=false;planifierSauvegardeEdl();}
 function nextStep(){
   if(!validate(cur))return;
   if(cur===STEPS.length){submit();return;}
@@ -1157,7 +1171,7 @@ function updProg(){
   document.getElementById('pl').textContent=`Étape ${cur} / ${STEPS.length}`;
 }
 function validate(s){
-  if(s===1){if(!document.getElementById('v-km').value){alert('⚠️ Kilométrage obligatoire.');return false;}if(!etat){alert('⚠️ État général obligatoire.');return false;}return true;}
+  if(s===1){if(!/^\d+$/.test(document.getElementById('v-km').value)){alert('⚠️ Kilométrage obligatoire.');return false;}if(!etat){alert('⚠️ État général obligatoire.');return false;}return true;}
   if(s===2){if(!photos['vin']){alert('⚠️ La photo du numéro de châssis (VIN) est obligatoire.');return false;}const m=['avant','arriere','gauche','droit','avg','avd','arg','ard'].filter(x=>!photos[x]);if(m.length){alert(`⚠️ ${m.length} photo(s) extérieure(s) manquante(s).`);return false;}return true;}
   if(s===3){const m=['pag','pad','prg','prd'].filter(x=>!photos[x]);if(m.length){alert(`⚠️ ${m.length} photo(s) de roue(s) manquante(s).`);return false;}return true;}
   if(s===4){
@@ -1170,7 +1184,7 @@ function validate(s){
   if(s===5){if(!sigHas){alert('⚠️ Signature obligatoire.');return false;}return true;}
   return true;
 }
-function setEtat(v,b){etat=v;document.querySelectorAll('.eb').forEach(x=>x.className='eb');const m={mauvais:'sm',acceptable:'sa',bon:'sb',excellent:'se'};b.classList.add(m[v]);}
+function setEtat(v,b){etat=v;document.querySelectorAll('.eb').forEach(x=>x.className='eb');const m={mauvais:'sm',acceptable:'sa',bon:'sb',excellent:'se'};b.classList.add(m[v]);planifierSauvegardeEdl();}
 function triggerPhoto(slot){curSlot=slot;document.getElementById('file-input').value='';document.getElementById('file-input').click();}
 function triggerPhotoNoDmg(slot){curSlot=slot;document.getElementById('file-input-nodmg').value='';document.getElementById('file-input-nodmg').click();}
 function handlePhotoNoDmg(e){
@@ -1195,6 +1209,7 @@ function handlePhoto(e){
   };r.readAsDataURL(f);
 }
 function updCtr(){
+  planifierSauvegardeEdl();
   const ec=document.getElementById('ext-c'),pc=document.getElementById('pneu-c'),ic=document.getElementById('int-c');
   if(ec)ec.textContent=['avant','arriere','gauche','droit','avg','avd','arg','ard'].filter(x=>photos[x]).length;
   if(pc)pc.textContent=['pag','pad','prg','prd'].filter(x=>photos[x]).length;
@@ -1230,7 +1245,7 @@ function handleDmgPhoto(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    dmgPhotos[curSlot].push(ev.target.result);dmgStep=2;
+    dmgPhotos[curSlot].push(ev.target.result);planifierSauvegardeEdl();dmgStep=2;
     document.getElementById('doi-photo').style.display='none';
     document.getElementById('doi-type').style.display='block';
     // Pas de bouton skip non plus ici - doit choisir le type
@@ -1239,7 +1254,7 @@ function handleDmgPhoto(e){
 }
 function pickDmg(t){
   if(!t.trim())return;
-  dmgTypes[curSlot].push(t);
+  dmgTypes[curSlot].push(t);planifierSauvegardeEdl();
   const sl=document.getElementById('sl-'+curSlot);if(sl)sl.classList.add('hasdmg');
   document.getElementById('doi-type').style.display='none';
   document.getElementById('doi-done-actions').style.display='flex';
@@ -1249,32 +1264,34 @@ function ajouterAutreDegat(){
   document.getElementById('doi-done-actions').style.display='none';
   dmgStep=0;
 }
-function closeDoi(){document.getElementById('doi').classList.remove('open');document.getElementById('doi-done-actions').style.display='none';}
+function closeDoi(){planifierSauvegardeEdl();document.getElementById('doi').classList.remove('open');document.getElementById('doi-done-actions').style.display='none';}
 const EL={mauvais:'🔴 Mauvais état',acceptable:'🟠 État correct',bon:'🔵 Bon état',excellent:'🟢 Excellent état'};
 function buildRecap(){
   const pd=Object.keys(dmgTypes).flatMap(s => (dmgTypes[s]||[]).map((t,i) => s+' #'+(i+1)+': '+t));
   const all=[...pd].filter(Boolean);
   const dh=all.length
-    ?`<div style="padding:8px;background:rgba(239,68,68,.05);border-radius:7px;border:1px solid rgba(239,68,68,.2);margin-top:4px"><span style="font-size:.73rem;color:var(--rd);font-weight:600">⚠️ Dommages : </span><span style="font-size:.78rem">${all.join(' · ')}</span></div>`
+    ?`<div style="padding:8px;background:rgba(239,68,68,.05);border-radius:7px;border:1px solid rgba(239,68,68,.2);margin-top:4px"><span style="font-size:.73rem;color:var(--rd);font-weight:600">⚠️ Dommages : </span><span style="font-size:.78rem">${edlHtml(all.join(' · '))}</span></div>`
     :`<div style="padding:7px 9px;background:rgba(34,197,94,.06);border-radius:7px;border:1px solid rgba(34,197,94,.2);font-size:.78rem;color:var(--gn)">✅ Aucun dommage constaté</div>`;
   document.getElementById('recap-content').innerHTML=`<div style="display:flex;flex-direction:column">
-    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${missionCode}</span></div>
-    <div class="rrow"><span>Véhicule</span><span>${document.getElementById('v-marque').value} ${document.getElementById('v-modele').value}</span></div>
-    <div class="rrow"><span>Immatriculation</span><span>${document.getElementById('v-immat').value}</span></div>
+    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${edlHtml(missionCode)}</span></div>
+    <div class="rrow"><span>Véhicule</span><span>${edlHtml(document.getElementById('v-marque').value)} ${edlHtml(document.getElementById('v-modele').value)}</span></div>
+    <div class="rrow"><span>Immatriculation</span><span>${edlHtml(document.getElementById('v-immat').value)}</span></div>
     <div class="rrow"><span>N° VIN (châssis)</span><span style="font-size:.78rem">${photos['vin']?'📸 Photo prise ✓':'—'}</span></div>
-    <div class="rrow"><span>Conducteur</span><span>${document.getElementById('v-conv').value}</span></div>
-    <div class="rrow"><span>Lieu</span><span>${document.getElementById('v-lieu').value||'—'}</span></div>
+    <div class="rrow"><span>Conducteur</span><span>${edlHtml(document.getElementById('v-conv').value)}</span></div>
+    <div class="rrow"><span>Lieu</span><span>${edlHtml(document.getElementById('v-lieu').value||'—')}</span></div>
     <div class="rrow"><span>Kilométrage</span><span>${document.getElementById('v-km').value} km</span></div>
     <div class="rrow"><span>État général</span><span>${EL[etat]||'—'}</span></div>
-    <div class="rrow"><span>Photos</span><span style="color:var(--gn)">16/16 ✅</span></div>
+    <div class="rrow"><span>Photos</span><span style="color:var(--gn)">${Object.keys(photos).length} photos ✅</span></div>
     <div class="rrow"><span>Phase</span><span>${PHASE_LABELS[PHASE]||'🚦 Départ'}</span></div>
     <div style="margin-top:5px">${dh}</div>
     <div style="margin-top:8px;padding:8px 10px;background:rgba(37,86,168,.06);border-radius:7px;border:1px solid rgba(37,86,168,.2);font-size:.78rem;color:var(--bl)">⛽ <strong>Rappel carburant :</strong> Restituer le véhicule avec le même niveau qu'à la prise en charge.</div>
-    ${document.getElementById('v-obs').value?`<div style="margin-top:5px;padding:7px;background:rgba(249,115,22,.06);border-radius:7px;border:1px solid rgba(249,115,22,.2)"><span style="font-size:.72rem;color:var(--or);font-weight:600">📝 Observations : </span><span style="font-size:.78rem">${document.getElementById('v-obs').value}</span></div>`:''}
+    ${document.getElementById('v-obs').value?`<div style="margin-top:5px;padding:7px;background:rgba(249,115,22,.06);border-radius:7px;border:1px solid rgba(249,115,22,.2)"><span style="font-size:.72rem;color:var(--or);font-weight:600">📝 Observations : </span><span style="font-size:.78rem">${edlHtml(document.getElementById('v-obs').value)}</span></div>`:''}
   </div>`;
 }
 async function submit(){
-  if(!validate(5))return;
+  if(document.getElementById('next-btn').disabled)return;
+  if(!currentMission)return;
+  for(let step=1;step<=5;step++)if(!validate(step))return;
   const btn = document.getElementById('next-btn');
   const originalText = btn.textContent;
   btn.disabled = true; btn.textContent = 'Enregistrement…';
@@ -1284,7 +1301,7 @@ async function submit(){
     const dommagesTxt = [...pd].filter(Boolean).join(' · ') || null;
 
     // Upload des photos (véhicule + dégâts éventuels) vers Supabase Storage
-    const folder = missionCode + '-' + PHASE + '-' + Date.now();
+    const folder = currentMission.devis_source_id ? currentMission.id+'/'+PHASE+'/'+edlSubmissionId : missionCode+'-'+PHASE+'-'+Date.now();
     const photoUrls = {};
     for (const slot in photos) {
       photoUrls[slot] = await uploadEdlFile(photos[slot], folder + '/' + slot + '.jpg');
@@ -1299,6 +1316,22 @@ async function submit(){
     const signatureDataUrl = sc.toDataURL('image/png');
     const signatureUrl = await uploadEdlFile(signatureDataUrl, folder + '/signature.png');
 
+    if(currentMission.devis_source_id){
+      const payload={km:Number(document.getElementById('v-km').value),carburant:document.getElementById('v-carb').value,etat_general:etat,
+        observations:document.getElementById('v-obs').value||null,dommages:dommagesTxt,signature_url:signatureUrl,photos:Object.assign({},photoUrls,dmgPhotoUrls)};
+      const {data,error}=await sbAuth.rpc('enregistrer_edl_test',{p_mission_id:currentMission.id,p_phase:PHASE,p_submission_id:edlSubmissionId,p_payload:payload});
+      if(error||!data?.ok){
+        const labels={KILOMETRAGE_INCOHERENT:'Le kilométrage est inférieur à celui du départ.',PHOTOS_MANQUANTES:'Des photos obligatoires sont manquantes.',FICHIER_NON_ENREGISTRE:'Une photo ou la signature doit être envoyée à nouveau.',PHASE_DEJA_VALIDEE:'Cette phase a déjà été validée.',ORDRE_INVALIDE:'La mission a changé de phase. Rechargez votre espace.'};
+        throw new Error(labels[data?.code]||'État des lieux non enregistré. Vos saisies sont conservées.');
+      }
+      await supprimerBrouillonEdl();
+      try{
+        const session=(await sbAuth.auth.getSession()).data.session;
+        const r=await fetch(SUPABASE_URL+'/functions/v1/mission-accepter-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({action:'notifications',mission_id:currentMission.id})});
+        const result=await r.json();
+        messageBrouillonEdl(result.ok?'Rapport enregistré. Notifications envoyées.':'Rapport enregistré. Notifications en attente.');
+      }catch{messageBrouillonEdl('Rapport enregistré. Notifications en attente.');}
+    } else {
     await sbFetch('etats_des_lieux', {
       method: 'POST',
       headers: { 'Prefer': 'return=minimal' },
@@ -1339,6 +1372,7 @@ async function submit(){
       envoyerEmailClientEdl(currentMission, PHASE);
     }
 
+    }
     document.getElementById('step-5').style.display='none';
     document.getElementById('sticky').style.display='none';
     document.getElementById('success-screen').style.display='block';
@@ -1348,15 +1382,15 @@ async function submit(){
         : "État des lieux d'arrivée validé !";
       document.getElementById('suc-msg').textContent = currentMission && currentMission.restitution
         ? "Le véhicule est arrivé. Une restitution est à effectuer — l'état des lieux de restitution (départ) sera disponible depuis ton espace convoyeur."
-        : "La mission est terminée. Rapport enregistré et signé.";
-      document.getElementById('sms-note').textContent='📱 SMS envoyé au client pour confirmer l\'arrivée.';
+        : "Livraison constatée. Rapport signé, en attente de contrôle HelixCar.";
+      document.getElementById('sms-note').textContent='Rapport disponible dans le dossier de la mission.';
     } else if (PHASE === 'restitution_depart') {
       document.getElementById('suc-title').textContent = "État des lieux de restitution (départ) validé !";
       document.getElementById('suc-msg').textContent = "Vous pouvez démarrer le trajet de restitution.";
     } else if (PHASE === 'restitution_arrivee') {
       document.getElementById('suc-title').textContent = "État des lieux de restitution (arrivée) validé !";
-      document.getElementById('suc-msg').textContent = "La restitution est terminée. Mission clôturée.";
-      document.getElementById('sms-note').textContent='📱 SMS envoyé au client pour confirmer la restitution.';
+      document.getElementById('suc-msg').textContent = "Restitution constatée. La mission attend le contrôle HelixCar.";
+      document.getElementById('sms-note').textContent='Rapport disponible dans le dossier de la mission.';
     }
     STEPS.forEach(s=>document.getElementById('psi-'+s.id).className='psi done');
     const sucCode = document.getElementById('suc-code');
@@ -1364,10 +1398,71 @@ async function submit(){
     window.scrollTo({top:0,behavior:'smooth'});
   } catch (e) {
     console.error(e);
-    alert('❌ Erreur lors de l\'enregistrement de l\'état des lieux (voir la console). Réessaie.');
+    await sauvegarderBrouillonEdl();
+    alert(e.message||'Échec de l’enregistrement. Vos saisies sont conservées sur cet appareil.');
     btn.disabled = false; btn.textContent = originalText;
   }
 }
+// Brouillon local séparé par compte, véhicule/mission et phase. Aucun succès simulé.
+let edlSubmissionId=crypto.randomUUID(),edlSaveTimer=null,edlRestoring=false,edlFinished=false;
+function messageBrouillonEdl(message){
+ let el=document.getElementById('edl-brouillon-status');
+ if(!el){el=document.createElement('p');el.id='edl-brouillon-status';el.setAttribute('role','status');el.style.cssText='padding:8px 16px;font-size:.8rem;color:#555';document.querySelector('.hdr').after(el);}
+ el.textContent=message;
+}
+async function baseBrouillonEdl(){
+ return new Promise((resolve,reject)=>{const r=indexedDB.open('helixcar-edl-brouillons',1);r.onupgradeneeded=()=>r.result.createObjectStore('brouillons');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+}
+async function cleBrouillonEdl(){
+ if(!currentMission?.devis_source_id)return null;
+ const session=(await sbAuth.auth.getSession()).data.session;
+ return session?session.user.id+'/'+currentMission.id+'/'+PHASE:null;
+}
+async function operationBrouillonEdl(mode,action){
+ const key=await cleBrouillonEdl();if(!key)return null;
+ const db=await baseBrouillonEdl();
+ try{return await new Promise((resolve,reject)=>{
+  const tx=db.transaction('brouillons',mode),store=tx.objectStore('brouillons');const req=action(store,key);
+  tx.oncomplete=()=>resolve(req.result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ });}finally{db.close();}
+}
+function planifierSauvegardeEdl(){
+ if(edlRestoring||edlFinished||!currentMission?.devis_source_id)return;
+ clearTimeout(edlSaveTimer);edlSaveTimer=setTimeout(sauvegarderBrouillonEdl,400);
+}
+async function sauvegarderBrouillonEdl(){
+ if(edlRestoring||edlFinished||!currentMission?.devis_source_id)return;
+ try{
+  const fields={};document.querySelectorAll('input[id^="v-"],textarea[id^="v-"],select[id^="v-"]').forEach(el=>fields[el.id]=el.value);
+  await operationBrouillonEdl('readwrite',(store,key)=>store.put({fields,photos,dmgPhotos,dmgTypes,dmgPins,etat,sigHas,signature:sigHas?sc.toDataURL('image/png'):null,submissionId:edlSubmissionId,savedAt:new Date().toISOString()},key));
+  messageBrouillonEdl('Brouillon sauvegardé sur cet appareil. Vous pouvez reprendre après une coupure.');
+ }catch{messageBrouillonEdl('La sauvegarde locale a échoué. Gardez cette page ouverte et libérez de l’espace sur cet appareil.');}
+}
+async function restaurerBrouillonEdl(){
+ if(!currentMission?.devis_source_id)return;
+ edlRestoring=true;
+ try{
+  const saved=await operationBrouillonEdl('readonly',(store,key)=>store.get(key));
+  if(!saved){messageBrouillonEdl('Vos saisies et photos seront sauvegardées sur cet appareil.');return;}
+  for(const [id,value] of Object.entries(saved.fields||{})){const el=document.getElementById(id);if(el&&id.startsWith('v-'))el.value=value;}
+  photos=saved.photos||{};dmgPhotos=saved.dmgPhotos||{};dmgTypes=saved.dmgTypes||{};dmgPins=saved.dmgPins||{};
+  etat=saved.etat;sigHas=!!saved.sigHas;edlSubmissionId=saved.submissionId||edlSubmissionId;
+  for(const [slot,src] of Object.entries(photos)){const el=document.getElementById('sl-'+slot),img=document.getElementById('pv-'+slot);if(el)el.classList.add('done');if(img)img.src=src;}
+  if(['mauvais','acceptable','bon','excellent'].includes(etat)){const b=document.querySelector('.eb[onclick*="'+etat+'"]');if(b)setEtat(etat,b);}
+  if(sigHas&&saved.signature){await new Promise(resolve=>{const img=new Image();img.onload=()=>{sx.drawImage(img,0,0,sc.width,sc.height);resolve();};img.onerror=()=>{sigHas=false;resolve();};img.src=saved.signature;});}
+  updCtr();messageBrouillonEdl('Brouillon restauré : vérifiez les informations et poursuivez.');
+ }catch{messageBrouillonEdl('Impossible de restaurer le brouillon local.');}
+ finally{edlRestoring=false;}
+}
+async function supprimerBrouillonEdl(){
+ edlFinished=true;clearTimeout(edlSaveTimer);
+ try{await operationBrouillonEdl('readwrite',(store,key)=>store.delete(key));}catch{messageBrouillonEdl('Rapport enregistré. Le brouillon local n’a pas pu être supprimé.');}
+}
+document.addEventListener('input',planifierSauvegardeEdl);document.addEventListener('change',planifierSauvegardeEdl);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')sauvegarderBrouillonEdl();});
+window.addEventListener('offline',()=>messageBrouillonEdl('Connexion coupée. Continuez la saisie ; l’envoi nécessitera le retour du réseau.'));
+window.addEventListener('online',()=>messageBrouillonEdl('Connexion rétablie. Vous pouvez valider et envoyer votre état des lieux.'));
+
 </script>
 </body>
 </html>

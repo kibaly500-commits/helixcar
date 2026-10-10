@@ -1,0 +1,159 @@
+// UI locale isolée : aucune session ni demande distante.
+const L = require('./lib');
+const {urlFichier} = require('./env');
+(async () => {
+ const http = require('http'), fs = require('fs'), path = require('path');
+ const racine = path.resolve(__dirname, '..');
+ const server = http.createServer((req,res) => {
+  const fichier = path.join(racine, new URL(req.url,'http://localhost').pathname);
+  if (!fichier.startsWith(racine + path.sep)) {res.writeHead(403);res.end();return;}
+  fs.readFile(fichier,(err,data)=>{if(err){res.writeHead(404);res.end();return;}
+   if(fichier.endsWith('.html')) res.setHeader('Content-Type','text/html; charset=utf-8');
+   res.end(data);});
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const origine='http://127.0.0.1:'+server.address().port;
+ const browser = await L.launch();
+ try {
+  const page = await L.newPage(browser);
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(() => { openModal('client'); document.getElementById('client-type').value='pro'; toggleClientType(); });
+  // Le parcours particulier tient désormais dans l’écran ; le professionnel
+  // conserve les champs société/SIRET et permet de tester le défilement long.
+  await page.waitForTimeout(400);
+  await page.mouse.move(190,450);
+  await page.mouse.wheel(0,2500);
+  await page.waitForTimeout(250);
+  const bas = await page.locator('#modal-client').evaluate(e=>e.scrollTop);
+  await page.mouse.wheel(0,-4000);
+  await page.waitForTimeout(250);
+  L.check('Formulaire public mobile : descente puis retour en haut', bas>0 && await page.locator('#modal-client').evaluate(e=>e.scrollTop)<5);
+  await page.evaluate(() => {
+   closeModal('client');
+   history.replaceState(null,'',location.pathname+'?nouvelle-demande=1');
+   _hcModeIntegre=()=>true;
+   _hcChargerSessionClient=()=>new Promise(resolve=>{
+    window.qaProfilPret=()=>{
+     _hcSessionClient={userId:'TEST-QA',email:'qa@example.invalid'};
+     _hcProfilConnecte={prenom:'TEST',nom:'QA',type_client:'particulier'};
+     resolve(_hcSessionClient);
+    };
+   });
+   window.qaDemarrage=_hcDemarrerDepuisEspaceClient();
+  });
+  await page.waitForTimeout(100);
+  L.check('Chargement du profil : aucun formulaire inscription visible',await page.locator('#modal-client').evaluate(e=>getComputedStyle(e).display==='none'));
+  await page.evaluate(async()=>{qaProfilPret();await qaDemarrage;});
+  L.check('Profil prêt : formulaire connecté ouvert directement à étape 2',await page.evaluate(()=>document.body.classList.contains('hc-sans-identite') && _formStepState.client===2 && getComputedStyle(document.getElementById('modal-client')).display!=='none'));
+  await page.goto(urlFichier('dashboard.html'));
+  await page.evaluate(() => {
+   // Les chargeurs distants sont hors du périmètre de ce test de navigation.
+   for (const nom of ['verifierAccesPartenaireEnCours','loadDemandesClient','loadFideliteCarte','loadMissionsResumeClient','loadProfilClient','loadMissionsClient','chargerAccueilAdmin','loadParametresAdmin','loadDashboardMissionsPreview','loadMissionsConvoyeur']) window[nom]=()=>{};
+   document.getElementById('login-screen').style.display='none';
+   document.getElementById('app').style.display='flex';
+  });
+  for (const [accueil,section] of [['client-dashboard','client-profil'],['admin-dashboard','admin-parametres'],['convoyeur-dashboard','convoyeur-missions']]) {
+   await page.evaluate(([a,b])=>{showPage(a);showPage(b);},[accueil,section]);
+   await page.goBack();
+   L.check('Retour interne : '+accueil, await page.locator('#page-'+accueil).evaluate(e=>e.classList.contains('active')));
+   await page.goForward();
+   L.check('Avancer : '+section, await page.locator('#page-'+section).evaluate(e=>e.classList.contains('active')));
+  }
+  await page.evaluate(() => {
+   showPage('client-nouvelle-demande');
+   const cadre=document.getElementById('client-demande-cadre');
+   cadre.style.height='2400px';
+   cadre.srcdoc='<body style="margin:0;height:2350px;background:linear-gradient(white,gray)">TEST QA</body>';
+  });
+  await page.waitForTimeout(100);
+  L.check('Demande mobile : cadre non plafonné',await page.locator('#client-demande-cadre').evaluate(e=>e.getBoundingClientRect().height>=2400));
+  await page.mouse.move(190,450);
+  await page.mouse.wheel(0,1600);
+  await page.waitForTimeout(250);
+  const basDashboard=await page.evaluate(()=>scrollY);
+  await page.mouse.wheel(0,-4000);
+  await page.waitForTimeout(250);
+  L.check('Dashboard mobile : défilement sur le cadre puis remontée complète',basDashboard>500 && await page.evaluate(()=>scrollY)<5);
+  await page.goto(origine+'/dashboard.html');
+  await page.evaluate(() => {
+   document.getElementById('login-screen').style.display='none';
+   document.getElementById('app').style.display='flex';
+   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+   document.getElementById('page-client-nouvelle-demande').classList.add('active');
+   _hcCadreMode='demande';
+   document.getElementById('client-demande-cadre').src='index.html?integre=1';
+  });
+  const cadre = await (await page.locator('#client-demande-cadre').elementHandle()).contentFrame();
+  await cadre.waitForFunction(()=>typeof _hcActiverModeIntegre==='function');
+  await cadre.evaluate(() => {
+   document.body.classList.add('hc-mode-demande');
+   _hcActiverModeIntegre();
+   document.querySelector('#modal-client .modal').style.minHeight='3000px';
+   _hcTransmettreHauteur();
+  });
+  await page.waitForFunction(()=>document.getElementById('client-demande-cadre').offsetHeight>=3000);
+  L.check('Dashboard : même accès HelixCar aux dates',await cadre.locator('[data-field="stock-debut"]').count()===1);
+  for(const service of ['convoyage','stockage']){
+   const hour=await cadre.evaluate(service=>{
+    const set=(id,v)=>document.getElementById(id).value=v;
+    const radio=(n,v)=>{const e=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(e)e.checked=true;};
+    radio('type-service',service);radio('stock-acheminement','helixcar');radio('stock-sortie','helixcar');set('stock-debut','2027-10-07');set('stock-fin','2027-10-21');set('nb-vehicules','2');rendreFichesVehicules();
+    radio('veh-0-liv-active','oui');radio('veh-0-restit-active','oui');basculerRestitVehicule(0);
+    set('veh-0-pc-date','2027-10-07');set('veh-0-liv-date','2027-10-21');set('veh-0-restit-date','2027-10-21');set('veh-0-liv-heure','16:00');
+    const e=document.getElementById('veh-0-restit-heure');e.value='';_hpOuvrirPicker(e);
+    const message=document.getElementById('hp-chrono-note').textContent;
+    document.getElementById('hp-ok').click();const hourOk=message.includes('16:15')&&e.value==='16:15'&&!_hpOverlay.classList.contains('open');
+    set('veh-0-restit-date','2027-10-22');e.value='09:00';_hcOuvrirCalendrier(document.getElementById('veh-0-restit-date'));_hcCalAnneeAffichee=2027;_hcCalMoisAffiche=9;_hcRendreCalendrier();_hcSelectionnerJour(21);
+    const adjusted=e.value==='16:15'&&document.getElementById('veh-0-restit-date').value==='2027-10-21';_hcFermerCalendrier();return hourOk&&adjusted;
+   },service);
+   L.check('Dashboard '+service+' : restitution proposée et validée à heure compatible',hour);
+  }
+  const chronologieCadre=await cadre.evaluate(()=>{
+   document.getElementById('pro-date-debut').value='2027-10-07';
+   document.getElementById('pro-date-fin').value='2027-10-23';
+   _hcOuvrirCalendrier(document.getElementById('pro-date-debut'));
+   _hcCalAnneeAffichee=2027;_hcCalMoisAffiche=9;_hcRendreCalendrier();
+   const r={blocked:document.querySelector('#hc-cal-grille [data-jour="25"]').disabled,
+    quiet:document.getElementById('hc-cal-chrono-note').hidden};
+   _hcSelectionnerJour(25);r.preserved=document.getElementById('pro-date-debut').value==='2027-10-07';
+   _hcSelectionnerJour(9);r.staysOpen=_hcCalOverlay.classList.contains('open');
+   document.getElementById('hc-cal-ok').click();r.okCloses=!_hcCalOverlay.classList.contains('open');
+   const radio=(name,v)=>document.querySelector('input[name="'+name+'"][value="'+v+'"]').checked=true;
+   radio('type-service','stockage');radio('stock-acheminement','helixcar');radio('stock-sortie','helixcar');
+   document.getElementById('stock-debut').value='2027-10-07';document.getElementById('stock-fin').value='2027-10-23';
+   rendreFichesVehicules();_hcEffacerSousVeh(0,'pc');
+   r.inheritedDate=document.getElementById('veh-0-pc-date').value==='2027-10-07';
+   return r;
+  });
+  for(const [key,ok] of Object.entries(chronologieCadre))L.check('Dashboard : calendrier cohérent '+key,ok);
+  L.check('Dashboard : aucun verrou plein écran du formulaire public',await cadre.evaluate(()=>!document.documentElement.classList.contains('hc-client-mobile-open')));
+  await page.evaluate(()=>scrollTo(0,1000));
+  await cadre.evaluate(() => {
+   const overlay=_hcConstruireDupliquerOverlay();
+   overlay.style.display='flex';
+   _hcAdapterOverlaysIntegres();
+  });
+  const position=await cadre.locator('#hc-dupliquer-overlay > div').boundingBox();
+  L.check('Cadre long : fenêtre de duplication dans écran visible',position.y>=0 && position.y+position.height<=844);
+  await cadre.evaluate(() => {
+   _hcConstruireDupliquerOverlay().style.display='none';
+   const champ=document.createElement('input');
+   champ.type='date';champ.id='qa-date';
+   champ.style.cssText='position:absolute;left:20px;top:'+(_hcBornesCadreVisibles().haut+100)+'px';
+   document.querySelector('#modal-client .modal').appendChild(champ);
+   _hcOuvrirCalendrier(champ);
+  });
+  await page.waitForTimeout(100);
+  const calendrier=await cadre.locator('.hc-cal-overlay.open .hc-cal').boundingBox();
+  L.check('Cadre long : calendrier dans écran visible',calendrier && calendrier.y>=0 && calendrier.y+calendrier.height<=844);
+  await cadre.evaluate(() => {
+   document.querySelector('.hc-cal-overlay').classList.remove('open');
+   document.getElementById('qa-date').remove();
+   document.querySelector('#modal-client .modal').style.minHeight='600px';
+   _hcTransmettreHauteur();
+  });
+  await page.waitForTimeout(100);
+  L.check('Cadre : hauteur redescend après réduction du formulaire',await page.locator('#client-demande-cadre').evaluate(e=>e.offsetHeight<1500));
+ } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }
+ process.exitCode=L.results()?1:0;
+})().catch(e=>{console.error(e);process.exitCode=1;});
