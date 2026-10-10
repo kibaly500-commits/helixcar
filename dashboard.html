@@ -10459,6 +10459,8 @@ function _aConvoyage(c) {
 // Période affichée uniquement : aucune modification des dates métier ni des prix.
 // Sans nouvelle saisie, la livraison sert de début estimé du séjour du véhicule repris.
 function _stockageRestitutionsDevis(c) {
+  // Les données résiduelles d'un autre service ne créent jamais de stockage.
+  if (!c || (!_aConvoyage(c) && !_aStockage(c))) return null;
   var periodes = ((c && c._vehicules) || []).filter(function (v) {
     return v.restitution_concernee && v.restit_destination === 'stockage'
       && _joursEntreDatesDash(v.date_livraison, v.restit_date) > 2;

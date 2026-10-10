@@ -383,16 +383,6 @@ function _proDetails(c) {
   return (d && typeof d === 'object') ? d : null;
 }
 
-function _aConvoyage(c) {
-  var t = _typeServiceDemande(c);
-  return t === 'convoyage' || t === 'convoyage_stockage';
-}
-
-function _aStockage(c) {
-  var t = _typeServiceDemande(c);
-  return t === 'stockage' || t === 'convoyage_stockage';
-}
-
 function _stockageAutomatiqueConvoyage(c) {
   if (!c || !_aConvoyage(c) || _aStockage(c)) return null;
 
@@ -414,6 +404,16 @@ function _stockageAutomatiqueConvoyage(c) {
   return duree > 2 ? { debut: debut, fin: fin, duree: duree } : null;
 }
 
+function _aConvoyage(c) {
+  var t = _typeServiceDemande(c);
+  return t === 'convoyage' || t === 'convoyage_stockage';
+}
+
+function _aStockage(c) {
+  var t = _typeServiceDemande(c);
+  return t === 'stockage' || t === 'convoyage_stockage';
+}
+
 function _joursEntreDatesDash(d1, d2) {
   if (!d1 || !d2) return null;
   var a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
@@ -424,6 +424,8 @@ function _joursEntreDatesDash(d1, d2) {
 }
 
 function _stockageRestitutionsDevis(c) {
+  // Les données résiduelles d'un autre service ne créent jamais de stockage.
+  if (!c || (!_aConvoyage(c) && !_aStockage(c))) return null;
   var periodes = ((c && c._vehicules) || []).filter(function (v) {
     return v.restitution_concernee && v.restit_destination === 'stockage'
       && _joursEntreDatesDash(v.date_livraison, v.restit_date) > 2;

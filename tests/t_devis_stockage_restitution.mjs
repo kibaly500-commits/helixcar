@@ -26,3 +26,7 @@ for(const [name,change] of Object.entries({deuxJours:{restit_date:'2026-11-10'},
 }
 test('stockage existant plus long non raccourci',()=>assert.equal(render('stockage',[vehicle,{...vehicle,position:2,date_livraison:'2026-11-20',restitution_concernee:false}]),'20/11/2026'));
 test('ancien convoyage long inchangé',()=>assert.equal(render('convoyage',[{...vehicle,date_prise_en_charge:'2026-11-01',restitution_concernee:false}]),'08/11/2026'));
+for(const service of ['nettoyage','professionnel']){
+ test(service+' : aucune période de stockage sans restitution',()=>assert.equal(render(service,[]),null));
+ test(service+' : anciennes restitutions ignorées',()=>assert.equal(render(service,[vehicle,{...vehicle,position:2,restit_date:'2026-11-16'}]),null));
+}
