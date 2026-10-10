@@ -13557,6 +13557,13 @@ function _construirePdfDevis(c, d, options) {
         // Objectif 15).
         _dessinerLigneCombineeV(_ligneOperationVCombinee('Prise en charge', adrDepartEff, datePcEff, horairePcEff));
         var dateLivEff = _monoPdf ? c.date_livraison : v.date_livraison;
+        // Convoyage : la durée > 2 jours doit aussi être visible dans la carte
+        // du véhicule concerné, sans reprendre les dates d'un autre véhicule.
+        var joursStockageConvoyageV = _joursEntreDatesDash(datePcEff, dateLivEff);
+        if (_aConvoyage(c) && joursStockageConvoyageV > 2) {
+          _dessinerLigneCombineeV('Stockage : ' + _dvDate(datePcEff) + ' au ' +
+            _dvDate(dateLivEff) + ' (' + joursStockageConvoyageV + ' jours)');
+        }
         _dessinerLigneCombineeV(_ligneOperationVCombinee('Livraison', adrArriveeEff, dateLivEff, horaireLivEff));
         if (_modeLigneV) {
           if (dess) {
