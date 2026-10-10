@@ -811,6 +811,27 @@ async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, 
   return { devis, uid };
 }
 
+// Lecture admin du même document archivé que celui accessible au client.
+// Aucun PDF reconstruit, aucune modification du devis ou de son acceptation.
+export async function actionAdminPdf(sb: any, req: Request, corps: any, cors: Record<string, string>) {
+  const auth = await adminAuthentifie(sb, req, cors);
+  if ("refus" in auth) return auth.refus;
+  if (typeof corps?.devis_id !== "string" || !/^[0-9a-f-]{36}$/i.test(corps.devis_id))
+    return erreur("BAD_REQUEST", "Identifiant de devis requis.", 400, cors);
+  const {data: devis, error} = await sb.from("devis").select("id,pdf_path,date_envoi,reference")
+    .eq("id", corps.devis_id).maybeSingle();
+  if (error || !devis) return erreur("NOT_FOUND", "Devis introuvable.", 404, cors);
+  const {data: archive, error: archiveError} = await sb.from("devis_preparations").select("pdf_path")
+    .eq("devis_id", devis.id).gt("envoyee_le", "1970-01-01T00:00:00Z")
+    .order("created_at", {ascending:false}).limit(1).maybeSingle();
+  if (archiveError) return erreur("INTERNAL_ERROR", "Impossible de lire le PDF envoyé.", 500, cors);
+  const path = archive ? archive.pdf_path : (devis.date_envoi ? devis.pdf_path : null);
+  if (!path) return erreur("PDF_NOT_READY", "Aucun PDF envoyé disponible.", 409, cors);
+  const {data: signed, error: signError} = await sb.storage.from("devis").createSignedUrl(path, 600);
+  if (signError || !signed?.signedUrl) return erreur("INTERNAL_ERROR", "Impossible d’ouvrir le PDF envoyé.", 500, cors);
+  return reponseJson({ok:true,pdf_url:signed.signedUrl,reference:devis.reference}, 200, cors);
+}
+
 export async function actionGet(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
   const autorisation = await devisDuClient(sb, corps, cors, req);
   if ("refus" in autorisation) return autorisation.refus;
@@ -917,12 +938,13 @@ export async function traiterRequete(
   try { corps = await req.json(); } catch { return erreur("BAD_REQUEST", "Corps JSON invalide.", 400, cors); }
 
   const action = corps?.action;
-  if (!["prepare", "get", "accept", "refuse", "send_email", "resume_send"].includes(action)) {
+  if (!["prepare", "get", "admin_pdf", "accept", "refuse", "send_email", "resume_send"].includes(action)) {
     return erreur("BAD_REQUEST", "Action inconnue.", 400, cors);
   }
   try {
     if (action === "resume_send") return await actionReprendreEnvoi(sb, req, corps, cors, env, fetchFn);
     if (action === "prepare") return await actionPrepare(sb, req, corps, cors);
+    if (action === "admin_pdf") return await actionAdminPdf(sb, req, corps, cors);
     if (action === "get") return await actionGet(sb, corps, cors, req);
     if (action === "accept") return await actionAccept(sb, corps, cors, req);
     if (action === "send_email") return await actionSendEmail(sb, req, corps, cors, env, fetchFn);

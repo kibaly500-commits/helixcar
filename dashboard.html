@@ -13953,7 +13953,8 @@ var _urlApercuCourante = null;
 
 // Aperçu AVANT saisie du montant. Utilise exactement le même
 // générateur que le PDF final : aucune divergence possible.
-function apercuDevis(clientId) {
+async function apercuDevis(clientId) {
+  if (await _ouvrirPdfEnvoyeAdmin(clientId, false)) return;
   var c = _demandesDevisListe.filter(function (x) { return String(x.id) === String(clientId); })[0];
   if (!c) return;
   var d = _devisParClient[String(clientId)] || {
@@ -13992,7 +13993,37 @@ function _afficherApercuPdf(c, d, clientId) {
   openModal('apercu-devis');
 }
 
-function previsualiserDevis(clientId) {
+async function _ouvrirPdfEnvoyeAdmin(clientId, telecharger) {
+  var d = _devisParClient[String(clientId)];
+  if (!d || !d.date_envoi) return false;
+  try {
+    var session = (await sbAuth.auth.getSession()).data.session;
+    if (!session) throw new Error('Reconnectez-vous pour consulter le devis.');
+    var response = await fetch(URL_FONCTION_DEVIS, {method:'POST', headers:{
+      'Authorization':'Bearer '+session.access_token, 'Content-Type':'application/json'
+    },body:JSON.stringify({action:'admin_pdf',devis_id:d.id})});
+    var result = await response.json();
+    if (!response.ok || !result.ok || !result.pdf_url) throw new Error(result.message || 'PDF envoyé indisponible.');
+    if (telecharger) {
+      var fichier = await fetch(result.pdf_url);
+      if (!fichier.ok) throw new Error('Téléchargement du PDF envoyé impossible.');
+      var lien = document.createElement('a'), url = URL.createObjectURL(await fichier.blob());
+      lien.href=url; lien.download=_nomFichierDevis(d); lien.click();
+      setTimeout(function(){URL.revokeObjectURL(url);},60000);
+    } else {
+      if (_urlApercuCourante) { URL.revokeObjectURL(_urlApercuCourante); _urlApercuCourante=null; }
+      document.getElementById('apercu-devis-iframe').src=result.pdf_url;
+      document.getElementById('apercu-devis-nom').textContent=_nomFichierDevis(d)+' — PDF envoyé';
+      var bouton=document.getElementById('btn-telecharger-devis');
+      bouton.setAttribute('data-client-id',clientId);bouton.style.display='';
+      openModal('apercu-devis');
+    }
+  } catch(e) { alert(e.message || 'Impossible de consulter le PDF envoyé.'); }
+  return true; // Ne jamais remplacer silencieusement une archive par un PDF reconstruit.
+}
+
+async function previsualiserDevis(clientId) {
+  if (await _ouvrirPdfEnvoyeAdmin(clientId, false)) return;
   var r;
   try { r = _pdfDevisPour(clientId); } catch (e) {
     console.error('Erreur PDF:', e);
@@ -14016,10 +14047,11 @@ function previsualiserDevis(clientId) {
   openModal('apercu-devis');
 }
 
-function telechargerDevisPdf() {
+async function telechargerDevisPdf() {
   var btn = document.getElementById('btn-telecharger-devis');
   var clientId = btn ? btn.getAttribute('data-client-id') : null;
   if (!clientId) return;
+  if (await _ouvrirPdfEnvoyeAdmin(clientId, true)) return;
   var r = _pdfDevisPour(clientId);
   if (!r) return;
   r.doc.save(_nomFichierDevis(r.d));
