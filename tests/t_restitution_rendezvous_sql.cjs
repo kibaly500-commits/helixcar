@@ -56,7 +56,7 @@ const planner=require('../assets/preparation-missions.js');
  assert(saved.brouillons[0].annonce.rows.some(r=>r.label==='Restitution prévue'&&r.value.includes('21:00')));
  const pub=await rpc('publier_preparation_mission',[pid]);
  const mission=(await db.query('select date_restitution_depart,restit_contact_nom from missions where id=$1',[pub.mission_id])).rows[0];
- assert.equal(new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',hourCycle:'h23'}).format(new Date(mission.date_restitution_depart)),'21 h');assert.equal(mission.restit_contact_nom,'HelixCar');
+ assert.equal(new Date(mission.date_restitution_depart).toISOString().slice(11,16),'21:00','La colonne timestamp sans fuseau doit conserver l’heure civile enregistrée');assert.equal(mission.restit_contact_nom,'HelixCar');
  await db.exec('grant select on public.missions to authenticated;set role authenticated');
  const act=(kind,rev)=>rpc('action_restitution_helixcar',[pid,kind,rev]);
  await assert.rejects(act('confirmer_remise',0),/Confirmez d’abord/);
