@@ -5,9 +5,9 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.goto(urlFichier('dashboard.html'));
  await page.evaluate(()=>{
   document.getElementById('login-screen').style.display='none';document.getElementById('app').classList.add('visible');_hcNavigationRole='admin';
-  const c={id:'client-1',type_service:'stockage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-10'};
-  const v={id:'veh1',position:1,marque_modele:'Renault Clio',immatriculation:'AA-123-BB',vin:'VIN',adresse_depart_rue:'3 rue Exemple',code_postal_depart:'75001',ville_depart:'Paris',adresse_arrivee_rue:'8 rue Livraison',code_postal_arrivee:'78000',ville_arrivee:'Versailles',date_prise_en_charge:'2026-11-08',date_livraison:'2026-11-10',heure_prise_en_charge:'09:00',heure_livraison:'14:00'};
-  const plans=HCPreparation.build(c,[v],HCPlanningCalcul.POINT);plans[0].mission.date_livraison='2026-11-08T10:45';plans[0].heure_remise='10:45';plans[1].mission.date_prise_en_charge='2026-11-10T12:15';plans[1].heure_retrait='12:15';
+  const c={id:'client-1',type_service:'stockage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-16'};
+  const v={id:'veh1',position:1,marque_modele:'Renault Clio',immatriculation:'AA-123-BB',vin:'VIN',adresse_depart_rue:'3 rue Exemple',code_postal_depart:'75001',ville_depart:'Paris',adresse_arrivee_rue:'8 rue Livraison',code_postal_arrivee:'78000',ville_arrivee:'Versailles',date_prise_en_charge:'2026-11-08',date_livraison:'2026-11-16',heure_prise_en_charge:'09:00',heure_livraison:'14:00'};
+  const plans=HCPreparation.build(c,[v],HCPlanningCalcul.POINT);plans[0].mission.date_livraison='2026-11-08T10:45';plans[0].heure_remise='10:45';plans[1].mission.date_prise_en_charge='2026-11-16T12:15';plans[1].heure_retrait='12:15';
   window.__rows=plans.map((plan,i)=>({id:'p'+i,client_id:c.id,cle:plan.key,empreinte:'hash',plan,clients:{numero_client:'HC-QA'},missions:{convoyeurs:{prenom:'Partenaire',nom:'Test'}}}));
   window.__blocked={};window.__states=[];window.__calls=[];window.__source={client:c,vehicules:[v],reference:'DEV-QA',empreinte:'hash',point_remise:HCPlanningCalcul.POINT,brouillons:__rows};
   window.__traffic={provider:'Google Maps',kind:'avant_stockage',km:40,minutes:60,margin:45,calculatedAt:new Date().toISOString(),suggestion:'2026-11-08T10:45',warnings:[]};
@@ -62,7 +62,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.locator('[data-field="heure_retrait"]').fill('12:30');
  await page.locator('[data-prep-save]').click();
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_livraison),'2026-11-08T11:15');
- assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-10T12:30');
+ assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-16T12:30');
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
  await page.locator('#hc-prep-close').click();
  await page.locator('#hc-planning-state').selectOption('actifs');
@@ -90,7 +90,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  }
  await page.evaluate(()=>{__blocked={};__states=[];__clients[0].stockage_heure_entree='08:30';});await page.locator('#hc-planning-refresh').click();await page.waitForSelector('[data-planning-id="p0"]');assert.equal(await self.count(),2);
  // Un ancien brouillon de stockage court ne doit plus créer un passage fictif.
- await page.evaluate(()=>{__source.vehicules[0].heure_livraison='09:00';});
+ await page.evaluate(()=>{__source.vehicules[0].date_livraison='2026-11-09';__source.vehicules[0].heure_livraison='09:00';});
  await page.locator('#hc-planning-refresh').click();
  assert.equal(await page.locator('[data-planning-id="p0"], [data-planning-id="p1"]').count(),0);
  assert.equal(await self.count(),2);
