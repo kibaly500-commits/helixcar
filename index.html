@@ -5977,7 +5977,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
       <details class="renfort-metiers">
         <summary>Voir tous les métiers</summary>
         <div class="renfort-metiers-list">
-          <span>Jockey automobile — gestion et déplacement des véhicules</span><span>Préparateur automobile</span>
+          <span>Jockey automobile</span><span>Préparateur automobile</span>
           <span>Assistant administratif automobile</span><span>Carrossier automobile</span>
           <span>Chargé d’accueil en concession automobile</span><span>Opérateur de parc automobile</span>
           <span>Mécanicien automobile</span><span>Technicien en diagnostic automobile</span>
@@ -7112,7 +7112,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <div class="modal-form-group" id="pro-mission-group" style="display:none">
               <label>Quelle mission souhaitez-vous confier ? <span class="field-required">*</span></label>
               <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-                <label class="radio-opt"><input type="radio" name="pro-mission" value="jockey" onclick="proOnMetierChange()"><span>Jockey automobile — gestion et déplacement des véhicules</span></label>
+                <label class="radio-opt"><input type="radio" name="pro-mission" value="jockey" onclick="proOnMetierChange()"><span>Jockey automobile</span></label>
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="accueil_preparation" onclick="proOnMetierChange()"><span>Chargé d’accueil en concession automobile</span></label>
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="soutien_administratif" onclick="proOnMetierChange()"><span>Assistant administratif automobile</span></label>
                 <label class="radio-opt"><input type="radio" name="pro-mission" value="autre" onclick="proOnMetierChange()"><span>Une autre mission</span></label>
@@ -10612,7 +10612,7 @@ var PRO_LIB_SPECIALITE = {
   autre: 'Autre spécialité', conseil: 'Client à conseiller'
 };
 var PRO_LIB_MISSION = {
-  jockey: 'Jockey automobile — gestion et déplacement des véhicules',
+  jockey: 'Jockey automobile',
   // Renommé : « Accueil et préparation des véhicules » devient
   // « Accueil en concession ». La CLÉ accueil_preparation est
   // conservée pour que les demandes déjà enregistrées continuent de
@@ -14386,7 +14386,7 @@ document.addEventListener('change', function (e) {
 var METIERS_PARTENAIRE = [
   { cle: 'convoyage',             libelle: 'Convoyage automobile',   activite: 'convoyage',   famille: 'Convoyage' },
   { cle: 'nettoyage',             libelle: 'Nettoyage automobile',   activite: 'nettoyage',   famille: 'Nettoyage' },
-  { cle: 'jockey',                libelle: 'Jockey automobile — gestion et déplacement des véhicules',      activite: 'renfort',     famille: 'Renfort sur site' },
+  { cle: 'jockey',                libelle: 'Jockey automobile',      activite: 'renfort',     famille: 'Renfort sur site' },
   { cle: 'accueil_preparation',   libelle: 'Chargé d’accueil en concession automobile',  activite: 'renfort',     famille: 'Renfort sur site' },
   { cle: 'soutien_administratif', libelle: 'Assistant administratif automobile',  activite: 'renfort',     famille: 'Renfort sur site' },
   { cle: 'mecanique',             libelle: 'Mécanicien automobile',              activite: 'technicien',  famille: 'Technicien' },
