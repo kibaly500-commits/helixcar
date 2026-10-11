@@ -114,7 +114,7 @@
     });return plans;
   }
   // Cette projection exclut les champs privés, même s'ils sont ajoutés à une mission.
-  function publicData(p){return {title:p.title,category:p.category,rows:p.rows.filter(r=>!['Garde du véhicule','Garde du véhicule récupéré'].includes(r.label)).concat(p.category==='convoyage'&&p.carburant_peages!=null&&p.carburant_peages!==''?[row('Carburant et péages inclus (€)',Number(p.carburant_peages))]:[]).concat(p.category==='convoyage'?[row('Distance',p.distance==null?'À préciser':p.distance+' km'),row('Motorisation',p.motorisation),...(p.mission.restitution?[row('Motorisation restitution',p.restit_motorisation)]:[])]:[]),remuneration:p.remuneration==null?null:Number(p.remuneration),nb_professionnels:p.nb_professionnels};}
+  function publicData(p){return {title:p.title,category:p.category,rows:p.rows.filter(r=>!['Garde du véhicule','Garde du véhicule récupéré'].includes(r.label)).map(r=>r.label==='Restitution prévue'&&p.retour_helixcar?{...r,value:p.retour_reception?p.retour_reception.replace('T',' · '):'Réception chez HelixCar à fixer'}:r).concat(p.category==='convoyage'&&p.carburant_peages!=null&&p.carburant_peages!==''?[row('Carburant et péages inclus (€)',Number(p.carburant_peages))]:[]).concat(p.category==='convoyage'?[row('Distance',p.distance==null?'À préciser':p.distance+' km'),row('Motorisation',p.motorisation),...(p.mission.restitution?[row('Motorisation restitution',p.restit_motorisation)]:[])]:[]),remuneration:p.remuneration==null?null:Number(p.remuneration),nb_professionnels:p.nb_professionnels};}
   function fraisErrors(p){
     if(p.category!=='convoyage'||p.carburant_peages==null||p.carburant_peages==='')return [];
     const frais=Number(p.carburant_peages),total=Number(p.remuneration);

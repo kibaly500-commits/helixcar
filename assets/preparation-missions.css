@@ -73,3 +73,10 @@
 .hc-prep-modal .hc-prep-edit-vehicle{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;width:32px;min-height:32px;padding:0;border:0;border-radius:5px;background:transparent;color:#626973;cursor:pointer}.hc-prep-edit-vehicle:hover{background:#edf0f2}.hc-prep-vehicle-editor{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;white-space:normal}.hc-prep-vehicle-editor label{display:grid;gap:5px;flex:1 1 100%;font-size:14px}.hc-prep-vehicle-editor input{box-sizing:border-box;width:100%;min-width:0;padding:9px;border:1px solid #d7d9d3;border-radius:6px;font:inherit}
 
 .hc-prep-return{margin-top:20px}.hc-prep-return>h4{margin:0 0 12px}.hc-prep-return-step{background:#fff;border:1px solid #dfe3e7;border-radius:8px;padding:16px;margin:14px 0}.hc-prep-return-step h5{font-size:15px;line-height:1.45;margin:0 0 10px;color:#202526}.hc-prep-return-step p{margin:8px 0;line-height:1.5}.hc-prep-return-step .hc-prep-fields{margin-top:12px;padding-top:0;border-top:0}
+
+/* Les deux cartes partagent les hauteurs du titre, du trajet et des détails. */
+@media(min-width:761px){
+ .hc-prep-legs--return{grid-template-rows:auto auto auto;row-gap:0}
+ .hc-prep-legs--return>.hc-prep-leg{display:grid;grid-row:span 3;grid-template-rows:subgrid;row-gap:0}
+ .hc-prep-legs--return>.hc-prep-leg>.hc-prep-leg-facts{margin-top:0;align-content:start;box-sizing:border-box;height:100%}
+}

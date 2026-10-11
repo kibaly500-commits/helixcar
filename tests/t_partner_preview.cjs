@@ -12,3 +12,8 @@ assert.ok(!html.includes('Garde du véhicule'));assert.equal((html.match(/2026-1
 const historical=ctx.card({...data,rows:[...data.rows,{label:'Garde du véhicule',value:'120 h'}]});assert.ok(!historical.includes('120 h'));
 assert.ok(source.includes('card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p))'));
 console.log('PASS aperçu : prix, distance, étapes explicites, date de récupération retour, aucune ligne de garde, brouillon actuel prioritaire.');
+
+const noisy={...p,retour_helixcar:{},retour_reception:'2026-11-18T17:45',rows:p.rows.map(r=>r.label==='Restitution prévue'?{...r,value:'Réception chez HelixCar à fixer'}:r)};
+const noisyHtml=ctx.card(P.publicData(noisy));assert.ok(noisyHtml.includes('2026-11-18'));assert.ok(noisyHtml.includes('17:45'));
+assert.ok(!noisyHtml.includes('Date à préciser'));
+console.log('PASS retour Noisy : rendez-vous saisi prioritaire sur ancienne ligne d’affichage.');

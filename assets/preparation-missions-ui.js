@@ -309,7 +309,11 @@
     if(field.value&&min&&field.value.slice(0,16)<min){
       field.value='';p.retour_reception='';
       note('Le retour à Noisy doit être postérieur à la livraison du premier véhicule. Choisissez un rendez-vous à partir du '+min.slice(0,10).split('-').reverse().join('/')+'.',true);
-    }
+    }else p.retour_reception=field.value;
+    const row=p.rows.find(r=>r.label==='Restitution prévue');
+    if(row)row.value=p.retour_reception?p.retour_reception.replace('T',' · '):'Réception chez HelixCar à fixer';
+    p.mission.date_restitution_depart=p.retour_reception||null;
+    editVersion++;backup();queueSave();
   });
   modal.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;
