@@ -15,7 +15,7 @@ for(const [date,expected] of [['2026-11-05',1],['2026-11-06',1],['2026-11-07',2]
 assert.equal(build({date_livraison:'2026-11-03',heure_livraison:'08:46'}).length,1);
 assert.equal(build({date_livraison:'2026-11-02',heure_livraison:'15:30'}).length,1);
 for(const [inMode,outMode,count] of [['client','client',0],['client','helixcar',1],['helixcar','client',1]])
- assert.equal(build({}, {...client,stockage_acheminement:inMode,stockage_sortie:outMode}).length,count);
+ assert.equal(build({livraison_apres_stockage:null}, {...client,stockage_acheminement:inMode,stockage_sortie:outMode}).length,count);
 assert.equal(build({livraison_apres_stockage:false})[0].kind,'avant_stockage');
 // Prise en charge/livraison inversées : blocage explicite, pas d'annonce valide.
 assert.ok(build({date_livraison:'2026-10-31'}).some(p=>p.missing.includes('Livraison antérieure à la prise en charge')));
