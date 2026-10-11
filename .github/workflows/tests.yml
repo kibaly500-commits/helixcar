@@ -39,8 +39,8 @@ jobs:
       - name: Rendre origin/main disponible
         run: git fetch --no-tags origin main:refs/remotes/origin/main || true
 
-      - name: Installer le décodeur de recette vidéo
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Installer les outils de recette vidéo et PDF
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg poppler-utils
 
       - name: Lancer toutes les suites
         env:
