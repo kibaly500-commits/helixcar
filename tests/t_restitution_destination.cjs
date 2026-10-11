@@ -49,7 +49,7 @@ const {PGlite}=require('@electric-sql/pglite');
    radio('type-service','stockage');rendreFichesVehicules();choice('depart');r.storageOrigin=_lireFichesVehicules()[0].restit_destination==='depart'&&!_lireFichesVehicules()[0].restit_recuperation_client;
    return r;
   });
-  for(const [k,v] of Object.entries(r))assert(v,width+' '+k);assert.deepEqual(p.jsErrors,[]);console.log('PASS formulaire '+width+'px : '+Object.keys(r).join(', '));
+  for(const [k,v] of Object.entries(r))assert(v,width+' '+k+' · '+JSON.stringify(r));assert.deepEqual(p.jsErrors,[]);console.log('PASS formulaire '+width+'px : '+Object.keys(r).join(', '));
   await p.close();
  }}finally{await browser.close();}
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error('Error restitution diagnostic: '+String(e.stack||e).replace(/\n/g,' | '));process.exitCode=1;});
