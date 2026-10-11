@@ -35,3 +35,14 @@ const secondary={key:'return',vehicule_id:'v',restitution_secondaire:true,distan
 assert.equal(B.travelPricing(bridge).returnFees,0);assert.equal(B.travelPricing(secondary,[bridge,secondary]).returnFees,55);
 r=B.allocate(1000,[{key:'a',fees:0,guard:0,extra:20,weight:1},{key:'b',fees:0,guard:0,weight:1}]);assert.equal(r.missions[0].total-r.missions[1].total,20);assert.equal(r.missions.reduce((s,x)=>s+x.total,0),700);
 console.log('PASS restitution : +20 IDF, 50 % aller hors IDF, mixte, découpage et conservation 30/70.');
+
+for(const [days,euros] of [[0,0],[1,0],[2,0],[3,0],[3.99,0],[4,25],[7,25],[8,50],[11,50],[12,75]])assert.equal(B.guardAllowance(days),euros);
+assert.throws(()=>B.guardAllowance(-1));
+assert.throws(()=>B.guardAllowance(NaN));
+for(const [before,after,euros] of [[2,2,0],[4,4,50],[5,5,50],[8,0,50]]){
+ const p={kind:'direct',organisation:{beforeDays:before,returnDays:after},mission:{restitution:true}};
+ assert.equal(B.guardPricing(p).guard,euros);
+}
+assert.equal(B.guardPricing({kind:'avant_stockage',organisation:{beforeDays:12},mission:{}}).guard,0);
+assert.equal(B.guardPricing({kind:'apres_stockage',organisation:{returnDays:8},retour_helixcar:{},mission:{restitution:true}}).guard,0);
+console.log('PASS paliers de garde : bornes, périodes séparées et exclusion dépôt HelixCar');

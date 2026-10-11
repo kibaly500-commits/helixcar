@@ -2,7 +2,7 @@
 
 Hors Île-de-France : distance totale confiée (restitution comprise) × 0,22 €/km. Ce montant forfaitaire inclut carburant et péages et ne représente pas leur coût exact. Aucun fournisseur de péages n’est nécessaire ni appelé.
 
-En Île-de-France : rémunération forfaitaire et kilomètres, sans frais de route distincts. La garde convoyeur est calculée à 10 €/jour. Le dépôt HelixCar en est exclu.
+En Île-de-France : rémunération forfaitaire et kilomètres, sans frais de route distincts. La garde convoyeur est calculée par période de garde d’un véhicule : 0 € avant 4 jours, 25 € de 4 à moins de 8 jours, 50 € de 8 à moins de 12 jours, puis 25 € par tranche complète de 4 jours. Les périodes de deux véhicules ne sont pas cumulées pour atteindre un palier. Le seuil organisationnel de 5 jours et les dérogations restent inchangés. Le dépôt HelixCar en est exclu.
 
 Le calcul réserve 30 % du devis et répartit les 70 % restants, frais et garde inclus. Les missions publiées gardent leur prix. Les prix peuvent être ajustés avant validation et le dépassement du budget est signalé.
 

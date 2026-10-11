@@ -13,7 +13,7 @@ function estimate(input){
  const remuneration=number(input.workPayEuros,'Rémunération du travail');
  const days=number(input.guardDays??0,'Jours de garde');
  if(!Number.isInteger(days))throw Error('Jours de garde : entier requis');
- const daily=10;
+ const blockDays=4,blockEuros=25;
  const fuelPrice=number(input.fuelPricePerLiter,'Prix du carburant',{zero:false});
  const rate=number(input.consumptionLitersPer100Km,'Consommation');
  let km=0,minutes=0,tolls=0;const unresolved=[];
@@ -26,7 +26,7 @@ function estimate(input){
  });
  km=round(km);minutes=Math.round(minutes);
  const fuel=round(km*rate/100*fuelPrice);
- const garde=round(days*daily);
+ const garde=Math.floor(days/blockDays)*blockEuros;
  const tollValue=unresolved.length?null:round(tolls);
  const fees=tollValue===null?null:round(fuel+tollValue);
  const total=fees===null?null:round(remuneration+garde+fees);
@@ -34,7 +34,7 @@ function estimate(input){
    status:fees===null?'peages_a_verifier':'estimation_complete',
    distanceKm:km,driveMinutes:minutes,receiptMarginMinutes:45,
    feesEuros:fees,totalEuros:total,missingTollLegs:unresolved,
-   internalBreakdown:{workPayEuros:remuneration,guardDays:days,guardRateEuros:daily,guardEuros:garde,fuelEuros:fuel,tollEuros:tollValue},
+   internalBreakdown:{workPayEuros:remuneration,guardDays:days,guardBlockDays:blockDays,guardBlockEuros:blockEuros,guardEuros:garde,fuelEuros:fuel,tollEuros:tollValue},
    partnerPreview:total===null?null:{totalEuros:total,roadFeesIncludedEuros:fees}
  };
 }

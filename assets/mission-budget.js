@@ -23,13 +23,16 @@ function local(plan){
  const m=plan.mission,addresses=[m.adresse_depart,m.adresse_arrivee];if(m.restitution)addresses.push(m.adresse_restitution);
  return addresses.every(a=>/\b(?:75|77|78|91|92|93|94|95)\d{3}\b/.test(a||''));
 }
-function guardDays(p){
+function guardPeriods(p){
  const o=p.organisation||{};
  // Ne compter que la garde confiée au convoyeur, jamais le séjour au dépôt.
  const before=p.kind==='apres_stockage'?1:p.kind==='direct'&&!o.retraitClient&&!o.depotClient?Math.max(0,o.beforeDays||0):0;
  const after=p.mission.restitution&&!p.retour_helixcar?Math.max(0,o.returnDays||0):0;
- return before+after;
+ return [before,after];
 }
+function guardDays(p){return guardPeriods(p).reduce((a,b)=>a+b,0);}
+function guardAllowance(days){amount(days);return Math.floor(days/4)*25;}
+function guardPricing(p){const periods=guardPeriods(p);return {periods,days:guardDays(p),guard:periods.reduce((sum,days)=>sum+guardAllowance(days),0)};}
 function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return isLocal?0:Math.round(km*22)/100;}
 function localAddresses(...addresses){return addresses.every(a=>/\b(?:75|77|78|91|92|93|94|95)\d{3}\b/.test(a||''));}
 function travelPricing(p,plans=[]){
@@ -52,6 +55,6 @@ function travelPricing(p,plans=[]){
  }
  return {outboundKm,outboundFees,returnFees,extra,fees:Math.round((outboundFees+returnFees)*100)/100,referenceFees};
 }
-const api={allocate,local,guardDays,roadFees,travelPricing};
+const api={allocate,local,guardDays,guardAllowance,guardPricing,roadFees,travelPricing};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCMissionBudget=api;
 })(typeof window==='undefined'?globalThis:window);
