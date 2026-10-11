@@ -212,7 +212,7 @@
     return h+'</div></section>';
   }
   function professionalTitle(value){
-    const labels={"Diagnostic":"Technicien en diagnostic automobile","Mécanique":"Mécanicien automobile","Carrosserie":"Carrossier automobile","Accueil en concession":"Chargé d’accueil en concession automobile","Soutien administratif":"Assistant administratif automobile","Jockey automobile":"Jockey automobile — gestion et déplacement des véhicules","Spécialité à préciser":"Professionnel automobile — spécialité à préciser","Métier à préciser":"Professionnel automobile — métier à définir"};
+    const labels={"Jockey automobile — gestion et déplacement des véhicules":"Jockey automobile","Diagnostic":"Technicien en diagnostic automobile","Mécanique":"Mécanicien automobile","Carrosserie":"Carrossier automobile","Accueil en concession":"Chargé d’accueil en concession automobile","Soutien administratif":"Assistant administratif automobile","Jockey automobile":"Jockey automobile","Spécialité à préciser":"Professionnel automobile — spécialité à préciser","Métier à préciser":"Professionnel automobile — métier à définir"};
     return labels[value]||value||'Professionnel automobile';
   }
   window.hcPreparationCarteOpportunite=function(o,options){
