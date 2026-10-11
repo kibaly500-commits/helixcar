@@ -9,10 +9,18 @@ function allocate(total,items){
  const open=items.filter(x=>!x.locked);
  const costs=open.map(x=>cents(amount(x.fees))+cents(amount(x.guard))+cents(amount(x.extra||0)));
  const work=open.map(x=>cents(amount(x.weight)));
- const spent=fixed+costs.reduce((a,b)=>a+b,0)+work.reduce((a,b)=>a+b,0);
- if(spent>budget)throw Error('Budget insuffisant : les tarifs calculés dépassent le plafond de 70 %. Ajustez les missions ou le devis ; aucun prix existant remplacé.');
- return {reserve:reserve/100,budget:budget/100,spent:spent/100,remaining:(invoice-spent)/100,unallocated:(budget-spent)/100,
-  missions:open.map((x,i)=>({key:x.key,total:(costs[i]+work[i])/100,work:work[i]/100,fees:x.fees,guard:x.guard,extra:x.extra||0}))};
+ const available=budget-fixed-costs.reduce((a,b)=>a+b,0);
+ if(available<0)throw Error('Budget insuffisant : frais, suppléments et missions déjà fixées dépassent les 70 %. Aucun prix existant remplacé.');
+ const normalWork=work.reduce((a,b)=>a+b,0),adjusted=normalWork>available;
+ const shares=adjusted?work.map(w=>Math.floor(available*w/normalWork)):work.slice();
+ if(adjusted){
+  const rest=available-shares.reduce((a,b)=>a+b,0);
+  const order=work.map((w,i)=>({i,r:available*w/normalWork-shares[i]})).sort((a,b)=>b.r-a.r||a.i-b.i);
+  for(let n=0;n<rest;n++)shares[order[n].i]++;
+ }
+ const spent=fixed+costs.reduce((a,b)=>a+b,0)+shares.reduce((a,b)=>a+b,0);
+ return {reserve:reserve/100,budget:budget/100,spent:spent/100,remaining:(invoice-spent)/100,unallocated:(budget-spent)/100,adjusted,
+  missions:open.map((x,i)=>({key:x.key,total:(costs[i]+shares[i])/100,work:shares[i]/100,standardWork:work[i]/100,adjusted:shares[i]<work[i],fees:x.fees,guard:x.guard,extra:x.extra||0}))};
 }
 function local(plan){
  const m=plan.mission,addresses=[m.adresse_depart,m.adresse_arrivee];if(m.restitution)addresses.push(m.adresse_restitution);

@@ -53,6 +53,19 @@ assert.equal(small.missions[0].total,294.93);
 assert.deepEqual(small.missions,large.missions);
 assert.equal(small.remaining,705.07);
 assert.equal(small.unallocated,405.07);
-assert.throws(()=>B.allocate(400,items),/plafond/);
+assert.equal(B.allocate(400,items).missions[0].total,280);
+assert.equal(B.allocate(300,items).missions[0].total,210);
+assert.equal(B.allocate(300,items).missions[0].work,86.11);
+assert.throws(()=>B.allocate(100,items),/insuffisant/);
 assert.equal(B.allocate(1000,[{key:'published',locked:true,total:500},...items.map(x=>({...x,weight:100,fees:0,guard:0}))]).spent,600);
 console.log('PASS plafond : tarif indépendant du devis, reliquat conservé, dépassement bloqué et mission publiée inchangée.');
+
+for(let n=0;n<100;n++){
+ const x=B.allocate(200+n/100,[{key:'a',weight:100,fees:20,guard:25},{key:'b',weight:200,fees:30,guard:0}]);
+ assert.equal(Math.round(x.spent*100),Math.round(x.budget*100));
+ assert.ok(x.adjusted);assert.equal(x.missions[0].fees,20);assert.equal(x.missions[0].guard,25);
+ assert.ok(Math.abs(x.missions[1].work-2*x.missions[0].work)<=.021);
+}
+const locked=B.allocate(400,[{key:'fixed',locked:true,total:100},...items]);
+assert.equal(locked.missions[0].total,180);assert.equal(locked.spent,280);
+console.log('PASS adaptation : 400→280, 300→210, frais préservés, centimes exacts, proportionnalité et publiés fixes.');
