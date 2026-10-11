@@ -139,21 +139,21 @@
       return '<span class="hc-prep-date">'+display(date||'Date à préciser')+'</span><strong class="hc-prep-time'+(hours?'':' hc-prep-unspecified')+'">'+esc(hours||'Heure à préciser')+'</strong>';
     };
     const vehicle=value=>{const parts=value.split(' · ');return {model:parts.length>1?parts.slice(1).join(' · '):value,type:parts.length>1?parts[0]:''};};
-    const route=(from,to,start,end)=>'<div class="hc-prep-route"><div><span class="hc-prep-route-label">Départ</span><strong class="hc-prep-city">'+display(from||'Ville à préciser')+'</strong>'+(start!==null?schedule(start):'')+'</div><span class="hc-prep-direction" aria-hidden="true">→</span><div><span class="hc-prep-route-label">Arrivée</span><strong class="hc-prep-city">'+display(to||'Ville à préciser')+'</strong>'+(end!==null?schedule(end):'')+'</div></div>';
+    const route=(from,to,start,end)=>'<div class="hc-prep-route"><div><span class="hc-prep-route-label">Véhicule à récupérer à</span><strong class="hc-prep-city">'+display(from||'Ville à préciser')+'</strong>'+(start!==null?schedule(start):'')+'</div><span class="hc-prep-direction" aria-hidden="true">→</span><div><span class="hc-prep-route-label">À livrer à</span><strong class="hc-prep-city">'+display(to||'Ville à préciser')+'</strong>'+(end!==null?schedule(end):'')+'</div></div>';
     const frais=raw('Carburant et péages inclus (€)');
     const fraisTexte=a.category==='convoyage'&&frais!==''&&Number.isFinite(Number(frais))&&Number(frais)>=0&&a.remuneration!=null&&Number(frais)<=Number(a.remuneration)?'<small class="hc-prep-muted"> (dont '+esc(money(frais))+' pour carburant et péages)</small>':'';
     let h='<section class="hc-prep-card hc-prep-annonce"><div class="hc-prep-mission-summary"><strong>'+esc(a.category==='convoyage'?'Convoyage':a.title)+'</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong>'+fraisTexte+'</div></div>';
     if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
     const delivered=vehicle(raw('Véhicule'));
-    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
+    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Premier véhicule</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
       facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
-      h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Restitution</h4></header>'+route(raw('Arrivée'),destination,null,raw('Restitution prévue'))+
+      h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Véhicule à restituer</h4></header>'+route(raw('Arrivée'),destination,raw('Livraison'),raw('Restitution prévue'))+
         facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     }
-    const shared=[['Distance de la mission',raw('Distance')],...(raw('Garde du véhicule')?[['Garde du véhicule',raw('Garde du véhicule')]]:[]),...(raw('Garde du véhicule récupéré')?[['Garde du véhicule récupéré',raw('Garde du véhicule récupéré')]]:[]),...(!raw('Restitution')?[['Restitution','Non']]:[])];
+    const shared=[['Distance aller',raw('Distance')]];
     return h+'</div><footer class="hc-prep-mission-footer">'+facts(shared)+'</footer></section>';
   }
   window.hcPreparationCarteOpportunite=function(o,options){
@@ -201,7 +201,7 @@
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
-      if(state.preview||linked){h+=card(p.saved?.annonce||HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
+      if(state.preview||linked){h+=card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
@@ -325,7 +325,12 @@
       }
       if(b.hasAttribute('data-prep-save')){await save();render();note('Brouillon enregistré. Rien n’est publié.');}
       if(b.dataset.prepView==='admin'){state.preview=false;render();note('');}
-      if(b.dataset.prepView==='preview'){await save();state.preview=true;render();note('');}
+      if(b.dataset.prepView==='preview'){
+        readEdits();
+        if(state.plans.some(p=>!p.saved?.mission_id&&p.category==='convoyage'&&(!(Number(p.remuneration)>0)||!(Number(p.distance)>0))))await calculateAll(generation,true);
+        if(state.plans.some(p=>!p.saved?.mission_id&&p.category==='convoyage'&&(!(Number(p.remuneration)>0)||!(Number(p.distance)>0))))throw Error('Complétez ou calculez le prix et la distance avant de voir l’aperçu partenaire.');
+        await save();state.preview=true;render();note('');
+      }
       if(b.hasAttribute('data-prep-publish')){
         readEdits();if(budgetErrors().length)throw Error(budgetErrors().join(' · '));
         const p=state.plans[Number(b.dataset.prepPublish)];if(!p.saved)throw Error('Enregistrez le brouillon avant publication.');
