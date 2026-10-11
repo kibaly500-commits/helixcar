@@ -50,6 +50,7 @@
       if(!s||!(s.empreinte===source.empreinte||s.mission_id))return p;
       if(!s.mission_id&&stable(s.plan.organisation)!==stable(p.organisation))return p;
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
+      if(!s.mission_id&&p.kind==='intervention'&&p.category!=='nettoyage'){result.nb_professionnels=1;result.rows=result.rows.map(r=>r.label==='Professionnels'?{...r,value:'1'}:r);}
       if(!s.mission_id&&p.category==='convoyage'){
         result.missing=p.missing;
         // Réactualise aussi les dates calculées d'un ancien brouillon.
@@ -178,8 +179,12 @@
       const serviceLabel=cleaning?(service==='Préparation complète'?'Nettoyage intérieur et extérieur':service):professionalTitle(service);
       let details='<div class="hc-prep-clean-body">'+(cleaning?'<p class="hc-prep-clean-service">'+esc(serviceLabel)+'</p>':'')+'<dl class="hc-prep-clean-schedule">'+
         scheduleRows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+display(value||'À préciser')+'</dd></div>').join('')+'</dl>';
-      const extra=rows.filter(r=>!['Lieu d’intervention','Période','Horaires','Prestation','Véhicules'].includes(r.label)&&!r.label.startsWith('Véhicule')&&!(r.label==='Organisation'&&r.value==='Créneau groupé'));
+      const extra=rows.filter(r=>!['Lieu d’intervention','Période','Horaires','Prestation','Véhicules','Professionnels','Tâches demandées'].includes(r.label)&&!r.label.startsWith('Véhicule')&&!(r.label==='Organisation'&&r.value==='Créneau groupé'));
       if(extra.length)details+=facts(extra.map(r=>[r.label,r.value]));
+      if(!cleaning&&(raw('Tâches demandées')||Number.isInteger(options.editIndex))){
+        const edit=Number.isInteger(options.editIndex)?'<button type="button" class="hc-prep-edit-vehicle" data-edit-tasks="'+options.editIndex+'" aria-label="Modifier les tâches demandées" title="Modifier les tâches demandées"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/></svg></button>':'';
+        details+='<dl class="hc-prep-tasks"><div><dt>Tâches demandées '+edit+'</dt><dd>'+display(raw('Tâches demandées')||'À renseigner')+'</dd></div></dl>';
+      }
       details+='</div>';
       if(options.detailsOnly)return details;
       return '<section class="hc-prep-card hc-prep-annonce hc-prep-clean"><div class="hc-prep-mission-summary"><strong>'+esc(cleaning?'Nettoyage automobile':serviceLabel)+'</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(a.remuneration==null?'À définir':Number(a.remuneration).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}))+'</strong></div></div>'+details+'</section>';
@@ -255,10 +260,10 @@
     if(!state.plans.length)h+='<p>Aucun trajet à confier : dépôt et récupération par le client, ou véhicules à compléter dans la demande.</p>';
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
-      if(state.preview||linked){h+=card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
+      if(state.preview||linked){h+=card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p),linked?{}:{editIndex:i});if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
       h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.category==='nettoyage'?'Nettoyage automobile':p.kind==='intervention'?professionalTitle(p.title):p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
-      h+=p.kind==='intervention'?card(HCPreparation.publicData(p),{detailsOnly:true}):'<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
+      h+=p.kind==='intervention'?card(HCPreparation.publicData(p),{detailsOnly:true,editIndex:i}):'<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       const auto=autoDrafts.get(p.key)||(p.calcul_interne?.pricingPolicy==='rounded_v1'?p.calcul_interne:null);
@@ -374,6 +379,28 @@
         p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
         render();
         note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+Number(routes[0].minutes||0)+' min de conduite hors trafic. Cliquez sur Calculer les tarifs des missions pour appliquer le forfait de frais de route.');
+      }
+      if(b.hasAttribute('data-edit-tasks')){
+        readEdits();const i=Number(b.dataset.editTasks),p=state.plans[i];
+        if(!p||p.kind!=='intervention'||p.category==='nettoyage'||p.saved?.mission_id)return;
+        const box=document.createElement('div');box.className='hc-prep-vehicle-editor';
+        const current=p.rows.find(r=>r.label==='Tâches demandées')?.value||'';
+        box.innerHTML='<label>Tâches demandées<textarea rows="4" maxlength="2000" data-tasks-value>'+esc(current)+'</textarea></label><button type="button" class="btn btn-outline" data-cancel-vehicle>Annuler</button><button type="button" class="btn btn-primary" data-save-tasks="'+i+'">Enregistrer</button>';
+        modal.querySelectorAll('.hc-prep-vehicle-editor').forEach(x=>x.remove());b.closest('.hc-prep-tasks').append(box);box.querySelector('textarea').focus();
+      }
+      if(b.hasAttribute('data-save-tasks')){
+        const p=state.plans[Number(b.dataset.saveTasks)];
+        if(!p||p.saved?.mission_id||p.kind!=='intervention'||p.category==='nettoyage')return;
+        const value=b.closest('.hc-prep-vehicle-editor').querySelector('textarea').value.trim();
+        if(value.length>2000)throw Error('Limitez les tâches demandées à 2 000 caractères.');
+        readEdits();
+        const old=p.rows.find(r=>r.label==='Tâches demandées')?.value||'';
+        p.rows=p.rows.filter(r=>r.label!=='Tâches demandées');
+        if(value)p.rows.push({label:'Tâches demandées',value});
+        const notes=String(p.mission.consignes||'');
+        const rest=old&&(notes===old||notes.startsWith(old+' · '))?notes.slice(old.length).replace(/^ · /,''):notes;
+        p.mission.consignes=[value,rest].filter(Boolean).join(' · ');
+        editVersion++;const preview=state.preview;await save();state.preview=preview;render();note('Tâches demandées enregistrées.');
       }
       if(b.hasAttribute('data-edit-vehicle')){
         readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];
