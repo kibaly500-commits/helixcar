@@ -24,6 +24,8 @@ function json(body: unknown, status: number, headers: Record<string,string>) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type":"application/json", ...headers } });
 }
 function dossierQa(client: any) {
+  // Dossier de nettoyage de recette autorisé le 11/10/2026.
+  if (client?.id === "4960fd58-1c83-4764-8077-7f975d761793" && client?.numero_client === "HC-2026-7241") return true;
   // Dossier de recette explicitement désigné par Hamid le 27/09/2026.
   if (client?.id === "951410e8-7104-4256-b46d-59487e73890a" && client?.numero_client === "HC-2026-2184") return true;
   // Dossier de recette autorisé par Hamid le 04/10/2026.
