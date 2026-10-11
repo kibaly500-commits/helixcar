@@ -123,3 +123,15 @@
  .hc-prep-clean-schedule>div:first-child{grid-column:1/-1}
  .hc-prep-clean-schedule dd{font-size:15px}
 }
+
+/* Dates d’intervention distinctes et lisibles, même sur deux mois. */
+.hc-prep-clean-schedule{grid-template-columns:repeat(3,minmax(0,1fr));padding:18px 20px;background:#f7f8fa;border:1px solid #e4e7eb;border-radius:12px;gap:20px 24px}
+.hc-prep-clean-schedule>div:first-child{grid-column:1/-1;padding-bottom:16px;border-bottom:1px solid #e4e7eb}
+.hc-prep-clean-schedule>div:first-child dd{font-size:19px}
+.hc-prep-clean-body>.hc-prep-leg-facts{padding:20px 0 0;line-height:1.6}
+.hc-prep-clean-body>.hc-prep-leg-facts>div{min-width:0;overflow-wrap:anywhere}
+@media(max-width:600px){
+ .hc-prep-clean-schedule{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}
+ .hc-prep-clean-schedule>div:last-child{grid-column:1/-1}
+ .hc-prep-clean-body>.hc-prep-leg-facts{grid-template-columns:1fr}
+}
