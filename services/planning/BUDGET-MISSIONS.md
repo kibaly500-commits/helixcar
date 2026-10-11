@@ -9,7 +9,8 @@ Les gardes confiées au convoyeur sont distinguées du stockage au dépôt. Les 
 ## Connexion routière
 
 - `ORS_FREE_API_KEY` : itinéraires gratuits existants ; aucun montant de péage fourni.
-- `HERE_ROUTING_API_KEY` : connexion optionnelle géocodage + itinéraire rapide + estimation de péages en euros. Clé exclusivement serveur, environnement Preview du projet `helixcar-i89b`. Vérifier le quota et le coût du contrat avant activation ; le péage constitue une transaction supplémentaire. Aucun abonnement n'est créé par ce code.
+- **Mode gratuit imposé : HERE n’est pas appelé, même si sa clé existe.** L’adaptateur reste isolé et non utilisé.
+- Documentation de l’adaptateur désactivé — `HERE_ROUTING_API_KEY` : connexion optionnelle géocodage + itinéraire rapide + estimation de péages en euros. Clé exclusivement serveur, environnement Preview du projet `helixcar-i89b`. Vérifier le quota et le coût du contrat avant activation ; le péage constitue une transaction supplémentaire. Aucun abonnement n'est créé par ce code.
 - Sans HERE, l'IDF peut être entièrement calculée avec ORS. Hors IDF, des péages inconnus restent indisponibles et bloquent la répartition automatique. Un montant vérifié saisi dans les ajustements permet le repli manuel.
 - Plateau : estimation non prise en charge ; signalée explicitement.
 

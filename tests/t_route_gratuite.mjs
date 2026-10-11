@@ -37,3 +37,8 @@ assert.equal(r.status,200);assert.equal(r.body.routes[0].km,225);assert.equal(r.
 r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{}});
 assert.equal(r.status,503);assert.equal(r.body.code,'ORS_NON_CONFIGURE');
 console.log('PASS itinéraire gratuit : URL 2026, kilométrage, absence de péages inventés, authentification, administration et configuration.');
+
+// La présence d'une clé payante ne doit jamais activer un repli facturable.
+r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{HERE_ROUTING_API_KEY:'must-not-be-used'}});
+assert.equal(r.status,503);assert.equal(r.body.code,'ORS_NON_CONFIGURE');
+console.log('PASS mode gratuit : aucun repli HERE même si sa clé est configurée.');
