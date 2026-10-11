@@ -11593,7 +11593,7 @@ function _restaurerTrajetGlobal() {
 function _hcRetourDestination(i, changement) {
   var choix=document.getElementById('veh-'+i+'-restit-destination');if(!choix)return;
   var optionDepart=choix.querySelector('option[value="depart"]');
-  var departDisponible=!!document.getElementById(_trajetCommun()?'client-from-rue':'veh-'+i+'-pc-rue');
+  var departDisponible=!!(document.getElementById(_trajetCommun()?'client-from-rue':'veh-'+i+'-pc-rue')||document.getElementById('veh-'+i+'-pc-rue'));
   optionDepart.disabled=!departDisponible;
   if(!departDisponible&&choix.value==='depart'){choix.value='adresse';changement=true;}
   var mode=choix.value,ancienMode=choix.dataset.precedent||'adresse';
@@ -11605,7 +11605,7 @@ function _hcRetourDestination(i, changement) {
   document.getElementById('veh-'+i+'-restit-adresse-zone').hidden=automatique;
   var resume=document.getElementById('veh-'+i+'-restit-retour-resume');resume.hidden=!automatique;
   if(automatique){
-    var valeurs=stockage?['Point de stockage HelixCar','93160','Noisy-le-Grand']:['rue','cp','ville'].map(function(k,j){var e=document.getElementById(_trajetCommun()?['client-from-rue','client-from-cp','client-from'][j]:'veh-'+i+'-pc-'+k);return e?(e.value||'').trim():'';});
+    var valeurs=stockage?['Point de stockage HelixCar','93160','Noisy-le-Grand']:['rue','cp','ville'].map(function(k,j){var e=document.getElementById(_trajetCommun()?['client-from-rue','client-from-cp','client-from'][j]:'veh-'+i+'-pc-'+k);var fallback=document.getElementById('veh-'+i+'-pc-'+k);return ((e&&e.value)||(fallback&&fallback.value)||'').trim();});
     champs.forEach(function(e,j){e.value=valeurs[j];});
     resume.textContent=stockage?'Nous ramenons le véhicule récupéré à notre point de stockage de Noisy-le-Grand. Vous viendrez ensuite le récupérer sur place. L’adresse exacte vous sera communiquée.':'Retour à l’adresse de prise en charge du premier véhicule : '+(valeurs.filter(Boolean).join(', ')||'renseignez d’abord la prise en charge.');
   }
