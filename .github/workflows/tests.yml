@@ -42,6 +42,15 @@ jobs:
       - name: Installer les outils de recette vidéo et PDF
         run: sudo apt-get update && sudo apt-get install -y ffmpeg poppler-utils
 
+      - name: Vérifier les régressions prioritaires avant la campagne longue
+        env:
+          CI_NO_SANDBOX: '1'
+        run: |
+          set -e
+          for suite in t_duplication_navigation t_planning_ui t_regle_garde_48h t_restitution_destination t_planning_calcul; do
+            node tests/lancer.js --sans-sql --seulement "$suite"
+          done
+
       - name: Lancer toutes les suites
         env:
           CI_NO_SANDBOX: '1'
