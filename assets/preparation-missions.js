@@ -114,12 +114,19 @@
     });return plans;
   }
   // Cette projection exclut les champs privés, même s'ils sont ajoutés à une mission.
-  function publicData(p){return {title:p.title,category:p.category,rows:p.rows.concat(p.category==='convoyage'?[row('Distance',p.distance==null?'À préciser':p.distance+' km'),row('Motorisation',p.motorisation),...(p.mission.restitution?[row('Motorisation restitution',p.restit_motorisation)]:[])]:[]),remuneration:p.remuneration==null?null:Number(p.remuneration),nb_professionnels:p.nb_professionnels};}
+  function publicData(p){return {title:p.title,category:p.category,rows:p.rows.concat(p.category==='convoyage'&&p.carburant_peages!=null&&p.carburant_peages!==''?[row('Carburant et péages inclus (€)',Number(p.carburant_peages))]:[]).concat(p.category==='convoyage'?[row('Distance',p.distance==null?'À préciser':p.distance+' km'),row('Motorisation',p.motorisation),...(p.mission.restitution?[row('Motorisation restitution',p.restit_motorisation)]:[])]:[]),remuneration:p.remuneration==null?null:Number(p.remuneration),nb_professionnels:p.nb_professionnels};}
+  function fraisErrors(p){
+    if(p.category!=='convoyage'||p.carburant_peages==null||p.carburant_peages==='')return [];
+    const frais=Number(p.carburant_peages),total=Number(p.remuneration);
+    if(!Number.isFinite(frais)||frais<0)return ['Le montant carburant et péages doit être positif ou nul.'];
+    if(p.remuneration==null||p.remuneration===''||!Number.isFinite(total)||frais>total)return ['Le montant carburant et péages doit être compris dans le prix total de la mission.'];
+    return [];
+  }
   function missingVins(m){const missing=[];if(!String(m.vin||'').trim())missing.push('VIN du véhicule livré (obligatoire)');if(m.restitution&&!String(m.restit_vin||'').trim())missing.push('VIN du véhicule à restituer (obligatoire)');return missing;}
   function preservePublished(fresh,saved) {
     const family=p=>String(p.key||'').split(':')[0];
     const pinned=new Map(saved.filter(s=>s.mission_id).map(s=>[family(s.plan),s.plan.kind==='direct']));
     return fresh.filter(p=>!pinned.has(family(p))).concat(saved.filter(s=>pinned.has(family(s.plan))&&(s.mission_id||s.plan.organisation?.version===2||pinned.get(family(s.plan))===(s.plan.kind==='direct'))).map(s=>s.plan));
   }
-  const api={build,publicData,stamp,daysBetween,elapsedHours,missingVins,preservePublished};if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPreparation=api;
+  const api={build,publicData,fraisErrors,stamp,daysBetween,elapsedHours,missingVins,preservePublished};if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPreparation=api;
 })(typeof window==='undefined'?globalThis:window);
