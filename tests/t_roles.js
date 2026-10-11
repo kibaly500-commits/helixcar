@@ -111,10 +111,11 @@ async function ouvrirDashboard(navigateur, roles) {
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
   await page.evaluate((r) => { window.__roles = r; }, roles);
   await page.evaluate(async () => {
-    loginRole = 'client';
-    document.getElementById('login-email').value = 'deux@helixcar.test';
-    document.getElementById('login-pw').value = 'motdepasse-test-qa';
-    await doLogin();
+    // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+    var __r = await sbAuth.auth.signInWithPassword({ email: 'deux@helixcar.test', password: 'motdepasse-test-qa' });
+    var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+    var __ok = await finaliserSessionClient('deux@helixcar.test', null, __uid);
+    if (__ok !== false) await _hcPreparerRoles('client', 'deux@helixcar.test', __uid);
   });
   await page.waitForTimeout(250);
   page.jsErrors = erreurs;
@@ -250,10 +251,11 @@ function etatEspace(page) {
     await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
     await page.evaluate(() => { window.__rpcEnPanne = true; window.__roles = ['client']; });
     await page.evaluate(async () => {
-      loginRole = 'client';
-      document.getElementById('login-email').value = 'deux@helixcar.test';
-      document.getElementById('login-pw').value = 'motdepasse-test-qa';
-      await doLogin();
+      // Lot A01 : le Dashboard ne connecte plus personne ; la session vient du site.
+      var __r = await sbAuth.auth.signInWithPassword({ email: 'deux@helixcar.test', password: 'motdepasse-test-qa' });
+      var __uid = (__r && __r.data && __r.data.user) ? __r.data.user.id : null;
+      var __ok = await finaliserSessionClient('deux@helixcar.test', null, __uid);
+      if (__ok !== false) await _hcPreparerRoles('client', 'deux@helixcar.test', __uid);
     });
     await page.waitForTimeout(300);
     const e = await etatEspace(page);
@@ -287,6 +289,12 @@ function etatEspace(page) {
     !/convoyeurs\?id=eq\.[\s\S]{0,400}auth_user_id/.test(cc));
   check('F8 : et plus aucune adresse d\'aperçu codée en dur',
     !/helixcar-i89b/.test(cc));
+  check('F9 : le retour de confirmation conserve le dossier convoyeur',
+    /dashboard\.html\?activation=partenaire&dossier=/.test(cc));
+  check('F10 : le Dashboard rattache le dossier AVANT de relire les rôles',
+    /async function finaliserSessionParUid[\s\S]{0,500}await _hcRattacherPartenaireApresConfirmation\(\);[\s\S]{0,200}await _hcRolesDeLaSession\(\)/.test(dash));
+  check('F11 : une liste de rôles vide ne devient plus un espace client',
+    /if \(!window\._hcRolesAutorises\.length\) \{[\s\S]{0,300}Aucun espace HelixCar/.test(dash));
 
   await navigateur.close();
   console.log('\n=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
