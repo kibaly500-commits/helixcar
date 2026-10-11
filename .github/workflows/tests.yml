@@ -46,10 +46,11 @@ jobs:
         env:
           CI_NO_SANDBOX: '1'
         run: |
-          set -e
+          status=0
           for suite in t_duplication_navigation t_planning_ui t_regle_garde_48h t_restitution_destination t_planning_calcul; do
-            node tests/lancer.js --sans-sql --seulement "$suite"
+            node tests/lancer.js --sans-sql --seulement "$suite" || status=1
           done
+          exit "$status"
 
       - name: Lancer toutes les suites
         env:
