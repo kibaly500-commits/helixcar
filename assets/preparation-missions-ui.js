@@ -158,9 +158,21 @@
     const sum=state.plans.reduce((s,p)=>s+Number(p.remuneration||0),0);
     return sum>budget+0.001?['Les rémunérations dépassent les 70 % du devis. Réduisez les montants pour préserver les 30 % HelixCar.']:[];
   }
-  function card(a){
+  function card(a,options={}){
     const rows=a.rows||[],raw=label=>String(rows.find(r=>r.label===label)?.value||'');
     const facts=items=>'<dl class="hc-prep-leg-facts">'+items.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+display(value||'À préciser')+'</dd></div>').join('')+'</dl>';
+    if(a.category==='nettoyage'){
+      const period=raw('Période'),periodLabel=period.includes(' · ')?'Période':'Date';
+      const service=raw('Prestation')||a.title||'Nettoyage automobile';
+      const serviceLabel=service==='Préparation complète'?'Nettoyage intérieur et extérieur':service;
+      let details='<div class="hc-prep-clean-body"><p class="hc-prep-clean-service">'+esc(serviceLabel)+'</p><dl class="hc-prep-clean-schedule">'+
+        [['Lieu',raw('Lieu d’intervention')],[periodLabel,period],['Horaires',raw('Horaires')]].map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+display(value||'À préciser')+'</dd></div>').join('')+'</dl>';
+      const extra=rows.filter(r=>!['Lieu d’intervention','Période','Horaires','Prestation','Véhicules'].includes(r.label)&&!r.label.startsWith('Véhicule')&&!(r.label==='Organisation'&&r.value==='Créneau groupé'));
+      if(extra.length)details+=facts(extra.map(r=>[r.label,r.value]));
+      details+='</div>';
+      if(options.detailsOnly)return details;
+      return '<section class="hc-prep-card hc-prep-annonce hc-prep-clean"><div class="hc-prep-mission-summary"><strong>Nettoyage automobile</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(a.remuneration==null?'À définir':Number(a.remuneration).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}))+'</strong></div></div>'+details+'</section>';
+    }
     const schedule=value=>{
       const date=value.match(/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/)?.[0];
       const hours=value.match(/\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?/)?.[0];
@@ -229,9 +241,9 @@
     state.plans.forEach((p,i)=>{
       const linked=p.saved?.mission_id;
       if(state.preview||linked){h+=card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p));if(linked){h+='<p class="hc-prep-muted">Mission déjà créée</p>';if(!state.preview&&p.retour_helixcar)h+='<div class="hc-prep-internal"><p><strong>Retour du convoyeur à Noisy :</strong> '+display(p.retour_reception?.replace('T',' · '))+'</p><p><strong>'+(p.retour_helixcar.transfert?'Départ du prochain convoyeur :':'Récupération par le client à Noisy :')+'</strong> '+display(p.retour_remise?.replace('T',' · '))+'</p><p>Suivi des deux rendez-vous dans le planning HelixCar.</p></div>';}else {if(p.missing.length)h+='<p class="hc-prep-incomplete">Publication bloquée · À compléter dans la demande : '+esc(p.missing.join(' · '))+'</p>';h+='<button type="button" class="btn btn-primary" data-prep-publish="'+i+'"'+(p.missing.length?' disabled':'')+'>Publier cette mission</button>';}return;}
-      h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
+      h+='<section class="hc-prep-card"><div class="hc-prep-head"><div><small>'+esc(p.position?'Véhicule '+p.position:'Prestation')+'</small><h4>'+esc(p.category==='nettoyage'?'Nettoyage automobile':p.title)+'</h4></div><span class="badge badge-pending">Brouillon</span></div>';
       if(p.category==='convoyage'&&p.kind!=='direct')h+='<p class="hc-prep-step">'+(p.kind==='avant_stockage'?'Trajet 1 · remise à HelixCar':'Trajet 2 · départ du point HelixCar')+'</p>';
-      h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
+      h+=p.category==='nettoyage'?card(HCPreparation.publicData(p),{detailsOnly:true}):'<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       const auto=autoDrafts.get(p.key)||(p.calcul_interne?.pricingPolicy==='rounded_v1'?p.calcul_interne:null);
