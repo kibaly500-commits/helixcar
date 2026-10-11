@@ -10,11 +10,16 @@ async function request(url,fetcher){
 export async function routeIgn(from,to,{fetcher=fetch}={}){
  const key=from+'\n'+to,cached=fetcher===fetch&&cache.get(key);
  if(cached&&cached.expires>Date.now())return {...cached.result};
+ const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
  const point=async(address)=>{
   const postcode=address.match(/\b\d{5}\b/)?.[0];
   if(!postcode)throw Error('Code postal manquant : complétez l’adresse.');
-  const data=await request('https://data.geopf.fr/geocodage/search?'+new URLSearchParams({q:address,index:'address',limit:'5',postcode}),fetcher);
-  const matches=(data.features||[]).filter(f=>f.properties?.postcode===postcode&&f.properties?.score>=0.55&&['housenumber','street'].includes(f.properties?.type));
+  const data=await request('https://data.geopf.fr/geocodage/search?'+new URLSearchParams({q:address,index:'address',limit:'5'}),fetcher);
+  const [street,city]=address.split(postcode);
+  const matches=(data.features||[]).filter(f=>{const p=f.properties||{};
+   const exactPlace=normalize(p.city)===normalize(city)&&normalize(p.name)===normalize(street);
+   return (p.postcode===postcode||exactPlace)&&p.score>=0.55&&['housenumber','street'].includes(p.type);
+  });
   const p=matches[0]?.geometry?.coordinates;
   if(!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite))throw Error('Adresse non reconnue avec suffisamment de précision : '+address);
   return p.join(',');

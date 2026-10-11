@@ -5,7 +5,7 @@ const key='free-test-key';
 const seen=[];
 const mock=async(url,options={})=>{
  seen.push({url,options});
- if(url.includes('data.geopf.fr/geocodage')){const q=new URL(url).searchParams;return {ok:true,json:async()=>({features:[{geometry:{coordinates:[2.35,48.85]},properties:{postcode:q.get('postcode'),score:0.95,type:'housenumber'}}]})};}
+ if(url.includes('data.geopf.fr/geocodage')){const q=new URL(url).searchParams;return {ok:true,json:async()=>({features:[{geometry:{coordinates:[2.35,48.85]},properties:{postcode:q.get('q').match(/\d{5}/)[0],score:0.95,type:'housenumber'}}]})};}
  if(url.includes('data.geopf.fr/navigation'))return {ok:true,json:async()=>({distance:225,duration:155})};
  if(url.includes('/geocode/')||url.includes('/pelias/v1/search'))return {ok:true,json:async()=>({features:[{geometry:{coordinates:url.includes('Paris')?[2.35,48.85]:[3.06,50.63]}}]})};
  if(url.includes('/directions/'))return {ok:true,json:async()=>({routes:[{summary:{distance:225000,duration:9300}}]})};
