@@ -373,6 +373,13 @@ const futur = dansNJours;
     'supabase/migrations/20260920154907_corriger_declencheur_stockage.sql',
     'supabase/migrations/20260920162027_preparation_missions_devis.sql',
     'supabase/migrations/20260920170316_motorisation_vehicules.sql',
+    // Périmètre PR6 documenté : calcul sans API payante et organisation à 5 jours.
+    'assets/remuneration-estimation.js',
+    'services/planning/route-gratuite.mjs',
+    'services/planning/GRATUIT-PR6.md',
+    'api/route-gratuite.mjs',
+    'supabase/migrations/20261010193552_organisation_interne_retrait_veille.sql',
+    'supabase/migrations/20261010211000_garde_cinq_jours.sql',
   ];
   const horsPerimetre = f => PERIMETRE.indexOf(f) === -1 && !PERIMETRE_PR6.includes(f)
     && !f.startsWith('migrations/') && !f.startsWith('tests/')
@@ -381,7 +388,7 @@ const futur = dansNJours;
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
-      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 53,
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 59,
     PERIMETRE.length + ' entrées historiques, ' + PERIMETRE_PR6.length + ' entrées PR6');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
