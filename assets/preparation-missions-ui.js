@@ -144,7 +144,7 @@
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont carburant et péages (€)')+input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont carburant et péages (€)')+input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Openrouteservice : durée sans trafic, péages à vérifier. Aucune rémunération ni publication automatique.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
@@ -202,6 +202,23 @@
         const fresh=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise,exceptions);
         state.plans=state.plans.filter(p=>(p.vehicule_id||'principal')!==id).concat(fresh.filter(p=>(p.vehicule_id||'principal')===id)).sort((a,b)=>a.position-b.position);
         render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
+      }
+      if(b.hasAttribute('data-estimate-free')){
+        const i=Number(b.dataset.estimateFree),p=state.plans[i];
+        if(!p||p.category!=='convoyage'||p.saved?.mission_id)throw Error('Ce calcul concerne uniquement un brouillon convoyage.');
+        readEdits();
+        const session=(await sbAuth.auth.getSession()).data?.session;
+        if(!session?.access_token)throw Error('Reconnectez-vous pour demander une estimation.');
+        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:state.source.client.id,key:p.key})});
+        const data=await response.json();
+        if(!response.ok)throw Error(data.error||'Calcul routier indisponible');
+        if(data.fingerprint!==state.source.empreinte)throw Error('La demande a changé. Rechargez les missions.');
+        const routes=data.routes||[];
+        if(!routes.length)throw Error('Aucun itinéraire calculé');
+        const distance=routes.reduce((sum,r)=>sum+Number(r.km||0),0);
+        p.distance=Math.round(distance*10)/10;
+        render();
+        note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+routes.reduce((s,r)=>s+Number(r.minutes||0),0)+' min de conduite hors trafic. Vérifiez les péages et le trajet autoroutier le plus rapide avant de valider. Prix inchangé. Enregistrez le brouillon si cette distance convient.');
       }
       if(b.hasAttribute('data-edit-vehicle')){
         readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];
