@@ -1,7 +1,7 @@
 /* Intégration du plan dans la fiche de demande. Aucune mutation à l'ouverture. */
 (function () {
   'use strict';
-  let state=null,busy=false,generation=0,totalDevis=null;
+  let state=null,busy=false,generation=0,totalDevis=null,autosaveTimer=null,editVersion=0;
   const autoDrafts=new Map();
   const pricingDrafts=new Map(); // Uniquement côté administrateur, jamais dans un plan Supabase.
   const esc=v=>escapeHtml(v==null?'':String(v));
@@ -11,16 +11,44 @@
   modal.innerHTML='<div class="modal hc-prep-modal"><div class="hc-prep-head"><div><div id="hc-prep-ref" class="hc-prep-muted"></div><h3>Préparer les missions</h3></div><button type="button" class="btn btn-outline" id="hc-prep-close">Fermer</button></div><div id="hc-prep-message" role="status" aria-live="polite"></div><div id="hc-prep-body"></div></div>';
   document.body.append(modal);
   const el=id=>document.getElementById(id);
-  window.addEventListener('hc-session-fermee',()=>{++generation;autoDrafts.clear();pricingDrafts.clear();state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
+  window.addEventListener('hc-session-fermee',()=>{++generation;clearTimeout(autosaveTimer);autoDrafts.clear();pricingDrafts.clear();state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
+  function stable(value){
+    if(value==null||typeof value!=='object')return JSON.stringify(value);
+    if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
+    return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}';
+  }
+  const draftFields=['remuneration','distance','distance_aller','distance_basis','carburant_peages','motorisation','restit_motorisation','heure_remise','heure_retrait','heure_prise_en_charge','retour_reception','retour_remise'];
+  function draftKey(source){const admin=window._currentAdmin;return admin?.id&&source?.client?.id?'hc-prep-draft:'+admin.id+':'+source.client.id+':'+source.devis_id:null;}
+  function backup(){
+    if(!state)return;const key=draftKey(state.source);if(!key)return;
+    try{localStorage.setItem(key,JSON.stringify({fingerprint:state.source.empreinte,plans:state.plans.filter(p=>!p.saved?.mission_id).map(p=>({key:p.key,organisation:p.organisation,fields:Object.fromEntries(draftFields.filter(k=>p[k]!==undefined).map(k=>[k,p[k]]))}))}));}
+    catch(_){note('La copie locale est indisponible. Attendez la confirmation de sauvegarde avant de quitter.',true);}
+  }
+  function restoreDraft(){
+    const key=draftKey(state?.source);if(!key)return;
+    try{const draft=JSON.parse(localStorage.getItem(key)||'null');if(!draft||draft.fingerprint!==state.source.empreinte)return;
+      for(const p of state.plans){const old=draft.plans.find(x=>x.key===p.key&&stable(x.organisation)===stable(p.organisation));if(old&&!p.saved?.mission_id)for(const k of draftFields)if(Object.hasOwn(old.fields,k))p[k]=old.fields[k];}
+    }catch(_){}
+  }
+  function queueSave(){
+    clearTimeout(autosaveTimer);
+    autosaveTimer=setTimeout(async()=>{
+      if(!state||state.preview)return;
+      if(busy){queueSave();return;}busy=true;
+      try{await save(false);note('Brouillon enregistré automatiquement.');}
+      catch(e){note('Saisie conservée sur cet appareil. Sauvegarde serveur à compléter : '+e.message,true);}
+      finally{busy=false;}
+    },800);
+  }
   function adopt(source){
     const saved=source.brouillons||[],exceptions={};
     saved.forEach(s=>{if(s.empreinte===source.empreinte&&s.plan.organisation)exceptions[s.plan.vehicule_id||'principal']=s.plan.organisation;});
     const fresh=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise,exceptions),saved);
     const plans=fresh.map(p=>{const s=saved.find(x=>x.cle===p.key);
       if(!s||!(s.empreinte===source.empreinte||s.mission_id))return p;
-      if(!s.mission_id&&JSON.stringify(s.plan.organisation)!==JSON.stringify(p.organisation))return p;
+      if(!s.mission_id&&stable(s.plan.organisation)!==stable(p.organisation))return p;
       const result=Object.assign({},s.plan,{saved:s,remuneration:s.plan.remuneration});
       if(!s.mission_id&&p.category==='convoyage'){
         result.missing=p.missing;
@@ -72,7 +100,7 @@
       try{const r=await sbAuth.from('devis').select('prix').eq('id',source.devis_id).eq('client_id',clientId).eq('statut','accepte').eq('paiement_statut','paye').maybeSingle();
         const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
       }catch(_){}
-      if(ticket!==generation)return;totalDevis=montant;adopt(source);render();
+      if(ticket!==generation)return;totalDevis=montant;adopt(source);restoreDraft();render();
       if(state.plans.length&&state.plans.every(p=>p.category==='convoyage')&&state.plans.some(p=>!p.saved?.mission_id&&(!(Number(p.distance)>0)||(p.mission.restitution&&!(Number(p.distance_aller)>0)))))await calculateAll(ticket,true);
     }
     catch(e){if(ticket===generation){if(!state)el('hc-prep-body').textContent='';note(e.message,true);}}
@@ -145,16 +173,15 @@
     let h='<section class="hc-prep-card hc-prep-annonce"><div class="hc-prep-mission-summary"><strong>'+esc(a.category==='convoyage'?'Convoyage':a.title)+'</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(money(a.remuneration))+'</strong>'+fraisTexte+'</div></div>';
     if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
     const delivered=vehicle(raw('Véhicule'));
-    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Premier véhicule</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
-      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')]])+'</section>';
+    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
+      facts([['Distance',raw('Distance')],['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
       h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Véhicule à restituer</h4></header>'+route(raw('Arrivée'),destination,raw('Livraison'),raw('Restitution prévue'))+
         facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     }
-    const shared=[['Distance aller',raw('Distance')]];
-    return h+'</div><footer class="hc-prep-mission-footer">'+facts(shared)+'</footer></section>';
+    return h+'</div></section>';
   }
   window.hcPreparationCarteOpportunite=function(o,options){
     let html=card(o.preparation_annonce);if(options?.partenaire){html+='<div id="opp-msg-'+esc(o.id)+'" class="hc-note" role="status"></div>';
@@ -256,7 +283,25 @@
       p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];
     });
   }
-  async function save(){readEdits();const errors=budgetErrors().concat(state.plans.flatMap(p=>HCPreparation.fraisErrors(p).concat(HCPlanningCalcul.retourErrors(p,false))));if(errors.length)throw Error(errors.join(' · '));const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
+  async function save(refresh=true){
+    readEdits();backup();const version=editVersion,snapshot=state,key=draftKey(state.source);
+    const errors=budgetErrors().concat(state.plans.flatMap(p=>HCPreparation.fraisErrors(p).concat(HCPlanningCalcul.retourErrors(p,false))));
+    if(errors.length)throw Error(errors.join(' · '));
+    const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});
+    if(state!==snapshot)return;
+    if(version===editVersion&&key){try{localStorage.removeItem(key);}catch(_){}}
+    if(refresh&&version===editVersion)adopt(data);
+    else{state.source=data;state.plans.forEach(p=>{const saved=data.brouillons?.find(x=>x.cle===p.key);if(saved)p.saved=saved;});}
+  }
+  modal.addEventListener('input',e=>{
+    if(!state||state.preview||!e.target.dataset?.field)return;
+    const p=state.plans[Number(e.target.dataset.plan)],key=e.target.dataset.field;
+    if(!p||p.saved?.mission_id||!draftFields.includes(key))return;
+    p[key]=e.target.type==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value;
+    if(key==='distance'){p.distance_aller=p.distance;p.distance_basis='outbound_v1';}
+    editVersion++;backup();queueSave();
+  });
+  window.addEventListener('beforeunload',()=>{if(state&&!state.preview)backup();});
   modal.addEventListener('change',e=>{
     const field=e.target;
     if(field.dataset?.field!=='retour_reception'||!state)return;
@@ -268,10 +313,10 @@
   });
   modal.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;
-    if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}
+    if(b.id==='hc-prep-close'){if(busy)return;clearTimeout(autosaveTimer);if(state&&!state.preview){busy=true;try{await save();}catch(e){note('Saisie conservée sur cet appareil : '+e.message,true);return;}finally{busy=false;}}++generation;closeModal('preparation-missions');return;}
     if(busy||!state)return;busy=true;b.disabled=true;
     try{
-      if(b.hasAttribute('data-auto-budget')){await calculateAll();}
+      if(b.hasAttribute('data-auto-budget')){await calculateAll();editVersion++;backup();queueSave();}
       if(b.hasAttribute('data-garde-vehicle')){
         readEdits();const id=b.dataset.gardeVehicle,key=b.dataset.gardePeriod;
         const family=state.plans.filter(p=>(p.vehicule_id||'principal')===id);

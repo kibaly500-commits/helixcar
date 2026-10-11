@@ -7,7 +7,7 @@ const source=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
 const code=source.slice(source.indexOf('  function card('),source.indexOf('  window.hcPreparationCarteOpportunite='));
 const ctx={esc:String,display:v=>String(v||''),money:v=>v==null?'À définir':v+' €'};vm.createContext(ctx);vm.runInContext(code,ctx);
 const html=ctx.card(data);assert.ok(html.includes('295 €'));assert.ok(html.includes('224 km'));
-assert.ok(html.includes('Véhicule à récupérer à'));assert.ok(html.includes('À livrer à'));assert.ok(html.includes('Premier véhicule'));assert.ok(html.includes('Véhicule à restituer'));
+assert.ok(html.includes('Véhicule à récupérer à'));assert.ok(html.includes('À livrer à'));assert.ok(html.includes('<h4>Livraison</h4>'));assert.ok(html.includes('Véhicule à restituer'));
 assert.ok(!html.includes('Garde du véhicule'));assert.equal((html.match(/2026-11-22/g)||[]).length,2);
 const historical=ctx.card({...data,rows:[...data.rows,{label:'Garde du véhicule',value:'120 h'}]});assert.ok(!historical.includes('120 h'));
 assert.ok(source.includes('card(linked?(p.saved?.annonce||HCPreparation.publicData(p)):HCPreparation.publicData(p))'));
