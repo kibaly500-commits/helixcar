@@ -9,7 +9,7 @@ export async function routeFree(from,to,{fetcher=fetch,key}={}){
  if(!valid(from)||!valid(to))throw Error('Adresses complètes nécessaires');
  const headers={'Authorization':key,'Accept':'application/json'};
  const geocode=async address=>{
-  const url=ORS+'/geocode/search?text='+encodeURIComponent(address)+'&size=1&boundary.country=FR';
+  const url=ORS+'/pelias/v1/search?text='+encodeURIComponent(address)+'&size=1&boundary.country=FR';
   const r=await fetcher(url,{headers,signal:AbortSignal.timeout(12000)});
   if(!r.ok)throw Error('Géocodage indisponible');
   const f=(await r.json()).features?.[0];
@@ -18,7 +18,7 @@ export async function routeFree(from,to,{fetcher=fetch,key}={}){
   return c;
  };
  const [a,b]=await Promise.all([geocode(from),geocode(to)]);
- const r=await fetcher(ORS+'/v2/directions/driving-car/json',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({coordinates:[a,b],preference:'fastest',instructions:false}),signal:AbortSignal.timeout(18000)});
+ const r=await fetcher(ORS+'/openrouteservice/v2/directions/driving-car/json',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({coordinates:[a,b],preference:'fastest',instructions:false}),signal:AbortSignal.timeout(18000)});
  if(!r.ok)throw Error('Calcul routier gratuit indisponible');
  const summary=(await r.json()).routes?.[0]?.summary;
  if(!Number.isFinite(summary?.distance)||!Number.isFinite(summary?.duration)||summary.distance<=0||summary.duration<=0)throw Error('Itinéraire non calculable');
