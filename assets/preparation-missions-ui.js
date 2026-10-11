@@ -59,11 +59,11 @@
       if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
     });
     plans.forEach(p=>{if(p.retour_helixcar)p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];});
-    pricingDrafts.clear();
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
-    if(busy)return;const ticket=++generation;busy=true;state=null;totalDevis=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
+    if(busy)return;
+    pricingDrafts.clear();const ticket=++generation;busy=true;state=null;totalDevis=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
     try{const source=await rpc('source_preparation_missions',{p_client_id:clientId});if(ticket!==generation)return;
       // Lecture admin du devis exact ; le total reste hors des plans et annonces.
       let montant=null;
