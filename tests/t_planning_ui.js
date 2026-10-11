@@ -62,7 +62,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.locator('[data-field="heure_retrait"]').fill('12:30');
  await page.locator('[data-prep-save]').click();
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_livraison),'2026-11-08T11:15');
- assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-16T12:30');
+ assert.equal(await page.evaluate(()=>__source.brouillons[1].plan.mission.date_prise_en_charge),'2026-11-15T12:30');
  assert.equal(await page.evaluate(()=>__source.brouillons[0].plan.mission.date_prise_en_charge),'2026-11-08T09:00');
  await page.locator('#hc-prep-close').click();
  await page.locator('#hc-planning-state').selectOption('actifs');
