@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   let state=null,busy=false,generation=0,totalDevis=null;
+  const pricingDrafts=new Map(); // Uniquement côté administrateur, jamais dans un plan Supabase.
   const esc=v=>escapeHtml(v==null?'':String(v));
   const display=v=>esc(String(v??'').replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'));
   const money=v=>v==null?'À définir':Number(v).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
@@ -58,6 +59,7 @@
       if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
     });
     plans.forEach(p=>{if(p.retour_helixcar)p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];});
+    pricingDrafts.clear();
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
@@ -148,6 +150,11 @@
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
+      if(p.category==='convoyage'){
+        const q=pricingDrafts.get(p.key)||{zone:'idf',days:0,fuelPrice:1.85,consumption:6.5,toll:'',verified:false};
+        const field=(k,label,type='number')=>'<label>'+label+'<input type="'+type+'" data-quote-field="'+k+'" data-quote-plan="'+i+'" '+(type==='number'?'min="0" step="'+(k==='days'?'1':'0.01')+'"':'')+' value="'+esc(q[k]??'')+'"></label>';
+        h+='<details class="hc-prep-internal hc-prep-quote"><summary>Simuler le prix · barème progressif HelixCar</summary><p class="hc-prep-muted">Proposition non contractuelle, avec 10 €/jour de garde. Montants de garde exclusivement administratifs. Aucun calcul routier ou péage inventé.</p><div class="hc-prep-fields"><label>Zone<select data-quote-field="zone" data-quote-plan="'+i+'"><option value="idf"'+(q.zone==='idf'?' selected':'')+'>Île-de-France</option><option value="hors_idf"'+(q.zone==='hors_idf'?' selected':'')+'>Hors Île-de-France</option></select></label>'+field('days','Jours de garde du convoyeur')+field('fuelPrice','Carburant (€ / litre)')+field('consumption','Consommation (L / 100 km)')+field('toll','Total des péages vérifiés (€)')+'</div><label><input type="checkbox" data-quote-field="verified" data-quote-plan="'+i+'"'+(q.verified?' checked':'')+'> J’ai vérifié le trajet autoroutier le plus rapide et ses péages</label><p class="hc-prep-muted">En Île-de-France, aucun carburant ni péage n’est ajouté automatiquement. Pour un trajet hors Île-de-France, complétez obligatoirement le montant des péages, y compris 0 € si confirmé.</p><button type="button" class="btn btn-outline" data-quote-propose="'+i+'">Proposer un prix (administration)</button></details>';
+      }
       if(p.retour_helixcar?.transfert){
         h+='<section class="hc-prep-internal hc-prep-return"><h4>Retour à Noisy avant une nouvelle mission</h4><p>Après la livraison, ce convoyeur ramène le véhicule récupéré à Noisy. Sa mission se termine à votre réception.</p><p><strong>Livraison précédente :</strong> '+display(p.rows.find(r=>r.label==='Livraison')?.value)+'</p><div class="hc-prep-fields">'+input(p,i,'retour_reception','Date et heure de réception à Noisy','datetime-local')+'</div><p>Prévoyez la durée du trajet retour et 45 minutes de marge. Le départ suivant est à régler dans la mission de restitution ci-dessous.</p></section>';
       }else if(p.retour_helixcar){
@@ -202,6 +209,30 @@
         const fresh=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise,exceptions);
         state.plans=state.plans.filter(p=>(p.vehicule_id||'principal')!==id).concat(fresh.filter(p=>(p.vehicule_id||'principal')===id)).sort((a,b)=>a.position-b.position);
         render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
+      }
+      if(b.hasAttribute('data-quote-propose')){
+        readEdits();
+        const i=Number(b.dataset.quotePropose),p=state.plans[i];
+        if(!p||p.category!=='convoyage'||p.saved?.mission_id)throw Error('Simulation disponible uniquement sur les brouillons convoyage');
+        const elements=[...modal.querySelectorAll('[data-quote-plan="'+i+'"]')];
+        const values=Object.fromEntries(elements.map(x=>[x.dataset.quoteField,x.type==='checkbox'?x.checked:x.value]));
+        pricingDrafts.set(p.key,values);
+        const km=Number(p.distance);
+        if(p.distance==null||!Number.isFinite(km)||km<=0)throw Error('Renseignez ou estimez la distance réelle de la mission.');
+        if(!values.verified)throw Error('Vérifiez l’itinéraire autoroutier le plus rapide et ses péages.');
+        const local=values.zone==='idf';
+        const toll=values.toll===''?null:Number(values.toll);
+        if(!local&&toll===null)throw Error('Péages à renseigner, même si le montant est de 0 €.');
+        const input={zone:values.zone,guardDays:Number(values.days),fuelPricePerLiter:local?undefined:Number(values.fuelPrice),
+          consumptionLitersPer100Km:local?undefined:Number(values.consumption),
+          legs:[{km,minutes:0,motorwayFastest:true,tollEuros:local?null:toll}]};
+        const result=HCRemunerationEstimation.quoteMission(input);
+        if(result.totalEuros==null)throw Error('Calcul incomplet : vérifiez les péages.');
+        // Seuls ces deux montants sont intégrés au brouillon. Jamais les jours ni le coût de garde.
+        p.remuneration=result.totalEuros;
+        p.carburant_peages=result.feesEuros;
+        render();
+        note('Proposition à confirmer : '+money(result.totalEuros)+' (dont '+money(result.feesEuros)+' de frais de route). Travail '+money(result.internalBreakdown.workPayEuros)+' et garde '+money(result.internalBreakdown.guardEuros)+' réservés à l’administration. Cliquez sur Enregistrer le brouillon pour sauvegarder les montants.');
       }
       if(b.hasAttribute('data-estimate-free')){
         const i=Number(b.dataset.estimateFree),p=state.plans[i];
