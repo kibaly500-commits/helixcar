@@ -12585,7 +12585,7 @@ function _hcVehiculeRenseigne(i) {
     // type d'horaire, radios) ne doivent pas faire passer une fiche vierge
     // pour une fiche déjà saisie.
     if (champ.type === 'radio' || champ.type === 'checkbox') return false;
-    if (!/^veh-\\d+-(?:type|marque|vin|motorisation|consignes|recup-heure|(?:pc|liv|restit)-(?:rue|cp|ville|contact|tel|date|heure|cdeb|cfin|consignes|vtype|marque|vin|motorisation))$/.test(champ.id || '')) return false;
+    if (!/^veh-\d+-(?:type|marque|vin|motorisation|consignes|recup-heure|(?:pc|liv|restit)-(?:rue|cp|ville|contact|tel|date|heure|cdeb|cfin|consignes|vtype|marque|vin|motorisation))$/.test(champ.id || '')) return false;
     return !!String(champ.value || '').trim();
   });
 }
