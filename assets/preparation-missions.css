@@ -92,7 +92,15 @@
 .hc-prep-toolbar .btn:focus-visible,.hc-prep-modal [data-prep-publish]:focus-visible{outline:2px solid #a92e3a;outline-offset:3px}
 .hc-prep-modal [data-prep-publish]{display:flex;margin:0 0 30px auto;padding:12px 22px;border-radius:9px;font-size:14px;letter-spacing:0;text-transform:none}
 @media(max-width:480px){
- .hc-prep-mission-summary{align-items:flex-start;flex-direction:column;gap:14px}
+ /* Espacements mobiles resserrés, tailles de texte et zones tactiles conservées. */
+ .hc-prep-annonce{margin:12px 0}
+ .hc-prep-mission-summary{align-items:flex-start;flex-direction:column;gap:10px;padding:12px 16px}
+ .hc-prep-legs{gap:10px;padding-bottom:10px}
+ .hc-prep-annonce-head{padding:10px 16px}
+ .hc-prep-route{padding:12px 16px}
+ .hc-prep-route .hc-prep-date{margin-top:6px}
+ .hc-prep-leg-facts{padding:12px 16px;row-gap:10px}
+ .hc-prep-modal [data-prep-publish]{margin-bottom:20px}
  .hc-prep-mission-summary>div{box-sizing:border-box;width:100%;max-width:none;text-align:left;padding:10px 14px}
  .hc-prep-toolbar{display:flex}
  .hc-prep-toolbar .btn{flex:1;min-width:0;padding:10px 8px;font-size:13px}
