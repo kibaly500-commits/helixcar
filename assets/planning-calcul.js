@@ -36,6 +36,13 @@ function guidance(p){
   rule:incoming?'Heure de prise en charge + durée du trajet vérifiée par vous + 45 minutes de battement.':'Récupération la veille de la livraison. Heure de remise au convoyeur à fixer par HelixCar.'
  };
 }
+function retourReceptionMin(p){
+ try{return civil(Math.max(...bounds(p,'Livraison',p.mission?.date_livraison))+MINUTE);}
+ catch(_){
+  const day=(p.rows?.find(r=>r.label==='Livraison')?.value||p.mission?.date_livraison||'').match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  return day?day+'T00:00':'';
+ }
+}
 function retourErrors(p,required){
  const r=p.retour_helixcar;if(!r)return [];
  const errors=[],receipt=p.retour_reception,hand=p.retour_remise,d=r.demande||{};
@@ -56,6 +63,6 @@ function retourDemande(p){
  const d=p.retour_helixcar?.demande||{};
  return [d.date,d.type==='creneau'?[d.debut,d.fin].filter(Boolean).map(x=>x.slice(0,5)).join(' - '):(d.heure||'').slice(0,5)].filter(Boolean).join(' · ');
 }
-const api={retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
+const api={retourReceptionMin,retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPlanningCalcul=api;
 })(typeof window==='undefined'?globalThis:window);

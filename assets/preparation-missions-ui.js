@@ -163,7 +163,12 @@
       else if(o.statut==='a_pourvoir')html+='<button class="btn btn-primary" id="opp-postuler-'+esc(o.id)+'" '+actionHtml('postulerOpportunite',[o.id])+'>Postuler</button>';
     }return '<div class="hc-prep-public" data-opportunite="'+esc(o.id)+'">'+html+'</div>';
   };
-  function input(p,i,key,label,type='number'){return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'0.1':'0.01')+'"':'')+' value="'+esc(p[key]??'')+'"></label>';}
+  function input(p,i,key,label,type='number'){
+    const min=key==='retour_reception'?HCPlanningCalcul.retourReceptionMin(p):'';
+    const value=p[key]??'';
+    const invalid=min&&value&&String(value).slice(0,16)<min;
+    return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'0.1':'0.01')+'"':'')+(min?' min="'+esc(min)+'"':'')+' value="'+esc(invalid?'':value)+'">'+(invalid?'<small>La date précédente était antérieure à la livraison. Choisissez un nouveau rendez-vous.</small>':'')+'</label>';
+  }
   function motor(p,i,key,label){
     const source=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise).find(x=>x.key===p.key);
     if(source?.[key])return '<div><span>'+esc(label)+'</span><p><strong>'+esc(p[key])+'</strong></p><small class="hc-prep-muted">Reprise de la demande</small></div>';
@@ -251,6 +256,15 @@
     });
   }
   async function save(){readEdits();const errors=budgetErrors().concat(state.plans.flatMap(p=>HCPreparation.fraisErrors(p).concat(HCPlanningCalcul.retourErrors(p,false))));if(errors.length)throw Error(errors.join(' · '));const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
+  modal.addEventListener('change',e=>{
+    const field=e.target;
+    if(field.dataset?.field!=='retour_reception'||!state)return;
+    const p=state.plans[Number(field.dataset.plan)],min=HCPlanningCalcul.retourReceptionMin(p);
+    if(field.value&&min&&field.value.slice(0,16)<min){
+      field.value='';p.retour_reception='';
+      note('Le retour à Noisy doit être postérieur à la livraison du premier véhicule. Choisissez un rendez-vous à partir du '+min.slice(0,10).split('-').reverse().join('/')+'.',true);
+    }
+  });
   modal.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}
