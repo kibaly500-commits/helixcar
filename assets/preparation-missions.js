@@ -54,7 +54,8 @@
       const missing=[];if(!d.adresse_ville)missing.push('Ville d’intervention');if(!start||!end)missing.push('Dates');if(!schedule)missing.push('Horaires');
       if(pro&&(d.conseil||!d.categorie||!d.nombre_professionnels))missing.push('Métier et nombre de professionnels');
       if(!pro&&c.type_client!=='professionnel'&&!c.societe&&!c.siret)missing.push('Nettoyage réservé aux entreprises');
-      plans.push({key:type,title,category,nb_professionnels:pro?(Number(d.nombre_professionnels)||1):1,date_debut:date(start),date_fin:date(end),zone:d.adresse_ville||'',rows:details,mission:m,missing,kind:'intervention'});return plans;
+      const count=pro?Math.max(1,Math.min(500,Math.trunc(Number(d.nombre_professionnels)||1))):1;
+      for(let i=0;i<count;i++)plans.push({key:i?type+':profil:'+i:type,title,category,nb_professionnels:1,date_debut:date(start),date_fin:date(end),zone:d.adresse_ville||'',rows:details.map(r=>({...r,...(r.label==='Professionnels'?{value:'1'}:{})})),mission:{...m},missing:[...missing],kind:'intervention'});return plans;
     }
     let vs=vehicles?.length?vehicles:(!c.flotte_a_detailler&&Number(c.nb_vehicules||1)===1?[legacy(c)]:[]);
     vs.forEach(raw=>{
