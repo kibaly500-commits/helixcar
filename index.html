@@ -12581,10 +12581,10 @@ function _hcVehiculeRenseigne(i) {
     // Un choix Oui/Non de livraison ou restitution, sans donnée saisie,
     // ne remplit pas une fiche (même règle que _hcVehiculeEstVierge).
     // Les coordonnées, horaires, identité et consignes restent protégés.
-    if (champ.type === 'radio' || champ.type === 'checkbox') {
-      if (/-(?:liv|restit)-active$/.test(champ.name)) return false;
-      return champ.checked && !(/-htype$/.test(champ.name) && champ.value === 'precise');
-    }
+    // Les radios et cases précochés proviennent du rendu par défaut :
+    // ils ne prouvent pas qu'une fiche a été renseignée. Seuls les champs
+    // réellement saisis (identité, adresses, horaires, consignes) comptent.
+    if (champ.type === 'radio' || champ.type === 'checkbox') return false;
     return !!String(champ.value || '').trim();
   });
 }
