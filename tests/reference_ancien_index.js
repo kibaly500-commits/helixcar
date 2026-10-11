@@ -158,12 +158,14 @@ const LIBELLES_ANCIEN_INDEX = [
   "À"
 ];
 
-// Les seize libellés de l'ancien index qui n'existent plus dans l'index
+// Les libellés disparus de l'ancien index qui n'existent plus dans l'index
 // actuel. Chacun a une raison NOMMÉE et vérifiable. Aucun n'est une
 // perte de fonctionnalité historique : ce sont soit des retraits
 // explicitement demandés, soit des remplacements par un dispositif
 // plus riche apporté par le main courant.
 const DISPARUS_EXPLIQUES = [
+  ["Date' + R + '", "Artefact d’extraction de l’ancien HTML concaténé, désormais remplacé par les champs de date du formulaire actuel."],
+  ["Horaire' + R + '", "Artefact d’extraction de l’ancien HTML concaténé, désormais remplacé par les sélecteurs d’horaires actuels."],
   ['Convoyeur', 'Libellé du profil devenu Partenaire HelixCar ; même valeur technique convoyeur et même sélection de profil.'],
   ['Trouver un professionnel automobile', 'Renommage demandé en Recherche d’un professionnel automobile ; même service professionnel et parcours conservé.'],
   ['Informations complémentaires (optionnel)', 'PR6 : harmonisation du libellé en Informations complémentaires (facultatif), champ conservé.'],
