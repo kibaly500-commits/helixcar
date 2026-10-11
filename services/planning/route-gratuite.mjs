@@ -1,3 +1,4 @@
+import {routeTolls} from './route-peages.mjs';
 /* Calcul routier sans facturation : clé du quota gratuit ORS requise.
  * Ne retourne ni péage inventé, ni trafic temps réel. Accès administrateur seul. */
 const SB='https://zsetmqnmmupqbkgqbjbo.supabase.co';
@@ -31,17 +32,24 @@ export async function handleFreeRoute(body,headers,{fetcher=fetch,env=process.en
  const rpc=async(name,args)=>{const r=await fetcher(SB+'/rest/v1/rpc/'+name,{method:'POST',headers:{Authorization:auth,apikey,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error('Accès administrateur refusé');return r.json();};
  try{
   if(await rpc('est_admin',{})!==true)return {status:403,body:{error:'Réservé à HelixCar administration'}};
-  if(!env.ORS_FREE_API_KEY)return {status:503,body:{code:'ORS_NON_CONFIGURE',error:'Clé gratuite openrouteservice non configurée. Aucune estimation inventée.'}};
+  if(!env.ORS_FREE_API_KEY&&!env.HERE_ROUTING_API_KEY)return {status:503,body:{code:'ORS_NON_CONFIGURE',error:'Clé gratuite openrouteservice non configurée. Aucune estimation inventée.'}};
   if(!/^[a-f\d-]{36}$/i.test(body?.clientId||'')||typeof body?.key!=='string'||body.key.length>100)throw Error('Demande invalide');
   const source=await rpc('source_preparation_missions',{p_client_id:body.clientId});
   const mod=await import('../../assets/preparation-missions.js');
-  const plan=mod.default?.build?.(source.client,source.vehicules,source.point_remise||POINT)?.find(p=>p.key===body.key);
+  const exceptions={};
+  (source.brouillons||[]).forEach(s=>{if(s.empreinte===source.empreinte&&s.plan?.organisation)exceptions[s.plan.vehicule_id||'principal']=s.plan.organisation;});
+  if(body.organisation&&typeof body.organisation==='object'){
+   const id=body.vehiculeId||'principal';
+   if(id!=='principal'&&!(source.vehicules||[]).some(v=>v.id===id))throw Error('Véhicule hors dossier');
+   exceptions[id]={before:body.organisation.before===true,return:body.organisation.return===true};
+  }
+  const plan=mod.default?.build?.(source.client,source.vehicules,source.point_remise||POINT,exceptions)?.find(p=>p.key===body.key);
   if(!plan||plan.category!=='convoyage')throw Error('Mission non trouvée');
   if(plan.mission.plateau)throw Error('Transport plateau non pris en charge');
   const legs=[[plan.mission.adresse_depart,plan.mission.adresse_arrivee]];
   if(plan.mission.restitution)legs.push([plan.mission.adresse_arrivee,plan.mission.adresse_restitution]);
   const routes=[];
-  for(const [from,to] of legs)routes.push(await routeFree(from,to,{fetcher,key:env.ORS_FREE_API_KEY}));
-  return {status:200,body:{fingerprint:source.empreinte,routes,source:'OpenStreetMap © contributeurs · openrouteservice by HeiGIT'}};
+  for(const [from,to] of legs)routes.push(await (env.HERE_ROUTING_API_KEY?routeTolls(from,to,{fetcher,key:env.HERE_ROUTING_API_KEY}):routeFree(from,to,{fetcher,key:env.ORS_FREE_API_KEY})));
+  return {status:200,body:{fingerprint:source.empreinte,routes,source:env.HERE_ROUTING_API_KEY?'HERE · estimations routières et péages':'OpenStreetMap © contributeurs · openrouteservice by HeiGIT'}};
  }catch(e){return {status:422,body:{error:e.name==='TimeoutError'?'Service temporairement indisponible':e.message}};}
 }

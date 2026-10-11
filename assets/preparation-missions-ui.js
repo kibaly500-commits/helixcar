@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   let state=null,busy=false,generation=0,totalDevis=null;
+  const autoDrafts=new Map();
   const pricingDrafts=new Map(); // Uniquement côté administrateur, jamais dans un plan Supabase.
   const esc=v=>escapeHtml(v==null?'':String(v));
   const display=v=>esc(String(v??'').replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'));
@@ -10,7 +11,7 @@
   modal.innerHTML='<div class="modal hc-prep-modal"><div class="hc-prep-head"><div><div id="hc-prep-ref" class="hc-prep-muted"></div><h3>Préparer les missions</h3></div><button type="button" class="btn btn-outline" id="hc-prep-close">Fermer</button></div><div id="hc-prep-message" role="status" aria-live="polite"></div><div id="hc-prep-body"></div></div>';
   document.body.append(modal);
   const el=id=>document.getElementById(id);
-  window.addEventListener('hc-session-fermee',()=>{++generation;state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
+  window.addEventListener('hc-session-fermee',()=>{++generation;autoDrafts.clear();pricingDrafts.clear();state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function adopt(source){
@@ -63,17 +64,82 @@
   }
   window.ouvrirPreparationDemande=async function(clientId){
     if(busy)return;
-    pricingDrafts.clear();const ticket=++generation;busy=true;state=null;totalDevis=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
+    pricingDrafts.clear();autoDrafts.clear();const ticket=++generation;busy=true;state=null;totalDevis=null;el('hc-prep-ref').textContent='';openModal('preparation-missions');el('hc-prep-body').textContent='Chargement des informations de la demande…';note('');
     try{const source=await rpc('source_preparation_missions',{p_client_id:clientId});if(ticket!==generation)return;
       // Lecture admin du devis exact ; le total reste hors des plans et annonces.
       let montant=null;
       try{const r=await sbAuth.from('devis').select('prix').eq('id',source.devis_id).eq('client_id',clientId).eq('statut','accepte').eq('paiement_statut','paye').maybeSingle();
         const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
       }catch(_){}
-      if(ticket!==generation)return;totalDevis=montant;adopt(source);render();}
-    catch(e){if(ticket===generation){el('hc-prep-body').textContent='';note(e.message,true);}}
+      if(ticket!==generation)return;totalDevis=montant;adopt(source);render();
+      if(state.plans.length&&state.plans.every(p=>p.category==='convoyage'&&!p.saved?.mission_id&&p.remuneration==null))await calculateAll(ticket);
+    }
+    catch(e){if(ticket===generation){if(!state)el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}
   };
+  async function calculateAll(ticket=generation){
+    readEdits();
+    if(totalDevis==null)throw Error('Montant du devis payé indisponible.');
+    if(state.plans.some(p=>p.category!=='convoyage'))throw Error('Répartition automatique réservée aux missions de convoyage.');
+    const snapshot=state;
+    const session=(await sbAuth.auth.getSession()).data?.session;
+    if(!session?.access_token)throw Error('Reconnectez-vous pour le calcul automatique.');
+    const failures=[];
+    for(const [i,p] of snapshot.plans.entries()){
+      if(p.saved?.mission_id)continue;
+      note('Calcul automatique : mission '+(i+1)+' sur '+snapshot.plans.length+'…');
+      try{
+        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
+        const data=await response.json();
+        if(ticket!==generation||state!==snapshot)return;
+        if(!response.ok)throw Error(data.error||'Calcul routier indisponible');
+        if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
+        const routes=data.routes;
+        if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
+        p.distance=Math.round(routes.reduce((sum,r)=>sum+r.km,0)*10)/10;
+        const local=HCMissionBudget.local(p),days=HCMissionBudget.guardDays(p);
+        const controls=[...modal.querySelectorAll('[data-quote-plan="'+i+'"]')];
+        const prior=Object.fromEntries(controls.map(x=>[x.dataset.quoteField,x.type==='checkbox'?x.checked:x.value]));
+        const toll=routes.every(r=>Number.isFinite(r.tollsEuros))?routes.reduce((sum,r)=>sum+r.tollsEuros,0):null;
+        let energy=0;
+        for(const [j,r] of routes.entries()){
+          const motor=String(j?p.restit_motorisation:p.motorisation).toLowerCase();
+          if(/electri|électri/.test(motor))energy+=r.km*18/100*0.60;
+          else if(/diesel/.test(motor))energy+=r.km*6/100*1.80;
+          else if(/hybrid/.test(motor))energy+=r.km*5/100*1.85;
+          else energy+=r.km*6.5/100*1.85;
+        }
+        const manualEnergy=prior.energy!==undefined&&prior.energy!==''?Number(prior.energy):null;
+        if(manualEnergy!==null){if(!Number.isFinite(manualEnergy)||manualEnergy<0)throw Error('Budget énergie invalide');energy=manualEnergy;}
+        const effectiveToll=toll==null&&prior.verified&&prior.toll!==''?Number(prior.toll):toll;
+        if(effectiveToll!==null&&(!Number.isFinite(effectiveToll)||effectiveToll<0))throw Error('Péages invalides');
+        const fees=local?0:effectiveToll==null?null:Math.round((energy+effectiveToll)*100)/100;
+        autoDrafts.set(p.key,{days,local,energy:local?0:energy,toll:local?0:effectiveToll,fees,source:data.source,minutes:routes.reduce((sum,r)=>sum+r.minutes,0)});
+        pricingDrafts.set(p.key,{...prior,zone:local?'idf':'hors_idf',days,fuelPrice:prior.fuelPrice||1.85,consumption:prior.consumption||6.5,toll:toll??'',verified:!!prior.verified});
+        if(fees==null)throw Error('Péages indisponibles : connexion du fournisseur requise');
+      }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
+    }
+    if(ticket!==generation||state!==snapshot)return;
+    render();
+    if(failures.length){note('Calcul incomplet. '+failures.join(' · ')+'. Aucun prix existant remplacé.',true);return;}
+    const items=snapshot.plans.map(p=>{
+      if(p.saved?.mission_id)return {key:p.key,locked:true,total:Number(p.remuneration)};
+      const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.days*10,weight:HCRemunerationEstimation.proposedLabor(p.distance,a.local?'idf':'hors_idf')};
+    });
+    const result=HCMissionBudget.allocate(totalDevis,items);
+    for(const r of result.missions){
+      const p=snapshot.plans.find(p=>p.key===r.key);p.remuneration=r.total;
+      p.carburant_peages=autoDrafts.get(p.key).local?null:r.fees;
+      Object.assign(autoDrafts.get(p.key),{work:r.work,total:r.total});p.calcul_interne={...autoDrafts.get(p.key)};
+    }
+    render();note('Proposition calculée : '+money(result.reserve)+' réservés à HelixCar ; '+money(result.budget)+' répartis entre les missions. Vérifiez puis enregistrez le brouillon.');
+  }
+  function budgetErrors(){
+    if(totalDevis==null||state.plans.some(p=>p.category!=='convoyage'))return [];
+    const budget=HCMissionBudget.allocate(totalDevis,[]).budget;
+    const sum=state.plans.reduce((s,p)=>s+Number(p.remuneration||0),0);
+    return sum>budget+0.001?['Les rémunérations dépassent les 70 % du devis. Réduisez les montants pour préserver les 30 % HelixCar.']:[];
+  }
   function card(a){
     const rows=a.rows||[],raw=label=>String(rows.find(r=>r.label===label)?.value||'');
     const facts=items=>'<dl class="hc-prep-leg-facts">'+items.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+display(value||'À préciser')+'</dd></div>').join('')+'</dl>';
@@ -120,8 +186,9 @@
   function render(){
     if(!state)return;el('hc-prep-ref').textContent=state.source.reference+' · Devis payé';
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
-    if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>Pour l’ensemble de la demande · Avant rémunération des partenaires et autres frais.</small></aside>';
+    if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>'+esc(totalDevis==null?'':('Part HelixCar : '+money(HCMissionBudget.allocate(totalDevis,[]).reserve)+' · Budget missions : '+money(HCMissionBudget.allocate(totalDevis,[]).budget)))+'</small></aside>';
     if(!state.preview){
+      h+='<button type="button" class="btn btn-primary" data-auto-budget>Calculer les trajets et répartir les 70 %</button><p class="hc-prep-muted">Frais de route et garde inclus dans le budget. Missions publiées conservées. Le recalcul remplace les prix des brouillons.</p>';
       h+='<section class="hc-prep-internal"><h4>Organisation des véhicules</h4><p>Jusqu’à 5 jours inclus : même convoyeur. Au-delà : stockage à Noisy et mission séparée. Chaque dérogation concerne uniquement la période choisie.</p>';
       const seen=new Set();state.plans.forEach(p=>{const id=p.vehicule_id||'principal';if(seen.has(id)||!p.organisation)return;seen.add(id);
         const family=state.plans.filter(x=>(x.vehicule_id||'principal')===id),locked=family.some(x=>x.saved?.mission_id),o=p.organisation;
@@ -145,6 +212,8 @@
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
+      const auto=autoDrafts.get(p.key)||p.calcul_interne;
+      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France')+'</strong><p>'+esc(p.distance)+' km · '+esc(auto.minutes)+' min hors trafic</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':('<p>Carburant / recharge estimés : '+esc(money(auto.energy))+' · Péages : '+esc(auto.toll==null?'Indisponibles':money(auto.toll))+'</p>'))+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Hypothèses ajustables : essence 6,5 L/100 à 1,85 €/L ; diesel 6 L/100 à 1,80 €/L ; hybride 5 L/100 à 1,85 €/L ; électrique 18 kWh/100 à 0,60 €/kWh.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont carburant et péages (€)')+input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Openrouteservice : durée sans trafic, péages à vérifier. Aucune rémunération ni publication automatique.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
@@ -153,7 +222,7 @@
       if(p.category==='convoyage'){
         const q=(typeof pricingDrafts!=='undefined'?pricingDrafts.get(p.key):null)||{zone:'',days:0,fuelPrice:1.85,consumption:6.5,toll:'',verified:false};
         const field=(k,label,type='number')=>'<label>'+label+'<input type="'+type+'" data-quote-field="'+k+'" data-quote-plan="'+i+'" '+(type==='number'?'min="0" step="'+(k==='days'?'1':'0.01')+'"':'')+' value="'+esc(q[k]??'')+'"></label>';
-        h+='<details class="hc-prep-internal hc-prep-quote"><summary>Simuler le prix · barème progressif HelixCar</summary><p class="hc-prep-muted">Proposition non contractuelle, avec 10 €/jour de garde. Montants de garde exclusivement administratifs. Aucun calcul routier ou péage inventé.</p><div class="hc-prep-fields"><label>Zone<select data-quote-field="zone" data-quote-plan="'+i+'"><option value="idf"'+(q.zone==='idf'?' selected':'')+'>Île-de-France</option><option value="hors_idf"'+(q.zone==='hors_idf'?' selected':'')+'>Hors Île-de-France</option></select></label>'+field('days','Jours de garde du convoyeur')+field('fuelPrice','Carburant (€ / litre)')+field('consumption','Consommation (L / 100 km)')+field('toll','Total des péages vérifiés (€)')+'</div><label><input type="checkbox" data-quote-field="verified" data-quote-plan="'+i+'"'+(q.verified?' checked':'')+'> J’ai vérifié le trajet autoroutier le plus rapide et ses péages</label><p class="hc-prep-muted">En Île-de-France, aucun carburant ni péage n’est ajouté automatiquement. Pour un trajet hors Île-de-France, complétez obligatoirement le montant des péages, y compris 0 € si confirmé.</p><button type="button" class="btn btn-outline" data-quote-propose="'+i+'">Proposer un prix (administration)</button></details>';
+        h+='<details class="hc-prep-internal hc-prep-quote"><summary>Ajustements facultatifs · énergie et péages</summary><p class="hc-prep-muted">Proposition non contractuelle, avec 10 €/jour de garde. Montants de garde exclusivement administratifs. Aucun calcul routier ou péage inventé.</p><div class="hc-prep-fields"><label>Zone<select data-quote-field="zone" data-quote-plan="'+i+'"><option value="idf"'+(q.zone==='idf'?' selected':'')+'>Île-de-France</option><option value="hors_idf"'+(q.zone==='hors_idf'?' selected':'')+'>Hors Île-de-France</option></select></label>'+field('energy','Remplacer l’estimation carburant / recharge (€)')+field('days','Jours de garde du convoyeur')+field('fuelPrice','Carburant (€ / litre)')+field('consumption','Consommation (L / 100 km)')+field('toll','Total des péages vérifiés (€)')+'</div><label><input type="checkbox" data-quote-field="verified" data-quote-plan="'+i+'"'+(q.verified?' checked':'')+'> J’ai vérifié le trajet autoroutier le plus rapide et ses péages</label><p class="hc-prep-muted">En Île-de-France, aucun carburant ni péage n’est ajouté automatiquement. Pour un trajet hors Île-de-France, complétez obligatoirement le montant des péages, y compris 0 € si confirmé.</p><button type="button" class="btn btn-outline" data-quote-propose="'+i+'">Proposer un prix (administration)</button></details>';
       }
       if(p.retour_helixcar?.transfert){
         h+='<section class="hc-prep-internal hc-prep-return"><h4>Retour à Noisy avant une nouvelle mission</h4><p>Après la livraison, ce convoyeur ramène le véhicule récupéré à Noisy. Sa mission se termine à votre réception.</p><p><strong>Livraison précédente :</strong> '+display(p.rows.find(r=>r.label==='Livraison')?.value)+'</p><div class="hc-prep-fields">'+input(p,i,'retour_reception','Date et heure de réception à Noisy','datetime-local')+'</div><p>Prévoyez la durée du trajet retour et 45 minutes de marge. Le départ suivant est à régler dans la mission de restitution ci-dessous.</p></section>';
@@ -194,12 +263,13 @@
       p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];
     });
   }
-  async function save(){readEdits();const errors=state.plans.flatMap(p=>HCPreparation.fraisErrors(p).concat(HCPlanningCalcul.retourErrors(p,false)));if(errors.length)throw Error(errors.join(' · '));const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
+  async function save(){readEdits();const errors=budgetErrors().concat(state.plans.flatMap(p=>HCPreparation.fraisErrors(p).concat(HCPlanningCalcul.retourErrors(p,false))));if(errors.length)throw Error(errors.join(' · '));const data=await rpc('enregistrer_preparation_missions',{p_client_id:state.source.client.id,p_empreinte:state.source.empreinte,p_plans:state.plans.map(p=>{const copy=Object.assign({},p);delete copy.saved;copy.public=HCPreparation.publicData(p);return copy;})});adopt(data);}
   modal.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.id==='hc-prep-close'){if(busy)return;++generation;closeModal('preparation-missions');return;}
     if(busy||!state)return;busy=true;b.disabled=true;
     try{
+      if(b.hasAttribute('data-auto-budget')){await calculateAll();}
       if(b.hasAttribute('data-garde-vehicle')){
         readEdits();const id=b.dataset.gardeVehicle,key=b.dataset.gardePeriod;
         const family=state.plans.filter(p=>(p.vehicule_id||'principal')===id);
@@ -208,7 +278,7 @@
         exceptions[id][key]=!exceptions[id][key];
         const fresh=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise,exceptions);
         state.plans=state.plans.filter(p=>(p.vehicule_id||'principal')!==id).concat(fresh.filter(p=>(p.vehicule_id||'principal')===id)).sort((a,b)=>a.position-b.position);
-        render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
+        autoDrafts.clear();render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
       }
       if(b.hasAttribute('data-quote-propose')){
         readEdits();
@@ -241,7 +311,7 @@
         readEdits();
         const session=(await sbAuth.auth.getSession()).data?.session;
         if(!session?.access_token)throw Error('Reconnectez-vous pour demander une estimation.');
-        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:state.source.client.id,key:p.key})});
+        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:state.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
         const data=await response.json();
         if(!response.ok)throw Error(data.error||'Calcul routier indisponible');
         if(data.fingerprint!==state.source.empreinte)throw Error('La demande a changé. Rechargez les missions.');
@@ -280,6 +350,7 @@
       if(b.dataset.prepView==='admin'){state.preview=false;render();note('');}
       if(b.dataset.prepView==='preview'){await save();state.preview=true;render();note('');}
       if(b.hasAttribute('data-prep-publish')){
+        readEdits();if(budgetErrors().length)throw Error(budgetErrors().join(' · '));
         const p=state.plans[Number(b.dataset.prepPublish)];if(!p.saved)throw Error('Enregistrez le brouillon avant publication.');
         if(p.missing.length)throw Error('Publication bloquée : '+p.missing.join(' · '));
         if(!confirm('Publier cette mission au prix total de '+money(p.remuneration)+' auprès des partenaires éligibles ?'))return;
