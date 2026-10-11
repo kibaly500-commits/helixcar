@@ -108,4 +108,4 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),0);
  await page.evaluate(()=>window.dispatchEvent(new Event('hc-session-fermee')));assert.equal(await page.locator('[data-planning-id]').count(),0);
  assert.deepEqual(errors,[]);await page.close();console.log('PASS planning UI '+width+' : filtres, adresses privées, confirmation, conflits, clés, horaires manuels sauvegardés et déconnexion');
- }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
+ }}finally{await browser.close();}})().catch(e=>{console.error('Error planning UI diagnostic: '+String(e.stack||e).replace(/\n/g,' | '));process.exitCode=1;});
