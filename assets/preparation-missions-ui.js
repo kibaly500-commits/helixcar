@@ -54,6 +54,7 @@
     saved.filter(s=>s.mission_id&&!plans.some(p=>p.key===s.cle)).forEach(s=>plans.push(Object.assign({},s.plan,{saved:s})));
     plans.forEach(p=>{
       if(p.category!=='convoyage')return;
+      HCMissionBudget.useOutboundDistance(p);
       if(!p.saved?.mission_id)p.missing=[...new Set([...(p.missing||[]),...HCPreparation.missingVins(p.mission)])];
       const pickupKey=p.kind==='apres_stockage'?'heure_retrait':'heure_prise_en_charge';
       if(p[pickupKey]==null)p[pickupKey]=p.rows.find(r=>r.label==='Prise en charge')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
@@ -78,6 +79,7 @@
     finally{busy=false;}
   };
   async function calculateAll(ticket=generation,automatic=false){
+    state.plans.forEach(p=>HCMissionBudget.useOutboundDistance(p));
     readEdits();
     if(totalDevis==null)throw Error('Montant du devis payé indisponible.');
     if(state.plans.some(p=>p.category!=='convoyage'))throw Error('Répartition automatique réservée aux missions de convoyage.');
@@ -94,16 +96,16 @@
           const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
           const data=await response.json();
           if(ticket!==generation||state!==snapshot)return;
-          if(!response.ok)throw Error('Kilomètres automatiques indisponibles. Saisissez la distance totale du trajet, restitution comprise, puis relancez le calcul.');
+          if(!response.ok)throw Error('Kilomètres automatiques indisponibles. Saisissez la distance aller uniquement, puis relancez le calcul.');
           if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
           const routes=data.routes;
           if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
-          p.distance=Math.round(routes.reduce((sum,r)=>sum+r.km,0)*10)/10;
+          p.distance=routes[0].km;p.distance_basis='outbound_v1';
           p.distance_aller=routes[0].km;
-          minutes=routes.reduce((sum,r)=>sum+r.minutes,0);source=data.source;
+          minutes=routes[0].minutes;source=data.source;
         }
         const local=HCMissionBudget.local(p),custody=HCMissionBudget.guardPricing(p);
-        autoDrafts.set(p.key,{...custody,local,source,minutes,rate:local?0:0.22});
+        autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',local,source,minutes,rate:local?0:0.22});
       }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
     }
     if(ticket!==generation||state!==snapshot)return;
@@ -112,7 +114,7 @@
     snapshot.plans.filter(p=>!p.saved?.mission_id).forEach(p=>Object.assign(autoDrafts.get(p.key),HCMissionBudget.travelPricing(p,snapshot.plans)));
     const items=snapshot.plans.map(p=>{
       if(p.saved?.mission_id||(automatic&&p.remuneration!=null&&p.remuneration!==''))return {key:p.key,locked:true,total:Number(p.remuneration)};
-      const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.guard,extra:a.extra,weight:HCRemunerationEstimation.proposedLabor(p.distance,a.local?'idf':'hors_idf')};
+      const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.guard,extra:a.extra,weight:HCRemunerationEstimation.proposedLabor(a.outboundKm,a.local?'idf':'hors_idf')};
     });
     const result=HCMissionBudget.allocate(totalDevis,items);
     for(const r of result.missions){
@@ -200,10 +202,11 @@
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
-      const auto=autoDrafts.get(p.key)||p.calcul_interne;
-      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+(auto.periods?esc(auto.periods.filter(d=>d>0).join(' + ')||0)+' jour(s) · 25 € par tranche complète de 4 jours, par véhicule = '+esc(money(auto.guard)):'Ancien calcul enregistré. Recalculez les brouillons pour appliquer les nouveaux paliers.')+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(auto.outboundKm??p.distance)+' km aller × 0,22 € = '+esc(money(auto.outboundFees??auto.fees))+'</p>')+(auto.returnFees>0?'<p>Restitution hors Île-de-France : 50 % des frais de l’aller ('+esc(money(auto.referenceFees))+') = '+esc(money(auto.returnFees))+'</p>':'')+(auto.extra>0?'<p>Supplément restitution Île-de-France : '+esc(money(auto.extra))+'</p>':'')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
+      const auto=autoDrafts.get(p.key)||(p.calcul_interne?.distanceBasis==='outbound_v1'?p.calcul_interne:null);
+      if(!auto&&p.calcul_interne)h+='<p class="hc-prep-muted">Ancien calcul enregistré : relancez le calcul pour appliquer le kilométrage aller uniquement.</p>';
+      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km aller'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+(auto.periods?esc(auto.periods.filter(d=>d>0).join(' + ')||0)+' jour(s) · 25 € par tranche complète de 4 jours, par véhicule = '+esc(money(auto.guard)):'Ancien calcul enregistré. Recalculez les brouillons pour appliquer les nouveaux paliers.')+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(auto.outboundKm??p.distance)+' km aller × 0,22 € = '+esc(money(auto.outboundFees??auto.fees))+'</p>')+(auto.returnFees>0?'<p>Restitution hors Île-de-France : 50 % des frais de l’aller ('+esc(money(auto.referenceFees))+') = '+esc(money(auto.returnFees))+'</p>':'')+(auto.extra>0?'<p>Supplément restitution Île-de-France : '+esc(money(auto.extra))+'</p>':'')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance totale, restitution comprise (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France, restitution comprise. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
@@ -232,6 +235,7 @@
     const p=state.plans[Number(e.dataset.plan)],key=e.dataset.field;
     const previous=p[key]??'';
     p[key]=e.type==='number'?(e.value===''?null:Number(e.value)):e.value;
+    if(key==='distance'&&!p.saved?.mission_id){p.distance_aller=p.distance;p.distance_basis='outbound_v1';}
     if(e.type==='time'&&e.value===previous)return;
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
@@ -275,10 +279,10 @@
         if(data.fingerprint!==state.source.empreinte)throw Error('La demande a changé. Rechargez les missions.');
         const routes=data.routes||[];
         if(!routes.length)throw Error('Aucun itinéraire calculé');
-        const distance=routes.reduce((sum,r)=>sum+Number(r.km||0),0);
+        const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
         p.distance=Math.round(distance*10)/10;p.distance_aller=routes[0].km;
         render();
-        note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+routes.reduce((s,r)=>s+Number(r.minutes||0),0)+' min de conduite hors trafic. Cliquez sur Calculer les trajets et répartir les 70 % pour appliquer le forfait de frais de route.');
+        note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+Number(routes[0].minutes||0)+' min de conduite hors trafic. Cliquez sur Calculer les trajets et répartir les 70 % pour appliquer le forfait de frais de route.');
       }
       if(b.hasAttribute('data-edit-vehicle')){
         readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];

@@ -33,6 +33,14 @@ function guardPeriods(p){
 function guardDays(p){return guardPeriods(p).reduce((a,b)=>a+b,0);}
 function guardAllowance(days){amount(days);return Math.floor(days/4)*25;}
 function guardPricing(p){const periods=guardPeriods(p);return {periods,days:guardDays(p),guard:periods.reduce((sum,days)=>sum+guardAllowance(days),0)};}
+function useOutboundDistance(p){
+ if(p.saved?.mission_id)return;
+ if(p.distance_basis!=='outbound_v1'){
+  if(p.mission.restitution)p.distance=Number(p.distance_aller)>0?Number(p.distance_aller):null;
+  p.distance_basis='outbound_v1';
+ }
+ p.distance_aller=p.distance;
+}
 function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return isLocal?0:Math.round(km*22)/100;}
 function localAddresses(...addresses){return addresses.every(a=>/\b(?:75|77|78|91|92|93|94|95)\d{3}\b/.test(a||''));}
 function travelPricing(p,plans=[]){
@@ -55,6 +63,6 @@ function travelPricing(p,plans=[]){
  }
  return {outboundKm,outboundFees,returnFees,extra,fees:Math.round((outboundFees+returnFees)*100)/100,referenceFees};
 }
-const api={allocate,local,guardDays,guardAllowance,guardPricing,roadFees,travelPricing};
+const api={allocate,local,guardDays,guardAllowance,guardPricing,useOutboundDistance,roadFees,travelPricing};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCMissionBudget=api;
 })(typeof window==='undefined'?globalThis:window);
