@@ -100,12 +100,12 @@
           if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
           const routes=data.routes;
           if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
-          p.distance=routes[0].km;p.distance_basis='outbound_v1';
-          p.distance_aller=routes[0].km;
+          p.distance=HCMissionBudget.wholeKm(routes[0].km);p.distance_basis='outbound_v1';
+          p.distance_aller=p.distance;
           minutes=routes[0].minutes;source=data.source;
         }
         const local=HCMissionBudget.local(p),custody=HCMissionBudget.guardPricing(p);
-        autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',pricingPolicy:'adaptive_v1',local,source,minutes,rate:local?0:0.22});
+        autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',pricingPolicy:'rounded_v1',local,source,minutes,rate:local?0:0.22});
       }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
     }
     if(ticket!==generation||state!==snapshot)return;
@@ -116,7 +116,7 @@
       if(p.saved?.mission_id||(automatic&&p.remuneration!=null&&p.remuneration!==''))return {key:p.key,locked:true,total:Number(p.remuneration)};
       const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.guard,extra:a.extra,weight:HCRemunerationEstimation.proposedLabor(a.outboundKm,a.local?'idf':'hors_idf')};
     });
-    const result=HCMissionBudget.allocate(totalDevis,items);
+    const result=HCMissionBudget.roundAllocation(HCMissionBudget.allocate(totalDevis,items),items);
     for(const r of result.missions){
       const p=snapshot.plans.find(p=>p.key===r.key);p.remuneration=r.total;
       p.carburant_peages=autoDrafts.get(p.key).local?null:r.fees;
@@ -167,7 +167,7 @@
     const min=key==='retour_reception'?HCPlanningCalcul.retourReceptionMin(p):'';
     const value=p[key]??'';
     const invalid=min&&value&&String(value).slice(0,16)<min;
-    return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'0.1':'0.01')+'"':'')+(min?' min="'+esc(min)+'"':'')+' value="'+esc(invalid?'':value)+'">'+(invalid?'<small>La date précédente était antérieure à la livraison. Choisissez un nouveau rendez-vous.</small>':'')+'</label>';
+    return '<label>'+label+'<input data-plan="'+i+'" data-field="'+key+'" type="'+type+'" '+(type==='number'?'min="0" step="'+(key==='distance'?'1':key==='remuneration'?'5':'0.01')+'"':'')+(min?' min="'+esc(min)+'"':'')+' value="'+esc(invalid?'':value)+'">'+(invalid?'<small>La date précédente était antérieure à la livraison. Choisissez un nouveau rendez-vous.</small>':'')+'</label>';
   }
   function motor(p,i,key,label){
     const source=HCPreparation.build(state.source.client,state.source.vehicules,state.source.point_remise).find(x=>x.key===p.key);
@@ -183,7 +183,7 @@
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
     if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>'+esc(totalDevis==null?'':('Minimum HelixCar (30 %) : '+money(HCMissionBudget.allocate(totalDevis,[]).reserve)+' · Plafond missions (70 %) : '+money(HCMissionBudget.allocate(totalDevis,[]).budget)))+'</small></aside>';
     if(!state.preview){
-      h+='<button type="button" class="btn btn-primary" data-auto-budget>Calculer les tarifs des missions</button><p class="hc-prep-muted">Tarifs selon le kilométrage aller, frais de route, restitution et garde inclus. Si le budget client est inférieur au barème, la part travail est réduite proportionnellement, en conservant les frais et suppléments. Aucun tarif n’est augmenté pour dépenser les 70 %. Missions publiées conservées. Le recalcul remplace les prix des brouillons.</p>';
+      h+='<button type="button" class="btn btn-primary" data-auto-budget>Calculer les tarifs des missions</button><p class="hc-prep-muted">Tarifs selon le kilométrage aller, frais de route, restitution et garde inclus. Si le budget client est inférieur au barème, la part travail est réduite proportionnellement, en conservant les frais et suppléments. Aucun tarif n’est augmenté pour dépenser les 70 %. Missions publiées conservées. Prix arrondis à 5 € près et kilomètres entiers. Si nécessaire, un prix est arrondi vers le bas pour respecter le plafond global. Le recalcul remplace les prix des brouillons.</p>';
       h+='<section class="hc-prep-internal"><h4>Organisation des véhicules</h4><p>Jusqu’à 5 jours inclus : même convoyeur. Au-delà : stockage à Noisy et mission séparée. Chaque dérogation concerne uniquement la période choisie.</p>';
       const seen=new Set();state.plans.forEach(p=>{const id=p.vehicule_id||'principal';if(seen.has(id)||!p.organisation)return;seen.add(id);
         const family=state.plans.filter(x=>(x.vehicule_id||'principal')===id),locked=family.some(x=>x.saved?.mission_id),o=p.organisation;
@@ -207,7 +207,7 @@
       h+='<dl class="hc-prep-facts">'+p.rows.map(r=>vehicleRow(p,i,r)).join('')+'</dl>';
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
-      const auto=autoDrafts.get(p.key)||(p.calcul_interne?.pricingPolicy==='adaptive_v1'?p.calcul_interne:null);
+      const auto=autoDrafts.get(p.key)||(p.calcul_interne?.pricingPolicy==='rounded_v1'?p.calcul_interne:null);
       if(!auto&&p.calcul_interne)h+='<p class="hc-prep-muted">Ancien calcul enregistré : relancez le calcul pour adapter les tarifs au budget client.</p>';
       if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km aller'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+(auto.periods?esc(auto.periods.filter(d=>d>0).join(' + ')||0)+' jour(s) · 25 € par tranche complète de 4 jours, par véhicule = '+esc(money(auto.guard)):'Ancien calcul enregistré. Recalculez les brouillons pour appliquer les nouveaux paliers.')+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(auto.outboundKm??p.distance)+' km aller × 0,22 € = '+esc(money(auto.outboundFees??auto.fees))+'</p>')+(auto.returnFees>0?'<p>Restitution hors Île-de-France : 50 % des frais de l’aller ('+esc(money(auto.referenceFees))+') = '+esc(money(auto.returnFees))+'</p>':'')+(auto.extra>0?'<p>Supplément restitution Île-de-France : '+esc(money(auto.extra))+'</p>':'')+(auto.adjusted?'<p><strong>Adapté au budget client</strong> · Travail au barème : '+esc(money(auto.standardWork))+' ; travail ajusté : '+esc(money(auto.work))+'</p>':'')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
@@ -240,7 +240,8 @@
     const p=state.plans[Number(e.dataset.plan)],key=e.dataset.field;
     const previous=p[key]??'';
     p[key]=e.type==='number'?(e.value===''?null:Number(e.value)):e.value;
-    if(key==='distance'&&!p.saved?.mission_id){p.distance_aller=p.distance;p.distance_basis='outbound_v1';}
+    if(key==='remuneration'&&!p.saved?.mission_id&&p[key]!=null){p[key]=Math.round(p[key]/5)*5;e.value=p[key];}
+    if(key==='distance'&&!p.saved?.mission_id){if(p.distance!=null)p.distance=HCMissionBudget.wholeKm(p.distance);e.value=p.distance??'';p.distance_aller=p.distance;p.distance_basis='outbound_v1';}
     if(e.type==='time'&&e.value===previous)return;
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
@@ -294,7 +295,7 @@
         const routes=data.routes||[];
         if(!routes.length)throw Error('Aucun itinéraire calculé');
         const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
-        p.distance=Math.round(distance*10)/10;p.distance_aller=routes[0].km;
+        p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
         render();
         note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+Number(routes[0].minutes||0)+' min de conduite hors trafic. Cliquez sur Calculer les tarifs des missions pour appliquer le forfait de frais de route.');
       }

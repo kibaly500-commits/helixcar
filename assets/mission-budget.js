@@ -22,6 +22,23 @@ function allocate(total,items){
  return {reserve:reserve/100,budget:budget/100,spent:spent/100,remaining:(invoice-spent)/100,unallocated:(budget-spent)/100,adjusted,
   missions:open.map((x,i)=>({key:x.key,total:(costs[i]+shares[i])/100,work:shares[i]/100,standardWork:work[i]/100,adjusted:shares[i]<work[i],fees:x.fees,guard:x.guard,extra:x.extra||0}))};
 }
+function roundAllocation(result,items){
+ const fixed=items.filter(x=>x.locked).reduce((s,x)=>s+cents(x.total),0);
+ const rows=result.missions.map(m=>{
+  const cost=cents(m.fees)+cents(m.guard)+cents(m.extra||0),raw=cents(m.total);
+  return {m,cost,raw,min:Math.ceil(cost/500)*500,value:Math.max(Math.round(raw/500)*500,Math.ceil(cost/500)*500)};
+ });
+ const budget=cents(result.budget);
+ if(fixed+rows.reduce((s,r)=>s+r.min,0)>budget)throw Error('Budget insuffisant pour arrondir les prix à 5 € tout en conservant les frais et suppléments.');
+ let spent=fixed+rows.reduce((s,r)=>s+r.value,0);
+ while(spent>budget){
+  const candidates=rows.filter(r=>r.value-500>=r.min).sort((a,b)=>(Math.abs(a.value-500-a.raw)-Math.abs(a.value-a.raw))-(Math.abs(b.value-500-b.raw)-Math.abs(b.value-b.raw)));
+  candidates[0].value-=500;spent-=500;
+ }
+ return {...result,spent:spent/100,remaining:(cents(result.remaining)+cents(result.spent)-spent)/100,unallocated:(budget-spent)/100,
+  missions:rows.map(r=>({...r.m,total:r.value/100,work:(r.value-r.cost)/100,rounding:(r.value-r.raw)/100}))};
+}
+function wholeKm(value){amount(value);return value>0?Math.max(1,Math.round(value)):0;}
 function local(plan){
  const m=plan.mission,addresses=[m.adresse_depart,m.adresse_arrivee];if(m.restitution)addresses.push(m.adresse_restitution);
  return addresses.every(a=>/\b(?:75|77|78|91|92|93|94|95)\d{3}\b/.test(a||''));
@@ -42,6 +59,7 @@ function useOutboundDistance(p){
   if(p.mission.restitution)p.distance=Number(p.distance_aller)>0?Number(p.distance_aller):null;
   p.distance_basis='outbound_v1';
  }
+ if(p.distance!=null)p.distance=wholeKm(Number(p.distance));
  p.distance_aller=p.distance;
 }
 function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return isLocal?0:Math.round(km*22)/100;}
@@ -66,6 +84,6 @@ function travelPricing(p,plans=[]){
  }
  return {outboundKm,outboundFees,returnFees,extra,fees:Math.round((outboundFees+returnFees)*100)/100,referenceFees};
 }
-const api={allocate,local,guardDays,guardAllowance,guardPricing,useOutboundDistance,roadFees,travelPricing};
+const api={allocate,roundAllocation,wholeKm,local,guardDays,guardAllowance,guardPricing,useOutboundDistance,roadFees,travelPricing};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCMissionBudget=api;
 })(typeof window==='undefined'?globalThis:window);
