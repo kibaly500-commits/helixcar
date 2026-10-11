@@ -30,6 +30,7 @@ function guardDays(p){
  const after=p.mission.restitution&&!p.retour_helixcar?Math.max(0,o.returnDays||0):0;
  return before+after;
 }
-const api={allocate,local,guardDays};
+function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return isLocal?0:Math.round(km*22)/100;}
+const api={allocate,local,guardDays,roadFees};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCMissionBudget=api;
 })(typeof window==='undefined'?globalThis:window);

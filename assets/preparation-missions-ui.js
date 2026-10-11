@@ -82,41 +82,28 @@
     if(totalDevis==null)throw Error('Montant du devis payé indisponible.');
     if(state.plans.some(p=>p.category!=='convoyage'))throw Error('Répartition automatique réservée aux missions de convoyage.');
     const snapshot=state;
-    const session=(await sbAuth.auth.getSession()).data?.session;
-    if(!session?.access_token)throw Error('Reconnectez-vous pour le calcul automatique.');
     const failures=[];
     for(const [i,p] of snapshot.plans.entries()){
       if(p.saved?.mission_id)continue;
       note('Calcul automatique : mission '+(i+1)+' sur '+snapshot.plans.length+'…');
       try{
-        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
-        const data=await response.json();
-        if(ticket!==generation||state!==snapshot)return;
-        if(!response.ok)throw Error(data.error||'Calcul routier indisponible');
-        if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
-        const routes=data.routes;
-        if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
-        p.distance=Math.round(routes.reduce((sum,r)=>sum+r.km,0)*10)/10;
-        const local=HCMissionBudget.local(p),days=HCMissionBudget.guardDays(p);
-        const controls=[...modal.querySelectorAll('[data-quote-plan="'+i+'"]')];
-        const prior=Object.fromEntries(controls.map(x=>[x.dataset.quoteField,x.type==='checkbox'?x.checked:x.value]));
-        const toll=routes.every(r=>Number.isFinite(r.tollsEuros))?routes.reduce((sum,r)=>sum+r.tollsEuros,0):null;
-        let energy=0;
-        for(const [j,r] of routes.entries()){
-          const motor=String(j?p.restit_motorisation:p.motorisation).toLowerCase();
-          if(/electri|électri/.test(motor))energy+=r.km*18/100*0.60;
-          else if(/diesel/.test(motor))energy+=r.km*6/100*1.80;
-          else if(/hybrid/.test(motor))energy+=r.km*5/100*1.85;
-          else energy+=r.km*6.5/100*1.85;
+        let minutes=null,source='Distance renseignée ou conservée';
+        if(!(Number(p.distance)>0&&Number.isFinite(Number(p.distance)))){
+          const session=(await sbAuth.auth.getSession()).data?.session;
+          if(!session?.access_token)throw Error('Renseignez les kilomètres ou reconnectez-vous au calcul routier.');
+          const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
+          const data=await response.json();
+          if(ticket!==generation||state!==snapshot)return;
+          if(!response.ok)throw Error('Kilomètres automatiques indisponibles. Saisissez la distance totale du trajet, restitution comprise, puis relancez le calcul.');
+          if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
+          const routes=data.routes;
+          if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
+          p.distance=Math.round(routes.reduce((sum,r)=>sum+r.km,0)*10)/10;
+          minutes=routes.reduce((sum,r)=>sum+r.minutes,0);source=data.source;
         }
-        const manualEnergy=prior.energy!==undefined&&prior.energy!==''?Number(prior.energy):null;
-        if(manualEnergy!==null){if(!Number.isFinite(manualEnergy)||manualEnergy<0)throw Error('Budget énergie invalide');energy=manualEnergy;}
-        const effectiveToll=toll==null&&prior.verified&&prior.toll!==''?Number(prior.toll):toll;
-        if(effectiveToll!==null&&(!Number.isFinite(effectiveToll)||effectiveToll<0))throw Error('Péages invalides');
-        const fees=local?0:effectiveToll==null?null:Math.round((energy+effectiveToll)*100)/100;
-        autoDrafts.set(p.key,{days,local,energy:local?0:energy,toll:local?0:effectiveToll,fees,source:data.source,minutes:routes.reduce((sum,r)=>sum+r.minutes,0)});
-        pricingDrafts.set(p.key,{...prior,zone:local?'idf':'hors_idf',days,fuelPrice:prior.fuelPrice||1.85,consumption:prior.consumption||6.5,toll:toll??'',verified:!!prior.verified});
-        if(fees==null)throw Error('Péages indisponibles : connexion du fournisseur requise');
+        const local=HCMissionBudget.local(p),days=HCMissionBudget.guardDays(p);
+        const fees=HCMissionBudget.roadFees(Number(p.distance),local);
+        autoDrafts.set(p.key,{days,local,fees,source,minutes,rate:local?0:0.22});
       }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
     }
     if(ticket!==generation||state!==snapshot)return;
@@ -213,17 +200,12 @@
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       const auto=autoDrafts.get(p.key)||p.calcul_interne;
-      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France')+'</strong><p>'+esc(p.distance)+' km · '+esc(auto.minutes)+' min hors trafic</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':('<p>Carburant / recharge estimés : '+esc(money(auto.energy))+' · Péages : '+esc(auto.toll==null?'Indisponibles':money(auto.toll))+'</p>'))+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Hypothèses ajustables : essence 6,5 L/100 à 1,85 €/L ; diesel 6 L/100 à 1,80 €/L ; hybride 5 L/100 à 1,85 €/L ; électrique 18 kWh/100 à 0,60 €/kWh.</small></aside>';
+      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(p.distance)+' km × 0,22 € = '+esc(money(auto.fees))+'</p>')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont carburant et péages (€)')+input(p,i,'distance','Distance du trajet (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Openrouteservice : durée sans trafic, péages à vérifier. Aucune rémunération ni publication automatique.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance totale, restitution comprise (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Distance automatique gratuite si le service est configuré. Sinon, saisissez les kilomètres Mappy puis cliquez sur Calculer les trajets et répartir les 70 %.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
-      if(p.category==='convoyage'){
-        const q=(typeof pricingDrafts!=='undefined'?pricingDrafts.get(p.key):null)||{zone:'',days:0,fuelPrice:1.85,consumption:6.5,toll:'',verified:false};
-        const field=(k,label,type='number')=>'<label>'+label+'<input type="'+type+'" data-quote-field="'+k+'" data-quote-plan="'+i+'" '+(type==='number'?'min="0" step="'+(k==='days'?'1':'0.01')+'"':'')+' value="'+esc(q[k]??'')+'"></label>';
-        h+='<details class="hc-prep-internal hc-prep-quote"><summary>Ajustements facultatifs · énergie et péages</summary><p class="hc-prep-muted">Proposition non contractuelle, avec 10 €/jour de garde. Montants de garde exclusivement administratifs. Aucun calcul routier ou péage inventé.</p><div class="hc-prep-fields"><label>Zone<select data-quote-field="zone" data-quote-plan="'+i+'"><option value="idf"'+(q.zone==='idf'?' selected':'')+'>Île-de-France</option><option value="hors_idf"'+(q.zone==='hors_idf'?' selected':'')+'>Hors Île-de-France</option></select></label>'+field('energy','Remplacer l’estimation carburant / recharge (€)')+field('days','Jours de garde du convoyeur')+field('fuelPrice','Carburant (€ / litre)')+field('consumption','Consommation (L / 100 km)')+field('toll','Total des péages vérifiés (€)')+'</div><label><input type="checkbox" data-quote-field="verified" data-quote-plan="'+i+'"'+(q.verified?' checked':'')+'> J’ai vérifié le trajet autoroutier le plus rapide et ses péages</label><p class="hc-prep-muted">En Île-de-France, aucun carburant ni péage n’est ajouté automatiquement. Pour un trajet hors Île-de-France, complétez obligatoirement le montant des péages, y compris 0 € si confirmé.</p><button type="button" class="btn btn-outline" data-quote-propose="'+i+'">Proposer un prix (administration)</button></details>';
-      }
       if(p.retour_helixcar?.transfert){
         h+='<section class="hc-prep-internal hc-prep-return"><h4>Retour à Noisy avant une nouvelle mission</h4><p>Après la livraison, ce convoyeur ramène le véhicule récupéré à Noisy. Sa mission se termine à votre réception.</p><p><strong>Livraison précédente :</strong> '+display(p.rows.find(r=>r.label==='Livraison')?.value)+'</p><div class="hc-prep-fields">'+input(p,i,'retour_reception','Date et heure de réception à Noisy','datetime-local')+'</div><p>Prévoyez la durée du trajet retour et 45 minutes de marge. Le départ suivant est à régler dans la mission de restitution ci-dessous.</p></section>';
       }else if(p.retour_helixcar){
@@ -280,31 +262,6 @@
         state.plans=state.plans.filter(p=>(p.vehicule_id||'principal')!==id).concat(fresh.filter(p=>(p.vehicule_id||'principal')===id)).sort((a,b)=>a.position-b.position);
         autoDrafts.clear();render();note('Découpage recalculé pour ce véhicule. Vérifiez les horaires, distances et prix, puis enregistrez le brouillon.');
       }
-      if(b.hasAttribute('data-quote-propose')){
-        readEdits();
-        const i=Number(b.dataset.quotePropose),p=state.plans[i];
-        if(!p||p.category!=='convoyage'||p.saved?.mission_id)throw Error('Simulation disponible uniquement sur les brouillons convoyage');
-        const elements=[...modal.querySelectorAll('[data-quote-plan="'+i+'"]')];
-        const values=Object.fromEntries(elements.map(x=>[x.dataset.quoteField,x.type==='checkbox'?x.checked:x.value]));
-        pricingDrafts.set(p.key,values);
-        const km=Number(p.distance);
-        if(p.distance==null||!Number.isFinite(km)||km<=0)throw Error('Renseignez ou estimez la distance réelle de la mission.');
-        if(!values.verified)throw Error('Vérifiez l’itinéraire autoroutier le plus rapide et ses péages.');
-        if(!['idf','hors_idf'].includes(values.zone))throw Error('Choisissez Île-de-France ou hors Île-de-France.');
-        const local=values.zone==='idf';
-        const toll=values.toll===''?null:Number(values.toll);
-        if(!local&&toll===null)throw Error('Péages à renseigner, même si le montant est de 0 €.');
-        const input={zone:values.zone,guardDays:Number(values.days),fuelPricePerLiter:local?undefined:Number(values.fuelPrice),
-          consumptionLitersPer100Km:local?undefined:Number(values.consumption),
-          legs:[{km,minutes:0,motorwayFastest:true,tollEuros:local?null:toll}]};
-        const result=HCRemunerationEstimation.quoteMission(input);
-        if(result.totalEuros==null)throw Error('Calcul incomplet : vérifiez les péages.');
-        // Seuls ces deux montants sont intégrés au brouillon. Jamais les jours ni le coût de garde.
-        p.remuneration=result.totalEuros;
-        p.carburant_peages=result.feesEuros;
-        render();
-        note('Proposition à confirmer : '+money(result.totalEuros)+' (dont '+money(result.feesEuros)+' de frais de route). Travail '+money(result.internalBreakdown.workPayEuros)+' et garde '+money(result.internalBreakdown.guardEuros)+' réservés à l’administration. Cliquez sur Enregistrer le brouillon pour sauvegarder les montants.');
-      }
       if(b.hasAttribute('data-estimate-free')){
         const i=Number(b.dataset.estimateFree),p=state.plans[i];
         if(!p||p.category!=='convoyage'||p.saved?.mission_id)throw Error('Ce calcul concerne uniquement un brouillon convoyage.');
@@ -320,7 +277,7 @@
         const distance=routes.reduce((sum,r)=>sum+Number(r.km||0),0);
         p.distance=Math.round(distance*10)/10;
         render();
-        note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+routes.reduce((s,r)=>s+Number(r.minutes||0),0)+' min de conduite hors trafic. Vérifiez les péages et le trajet autoroutier le plus rapide avant de valider. Prix inchangé. Enregistrez le brouillon si cette distance convient.');
+        note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+routes.reduce((s,r)=>s+Number(r.minutes||0),0)+' min de conduite hors trafic. Cliquez sur Calculer les trajets et répartir les 70 % pour appliquer le forfait de frais de route.');
       }
       if(b.hasAttribute('data-edit-vehicle')){
         readEdits();const i=Number(b.dataset.editVehicle),key=b.dataset.vehicleKey,p=state.plans[i];

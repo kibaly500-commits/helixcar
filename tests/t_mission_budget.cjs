@@ -18,3 +18,9 @@ assert.equal(B.guardDays({kind:'avant_stockage',organisation:{beforeDays:6},miss
 assert.equal(B.guardDays({kind:'apres_stockage',organisation:{beforeDays:6,returnDays:6},retour_helixcar:{},mission:{restitution:true}}),1);
 assert.equal(B.guardDays({kind:'direct',organisation:{retraitClient:true,beforeDays:6},mission:{}}),0);
 console.log('PASS budget : 30/70, centimes, pondération, frais inclus, publié verrouillé, dépassement, IDF, gardes sans dépôt.');
+assert.equal(B.roadFees(934,false),205.48);
+assert.equal(B.roadFees(500,false),110);
+assert.equal(B.roadFees(200,false),44);
+assert.equal(B.roadFees(80,true),0);
+assert.throws(()=>B.roadFees(0,false));assert.throws(()=>B.roadFees(NaN,false));
+console.log('PASS forfait 0,22 €/km et exclusion IDF.');
