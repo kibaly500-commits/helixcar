@@ -1,13 +1,13 @@
 const assert=require('node:assert/strict');
 const B=require('../assets/mission-budget.js');
 let r=B.allocate(1000,[{key:'court',fees:0,guard:0,weight:50},{key:'long',fees:100,guard:50,weight:150}]);
-assert.equal(r.reserve,300);assert.equal(r.budget,700);assert.deepEqual(r.missions.map(x=>x.total),[137.5,562.5]);
-for(let n=1;n<101;n++){
+assert.equal(r.reserve,300);assert.equal(r.budget,700);assert.deepEqual(r.missions.map(x=>x.total),[50,300]);
+for(let n=10;n<101;n++){
  r=B.allocate(n+0.01,[{key:'a',fees:0,guard:0,weight:1},{key:'b',fees:0,guard:0,weight:2},{key:'c',fees:0,guard:0,weight:3}]);
- assert.equal(Math.round(r.missions.reduce((s,x)=>s+x.total,0)*100),Math.round(r.budget*100));
+ assert.equal(Math.round(r.missions.reduce((s,x)=>s+x.total,0)*100),600);
  assert.ok(r.reserve>=(n+0.01)*0.3-1e-9);
 }
-r=B.allocate(1000,[{key:'published',locked:true,total:300},{key:'new',fees:50,guard:20,weight:100}]);assert.equal(r.missions[0].total,400);
+r=B.allocate(1000,[{key:'published',locked:true,total:300},{key:'new',fees:50,guard:20,weight:100}]);assert.equal(r.missions[0].total,170);
 assert.throws(()=>B.allocate(100,[{key:'x',fees:60,guard:20,weight:10}]),/insuffisant/);
 assert.throws(()=>B.allocate(100,[{key:'x',locked:true,total:80}]),/insuffisant/);
 assert.throws(()=>B.allocate(NaN,[]));
@@ -33,7 +33,7 @@ pricing=B.travelPricing(mixed);assert.equal(pricing.fees,110);assert.equal(prici
 const bridge={...outside,retour_helixcar:{transfert:true}};
 const secondary={key:'return',vehicule_id:'v',restitution_secondaire:true,distance:25,mission:{adresse_depart:'93160 Noisy',adresse_arrivee:'78000 Versailles'}};
 assert.equal(B.travelPricing(bridge).returnFees,0);assert.equal(B.travelPricing(secondary,[bridge,secondary]).returnFees,55);
-r=B.allocate(1000,[{key:'a',fees:0,guard:0,extra:20,weight:1},{key:'b',fees:0,guard:0,weight:1}]);assert.equal(r.missions[0].total-r.missions[1].total,20);assert.equal(r.missions.reduce((s,x)=>s+x.total,0),700);
+r=B.allocate(1000,[{key:'a',fees:0,guard:0,extra:20,weight:1},{key:'b',fees:0,guard:0,weight:1}]);assert.equal(r.missions[0].total-r.missions[1].total,20);assert.equal(r.missions.reduce((s,x)=>s+x.total,0),22);
 console.log('PASS restitution : +20 IDF, 50 % aller hors IDF, mixte, découpage et conservation 30/70.');
 
 for(const [days,euros] of [[0,0],[1,0],[2,0],[3,0],[3.99,0],[4,25],[7,25],[8,50],[11,50],[12,75]])assert.equal(B.guardAllowance(days),euros);
@@ -46,3 +46,13 @@ for(const [before,after,euros] of [[2,2,0],[4,4,50],[5,5,50],[8,0,50]]){
 assert.equal(B.guardPricing({kind:'avant_stockage',organisation:{beforeDays:12},mission:{}}).guard,0);
 assert.equal(B.guardPricing({kind:'apres_stockage',organisation:{returnDays:8},retour_helixcar:{},mission:{restitution:true}}).guard,0);
 console.log('PASS paliers de garde : bornes, périodes séparées et exclusion dépôt HelixCar');
+
+const items=[{key:'paris-lille',weight:171.04,fees:73.89,guard:50}];
+const small=B.allocate(1000,items),large=B.allocate(2000,items);
+assert.equal(small.missions[0].total,294.93);
+assert.deepEqual(small.missions,large.missions);
+assert.equal(small.remaining,705.07);
+assert.equal(small.unallocated,405.07);
+assert.throws(()=>B.allocate(400,items),/plafond/);
+assert.equal(B.allocate(1000,[{key:'published',locked:true,total:500},...items.map(x=>({...x,weight:100,fees:0,guard:0}))]).spent,600);
+console.log('PASS plafond : tarif indépendant du devis, reliquat conservé, dépassement bloqué et mission publiée inchangée.');

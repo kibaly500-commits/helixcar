@@ -8,16 +8,11 @@ function allocate(total,items){
  const fixed=items.filter(x=>x.locked).reduce((s,x)=>s+cents(amount(x.total)),0);
  const open=items.filter(x=>!x.locked);
  const costs=open.map(x=>cents(amount(x.fees))+cents(amount(x.guard))+cents(amount(x.extra||0)));
- const available=budget-fixed-costs.reduce((a,b)=>a+b,0);
- if(available<0)throw Error('Budget insuffisant : frais et garde dépassent les 70 % disponibles. Les 30 % HelixCar sont préservés.');
- const weights=open.map(x=>amount(x.weight));const sum=weights.reduce((a,b)=>a+b,0);
- if(open.length&&!sum)throw Error('Distances nécessaires pour répartir le budget');
- const shares=weights.map(w=>Math.floor(available*w/sum));
- let rest=available-shares.reduce((a,b)=>a+b,0);
- const order=weights.map((w,i)=>({i,r:available*w/sum-shares[i]})).sort((a,b)=>b.r-a.r||a.i-b.i);
- for(let j=0;j<rest&&order.length;j++)shares[order[j%order.length].i]++;
- return {reserve:reserve/100,budget:budget/100,unallocated:open.length?0:(budget-fixed)/100,
-  missions:open.map((x,i)=>({key:x.key,total:(costs[i]+shares[i])/100,work:shares[i]/100,fees:x.fees,guard:x.guard,extra:x.extra||0}))};
+ const work=open.map(x=>cents(amount(x.weight)));
+ const spent=fixed+costs.reduce((a,b)=>a+b,0)+work.reduce((a,b)=>a+b,0);
+ if(spent>budget)throw Error('Budget insuffisant : les tarifs calculés dépassent le plafond de 70 %. Ajustez les missions ou le devis ; aucun prix existant remplacé.');
+ return {reserve:reserve/100,budget:budget/100,spent:spent/100,remaining:(invoice-spent)/100,unallocated:(budget-spent)/100,
+  missions:open.map((x,i)=>({key:x.key,total:(costs[i]+work[i])/100,work:work[i]/100,fees:x.fees,guard:x.guard,extra:x.extra||0}))};
 }
 function local(plan){
  const m=plan.mission,addresses=[m.adresse_depart,m.adresse_arrivee];if(m.restitution)addresses.push(m.adresse_restitution);
