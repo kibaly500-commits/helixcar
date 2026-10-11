@@ -42,6 +42,49 @@ function partnerProjection(result){
  if(!result||!result.partnerPreview)return null;
  return {totalEuros:result.partnerPreview.totalEuros,roadFeesIncludedEuros:result.partnerPreview.roadFeesIncludedEuros};
 }
-const api={estimate,partnerProjection};
+
+// Barème PROPOSÉ, administrativement ajustable. Ne constitue pas une grille approuvée.
+const DEFAULT_POLICY=Object.freeze({
+ idf:{minimum:45,base:20,tiers:[{upTo:50,rate:0.90},{upTo:150,rate:0.55},{upTo:400,rate:0.42},{upTo:Infinity,rate:0.32}]},
+ hors_idf:{minimum:85,base:40,tiers:[{upTo:50,rate:0.90},{upTo:150,rate:0.55},{upTo:400,rate:0.42},{upTo:Infinity,rate:0.32}]}
+});
+function proposedLabor(km,zone,policy=DEFAULT_POLICY){
+ number(km,'Distance totale');
+ if(!['idf','hors_idf'].includes(zone))throw Error('Zone de mission inconnue');
+ const p=policy[zone];
+ if(!p||!Array.isArray(p.tiers))throw Error('Barème de rémunération indisponible');
+ number(p.base,'Base');number(p.minimum,'Minimum');
+ let last=0,cost=p.base;
+ for(const tier of p.tiers){
+  const end=tier.upTo;
+  if(!(end>last)||!(Number.isFinite(end)||end===Infinity))throw Error('Paliers incohérents');
+  number(tier.rate,'Tarif kilométrique');
+  cost+=(Math.min(km,end)-last>0?Math.min(km,end)-last:0)*tier.rate;
+  last=end;
+  if(km<=end)break;
+ }
+ if(last<km)throw Error('Barème kilométrique incomplet');
+ return round(Math.max(p.minimum,cost));
+}
+function quoteMission(input){
+ if(!input||!Array.isArray(input.legs)||!input.legs.length)throw Error('Trajets nécessaires');
+ const km=input.legs.reduce((sum,leg)=>sum+number(leg.km,'Kilomètres'),0);
+ const proposedWorkEuros=proposedLabor(km,input.zone,input.policy||DEFAULT_POLICY);
+ const workPayEuros=input.workPayEuros==null?proposedWorkEuros:number(input.workPayEuros,'Travail du convoyeur');
+ // L'Île-de-France n'ajoute pas automatiquement de frais, mais des frais explicites restent possibles.
+ const local=input.zone==='idf';
+ const roadLegs=input.legs.map(leg=>({
+  ...leg,
+  tollEuros:local&&leg.tollEuros==null?0:leg.tollEuros
+ }));
+ const simulation=estimate({...input,legs:roadLegs,workPayEuros,
+   fuelPricePerLiter:local&&input.fuelPricePerLiter==null?1:input.fuelPricePerLiter,
+   consumptionLitersPer100Km:local&&input.consumptionLitersPer100Km==null?0:input.consumptionLitersPer100Km});
+ // Pour l'IDF, carburant et péages non ajoutés par défaut ; explicite = calcul réel.
+ const invoice=input.clientAmountEuros;
+ const remaining=invoice==null||simulation.totalEuros==null?null:round(number(invoice,'Montant client')-simulation.totalEuros);
+ return {...simulation,zone:input.zone,proposedWorkEuros,remainingBeforeCostsEuros:remaining,pricingPolicy:'simulation_non_validee'};
+}
+const api={estimate,partnerProjection,quoteMission,proposedLabor,DEFAULT_POLICY};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCRemunerationEstimation=api;
 })(typeof window==='undefined'?globalThis:window);
