@@ -73,13 +73,15 @@ function quoteMission(input){
  const workPayEuros=input.workPayEuros==null?proposedWorkEuros:number(input.workPayEuros,'Travail du convoyeur');
  // L'Île-de-France n'ajoute pas automatiquement de frais, mais des frais explicites restent possibles.
  const local=input.zone==='idf';
+ const hasExplicitLocalCosts=local&&(input.fuelPricePerLiter!=null||input.consumptionLitersPer100Km!=null||input.legs.some(l=>l.tollEuros!=null&&l.tollEuros!==0));
+ if(hasExplicitLocalCosts&&(input.fuelPricePerLiter==null||input.consumptionLitersPer100Km==null))throw Error('Renseignez les paramètres de carburant pour les frais IDF explicites');
  const roadLegs=input.legs.map(leg=>({
   ...leg,
   tollEuros:local&&leg.tollEuros==null?0:leg.tollEuros
  }));
  const simulation=estimate({...input,legs:roadLegs,workPayEuros,
-   fuelPricePerLiter:local&&input.fuelPricePerLiter==null?1:input.fuelPricePerLiter,
-   consumptionLitersPer100Km:local&&input.consumptionLitersPer100Km==null?0:input.consumptionLitersPer100Km});
+   fuelPricePerLiter:local&&!hasExplicitLocalCosts?1:input.fuelPricePerLiter,
+   consumptionLitersPer100Km:local&&!hasExplicitLocalCosts?0:input.consumptionLitersPer100Km});
  // Pour l'IDF, carburant et péages non ajoutés par défaut ; explicite = calcul réel.
  const invoice=input.clientAmountEuros;
  const remaining=invoice==null||simulation.totalEuros==null?null:round(number(invoice,'Montant client')-simulation.totalEuros);
