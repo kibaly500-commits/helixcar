@@ -1,0 +1,7 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const text=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
+const code=text.slice(text.indexOf('  async function calculateAll('),text.indexOf('  function budgetErrors('));
+const plans=[{key:'long',category:'convoyage',distance:934,kind:'direct',organisation:{beforeDays:3},mission:{adresse_depart:'75012 Paris',adresse_arrivee:'06000 Nice'}},{key:'idf',category:'convoyage',distance:30,kind:'direct',organisation:{beforeDays:0},mission:{adresse_depart:'75012 Paris',adresse_arrivee:'93160 Noisy'}}];
+const c={state:{plans},generation:1,totalDevis:1000,readEdits(){},note(){},render(){},money:String,autoDrafts:new Map(),HCMissionBudget:require('../assets/mission-budget.js'),HCRemunerationEstimation:require('../assets/remuneration-estimation.js')};
+vm.createContext(c);vm.runInContext(code,c);
+(async()=>{await c.calculateAll();assert.equal(plans[0].carburant_peages,205.48);assert.equal(plans[1].carburant_peages,null);assert.equal(Math.round(plans.reduce((s,p)=>s+p.remuneration,0)*100),70000);assert.equal(plans[0].calcul_interne.days,3);plans[0].remuneration=250;plans[1].remuneration=null;await c.calculateAll(1,true);assert.equal(plans[0].remuneration,250);assert.equal(plans[1].remuneration,450);console.log('PASS écran : distances saisies sans session fournisseur ni appel réseau, forfait et répartition 70 %.');})();

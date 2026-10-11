@@ -1,3 +1,4 @@
+import {routeIgn} from './route-ign.mjs';
 /* Calcul routier sans facturation : clé du quota gratuit ORS requise.
  * Ne retourne ni péage inventé, ni trafic temps réel. Accès administrateur seul. */
 const SB='https://zsetmqnmmupqbkgqbjbo.supabase.co';
@@ -5,8 +6,8 @@ const ORS='https://api.heigit.org';
 const POINT='12 rue de l’Université, 93160 Noisy-le-Grand';
 const valid=s=>typeof s==='string'&&s.length>=8&&s.length<400&&/\d{5}/.test(s);
 export async function routeFree(from,to,{fetcher=fetch,key}={}){
- if(!key)throw Error('Clé gratuite openrouteservice non configurée');
  if(!valid(from)||!valid(to))throw Error('Adresses complètes nécessaires');
+ if(!key)return routeIgn(from,to,{fetcher});
  const headers={'Authorization':key,'Accept':'application/json'};
  const geocode=async address=>{
   const url=ORS+'/pelias/v1/search?text='+encodeURIComponent(address)+'&size=1&boundary.country=FR';
@@ -31,7 +32,6 @@ export async function handleFreeRoute(body,headers,{fetcher=fetch,env=process.en
  const rpc=async(name,args)=>{const r=await fetcher(SB+'/rest/v1/rpc/'+name,{method:'POST',headers:{Authorization:auth,apikey,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error('Accès administrateur refusé');return r.json();};
  try{
   if(await rpc('est_admin',{})!==true)return {status:403,body:{error:'Réservé à HelixCar administration'}};
-  if(!env.ORS_FREE_API_KEY)return {status:503,body:{code:'ORS_NON_CONFIGURE',error:'Clé gratuite openrouteservice non configurée. Aucune estimation inventée.'}};
   if(!/^[a-f\d-]{36}$/i.test(body?.clientId||'')||typeof body?.key!=='string'||body.key.length>100)throw Error('Demande invalide');
   const source=await rpc('source_preparation_missions',{p_client_id:body.clientId});
   const mod=await import('../../assets/preparation-missions.js');
@@ -49,6 +49,6 @@ export async function handleFreeRoute(body,headers,{fetcher=fetch,env=process.en
   if(plan.mission.restitution)legs.push([plan.mission.adresse_arrivee,plan.mission.adresse_restitution]);
   const routes=[];
   for(const [from,to] of legs)routes.push(await routeFree(from,to,{fetcher,key:env.ORS_FREE_API_KEY}));
-  return {status:200,body:{fingerprint:source.empreinte,routes,source:'OpenStreetMap © contributeurs · openrouteservice by HeiGIT'}};
+  return {status:200,body:{fingerprint:source.empreinte,routes,source:env.ORS_FREE_API_KEY?'OpenStreetMap © contributeurs · openrouteservice by HeiGIT':'IGN Géoplateforme · BD TOPO / Base Adresse Nationale'}};
  }catch(e){return {status:422,body:{error:e.name==='TimeoutError'?'Service temporairement indisponible':e.message}};}
 }

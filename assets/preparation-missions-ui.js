@@ -72,12 +72,12 @@
         const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
       }catch(_){}
       if(ticket!==generation)return;totalDevis=montant;adopt(source);render();
-      if(state.plans.length&&state.plans.every(p=>p.category==='convoyage'&&!p.saved?.mission_id&&p.remuneration==null))await calculateAll(ticket);
+      if(state.plans.length&&state.plans.every(p=>p.category==='convoyage')&&state.plans.some(p=>!p.saved?.mission_id&&!(Number(p.distance)>0)))await calculateAll(ticket,true);
     }
     catch(e){if(ticket===generation){if(!state)el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}
   };
-  async function calculateAll(ticket=generation){
+  async function calculateAll(ticket=generation,automatic=false){
     readEdits();
     if(totalDevis==null)throw Error('Montant du devis payé indisponible.');
     if(state.plans.some(p=>p.category!=='convoyage'))throw Error('Répartition automatique réservée aux missions de convoyage.');
@@ -110,7 +110,7 @@
     render();
     if(failures.length){note('Calcul incomplet. '+failures.join(' · ')+'. Aucun prix existant remplacé.',true);return;}
     const items=snapshot.plans.map(p=>{
-      if(p.saved?.mission_id)return {key:p.key,locked:true,total:Number(p.remuneration)};
+      if(p.saved?.mission_id||(automatic&&p.remuneration!=null&&p.remuneration!==''))return {key:p.key,locked:true,total:Number(p.remuneration)};
       const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.days*10,weight:HCRemunerationEstimation.proposedLabor(p.distance,a.local?'idf':'hors_idf')};
     });
     const result=HCMissionBudget.allocate(totalDevis,items);
@@ -202,7 +202,7 @@
       const auto=autoDrafts.get(p.key)||p.calcul_interne;
       if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(p.distance)+' km × 0,22 € = '+esc(money(auto.fees))+'</p>')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance totale, restitution comprise (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Distance automatique gratuite si le service est configuré. Sinon, saisissez les kilomètres Mappy puis cliquez sur Calculer les trajets et répartir les 70 %.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance totale, restitution comprise (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France, restitution comprise. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';

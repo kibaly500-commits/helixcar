@@ -5,6 +5,8 @@ const key='free-test-key';
 const seen=[];
 const mock=async(url,options={})=>{
  seen.push({url,options});
+ if(url.includes('data.geopf.fr/geocodage')){const q=new URL(url).searchParams;return {ok:true,json:async()=>({features:[{geometry:{coordinates:[2.35,48.85]},properties:{postcode:q.get('postcode'),score:0.95,type:'housenumber'}}]})};}
+ if(url.includes('data.geopf.fr/navigation'))return {ok:true,json:async()=>({distance:225,duration:155})};
  if(url.includes('/geocode/')||url.includes('/pelias/v1/search'))return {ok:true,json:async()=>({features:[{geometry:{coordinates:url.includes('Paris')?[2.35,48.85]:[3.06,50.63]}}]})};
  if(url.includes('/directions/'))return {ok:true,json:async()=>({routes:[{summary:{distance:225000,duration:9300}}]})};
  throw Error('Requête inattendue : '+url);
@@ -35,10 +37,10 @@ const authorized=async(url,opts)=>{
 r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{ORS_FREE_API_KEY:key}});
 assert.equal(r.status,200);assert.equal(r.body.routes[0].km,225);assert.equal(r.body.routes[0].tollsEuros,null);
 r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{}});
-assert.equal(r.status,503);assert.equal(r.body.code,'ORS_NON_CONFIGURE');
+assert.equal(r.status,200);assert.equal(r.body.routes[0].provider,'IGN Géoplateforme');
 console.log('PASS itinéraire gratuit : URL 2026, kilométrage, absence de péages inventés, authentification, administration et configuration.');
 
 // La présence d'une clé payante ne doit jamais activer un repli facturable.
 r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{HERE_ROUTING_API_KEY:'must-not-be-used'}});
-assert.equal(r.status,503);assert.equal(r.body.code,'ORS_NON_CONFIGURE');
+assert.equal(r.status,200);assert.equal(r.body.routes[0].provider,'IGN Géoplateforme');
 console.log('PASS mode gratuit : aucun repli HERE même si sa clé est configurée.');
