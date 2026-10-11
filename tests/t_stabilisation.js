@@ -1469,8 +1469,8 @@ window.jspdf = { jsPDF: function () {
       nonExpliques.length === 0, nonExpliques.join(' | '));
     check('O3 : et aucune « raison » ne couvre un libellé toujours présent',
       excusesSansObjet.length === 0, excusesSansObjet.join(' | '));
-    check('O4 : les vingt et une disparitions correspondent aux changements explicitement documentés',
-      disparus.length === 21, disparus.length + ' : ' + disparus.join(' | '));
+    check('O4 : les vingt-trois disparitions correspondent aux changements explicitement documentés',
+      disparus.length === 23, disparus.length + ' : ' + disparus.join(' | '));
 
     check('O4b : les deux libellés renommés conservent leurs contrôles et valeurs techniques',
       /name="rc-profil" value="convoyeur"[^>]*> Partenaire HelixCar/.test(idx)
