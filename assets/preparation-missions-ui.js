@@ -72,7 +72,7 @@
         const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
       }catch(_){}
       if(ticket!==generation)return;totalDevis=montant;adopt(source);render();
-      if(state.plans.length&&state.plans.every(p=>p.category==='convoyage')&&state.plans.some(p=>!p.saved?.mission_id&&!(Number(p.distance)>0)))await calculateAll(ticket,true);
+      if(state.plans.length&&state.plans.every(p=>p.category==='convoyage')&&state.plans.some(p=>!p.saved?.mission_id&&(!(Number(p.distance)>0)||(p.mission.restitution&&!(Number(p.distance_aller)>0)))))await calculateAll(ticket,true);
     }
     catch(e){if(ticket===generation){if(!state)el('hc-prep-body').textContent='';note(e.message,true);}}
     finally{busy=false;}
@@ -88,7 +88,7 @@
       note('Calcul automatique : mission '+(i+1)+' sur '+snapshot.plans.length+'…');
       try{
         let minutes=null,source='Distance renseignée ou conservée';
-        if(!(Number(p.distance)>0&&Number.isFinite(Number(p.distance)))){
+        if(!(Number(p.distance)>0&&Number.isFinite(Number(p.distance)))||(p.mission.restitution&&!(Number(p.distance_aller)>0))){
           const session=(await sbAuth.auth.getSession()).data?.session;
           if(!session?.access_token)throw Error('Renseignez les kilomètres ou reconnectez-vous au calcul routier.');
           const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
@@ -99,19 +99,20 @@
           const routes=data.routes;
           if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
           p.distance=Math.round(routes.reduce((sum,r)=>sum+r.km,0)*10)/10;
+          p.distance_aller=routes[0].km;
           minutes=routes.reduce((sum,r)=>sum+r.minutes,0);source=data.source;
         }
         const local=HCMissionBudget.local(p),days=HCMissionBudget.guardDays(p);
-        const fees=HCMissionBudget.roadFees(Number(p.distance),local);
-        autoDrafts.set(p.key,{days,local,fees,source,minutes,rate:local?0:0.22});
+        autoDrafts.set(p.key,{days,local,source,minutes,rate:local?0:0.22});
       }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
     }
     if(ticket!==generation||state!==snapshot)return;
     render();
     if(failures.length){note('Calcul incomplet. '+failures.join(' · ')+'. Aucun prix existant remplacé.',true);return;}
+    snapshot.plans.filter(p=>!p.saved?.mission_id).forEach(p=>Object.assign(autoDrafts.get(p.key),HCMissionBudget.travelPricing(p,snapshot.plans)));
     const items=snapshot.plans.map(p=>{
       if(p.saved?.mission_id||(automatic&&p.remuneration!=null&&p.remuneration!==''))return {key:p.key,locked:true,total:Number(p.remuneration)};
-      const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.days*10,weight:HCRemunerationEstimation.proposedLabor(p.distance,a.local?'idf':'hors_idf')};
+      const a=autoDrafts.get(p.key);return {key:p.key,fees:a.fees,guard:a.days*10,extra:a.extra,weight:HCRemunerationEstimation.proposedLabor(p.distance,a.local?'idf':'hors_idf')};
     });
     const result=HCMissionBudget.allocate(totalDevis,items);
     for(const r of result.missions){
@@ -200,7 +201,7 @@
       if(p.category==='convoyage'&&p.kind==='direct')h+='<p class="hc-prep-muted">Horaires repris de la demande client.</p>';
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       const auto=autoDrafts.get(p.key)||p.calcul_interne;
-      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(p.distance)+' km × 0,22 € = '+esc(money(auto.fees))+'</p>')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
+      if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+esc(auto.days)+' jour(s) × 10 € = '+esc(money(auto.days*10))+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(auto.outboundKm??p.distance)+' km aller × 0,22 € = '+esc(money(auto.outboundFees??auto.fees))+'</p>')+(auto.returnFees>0?'<p>Restitution hors Île-de-France : 50 % des frais de l’aller ('+esc(money(auto.referenceFees))+') = '+esc(money(auto.returnFees))+'</p>':'')+(auto.extra>0?'<p>Supplément restitution Île-de-France : '+esc(money(auto.extra))+'</p>':'')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance totale, restitution comprise (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France, restitution comprise. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
@@ -275,7 +276,7 @@
         const routes=data.routes||[];
         if(!routes.length)throw Error('Aucun itinéraire calculé');
         const distance=routes.reduce((sum,r)=>sum+Number(r.km||0),0);
-        p.distance=Math.round(distance*10)/10;
+        p.distance=Math.round(distance*10)/10;p.distance_aller=routes[0].km;
         render();
         note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+routes.reduce((s,r)=>s+Number(r.minutes||0),0)+' min de conduite hors trafic. Cliquez sur Calculer les trajets et répartir les 70 % pour appliquer le forfait de frais de route.');
       }
