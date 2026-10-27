@@ -33,3 +33,13 @@
 - Complément : simuler la fidélité de bout en bout (crédit après paiement/réalisation, pas de doublons, seuils 2 000/10 000/12 000, plusieurs box, suivi admin/client) sans modifier les soldes réels.
 - Revoir partiellement l'état des lieux convoyage : ergonomie, fonctionnement et photos/illustrations à identifier avec le propriétaire puis remplacer.
 - Actualiser les couleurs/identité HelixCar de la lettre de voiture ; vérifier le PDF et l'impression, conserver les données et signatures.
+
+## Correction des échecs CI — 27 octobre, soirée
+
+- Bug réel corrigé : les boutons « Valider cette réponse » et « Demander une correction » passaient des arguments invalides à actionHtml et pouvaient empêcher le rendu des informations manquantes. La recette clique désormais sur le bouton réellement généré.
+- Recettes alignées sur les décisions PR6 : Mes missions attribuées, interventions sans photos obligatoires ni action de démarrage, identité du partenaire masquée au client, nouveaux intitulés métiers, une mission par professionnel, prix arrondis, alerte des devis non lus distincte du compteur total.
+- Maintien des contrôles de publication : VIN, chronologie des rendez-vous, données privées et autorisations. Dépendances des scénarios de test réparées ; aucune suite désactivée.
+- Lanceur corrigé pour reconnaître également les résumés « N PASS / N FAIL » sans délimiteurs, tout en conservant l’échec sur code non nul ou FAIL explicite.
+- Test SQL de restitution rendu indépendant du fuseau de la machine : contrôle de l’heure civile en PostgreSQL, sans conversion implicite JavaScript en UTC. Vérifié en UTC et Africa/Cairo.
+- Sur f8d27e3 : contrôles GitHub PostgreSQL 16 (764) et WebKit (820) réussis. Campagne générale relancée sur le correctif final ; consulter GitHub Actions pour son résultat définitif.
+- Correctif applicatif f8d27e3 déployé en aperçu sur helixcar-i89b uniquement. main et PR6 non fusionnées. Les intégrations et la recette métier prévues demain restent à réaliser.
