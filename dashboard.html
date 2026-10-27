@@ -1398,6 +1398,10 @@ body.scroll-verrouille { overflow: hidden; }
             </table>
           </div>
         </div>
+        <div class="card" id="interventions-table-carte" style="display:none">
+          <div class="card-header"><div class="card-title">Interventions sur place</div></div>
+          <div class="table-wrap"><table><thead><tr><th>Référence / Prestation</th><th>Lieu / Contact</th><th>Client</th><th>Professionnel</th><th>Période</th><th>Horaires</th><th>Prix TTC</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="interventions-table"></tbody></table></div>
+        </div>
       </div>
 
       <!-- ADMIN: Clients -->
@@ -1738,11 +1742,15 @@ body.scroll-verrouille { overflow: hidden; }
             <tbody id="conv-missions-table"></tbody>
           </table></div>
         </div>
+        <div class="card" id="conv-interventions-table-carte" style="display:none">
+          <div class="card-header"><div class="card-title">Interventions sur place</div></div>
+          <div class="table-wrap"><table><thead><tr><th>Prestation / Lieu</th><th>Période</th><th>Horaires</th><th>Rémunération</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="conv-interventions-table"></tbody></table></div>
+        </div>
       </div>
 
       <!-- CONVOYEUR: Facturation -->
       <div class="page" id="page-convoyeur-facturation">
-        <div class="alert alert-info"><span>💡 Une mission terminée doit d'abord être <strong>validée par HelixCar</strong>, et sa <strong>lettre de voiture signée envoyée</strong> (depuis Historique), avant de pouvoir être facturée. Regroupez ensuite plusieurs missions prêtes en une seule facture. Paiement sous <strong>9 jours ouvrés</strong> après validation de la facture. Vous pouvez générer une nouvelle facture tous les <strong>5 jours ouvrés</strong>.</span></div>
+        <div class="alert alert-info"><span>💡 Une mission terminée doit d'abord être <strong>validée par HelixCar</strong>, et, pour un convoyage, sa <strong>lettre de voiture signée envoyée</strong> (depuis Mes missions), avant de pouvoir être facturée. Regroupez ensuite plusieurs missions prêtes en une seule facture. Paiement sous <strong>9 jours ouvrés</strong> après validation de la facture. Vous pouvez générer une nouvelle facture tous les <strong>5 jours ouvrés</strong>.</span></div>
         <div class="card">
           <div class="card-header"><div class="card-title">✅ Missions terminées — prêtes à facturer</div></div>
           <div id="fc-conv-missions-list" style="padding:4px 0"><p style="color:#888;font-size:.85rem">Chargement…</p></div>
@@ -8515,6 +8523,51 @@ async function reglerTarifBrouillon(id) {
   loadMissions();
 }
 
+function missionSurPlace(m) { return ['nettoyage','professionnel'].includes(m.type_mission); }
+function periodeIntervention(m) {
+  return (m.date_intervention ? _dvDate(m.date_intervention) : 'À préciser')
+    + (m.date_fin_intervention && m.date_fin_intervention !== m.date_intervention ? ' au ' + _dvDate(m.date_fin_intervention) : '');
+}
+function horairesIntervention(m) {
+  return m.heure_intervention || [m.heure_debut_intervention,m.heure_fin_intervention].filter(Boolean).map(h=>String(h).slice(0,5)).join(' – ') || 'À préciser';
+}
+function lieuIntervention(m) {
+  return [m.adresse_intervention,[m.code_postal_intervention,m.ville_intervention].filter(Boolean).join(' ')].filter(Boolean).join(', ') || 'Lieu à préciser';
+}
+function actionsIntervention(m) {
+  if (m.statut === 'acceptee') return '<button class="btn btn-sm btn-primary" ' + actionHtml('avancerIntervention',[m.id,'en_cours']) + '>Commencer l’intervention</button>';
+  if (m.statut === 'en_cours') return '<button class="btn btn-sm btn-primary" ' + actionHtml('avancerIntervention',[m.id,'fini']) + '>Intervention terminée</button>';
+  return m.statut === 'fini' ? '<span class="badge badge-pending">En attente de confirmation HelixCar</span>' : '—';
+}
+var interventionsEnCours = new Set();
+async function avancerIntervention(id, statut) {
+  if (!['en_cours','fini'].includes(statut) || interventionsEnCours.has(id) || !window._currentConvoyeur) return;
+  if (!confirm(statut === 'fini' ? 'Déclarer cette intervention terminée ? HelixCar la confirmera ensuite.' : 'Confirmer le début de cette intervention ?')) return;
+  interventionsEnCours.add(id);
+  try {
+    const ancien = statut === 'fini' ? 'en_cours' : 'acceptee';
+    const {data,error} = await sbAuth.from('missions').update({statut}).eq('id',id).eq('convoyeur_id',window._currentConvoyeur.id).in('type_mission',['professionnel','nettoyage']).eq('statut',ancien).select('id,statut').single();
+    if (error || !data || data.statut !== statut) throw new Error('La mise à jour n’a pas été confirmée. Rechargez vos missions.');
+    await loadMissionsConvoyeur();
+  } catch (e) { alert(e.message || 'Impossible de mettre à jour l’intervention.'); }
+  finally { interventionsEnCours.delete(id); }
+}
+function ligneIntervention(m, admin, actions, client, partenaire) {
+  const statut = m.statut === 'acceptee' ? '<span class="badge badge-progress">À réaliser</span>' : MISSION_STATUT_BADGE[m.statut] || escapeHtml(m.statut);
+  const details = '<strong>' + escapeHtml(m.prestation || (m.type_mission === 'nettoyage' ? 'Nettoyage automobile' : 'Intervention professionnelle')) + '</strong>'
+    + '<br><small>' + escapeHtml(m.reference || '') + '</small>';
+  const lieu = escapeHtml(lieuIntervention(m))
+    + (m.contact_nom || m.contact_tel ? '<br>Contact : ' + escapeHtml([m.contact_nom,m.contact_tel].filter(Boolean).join(' · ')) : '')
+    + (m.nb_vehicules ? '<br>' + escapeHtml(String(m.nb_vehicules)) + ' véhicule(s)' : '')
+    + (m.consignes ? '<br><span style="white-space:pre-wrap">' + escapeHtml(m.consignes) + '</span>' : '');
+  const montant = admin ? m.prix_ttc : m.remuneration_prevue != null ? m.remuneration_prevue : m.prix_ttc != null ? Math.round(Number(m.prix_ttc)*0.5) : null;
+  return '<tr><td>' + details + (admin ? '</td><td>' : '<br>') + lieu + '</td>'
+    + (admin ? '<td>' + client + '</td><td>' + partenaire + '</td>' : '')
+    + '<td>' + escapeHtml(periodeIntervention(m)) + '</td><td>' + escapeHtml(horairesIntervention(m)) + '</td>'
+    + '<td><strong>' + (montant != null ? escapeHtml(String(montant)) + ' €' : '—') + '</strong></td>'
+    + '<td>' + statut + '</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">' + actions + '</div></td></tr>';
+}
+
 function loadMissions() {
   var _hcSyncTasks = [];
 
@@ -8532,6 +8585,10 @@ function loadMissions() {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
     const missions = results[0] || [];
+    const interventions = [];
+    document.getElementById('interventions-table').innerHTML = '';
+    document.getElementById('interventions-table-carte').style.display = missions.some(missionSurPlace) ? '' : 'none';
+    tbody.closest('.card').style.display = missions.some(m=>!missionSurPlace(m)) || !missions.length ? '' : 'none';
     window._missionsTest=new Set(missions.filter(m=>m.devis_source_id).map(m=>m.id));
     const convoyeurs = {};
     (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
@@ -8579,12 +8636,12 @@ function loadMissions() {
       } else {
         actions = '—';
       }
-      if(m.devis_source_id && !['brouillon','fini','terminee','annulee'].includes(m.statut)) actions='<span class="badge badge-pending">En attente du rapport convoyeur</span>';
+      if(!estSurPlace && m.devis_source_id && !['brouillon','fini','terminee','annulee'].includes(m.statut)) actions='<span class="badge badge-pending">En attente du rapport convoyeur</span>';
       if(m.statut==='brouillon') {
         actions='<button class="btn btn-sm btn-outline" '+actionHtml('ouvrirFicheDemande',[m.client_id])+'>Contrôler le dossier</button> <button class="btn btn-sm btn-outline" '+actionHtml('reglerTarifBrouillon',[m.id])+'>Tarif convoyeur'+(m.remuneration_prevue==null?' à définir':' : '+escapeHtml(String(m.remuneration_prevue))+' €')+'</button>';
         if(m.devis_source_id) actions+=' <button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDocumentPaiementTest',[m.devis_source_id,true])+'>Document de paiement TEST</button>';
       }
-      if(m.devis_source_id){
+      if(m.devis_source_id && !estSurPlace){
         actions='<button class="btn btn-sm btn-outline" '+actionHtml('voirEtatsDesLieuxTest',[m.id])+'>États des lieux</button> '+actions;
         if(m.convoyeur_id)actions+=' <button class="btn btn-sm btn-outline" '+actionHtml('notifierMissionTest',[m.id])+'>Relancer les notifications</button>';
       }
@@ -8594,14 +8651,7 @@ function loadMissions() {
         actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
           + actionHtml('ouvrirOpportuniteMission', [m.id]) + '>📣 Opportunité</button>' + (actions === '—' ? '' : actions);
       }
-      // Une prestation de nettoyage se valide sur pièces : le bouton
-      // Photos est donc offert à TOUS les états, y compris une fois la
-      // mission terminée — c'est la trace de l'état des véhicules.
-      if (estNettoyage) {
-        actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
-          + '' + actionHtml('voirPhotosMission', [m.id, m.reference || '']) + '>'
-          + '\uD83D\uDCF7 Photos</button>' + (actions === '—' ? '' : actions);
-      }
+      if (estSurPlace) { interventions.push(ligneIntervention(m,true,actions,clientNom,convoyeurNom)); return ''; }
       // L'URL vient de la base : « javascript:… » y serait exécutable au
       // clic, et un guillemet suffisait à sortir de l'attribut.
       var urlLettre = urlSure(m.lettre_voiture_signee_url);
@@ -8638,6 +8688,7 @@ function loadMissions() {
         + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + actions + '</td>'
         + '</tr>';
     }).join('');
+    document.getElementById('interventions-table').innerHTML = interventions.join('');
   }).catch(function(e) {
  if (_hcSyncCycle) return;
 
@@ -8882,34 +8933,7 @@ function envoyerLettreVoitureSignee(input, missionId, reference) {
 // temporaire, comme pour les vidéos de candidature.
 var _photosParMission = {};
 
-function _actionsMissionNettoyage(m) {
-  var etat = _photosParMission[String(m.id)] || { avant: 0, apres: 0 };
-  var boutons = '';
-  if (m.statut !== 'terminee' && m.statut !== 'annulee') {
-    boutons += '<button class="btn btn-sm btn-outline" ' + actionHtml('ouvrirPhotosMission', [m.id, 'avant']) + '>'
-      + '📷 Avant (' + etat.avant + ')</button>';
-    boutons += '<button class="btn btn-sm btn-outline" ' + actionHtml('ouvrirPhotosMission', [m.id, 'apres']) + '>'
-      + '📷 Après (' + etat.apres + ')</button>';
-  }
-  // Le partenaire relit ce qu'il a déposé — et rien d'autre : les
-  // politiques Storage ne lui ouvrent que les photos de SA mission.
-  if (etat.avant + etat.apres > 0) {
-    boutons += '<button class="btn btn-sm btn-secondary" '
-      + '' + actionHtml('voirPhotosMission', [m.id, m.reference || '']) + '>'
-      + 'Voir les photos</button>';
-  }
-  if (m.statut === 'acceptee' || m.statut === 'en_cours') {
-    // On ne peut déclarer une intervention terminée sans l'avoir
-    // constatée : une photo avant et une photo après, au minimum.
-    var pret = etat.avant > 0 && etat.apres > 0;
-    boutons += '<button class="btn btn-sm ' + (pret ? 'btn-primary' : 'btn-secondary') + '"'
-      + (pret ? '' : ' disabled title="Ajoutez au moins une photo avant et une photo après."')
-      + ' ' + actionHtml('terminerMissionNettoyage', [m.id]) + '>Intervention terminée</button>';
-  }
-  if (m.statut === 'fini') boutons += '<span class="badge badge-pending">En attente de validation HelixCar</span>';
-  if (m.statut === 'terminee') boutons += '<span class="badge badge-active">✅ Validée</span>';
-  return boutons || '—';
-}
+function _actionsMissionNettoyage(m) { return actionsIntervention(m); }
 
 function chargerPhotosMissions(missions) {
   var ids = (missions || []).filter(function (m) { return m.type_mission === 'nettoyage'; })
@@ -9110,32 +9134,7 @@ async function envoyerPhotoMission(input) {
   }
 }
 
-function terminerMissionNettoyage(missionId) {
-  var etat = _photosParMission[String(missionId)] || { avant: 0, apres: 0 };
-  if (!(etat.avant > 0 && etat.apres > 0)) {
-    alert('Ajoutez au moins une photo avant et une photo après avant de terminer.');
-    return;
-  }
-  if (!confirm('Déclarer cette intervention terminée ?\n\nHelixCar la validera ensuite.')) return;
-  sbFetch('missions?id=eq.' + missionId, {
-    method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ statut: 'fini' })
-  }).then(function () { loadHistoriqueConvoyeur(); })
-    .catch(function (e) {
-      console.error('terminerMissionNettoyage:', e);
-      // Le compteur ci-dessus est un confort d'interface, pas une
-      // garantie : c'est le verrou serveur (migration 97) qui vérifie
-      // que les photos existent VRAIMENT en base. Si l'écriture est
-      // refusée pour cette raison, on le dit dans ces termes.
-      var m = String((e && e.message) || '');
-      alert(/photo/i.test(m)
-        ? 'HelixCar n\'a pas retrouvé vos photos avant et après.\n\n'
-          + 'Redéposez-les, puis réessayez.'
-        : 'La mission n\'a pas pu être mise à jour.');
-      loadHistoriqueConvoyeur();
-    });
-}
+function terminerMissionNettoyage(missionId) { return avancerIntervention(missionId, 'fini'); }
 
 // Validation finale par l'administrateur : elle constate la prestation,
 // et c'est elle seule qui clôt la mission.
@@ -9151,14 +9150,7 @@ function validerPrestationNettoyage(missionId) {
     prestation_validee_le: new Date().toISOString()
   }).eq('id', missionId).then(function (res) {
     if (res.error) {
-      // Le refus le plus fréquent est celui du verrou serveur : une
-      // prestation ne se valide pas sans ses photos. On le dit
-      // clairement plutôt que d'afficher une erreur technique.
-      var m = String((res.error && res.error.message) || '');
-      alert(/non constatée|photo/i.test(m)
-        ? 'Validation refusée : cette prestation n\'a pas ses photos avant et après.\n\n'
-          + 'Ouvrez « 📷 Photos » pour vérifier ce qui a été déposé.'
-        : 'La validation n\'a pas pu être enregistrée.\n\n' + m);
+      alert('La validation n’a pas pu être enregistrée.');
       return;
     }
     if (typeof loadMissions === 'function') loadMissions();
@@ -9201,10 +9193,13 @@ function chargerMissionsAttribuees(enCours) {
       }
 
       if (!rows || rows.length === 0) {
+        document.getElementById('conv-interventions-table').innerHTML = '';
+        document.getElementById('conv-interventions-table-carte').style.display = 'none';
+        tbody.closest('.card').style.display = '';
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">' + 'Aucune mission attribuée pour le moment' + '</td></tr>';
         return;
       }
-      return chargerPhotosMissions(rows).then(function () {
+      return Promise.resolve().then(function () {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
  rendreHistorique(rows); });
     })
@@ -9220,6 +9215,17 @@ function chargerMissionsAttribuees(enCours) {
   function rendreHistorique(rows) {
       const groupe = m => STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? 0 : m.statut === 'fini' ? 1 : 2;
       const titres = ['À réaliser et en cours', 'Réalisées — en attente de confirmation', 'Historique — missions terminées ou annulées'];
+      const surPlace = rows.filter(missionSurPlace).sort((a,b)=>groupe(a)-groupe(b));
+      const zone = document.getElementById('conv-interventions-table');
+      document.getElementById('conv-interventions-table-carte').style.display = surPlace.length ? '' : 'none';
+      let groupeIntervention = -1;
+      zone.innerHTML = surPlace.map(m=>{
+        const g = groupe(m), entete = g !== groupeIntervention ? '<tr class="mes-missions-section"><th colspan="6" style="padding:20px 12px 10px;text-align:left">' + titres[g] + '</th></tr>' : '';
+        groupeIntervention = g;
+        return entete + ligneIntervention(m,false,actionsIntervention(m));
+      }).join('');
+      rows = rows.filter(m=>!missionSurPlace(m));
+      tbody.closest('.card').style.display = rows.length || !surPlace.length ? '' : 'none';
       let precedent = -1;
       tbody.innerHTML = rows.slice().sort((a,b) => groupe(a)-groupe(b)).map(function(m) {
         const g = groupe(m);
@@ -9343,23 +9349,25 @@ function loadFacturationConvoyeur() {
       listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Aucune mission terminée à facturer pour le moment.</p>';
     } else {
       listEl.innerHTML = missionsAFacturer.map(function(m) {
-        const dateTxt = m.date_livraison ? new Date(m.date_livraison).toLocaleDateString('fr-FR') : '—';
+        const dateFin = missionSurPlace(m) ? m.date_fin_intervention || m.date_intervention : m.date_livraison;
+        const dateTxt = dateFin ? _dvDate(dateFin) : '—';
+        const description = missionSurPlace(m) ? escapeHtml(m.prestation || 'Intervention') + ' · ' + escapeHtml(m.ville_intervention || '') : escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee);
         if (!m.validee_paiement) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
-            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
+            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + ' · ⏳ en attente de validation HelixCar</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
-        if (!m.lettre_voiture_signee_url) {
+        if (!missionSurPlace(m) && !m.lettre_voiture_signee_url) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
-            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
+            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Mes missions)</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee">'
-          + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
+          + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
           + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + '</span></div>'
           + '<div style="display:flex;align-items:center;gap:10px">'
           + '<strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong>'
@@ -15016,7 +15024,7 @@ function declencherChampFichier(id) {
 
 [
   'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
-  'choisirNoteEvaluation', 'evaluerMissionClient',
+  'avancerIntervention', 'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',
   'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite', 'deciderMetierProfessionnel',

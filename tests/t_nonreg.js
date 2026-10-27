@@ -385,7 +385,7 @@ const futur = dansNJours;
     'supabase/migrations/20261027113400_correction_chemin_rib_prive.sql',
     'supabase/migrations/20261027123209_validation_initiale_badges.sql',
     'supabase/migrations/20261027130328_candidature_obligatoire_missions.sql',
-    'supabase/migrations/20261027132112_preselection_interne.sql', 'SUIVI_PR6.md');
+    'supabase/migrations/20261027132112_preselection_interne.sql', 'supabase/migrations/20261027133857_suivi_interventions_sans_transport.sql', 'SUIVI_PR6.md');
   const horsPerimetre = f => PERIMETRE.indexOf(f) === -1 && !PERIMETRE_PR6.includes(f)
     && !f.startsWith('migrations/') && !f.startsWith('tests/')
     && !f.startsWith('supabase/functions/') && !f.startsWith('supabase/templates/');
@@ -393,7 +393,7 @@ const futur = dansNJours;
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
-      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 65,
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 66,
     PERIMETRE.length + ' entrées historiques, ' + PERIMETRE_PR6.length + ' entrées PR6');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.

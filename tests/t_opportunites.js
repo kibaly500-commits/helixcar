@@ -189,6 +189,46 @@ window.fetch=function(url){
       await page.evaluate(async()=>{__missions=[];await loadMissionsConvoyeur()});
       check('Mes missions : état vide '+width,(await page.locator('#conv-missions-table').innerText()).includes('Aucune mission attribuée'));
     }
+    for (const width of [1280,390]) {
+      await page.setViewportSize({width,height:844});
+      await page.evaluate(async()=>{
+        window._currentConvoyeur={id:'test-pro'};
+        window.__missions=['professionnel','nettoyage'].map((type_mission,i)=>({id:'inter'+i,reference:'INT-'+i,convoyeur_id:'test-pro',type_mission,statut:i?'en_cours':'acceptee',prestation:i?'Nettoyage flotte':'Diagnostic',adresse_intervention:'12 rue du Test',ville_intervention:'Noisy',date_intervention:'2026-11-01',date_fin_intervention:'2026-11-10',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30',nb_vehicules:30,consignes:'Contrôler la flotte',remuneration_prevue:300,devis_source_id:'source'}));
+        sbFetchToutePage=async path=>path.startsWith('missions?')?__missions:[];
+        await loadMissionsConvoyeur();
+      });
+      let t=await page.locator('#conv-interventions-table').innerText();
+      check('Interventions : détails et rémunération '+width,['Diagnostic','Nettoyage flotte','Noisy','08:30','17:30','30 véhicule(s)','300 €'].every(x=>t.includes(x)));
+      check('Interventions : commencer et terminer sans photos '+width,t.includes('Commencer l’intervention')&&t.includes('Intervention terminée')&&!/photo|lieux départ|Lettre de voiture/i.test(t));
+      check('Interventions : colonnes transport masquées '+width,!(await page.locator('#conv-missions-table').isVisible()));
+      check('Interventions : largeur mobile '+width,await page.locator('#conv-interventions-table').evaluate(el=>el.closest('.table-wrap').scrollWidth<=el.closest('.table-wrap').clientWidth+1));
+      await page.evaluate(async()=>{
+        currentRole='admin';buildNav('admin');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-admin-missions').classList.add('active');await loadMissions();
+      });
+      t=await page.locator('#interventions-table').innerText();
+      check('Admin interventions : détails sans documents transport '+width,t.includes('Diagnostic')&&t.includes('Nettoyage flotte')&&!/Lettre|EDL|Photos/.test(t));
+      check('Admin interventions : colonnes transport masquées '+width,!(await page.locator('#missions-table').isVisible()));
+      await page.evaluate(async()=>{
+        __missions.push({id:'conv',reference:'CONVOYAGE',type_mission:'convoyage',statut:'acceptee',convoyeur_id:'test-pro',ville_depart:'Paris',ville_arrivee:'Lyon'});await loadMissions();
+      });
+      check('Admin mixte : deux tableaux adaptés '+width,await page.locator('#missions-table').isVisible()&&await page.locator('#interventions-table').isVisible());
+      await page.evaluate(async()=>{__missions=[];await loadMissions()});
+      check('Admin : interventions effacées après relecture vide '+width,!(await page.locator('#interventions-table').isVisible()));
+      await page.evaluate(()=>{currentRole='convoyeur';document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-convoyeur-missions').classList.add('active')});
+    }
+    const suivi=await page.evaluate(async()=>{
+      const original=sbAuth.from, reload=loadMissionsConvoyeur, alerte=window.alert;
+      let refresh=0, alerts=0, query, erreur=false;
+      loadMissionsConvoyeur=async()=>{refresh++};window.alert=()=>{alerts++};
+      sbAuth.from=()=>{query={};const q={update(v){query.update=v;return q},eq(k,v){query[k]=v;return q},in(k,v){query[k]=v;return q},select(){return q},single:async()=>erreur?{error:{message:'Refus'}}:{data:{id:'inter',statut:query.update.statut}}};return q};
+      await avancerIntervention('inter','en_cours');const debut={...query};
+      await avancerIntervention('inter','fini');const fin={...query};
+      erreur=true;await avancerIntervention('inter','fini');
+      sbAuth.from=original;loadMissionsConvoyeur=reload;window.alert=alerte;
+      return {debut,fin,refresh,alerts};
+    });
+    check('Suivi : écriture bornée au professionnel, au type et au statut',suivi.debut.convoyeur_id==='test-pro'&&suivi.debut.statut==='acceptee'&&suivi.fin.statut==='en_cours'&&suivi.debut.type_mission.includes('nettoyage'));
+    check('Suivi : aucun faux succès après refus serveur',suivi.refresh===2&&suivi.alerts===1);
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
