@@ -264,6 +264,11 @@ window.fetch=function(url){
       const texte=await page.locator('#client-missions-table').textContent();
       check('Client '+type+' : référence courte affichée',texte.includes('HC-2026-0009')&&!texte.includes('M-f6fb6dcea6904e20'));
     }
+    await page.evaluate(async()=>{
+      __opportunites[1].mission_reference='HC-2026-0009';await loadOpportunitesAdmin();await ouvrirOpportuniteAdmin(__opportunites[1].id);
+    });
+    check('Opportunité : référence courte dans la liste',(await page.locator('#opportunites-table').textContent()).includes('HC-2026-0009'));
+    check('Opportunité : référence courte dans le détail',(await page.locator('#opportunite-titre').textContent()).includes('HC-2026-0009'));
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

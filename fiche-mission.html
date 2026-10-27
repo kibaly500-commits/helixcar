@@ -182,7 +182,7 @@ function setField(id, value) {
       document.getElementById('stockage-remise-section').style.display='block';
     }
 
-    document.getElementById('doc-code').textContent = m.reference;
+    document.getElementById('doc-code').textContent = m.reference_courte || m.reference;
     setField('f-ville-depart', m.adresse_depart || m.ville_depart);
     setField('f-ville-arrivee', m.adresse_arrivee || m.ville_arrivee);
     setField('f-date-pec', m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR') : null);

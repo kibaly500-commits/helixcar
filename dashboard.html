@@ -6178,7 +6178,7 @@ async function lancerArchivage() {
   logArchivage('🔎 Lecture du bucket "edl"…');
 
   try {
-    const missions = await sbFetchToutePage('missions?select=id,reference,convoyeur_id,lettre_voiture_signee_url');
+    const missions = await sbFetchToutePage('missions?select=id,reference_courte,reference,convoyeur_id,lettre_voiture_signee_url');
     const parMission = await construireIndexFichiersDepuisDB(missions, function(msg) { logArchivage(msg); });
 
     const references = Object.keys(parMission);
@@ -6383,7 +6383,7 @@ async function lancerSynchronisation() {
     const [actifs, tousLesClients, missions, convoyeurs, recontacts, factures] = await Promise.all([
       sbFetchToutePage('convoyeurs?statut=eq.actif&order=nom.asc'),
       sbFetchToutePage('clients?order=created_at.asc'),
-      sbFetchToutePage('missions?select=id,reference,client_id,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url'),
+      sbFetchToutePage('missions?select=id,reference_courte,reference,client_id,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url'),
       sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
       sbFetchToutePage('recontacts?order=created_at.desc'),
       sbFetchToutePage('factures_convoyeur?order=date_generation.desc')
@@ -6705,7 +6705,7 @@ async function lancerArchivageConvoyeurs() {
     ecrireLogArchive(logId, enAttente.length + ' en attente de validation, ' + actifs.length + ' actif(s).');
 
     ecrireLogArchive(logId, '🔎 Lecture des missions et des états des lieux…');
-    const missions = await sbFetchToutePage('missions?select=id,reference,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url');
+    const missions = await sbFetchToutePage('missions?select=id,reference_courte,reference,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url');
     const fichiersParReference = await construireIndexFichiersDepuisDB(missions, function(msg) { ecrireLogArchive(logId, msg); });
 
     const zip = new JSZip();
@@ -6845,7 +6845,7 @@ function texteFicheClient(c) {
 
 function texteFicheMission(m, convoyeurNom) {
   const lignes = [
-    'MISSION — ' + (m.reference || '—'),
+    'MISSION — ' + (referenceMission(m) || '—'),
     '='.repeat(50),
     'Statut : ' + (m.statut || '—'),
     'Convoyeur : ' + (convoyeurNom || '—'),
@@ -6970,7 +6970,7 @@ async function lancerArchivageClients() {
 
     ecrireLogArchive(logId, '🔎 Lecture des missions, convoyeurs et demandes de recontact…');
     const [missions, convoyeurs, recontacts] = await Promise.all([
-      sbFetchToutePage('missions?select=id,reference,client_id,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url'),
+      sbFetchToutePage('missions?select=id,reference_courte,reference,client_id,convoyeur_id,statut,ville_depart,ville_arrivee,adresse_depart,adresse_arrivee,date_prise_en_charge,date_livraison,marque_modele,immatriculation,prix_ttc,lettre_voiture_signee_url'),
       sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
       sbFetchToutePage('recontacts?order=created_at.desc')
     ]);
@@ -7193,7 +7193,7 @@ async function lancerArchivageFactures() {
     const [factures, convoyeurs, missions] = await Promise.all([
       sbFetchToutePage('factures_convoyeur?order=date_generation.desc'),
       sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
-      sbFetchToutePage('missions?select=id,reference')
+      sbFetchToutePage('missions?select=id,reference_courte,reference')
     ]);
     if (!factures || factures.length === 0) {
       ecrireLogArchive(logId, '✅ Aucune facture pour le moment.');
@@ -7980,7 +7980,7 @@ function voirConvoyeurSb(id) {
   preparerFichePartenaire(c);
   openModal('dossier');
 
-  sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
+  sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference_courte,reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
     .then(function(rows) {
       const el = document.getElementById('dossier-missions-liste');
       if (!el) return;
@@ -8442,7 +8442,7 @@ function chargerMissionsAccueil() {
   var tbody = document.getElementById('missions-accueil');
   if (!tbody) return;
   _hcSyncTasks.push(Promise.all([
-    sbFetch('missions?select=id,reference,ville_depart,ville_arrivee,client_id,convoyeur_id,marque_modele,immatriculation,date_prise_en_charge,prix_ttc,statut&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc&limit=6'),
+    sbFetch('missions?select=id,reference_courte,reference,ville_depart,ville_arrivee,client_id,convoyeur_id,marque_modele,immatriculation,date_prise_en_charge,prix_ttc,statut&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc&limit=6'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
     sbFetchToutePage('clients?select=id,prenom,nom')
   ]).then(function (res) {
@@ -8880,7 +8880,7 @@ function envoyerEmailFicheMission(missionId, conv) {
     const optionsTxt = optionsListe.length ? '\nOptions : ' + optionsListe.join(', ') : '';
     const lienFiche = _hcOrigineOfficielle() + '/fiche-mission.html?mission=' + encodeURIComponent(m.reference);
     const msg = 'Bonjour ' + (conv.prenom || '') + ',\n\n' +
-      'Mission confirmée : ' + m.reference + '\n\n' +
+      'Mission confirmée : ' + referenceMission(m) + '\n\n' +
       '📄 Fiche mission complète (à imprimer et à faire signer au départ et à l\'arrivée) :\n' + lienFiche + '\n\n' +
       'Trajet : ' + m.ville_depart + ' → ' + m.ville_arrivee +
       adresseDepartTxt + adresseArriveeTxt + '\n' +
@@ -9546,7 +9546,7 @@ function loadFacturationAdmin() {
   _hcSyncTasks.push(Promise.all([
     sbFetchToutePage('factures_convoyeur?order=date_generation.desc'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
-    sbFetchToutePage('missions?select=id,reference')
+    sbFetchToutePage('missions?select=id,reference_courte,reference')
   ]).then(function(results) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
@@ -9554,7 +9554,7 @@ function loadFacturationAdmin() {
     const convoyeurs = {};
     (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
     const missionsRef = {};
-    (results[2] || []).forEach(function(m) { missionsRef[m.id] = m.reference; });
+    (results[2] || []).forEach(function(m) { missionsRef[m.id] = referenceMission(m); });
 
     function missionsTxt(f) {
       return (f.mission_ids || []).map(function(id) { return missionsRef[id] || id; }).join(' · ');
@@ -10793,7 +10793,7 @@ function _missionNettoyageDe(c) {
 function _missionNettoyageTexte(c) {
   var m = _missionNettoyageDe(c);
   if (!m) return 'Pas encore';
-  return m.reference + ' — ' + (LIB_STATUT_MISSION[m.statut] || m.statut);
+  return referenceMission(m) + ' — ' + (LIB_STATUT_MISSION[m.statut] || m.statut);
 }
 
 var LIB_STATUT_MISSION = {
@@ -10809,7 +10809,7 @@ var LIB_STATUT_MISSION = {
 // Charge les missions déjà créées pour les demandes affichées, afin de
 // ne jamais proposer deux fois la création de la même mission.
 function chargerMissionsParDemande() {
-  return sbFetchToutePage('missions?select=id,reference,statut,client_id,type_mission,convoyeur_id'
+  return sbFetchToutePage('missions?select=id,reference_courte,reference,statut,client_id,type_mission,convoyeur_id'
                           + '&type_mission=eq.nettoyage')
     .then(function (rows) {
       _missionsParDemande = {};

@@ -994,10 +994,10 @@ function envoyerEmailClientEdl(mission, phase) {
     const client = (rows || [])[0];
     if (!client || !client.email) return;
     const TITRES = {
-      depart: '🚗 Votre véhicule est pris en charge — ' + mission.reference,
-      arrivee: '🏁 Votre véhicule est arrivé — ' + mission.reference,
-      restitution_depart: '🔄 Restitution en cours — ' + mission.reference,
-      restitution_arrivee: '✅ Restitution terminée — ' + mission.reference
+      depart: '🚗 Votre véhicule est pris en charge — ' + (mission.reference_courte || mission.reference),
+      arrivee: '🏁 Votre véhicule est arrivé — ' + (mission.reference_courte || mission.reference),
+      restitution_depart: '🔄 Restitution en cours — ' + (mission.reference_courte || mission.reference),
+      restitution_arrivee: '✅ Restitution terminée — ' + (mission.reference_courte || mission.reference)
     };
     const CORPS = {
       depart: 'Votre véhicule vient d\'être pris en charge par notre convoyeur à ' + mission.ville_depart + '.\n\nL\'état des lieux de départ a bien été réalisé.',
@@ -1010,7 +1010,7 @@ function envoyerEmailClientEdl(mission, phase) {
     const titre = TITRES[phase] || TITRES.depart;
     const msg = 'Bonjour ' + (client.prenom || '') + ',\n\n' +
       (CORPS[phase] || CORPS.depart) +
-      '\n\nRéférence mission : ' + mission.reference +
+      '\n\nRéférence mission : ' + (mission.reference_courte || mission.reference) +
       (estFinDeMission
         ? '\n\nMerci de votre confiance — n\'hésitez pas à nous contacter pour toute question. À bientôt pour une prochaine mission, nous serons ravis de vous accompagner à nouveau !\n\nCordialement,\nL\'équipe HelixCar'
         : '\n\nVous pouvez compter sur notre équipe pour vous accompagner et vous tenir informé tout au long de la mission.\n\nCordialement,\nL\'équipe HelixCar');
@@ -1087,7 +1087,7 @@ async function validateMissionCode() {
     document.getElementById('screen-code').style.display = 'none';
     document.getElementById('step-1').style.display = 'block';
     document.querySelector('.hdr .logo').insertAdjacentHTML('afterend',
-      `<span style="font-size:.72rem;background:rgba(245,197,24,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${edlHtml(missionCode)}</span>`
+      `<span style="font-size:.72rem;background:rgba(245,197,24,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${edlHtml(currentMission.reference_courte || missionCode)}</span>`
     );
     if (PHASE === 'arrivee' || PHASE === 'restitution_arrivee') chargerPhotosPrecedentesPourComparaison();
     await restaurerBrouillonEdl();
@@ -1273,7 +1273,7 @@ function buildRecap(){
     ?`<div style="padding:8px;background:rgba(239,68,68,.05);border-radius:7px;border:1px solid rgba(239,68,68,.2);margin-top:4px"><span style="font-size:.73rem;color:var(--rd);font-weight:600">⚠️ Dommages : </span><span style="font-size:.78rem">${edlHtml(all.join(' · '))}</span></div>`
     :`<div style="padding:7px 9px;background:rgba(34,197,94,.06);border-radius:7px;border:1px solid rgba(34,197,94,.2);font-size:.78rem;color:var(--gn)">✅ Aucun dommage constaté</div>`;
   document.getElementById('recap-content').innerHTML=`<div style="display:flex;flex-direction:column">
-    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${edlHtml(missionCode)}</span></div>
+    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${edlHtml(currentMission.reference_courte || missionCode)}</span></div>
     <div class="rrow"><span>Véhicule</span><span>${edlHtml(document.getElementById('v-marque').value)} ${edlHtml(document.getElementById('v-modele').value)}</span></div>
     <div class="rrow"><span>Immatriculation</span><span>${edlHtml(document.getElementById('v-immat').value)}</span></div>
     <div class="rrow"><span>N° VIN (châssis)</span><span style="font-size:.78rem">${photos['vin']?'📸 Photo prise ✓':'—'}</span></div>
@@ -1394,7 +1394,7 @@ async function submit(){
     }
     STEPS.forEach(s=>document.getElementById('psi-'+s.id).className='psi done');
     const sucCode = document.getElementById('suc-code');
-    if (sucCode) sucCode.textContent = missionCode;
+    if (sucCode) sucCode.textContent = currentMission.reference_courte || missionCode;
     window.scrollTo({top:0,behavior:'smooth'});
   } catch (e) {
     console.error(e);
