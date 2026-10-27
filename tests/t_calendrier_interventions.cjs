@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const source=fs.readFileSync('dashboard.html','utf8');
-const a=source.indexOf('function missionSurPlace('),b=source.indexOf('\nfunction loadMissions()',a);
+const a=source.indexOf('var filtresMissionsAdmin ='),b=source.indexOf('\nfunction loadMissions()',a);
 let timer;const c={Intl,Date,Map,Set,document:{querySelectorAll:()=>[]},setInterval:fn=>timer=fn,escapeHtml:s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),_dvDate:s=>s};vm.createContext(c);vm.runInContext(source.slice(a,b),c);
 let n=0;function check(name,ok){assert.ok(ok,name);console.log('PASS '+name);n++}
 const m={id:'m',convoyeur_id:'p',type_mission:'professionnel',statut:'acceptee',date_intervention:'2026-11-20',date_fin_intervention:'2026-11-30',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30',ville_intervention:'Paris',consignes:'Consignes privées <script>',prestation:'Diagnostic',remuneration_prevue:300};
@@ -16,4 +16,12 @@ const html=c.ligneIntervention(m,false,'');check('Consignes derrière détails f
 check('Sans colonnes transport',!/Livraison|Prise en charge|Restitution|Lettre de voiture/.test(html));
 check('Admin confirme mission attribuée',source.includes("actionHtml('confirmerMissionTerminee',[m.id])+'>Confirmer la réalisation"));
 check('Rubriques distinctes',source.includes('Missions de convoyage')&&source.includes('Autres missions'));
+const rows=[{id:'a',type_mission:'convoyage',statut:'en_cours',reference:'M-old',reference_courte:'HC-2026-0001'},{id:'b',type_mission:'convoyage',statut:'terminee',reference:'M-old2',reference_courte:'HC-2026-0002'},{id:'c',type_mission:'professionnel',statut:'terminee',reference:'M-pro',reference_courte:'HC-2026-0003'}];
+check('Archives exclues des missions actives',c.filtrerMissionsAdmin(rows).map(m=>m.id).join()==='a');
+c.filtresMissionsAdmin.convoyage.archives=true;
+check('Archives convoyage isolées',c.filtrerMissionsAdmin(rows).map(m=>m.id).join()==='b');
+c.filtresMissionsAdmin.autres.archives=true;c.filtresMissionsAdmin.autres.recherche='hc-2026-0003';
+check('Recherche courte insensible à la casse',c.filtrerMissionsAdmin(rows).some(m=>m.id==='c'));
+c.filtresMissionsAdmin.autres.recherche='M-pro';check('Ancienne référence encore recherchable',c.filtrerMissionsAdmin(rows).some(m=>m.id==='c'));
+check('Numéro court affiché',c.referenceMission(rows[0])==='HC-2026-0001');
 console.log(n+' PASS / 0 FAIL');

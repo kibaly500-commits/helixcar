@@ -1383,6 +1383,11 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- ADMIN: Missions -->
       <div class="page" id="page-admin-missions">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+          <button class="btn btn-sm btn-dark" id="missions-actives-convoyage" onclick="choisirArchivesMissions('convoyage',false)">Missions actives</button>
+          <button class="btn btn-sm btn-outline" id="missions-archives-convoyage" onclick="choisirArchivesMissions('convoyage',true)">Archives</button>
+          <input type="search" id="missions-recherche-convoyage" aria-label="Rechercher une référence de mission" placeholder="Rechercher une référence…" oninput="rechercherReferenceMission('convoyage',this.value)" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;max-width:100%">
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
           <div></div>
           <button class="btn btn-primary" onclick="openNewMission()">+ Créer une mission</button>
@@ -1400,6 +1405,11 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
       </div>
       <div class="page" id="page-admin-autres-missions">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+          <button class="btn btn-sm btn-dark" id="missions-actives-autres" onclick="choisirArchivesMissions('autres',false)">Missions actives</button>
+          <button class="btn btn-sm btn-outline" id="missions-archives-autres" onclick="choisirArchivesMissions('autres',true)">Archives</button>
+          <input type="search" id="missions-recherche-autres" aria-label="Rechercher une référence de mission" placeholder="Rechercher une référence…" oninput="rechercherReferenceMission('autres',this.value)" style="padding:9px 12px;border:1px solid #ddd;border-radius:8px;max-width:100%">
+        </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
           <button class="btn btn-primary" onclick="openNewMission()">+ Créer une mission</button>
         </div>
@@ -2894,10 +2904,10 @@ async function rendreInfosDemandeAdmin(c) {
     if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
       actions = '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
         + '<button class="btn btn-sm btn-primary"'
-        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'validee'])
+        + actionHtml('choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', [c.id, l.cle, 'validee'])
         + '>Valider cette réponse</button>'
         + '<button class="btn btn-sm btn-secondary"'
-        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
+        + actionHtml('choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
         + '>Demander une correction</button>'
         + '</div>';
     }
@@ -3351,7 +3361,7 @@ async function loadMissionsClient() {
     if (m.evaluee) evaluation = '<span class="badge badge-done">' + escapeHtml(String(m.evaluation_note)) + '/20</span>';
     else if (m.statut === 'terminee') evaluation = '<button class="btn btn-sm btn-outline" onclick="showPage(\'client-notation\')">À évaluer</button>';
     return '<tr data-mission="' + escapeHtml(m.id) + '">'
-      + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(m.reference || '—') + '</td>'
+      + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(referenceMission(m) || '—') + '</td>'
       + '<td>' + escapeHtml(_missionPrestationClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
@@ -3455,7 +3465,7 @@ function _evalHtmlFormulaire(m) {
   const id = String(m.id);
   const notes = _evalNotes[id] || {};
   let html = '<div class="card" style="margin-bottom:14px" id="eval-' + escapeHtml(id) + '" data-mission="' + escapeHtml(id) + '">'
-    + '<div class="card-header"><div><div class="card-title">' + escapeHtml(m.reference || 'Mission') + '</div>'
+    + '<div class="card-header"><div><div class="card-title">' + escapeHtml(referenceMission(m) || 'Mission') + '</div>'
     + '<div class="card-sub">' + escapeHtml(_missionPrestationClient(m)) + ' · ' + escapeHtml(_missionLieuClient(m))
     + (m.convoyeur_prenom ? ' · ' + escapeHtml(m.convoyeur_prenom) : '') + ' · ' + escapeHtml(_missionDateClient(m)) + '</div></div></div>';
   EVALUATION_CRITERES.forEach(function (c) {
@@ -3582,7 +3592,7 @@ async function loadEvaluationsClient() {
     ? evaluations.map(function (e) {
         const m = parMission[String(e.mission_id)] || {};
         return '<div class="detail-row" data-evaluation="' + escapeHtml(e.id) + '">'
-          + '<span class="detail-label">' + escapeHtml(m.reference || 'Mission') + ' · ' + escapeHtml(_dvDate(e.created_at))
+          + '<span class="detail-label">' + escapeHtml(referenceMission(m) || 'Mission') + ' · ' + escapeHtml(_dvDate(e.created_at))
           + (m.convoyeur_prenom ? ' · ' + escapeHtml(m.convoyeur_prenom) : '') + '</span>'
           + '<span class="detail-val"><span class="badge badge-done">' + escapeHtml(String(e.note_totale)) + '/20</span>'
           + (e.commentaire ? '<div style="font-size:.8rem;color:#555;margin-top:4px">' + escapeHtml(e.commentaire) + '</div>' : '')
@@ -7971,7 +7981,7 @@ function voirConvoyeurSb(id) {
       el.innerHTML = rows.map(function(m) {
         const dateStr = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleDateString('fr-FR') : '—';
         return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">'
-          + '<span>' + escapeHtml(m.reference) + ' · ' + escapeHtml(m.ville_depart || '') + ' → ' + escapeHtml(m.ville_arrivee || '') + ' · ' + dateStr + '</span>'
+          + '<span>' + escapeHtml(referenceMission(m)) + ' · ' + escapeHtml(m.ville_depart || '') + ' → ' + escapeHtml(m.ville_arrivee || '') + ' · ' + dateStr + '</span>'
           + '<span style="color:#888">' + escapeHtml(m.statut) + '</span></div>';
       }).join('');
     })
@@ -8451,7 +8461,7 @@ function chargerMissionsAccueil() {
         || '<span class="badge">' + escapeHtml(m.statut || '—') + '</span>';
       return '<tr>'
         + '<td><strong>' + escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—') + '</strong>'
-        + '<br><span style="font-size:.72rem;color:#888">' + escapeHtml(m.reference || '') + '</span></td>'
+        + '<br><span style="font-size:.72rem;color:#888">' + escapeHtml(referenceMission(m) || '') + '</span></td>'
         + '<td>' + escapeHtml(m.client_id ? (cli[m.client_id] || '—') : '—') + '</td>'
         + '<td>' + escapeHtml(m.convoyeur_id ? (conv[m.convoyeur_id] || '—') : '—') + '</td>'
         + '<td>' + escapeHtml(vehicule) + '</td>'
@@ -8530,6 +8540,29 @@ async function reglerTarifBrouillon(id) {
   loadMissions();
 }
 
+var filtresMissionsAdmin = {convoyage:{archives:false,recherche:''},autres:{archives:false,recherche:''}};
+function referenceMission(m) { return m.reference_courte || m.reference || ''; }
+function missionArchivee(m) { return ['terminee','annulee'].includes(m.statut); }
+function filtrerMissionsAdmin(rows) {
+  return rows.filter(m=>{
+    const f=filtresMissionsAdmin[missionSurPlace(m)?'autres':'convoyage'];
+    const texte=[m.reference_courte,m.reference].filter(Boolean).join(' ').toLocaleLowerCase('fr');
+    return missionArchivee(m)===f.archives && texte.includes(f.recherche.trim().toLocaleLowerCase('fr'));
+  });
+}
+function choisirArchivesMissions(type,archives) {
+  if(!filtresMissionsAdmin[type])return;
+  filtresMissionsAdmin[type].archives=archives;
+  document.getElementById('missions-actives-'+type).className='btn btn-sm '+(!archives?'btn-dark':'btn-outline');
+  document.getElementById('missions-archives-'+type).className='btn btn-sm '+(archives?'btn-dark':'btn-outline');
+  loadMissions();
+}
+var rechercheMissionDelai;
+function rechercherReferenceMission(type,valeur) {
+  if(!filtresMissionsAdmin[type])return;
+  filtresMissionsAdmin[type].recherche=valeur;
+  clearTimeout(rechercheMissionDelai);rechercheMissionDelai=setTimeout(loadMissions,180);
+}
 function missionSurPlace(m) { return ['nettoyage','professionnel'].includes(m.type_mission); }
 function periodeIntervention(m) {
   return (m.date_intervention ? _dvDate(m.date_intervention) : 'À préciser')
@@ -8583,7 +8616,7 @@ function ligneIntervention(m, admin, actions, client, partenaire) {
   interventionsAffichees.set(String(m.id),m);
   const statut = badgeIntervention(m);
   const details = '<strong>' + escapeHtml(m.prestation || (m.type_mission === 'nettoyage' ? 'Nettoyage automobile' : 'Intervention professionnelle')) + '</strong>'
-    + '<br><small>' + escapeHtml(m.reference || '') + '</small>';
+    + '<br><small>' + escapeHtml(referenceMission(m) || '') + '</small>';
   const informations = escapeHtml(lieuIntervention(m))
     + (m.contact_nom || m.contact_tel ? '<br>Contact : ' + escapeHtml([m.contact_nom,m.contact_tel].filter(Boolean).join(' · ')) : '')
     + (m.nb_vehicules ? '<br>' + escapeHtml(String(m.nb_vehicules)) + ' véhicule(s)' : '')
@@ -8614,7 +8647,7 @@ function loadMissions() {
   ]).then(function(results) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
-    const missions = results[0] || [];
+    const missions = filtrerMissionsAdmin(results[0] || []);
     const interventions = [];
     document.getElementById('interventions-table').innerHTML = '';
     document.getElementById('interventions-table-carte').style.display = '';
@@ -8628,7 +8661,7 @@ function loadMissions() {
     const sub = document.getElementById('missions-count-sub');
     if (sub) sub.textContent = missions.filter(m=>!missionSurPlace(m)).length + ' mission(s)';
 
-    if (!missions.some(missionSurPlace)) document.getElementById('interventions-table').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px">Aucune autre mission pour le moment</td></tr>';
+    if (!missions.some(missionSurPlace)) document.getElementById('interventions-table').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px">Aucune mission correspondant à cette vue</td></tr>';
     if (missions.length === 0) {
       tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Aucune mission pour le moment</td></tr>';
       return;
@@ -8704,7 +8737,7 @@ function loadMissions() {
              .filter(Boolean).join(', ') || '—')
         : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
       return '<tr>'
-        + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(m.reference) + '</td>'
+        + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(referenceMission(m)) + '</td>'
         + '<td>' + badgeType + '</td>'
         + '<td><strong>' + (estSurPlace ? escapeHtml(lieu) : lieu) + '</strong>'
         + (estSurPlace && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
@@ -8727,7 +8760,7 @@ function loadMissions() {
         + '</tr>';
     }).join('');
     if (interventions.length) document.getElementById('interventions-table').innerHTML = interventions.join('');
-    if (!missions.some(m=>!missionSurPlace(m))) tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px">Aucune mission de convoyage pour le moment</td></tr>';
+    if (!missions.some(m=>!missionSurPlace(m))) tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px">Aucune mission correspondant à cette vue</td></tr>';
   }).catch(function(e) {
  if (_hcSyncCycle) return;
 
@@ -8792,7 +8825,7 @@ async function loadDashboardMissionsPreview() {
     const rows = await chargerMissionsEnCours();
     if (cycle && !window.HCSync.safe(cycle)) return;
     el.innerHTML = rows.length ? rows.slice(0, 3).map(m =>
-      '<div class="mission-card"><div class="mission-route">' + escapeHtml(m.reference || 'Mission attribuée') + '</div>'
+      '<div class="mission-card"><div class="mission-route">' + escapeHtml(referenceMission(m) || 'Mission attribuée') + '</div>'
       + '<div class="mission-details">' + escapeHtml(m.marque_modele || m.prestation || '') + '</div>'
       + (MISSION_STATUT_BADGE[m.statut] || '')
       + '<button class="btn btn-sm btn-primary" ' + actionHtml('showPage', ['convoyeur-missions']) + '>Suivre la mission</button></div>'
@@ -9394,20 +9427,20 @@ function loadFacturationConvoyeur() {
         const description = missionSurPlace(m) ? escapeHtml(m.prestation || 'Intervention') + ' · ' + escapeHtml(m.ville_intervention || '') : escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee);
         if (!m.validee_paiement) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
-            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
+            + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + ' · ⏳ en attente de validation HelixCar</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
         if (!missionSurPlace(m) && !m.lettre_voiture_signee_url) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
-            + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
+            + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Mes missions)</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee">'
-          + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + description
+          + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
           + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + '</span></div>'
           + '<div style="display:flex;align-items:center;gap:10px">'
           + '<strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong>'
@@ -10788,7 +10821,7 @@ function _blocMissionNettoyageHtml(c) {
 
   if (m) {
     html += '<div style="font-size:.9rem;margin-bottom:6px"><b style="color:#1F7A4D">✓ Mission '
-      + escapeHtml(m.reference) + ' créée</b></div>';
+      + escapeHtml(referenceMission(m)) + ' créée</b></div>';
     html += '<div style="font-size:.85rem;margin-bottom:10px">État : '
       + escapeHtml(LIB_STATUT_MISSION[m.statut] || m.statut) + '</div>';
     html += '<button class="btn btn-sm btn-secondary" onclick="showPage(\'admin-missions\')">'
@@ -15068,7 +15101,7 @@ function declencherChampFichier(id) {
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',
   'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite', 'deciderMetierProfessionnel',
-  'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
+  'choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
   'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',
   'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',

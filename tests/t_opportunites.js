@@ -217,9 +217,22 @@ window.fetch=function(url){
       });
       check('Admin mixte : deux pages distinctes '+width,!(await page.locator('#missions-table').isVisible())&&await page.locator('#interventions-table').isVisible()&&await page.locator('#page-admin-missions #missions-table').count()===1);
       await page.evaluate(async()=>{__missions=[];await loadMissions()});
-      check('Admin : état vide autres missions '+width,(await page.locator('#interventions-table').innerText()).includes('Aucune autre mission'));
+      check('Admin : état vide autres missions '+width,(await page.locator('#interventions-table').innerText()).includes('Aucune mission correspondant à cette vue'));
       await page.evaluate(()=>{currentRole='convoyeur';document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-convoyeur-missions').classList.add('active')});
     }
+    await page.evaluate(async()=>{
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-admin-autres-missions').classList.add('active');
+      __missions=[{id:'active',type_mission:'professionnel',reference:'M-active',reference_courte:'HC-2026-0001',statut:'en_cours'},{id:'archive',type_mission:'professionnel',reference:'M-old-longue',reference_courte:'HC-2026-0002',statut:'terminee'}];await loadMissions();
+    });
+    check('Actives : terminées retirées',!(await page.locator('#interventions-table').innerText()).includes('HC-2026-0002'));
+    await page.locator('#missions-archives-autres').click();await page.waitForTimeout(250);
+    check('Bouton Archives : terminées retrouvées',(await page.locator('#interventions-table').innerText()).includes('HC-2026-0002')&&!(await page.locator('#interventions-table').innerText()).includes('HC-2026-0001'));
+    await page.locator('#missions-recherche-autres').fill('hc-2026-0002');await page.waitForTimeout(350);
+    check('Recherche nouvelle référence',(await page.locator('#interventions-table').innerText()).includes('HC-2026-0002'));
+    await page.locator('#missions-recherche-autres').fill('M-old-longue');await page.waitForTimeout(350);
+    check('Recherche ancienne référence',(await page.locator('#interventions-table').innerText()).includes('HC-2026-0002'));
+    await page.locator('#missions-recherche-autres').fill('introuvable');await page.waitForTimeout(350);
+    check('Recherche sans résultat',(await page.locator('#interventions-table').innerText()).includes('Aucune mission correspondant'));
     const calendrier=await page.evaluate(()=>{
       const m={id:'date',convoyeur_id:'test-pro',statut:'acceptee',date_intervention:'2026-10-27',date_fin_intervention:'2026-10-28',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30'};
       return ['2026-10-27T07:29:00Z','2026-10-27T07:30:00Z','2026-10-28T16:31:00Z'].map(t=>statutIntervention(m,new Date(t)).cle).concat(statutIntervention({...m,statut:'terminee'}).cle,statutIntervention({...m,convoyeur_id:null}).cle);
