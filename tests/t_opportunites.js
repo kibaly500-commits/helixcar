@@ -281,14 +281,14 @@ window.fetch=function(url){
       buildNav('admin');await majCompteursMenuAdmin();const reconstruit=lire();
       window.__menuErreur=true;await majCompteursMenuAdmin();const erreur=lire();window.__menuErreur=false;
       __menuMissions=[];__menuDemandes=[];_compterLignes=async()=>0;await majCompteursMenuAdmin();await majBadgeCandidatures();
-      const zeros=lire(),visibles=['admin-missions','admin-autres-missions','admin-devis','admin-opportunites','candidatures'].every(id=>document.getElementById('badge-'+id).style.display!=='none');
+      const zeros=lire(),visibles=['admin-missions','admin-autres-missions','admin-devis','admin-opportunites','candidatures'].every(id=>document.getElementById('badge-'+id).style.display==='none');
       return {initial,apresLecture,reconstruit,erreur,zeros,visibles};
     });
     check('Menu : totaux exacts, archives et comptes seuls exclus',JSON.stringify(compteurs.initial)===JSON.stringify(['2','1','2','3','6']));
     check('Menu : consulter les devis conserve le total',JSON.stringify(compteurs.apresLecture)===JSON.stringify(compteurs.initial));
     check('Menu : compteurs restaurés après reconstruction',JSON.stringify(compteurs.reconstruit)===JSON.stringify(compteurs.initial));
     check('Menu : erreur réseau conserve les compteurs',JSON.stringify(compteurs.erreur)===JSON.stringify(compteurs.initial));
-    check('Menu : zéro reste affiché',compteurs.zeros.every(n=>n==='0')&&compteurs.visibles);
+    check('Menu : compteurs masqués à zéro',compteurs.zeros.every(n=>n==='0')&&compteurs.visibles);
     const infos=await page.evaluate(()=>{
       _adminInfosCharge=true;_adminInfosDossiers=[{client:{id:'a'},lignes:[{statut:'attendue'},{statut:'attendue'}]},{client:{id:'b'},lignes:[{statut:'transmise'}]},{client:{id:'c'},lignes:[{statut:'validee'}]}];
       majCompteurInformationsAdmin();const initial=document.getElementById('badge-admin-infos').textContent;
@@ -299,7 +299,7 @@ window.fetch=function(url){
     check('Informations : compte les dossiers, pas les champs',infos.initial==='2');
     check('Informations : recherche sans effet sur le total',infos.filtre==='2');
     check('Informations : validation et zéro actualisés',infos.valide==='1'&&infos.zero==='0');
-    check('Métiers : compteur visible à zéro',await page.locator('#badge-admin-metiers').textContent()==='0');
+    check('Métiers : compteur masqué à zéro',await page.locator('#badge-admin-metiers').isHidden());
     await page.evaluate(async()=>{
       currentRole='admin';const c={prenom:'Compte',nom:'Validé',statut:'actif'};
       window.__badgesTest=[{professionnel_id:'1',metier:'convoyage',decision:'oui',convoyeurs:c},{professionnel_id:'2',metier:'nettoyage',decision:'en_attente',convoyeurs:{...c,nom:'En attente'}},{professionnel_id:'2',metier:'convoyage',decision:'non',convoyeurs:c}];

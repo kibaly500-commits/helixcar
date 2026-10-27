@@ -4965,7 +4965,7 @@ function afficherCompteurMenu(id, n, libelle) {
   if (!badge) return;
   const texte = String(n);
   if (badge.textContent !== texte) badge.textContent = texte;
-  badge.style.display = '';
+  badge.style.display = n > 0 ? '' : 'none';
   badge.title = texte + ' ' + libelle;
 }
 async function majCompteursMenuAdmin() {
@@ -8200,7 +8200,7 @@ function majBadgeCandidatures() {
       var sousCandidatures = document.getElementById('candidatures-count-sub');
       if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
-      if (bdg) { bdg.textContent = n; bdg.style.display = ''; bdg.title = n + ' candidatures en attente'; }
+      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; bdg.title = n + ' candidatures en attente'; }
     })
     .catch(function () {});
 }
@@ -8349,7 +8349,7 @@ function chargerAccueilAdmin() {
       var sousCandidatures = document.getElementById('candidatures-count-sub');
       if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
-      if (bdg) { bdg.textContent = n; bdg.style.display = ''; bdg.title = n + ' candidatures en attente'; }
+      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; bdg.title = n + ' candidatures en attente'; }
       var al = document.getElementById('alerte-candidatures');
       if (al) {
         al.textContent = n > 0
