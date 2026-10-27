@@ -257,6 +257,13 @@ window.fetch=function(url){
       window._factureBloqueeJusquau=null;const input=document.createElement('input');input.type='checkbox';input.className='fc-conv-check';input.checked=true;input.dataset.montant='100';document.body.appendChild(input);
       recalculerTotalFactureConvoyeur();const enabled=!document.getElementById('fc-conv-generer-btn').disabled;input.remove();return enabled;
     }));
+    for(const type of ['professionnel','particulier']){
+      await page.evaluate(async(type)=>{
+        chargerMissionsSuiviClient=async()=>[{id:'mission-client',reference:'M-f6fb6dcea6904e20',reference_courte:'HC-2026-0009',type_mission:'professionnel',prestation:'Diagnostic',statut:'en_cours',_paiement:'paye'}];await loadMissionsClient();
+      },type);
+      const texte=await page.locator('#client-missions-table').textContent();
+      check('Client '+type+' : référence courte affichée',texte.includes('HC-2026-0009')&&!texte.includes('M-f6fb6dcea6904e20'));
+    }
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
