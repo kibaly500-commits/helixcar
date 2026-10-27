@@ -18,3 +18,15 @@
 - Mes missions clients : identité partenaire masquée, statuts simplifiés, récapitulatif limité à une mission, évaluation après fin.
 - Migration 20261027195656 appliquée à zsetmqnmmupqbkgqbjbo. Aucun ancien dossier actuellement admissible au rattrapage des points.
 - Tests ciblés : fidélité 76 contrôles ; récompenses SQL 15 ; UI récompenses/récaps 9 ; offres/badges/compteurs 106 ; références client 7.
+
+## À reprendre le 28 octobre 2026 — demande du propriétaire
+
+- Configurer les e-mails automatiques et vérifier leurs déclencheurs.
+- Vérifier les attributions des missions ; définir et finaliser challenges/récompenses professionnels (distincts des box fidélité clients).
+- Renseigner le RIB de HelixCar Pro.
+- Configurer les notifications au partenaire retenu, y compris SMS.
+- Vérifier la fiche mission des partenaires retenus, notamment convoyeurs.
+- Brancher Stripe au compte bancaire Qonto du propriétaire.
+- Recette complète, convoyage puis autres métiers : devis/paiement → offre selon badges validés → candidature → décision/attribution admin → notification → fiche mission → début → fin → validation HelixCar → archives → disponibilité pour facturation → génération/envoi facture professionnel → réception et suivi admin.
+- Vérifier les validations obligatoires, l'absence de doublons et la séparation des comptes. Préserver EDL/lettre de voiture pour convoyage uniquement.
+- Cette liste reste à réaliser : les tests de fidélité clients précédents ne valident pas ces intégrations.
