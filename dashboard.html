@@ -225,6 +225,19 @@ input::-ms-reveal, input::-ms-clear { display: none; }
   font-size: 0.72rem; padding: 2px 8px; border-radius: 100px; margin-top: 3px;
   display: inline-block; font-weight: 600;
 }
+#profil-badges-choix { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0;max-width:760px; }
+#profil-badges-choix .badge-metier-choix { display:flex;align-items:center;justify-content:flex-start;gap:12px;min-width:0;margin:0;padding:12px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:.88rem;font-weight:500;text-transform:none;letter-spacing:normal;line-height:1.4;text-align:left;cursor:pointer; }
+#profil-badges-choix input[type="checkbox"] { flex:0 0 18px;width:18px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--green); }
+#profil-badges-choix .badge-metier-choix:has(input:checked) { border-color:var(--green);background:#f0f7f3; }
+#profil-badges-choix .badge-metier-choix:focus-within { outline:2px solid var(--blue-mid);outline-offset:2px; }
+@media(max-width:600px) { #profil-badges-choix { grid-template-columns:minmax(0,1fr); } }
+.sb-metiers[hidden] { display:none; }
+.sb-metiers { display:flex;flex-wrap:wrap;gap:5px;margin-top:5px; }
+.sb-metier { display:inline-flex;flex-direction:column;gap:2px;max-width:100%;box-sizing:border-box;padding:4px 8px;border-radius:8px;font-size:.7rem;font-weight:600;line-height:1.35;overflow-wrap:anywhere; }
+.sb-metier[data-decision="oui"] { background:rgba(31,122,77,.24);color:#8ee0ad; }
+.sb-metier[data-decision="en_attente"] { background:rgba(255,255,255,.07);color:#a9afb7;border:1px solid rgba(255,255,255,.12); }
+.sb-metier[data-decision="non"] { background:rgba(255,255,255,.04);color:#9299a2;border:1px solid rgba(255,255,255,.08); }
+.sb-metier small { font-size:.62rem;font-weight:400; }
 .role-admin { background: var(--yellow); color: #fff; }
 .role-convoyeur { background: rgba(31,122,77,0.2); color: var(--green); }
 .role-client { background: rgba(58,65,73,0.3); color: #C9CDD2; }
@@ -1223,6 +1236,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="user-info">
         <div class="user-name" id="sb-name">Hamid K.</div>
         <span class="user-role role-admin" id="sb-role">Admin</span>
+        <div class="sb-metiers" id="sb-metiers" aria-label="Mes badges métiers" aria-live="polite" hidden></div>
       </div>
     </div>
 
@@ -1943,7 +1957,7 @@ body.scroll-verrouille { overflow: hidden; }
             <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
             <div style="margin-top:18px"><h3>Mes badges métiers</h3><p>Chaque métier demandé doit être validé par HelixCar pour accéder aux annonces correspondantes.</p>
             <div id="profil-badges" aria-live="polite"></div>
-            <div id="profil-badges-choix" style="display:grid;gap:10px;margin:16px 0"></div>
+            <div id="profil-badges-choix"></div>
             <button type="button" class="btn btn-primary" id="demander-badges" onclick="demanderMesBadges()">Demander les badges sélectionnés</button>
             <p id="profil-badges-message" role="status"></p></div>
           </div>
@@ -4870,6 +4884,9 @@ function initApp(user) {
   const roleEl = document.getElementById('sb-role');
   roleEl.textContent = user.roleLabel || (user.role === 'admin' ? 'Admin' : user.role === 'convoyeur' ? 'Professionnel' : 'Client');
   roleEl.className = 'user-role role-' + user.role;
+  roleEl.style.display = user.role === 'convoyeur' ? 'none' : '';
+  const badgesIdentite = document.getElementById('sb-metiers');
+  if (badgesIdentite) { badgesIdentite.hidden = user.role !== 'convoyeur'; badgesIdentite.innerHTML = ''; }
 
   buildNav(user.role);
   showPage(user.role + '-dashboard');
@@ -6013,14 +6030,14 @@ function urlSure(u) {
 // Dashboard ne réinvente aucune nomenclature.
 var CONV_ACTIVITES_CONNUES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
 var CONV_LIB_METIER = {
-  convoyage: 'Convoyage automobile',
-  nettoyage: 'Nettoyage automobile',
+  convoyage: 'Convoyeur',
+  nettoyage: 'Nettoyeur professionnel',
   jockey: 'Jockey automobile',
-  accueil_preparation: 'Accueil en concession',
-  soutien_administratif: 'Soutien administratif',
-  mecanique: 'Mécanique',
-  carrosserie: 'Carrosserie',
-  diagnostic: 'Diagnostic'
+  accueil_preparation: 'Chargé d’accueil en concession',
+  soutien_administratif: 'Assistant administratif',
+  mecanique: 'Mécanicien automobile',
+  carrosserie: 'Carrossier automobile',
+  diagnostic: 'Technicien en diagnostic'
 };
 
 function normaliserActivites(activites) {
@@ -7781,7 +7798,9 @@ function _libelleCivilite(c) {
 function _appliquerCiviliteEspacePartenaire(c) {
   const role = _accordPartenaire(c, 'Professionnel', 'Professionnelle');
   const roleEl = document.getElementById('sb-role');
-  if (roleEl) roleEl.textContent = role;
+  if (roleEl) { roleEl.textContent = role; roleEl.style.display = 'none'; }
+  rendreBadgesIdentite(c, []);
+  chargerBadgesIdentite();
   const section = document.querySelector('#sidebar-nav .nav-section-label');
   if (section) section.textContent = _accordPartenaire(c, 'Espace professionnel', 'Espace professionnelle');
   const titre = document.getElementById('profil-partenaire-titre');
@@ -14980,6 +14999,35 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 }
 
 
+function rendreBadgesIdentite(c, badges) {
+  const zone = document.getElementById('sb-metiers');
+  if (!zone || currentRole !== 'convoyeur') return;
+  zone.hidden = false;
+  const metiers = normaliserMetiers(c && c.metiers);
+  zone.innerHTML = metiers.length ? metiers.map(m => {
+    const b = (badges || []).find(x => x.metier === m);
+    const decision = b && ['oui','non'].includes(b.decision) ? b.decision : 'en_attente';
+    const etat = decision === 'oui' ? 'Validé' : decision === 'non' ? 'Refusé' : 'En attente';
+    return '<span class="sb-metier" data-decision="' + decision + '" title="' + etat + '">' + escapeHtml(CONV_LIB_METIER[m]) + (decision === 'oui' ? '' : '<small>' + etat + '</small>') + '</span>';
+  }).join('') : '<span class="sb-metier" data-decision="en_attente">Métiers à renseigner</span>';
+}
+var _badgesIdentiteRequete = 0;
+async function chargerBadgesIdentite() {
+  const c = window._currentConvoyeur, requete = ++_badgesIdentiteRequete;
+  if (!c || currentRole !== 'convoyeur' || !sbAuth) return;
+  try {
+    const r = await sbAuth.from('professionnel_badges').select('metier,decision').eq('professionnel_id', c.id);
+    if (requete !== _badgesIdentiteRequete || window._currentConvoyeur !== c || currentRole !== 'convoyeur') return;
+    if (r.error) throw r.error;
+    rendreBadgesIdentite(c, r.data || []);
+  } catch(e) {
+    if (requete !== _badgesIdentiteRequete || window._currentConvoyeur !== c || currentRole !== 'convoyeur') return;
+    rendreBadgesIdentite(c, []);
+    const zone = document.getElementById('sb-metiers');
+    if (zone) { zone.querySelectorAll('small').forEach(el => { el.textContent = 'Statut indisponible'; }); zone.querySelectorAll('[title]').forEach(el => { el.title = 'Statut indisponible'; }); }
+  }
+}
+
 var _badgesChargement = 0;
 async function chargerMesBadges() {
   const cycle = window.HCSync ? window.HCSync.capture() : null;
@@ -14993,10 +15041,11 @@ async function chargerMesBadges() {
     const r = await sbAuth.from('professionnel_badges').select('metier,decision').eq('professionnel_id', c.id);
     if (r.error) throw r.error;
     if (jeton !== _badgesChargement || window._currentConvoyeur !== c || (window.HCSync && !window.HCSync.safe(cycle))) return;
+    rendreBadgesIdentite(c, r.data || []);
     const lignes = r.data || [], lib = {oui:'Validé',non:'Refusé',en_attente:'En attente'};
     zone.innerHTML = lignes.length ? lignes.map(b => '<p><b>' + escapeHtml(CONV_LIB_METIER[b.metier] || b.metier) + '</b> — ' + escapeHtml(lib[b.decision] || 'En attente') + '</p>').join('') : '<p>Aucun badge demandé.</p>';
     const libres = Object.keys(CONV_LIB_METIER).filter(m => !lignes.some(b => b.metier === m));
-    choix.innerHTML = libres.map(m => '<label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="badge-metier" value="' + m + '">' + escapeHtml(CONV_LIB_METIER[m]) + '</label>').join('');
+    choix.innerHTML = libres.map(m => '<label class="badge-metier-choix"><input type="checkbox" name="badge-metier" value="' + m + '"><span>' + escapeHtml(CONV_LIB_METIER[m]) + '</span></label>').join('');
     bouton.disabled = !libres.length;
   } catch (e) { zone.textContent = 'Impossible de charger vos badges. Réessayez en ouvrant votre profil.'; }
 }

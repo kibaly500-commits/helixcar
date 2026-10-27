@@ -95,6 +95,7 @@
         if (typeof majBadgeDemandes === 'function') tasks.push(majBadgeDemandes(true));
         if (typeof majBadgeCandidatures === 'function') tasks.push(majBadgeCandidatures());
       }
+      if (role() === 'convoyeur' && typeof chargerBadgesIdentite === 'function') tasks.push(chargerBadgesIdentite());
       if (typeof verifierAccesPartenaireEnCours === 'function' && role() === 'convoyeur') tasks.push(verifierAccesPartenaireEnCours());
       await Promise.allSettled(tasks);
       restoreDetails();
