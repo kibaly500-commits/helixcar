@@ -1398,7 +1398,12 @@ body.scroll-verrouille { overflow: hidden; }
             </table>
           </div>
         </div>
-        <div class="card" id="interventions-table-carte" style="display:none">
+      </div>
+      <div class="page" id="page-admin-autres-missions">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+          <button class="btn btn-primary" onclick="openNewMission()">+ Créer une mission</button>
+        </div>
+        <div class="card" id="interventions-table-carte">
           <div class="card-header"><div class="card-title">Autres missions</div></div>
           <div class="table-wrap"><table><thead><tr><th>Référence / Prestation</th><th>Lieu / Contact</th><th>Client</th><th>Professionnel</th><th>Période</th><th>Horaires</th><th>Prix TTC</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="interventions-table"></tbody></table></div>
         </div>
@@ -2257,7 +2262,8 @@ const NAVS = {
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
     { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers' },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
-    { id: 'admin-missions',     icon: '🚗', label: 'Missions' },
+    { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage' },
+    { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions' },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
@@ -4972,7 +4978,8 @@ const PAGE_TITLES = {
   'admin-dashboard':     ['Tableau de bord', 'Vue d\'ensemble de HelixCar'],
   'admin-metiers': ['Validation des métiers', 'Chaque badge est validé indépendamment'],
   'admin-candidatures':  ['Candidatures', 'Gérez les candidatures des professionnels'],
-  'admin-missions':      ['Missions', 'Toutes les missions HelixCar'],
+  'admin-missions':      ['Missions de convoyage', 'Transport de véhicules et suivi des états des lieux'],
+  'admin-autres-missions': ['Autres missions', 'Nettoyage et interventions professionnelles'],
   'admin-clients':       ['Clients', 'Base clients HelixCar'],
   'admin-infos': ['Informations manquantes', 'Suivez les dossiers et vérifiez les informations transmises'],
   'admin-devis':         ['Demandes de devis', 'Traitez les demandes de convoyage et envoyez vos devis'],
@@ -5114,7 +5121,7 @@ function showPage(id, options) {
   if (id === 'admin-metiers') { chargerValidationMetiers(); }
   if (id === 'convoyeur-profil') { chargerMesBadges(); }
   if (id === 'admin-candidatures') { loadCandidatures(); loadConvoyeursActifs(); }
-  if (id === 'admin-missions') { loadMissions(); }
+  if (id === 'admin-missions' || id === 'admin-autres-missions') { loadMissions(); }
   if (id === 'convoyeur-dashboard') { loadDashboardMissionsPreview(); }
   if (id === 'convoyeur-missions') { loadMissionsConvoyeur(); }
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
@@ -8610,8 +8617,8 @@ function loadMissions() {
     const missions = results[0] || [];
     const interventions = [];
     document.getElementById('interventions-table').innerHTML = '';
-    document.getElementById('interventions-table-carte').style.display = missions.some(missionSurPlace) ? '' : 'none';
-    tbody.closest('.card').style.display = missions.some(m=>!missionSurPlace(m)) || !missions.length ? '' : 'none';
+    document.getElementById('interventions-table-carte').style.display = '';
+    tbody.closest('.card').style.display = '';
     window._missionsTest=new Set(missions.filter(m=>m.devis_source_id).map(m=>m.id));
     const convoyeurs = {};
     (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
@@ -8619,8 +8626,9 @@ function loadMissions() {
     (results[2] || []).forEach(function(c) { clients[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
 
     const sub = document.getElementById('missions-count-sub');
-    if (sub) sub.textContent = missions.length + ' mission(s)';
+    if (sub) sub.textContent = missions.filter(m=>!missionSurPlace(m)).length + ' mission(s)';
 
+    if (!missions.some(missionSurPlace)) document.getElementById('interventions-table').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px">Aucune autre mission pour le moment</td></tr>';
     if (missions.length === 0) {
       tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#888;padding:20px">Aucune mission pour le moment</td></tr>';
       return;
@@ -8718,7 +8726,8 @@ function loadMissions() {
         + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + actions + '</td>'
         + '</tr>';
     }).join('');
-    document.getElementById('interventions-table').innerHTML = interventions.join('');
+    if (interventions.length) document.getElementById('interventions-table').innerHTML = interventions.join('');
+    if (!missions.some(m=>!missionSurPlace(m))) tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px">Aucune mission de convoyage pour le moment</td></tr>';
   }).catch(function(e) {
  if (_hcSyncCycle) return;
 

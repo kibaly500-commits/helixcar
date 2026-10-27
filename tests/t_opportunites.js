@@ -207,7 +207,7 @@ window.fetch=function(url){
       check('Interventions : colonnes transport masquées '+width,!(await page.locator('#conv-missions-table').isVisible()));
       check('Interventions : largeur mobile '+width,await page.locator('#conv-interventions-table').evaluate(el=>el.closest('.table-wrap').scrollWidth<=el.closest('.table-wrap').clientWidth+1));
       await page.evaluate(async()=>{
-        currentRole='admin';buildNav('admin');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-admin-missions').classList.add('active');await loadMissions();
+        currentRole='admin';buildNav('admin');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-admin-autres-missions').classList.add('active');await loadMissions();
       });
       t=await page.locator('#interventions-table').innerText();
       check('Admin interventions : détails sans documents transport '+width,t.includes('Diagnostic')&&t.includes('Nettoyage flotte')&&!/Lettre|EDL|Photos/.test(t));
@@ -215,9 +215,9 @@ window.fetch=function(url){
       await page.evaluate(async()=>{
         __missions.push({id:'conv',reference:'CONVOYAGE',type_mission:'convoyage',statut:'acceptee',convoyeur_id:'test-pro',ville_depart:'Paris',ville_arrivee:'Lyon'});await loadMissions();
       });
-      check('Admin mixte : deux tableaux adaptés '+width,await page.locator('#missions-table').isVisible()&&await page.locator('#interventions-table').isVisible());
+      check('Admin mixte : deux pages distinctes '+width,!(await page.locator('#missions-table').isVisible())&&await page.locator('#interventions-table').isVisible()&&await page.locator('#page-admin-missions #missions-table').count()===1);
       await page.evaluate(async()=>{__missions=[];await loadMissions()});
-      check('Admin : interventions effacées après relecture vide '+width,!(await page.locator('#interventions-table').isVisible()));
+      check('Admin : état vide autres missions '+width,(await page.locator('#interventions-table').innerText()).includes('Aucune autre mission'));
       await page.evaluate(()=>{currentRole='convoyeur';document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-convoyeur-missions').classList.add('active')});
     }
     const calendrier=await page.evaluate(()=>{
