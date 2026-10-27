@@ -8,7 +8,7 @@
 //   * l'espace client AFFICHE ce que le serveur calcule (v_ma_fidelite)
 //     et ne recalcule rien : solde, prochain palier, points restants ;
 //   * les cinq paliers (2 000 → 10 000) avec cinq icônes SVG distinctes,
-//     état en texte (Atteint / En cours / À atteindre) pour 0, 1 999,
+//     état en texte (Atteint / En cours / À débloquer) pour 0, 1 999,
 //     2 000, 9 999, 10 000, 12 000 et 25 000 points ;
 //   * au-delà de 10 000 : historique acquis, seuil courant et prochain
 //     seuil « Box mystère », nom et seuil seulement ;
@@ -222,7 +222,7 @@ async function ouvrirFidelite(page, cas, mouvements) {
     /pas encore de points/.test(accueil.carte) && !/disponible/i.test(accueil.carte));
 
   // ── B. LA PAGE FIDÉLITÉ, POUR CHAQUE SOLDE ──
-  const ATTENDUS = Object.fromEntries(Object.keys(CAS).map(n=>[n,{etats:Array.from({length:5},(_,i)=>i<Math.floor((Number(n)%10000)/2000)?'Atteint':i===Math.floor((Number(n)%10000)/2000)?'En cours':'À atteindre'),vide:Number(n)===0}]));
+  const ATTENDUS = Object.fromEntries(Object.keys(CAS).map(n=>[n,{etats:Array.from({length:5},(_,i)=>i<Math.floor((Number(n)%10000)/2000)?'Atteint':i===Math.floor((Number(n)%10000)/2000)?'En cours':'À débloquer'),vide:Number(n)===0}]));
   const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   for (const solde of [0, 1999, 2000, 9999, 10000, 12000, 25000]) {
     const cas = CAS[solde], att = ATTENDUS[solde];
@@ -258,7 +258,7 @@ async function ouvrirFidelite(page, cas, mouvements) {
     icones.join(',') === 'cadeau,etoile,insigne,couronne,trophee', icones.join(','));
   check('C2 : les cinq tracés sont distincts (pas cinq fois le même dessin)',
     new Set(r2000.paliers.map(p => p.trace)).size === 5 && r2000.paliers.every(p => p.trace.length > 20));
-  check('C3 : une box surprise à chacun des cinq paliers', r2000.paliers.every(p=>p.recompense==='Une box surprise.'));
+  check('C3 : récompense expliquée une seule fois, cartes épurées', r2000.paliers.every(p=>p.recompense==='') && r2000.texte.includes('Chaque palier atteint débloque une box surprise.'));
   check('C4 : l\'historique liste les mouvements du serveur avec leur signe',
     r2000.historique.length === 4 && /\+1\s234/.test(r2000.historique.join(' ')) && /−1\s234/.test(r2000.historique.join(' ')),
     JSON.stringify(r2000.historique));
