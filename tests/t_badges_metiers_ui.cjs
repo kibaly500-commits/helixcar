@@ -4,14 +4,14 @@ const L=require('./lib');
  for(const mobile of [false,true]){
  const page=await L.newPage(browser);if(mobile)await page.setViewportSize({width:390,height:844});
  await page.addInitScript(()=>{
-  window.__badges=[{professionnel_id:'p1',metier:'nettoyage',decision:'oui',convoyeurs:{prenom:'Test',nom:'Pro'}}];
+  window.__badges=[{professionnel_id:'p1',metier:'nettoyage',decision:'oui',convoyeurs:{prenom:'Test',nom:'Pro',statut:'actif'}}];
   window.__profil={id:'p1',prenom:'Test',nom:'Pro',civilite:'madame',metiers:['nettoyage'],statut:'actif'};
   window.__calls=[];window.__error=false;window.__confirm=true;window.confirm=()=>window.__confirm;
   window.supabase={createClient(){return{
    auth:{onAuthStateChange(){},getSession:async()=>({data:{session:null}})},
    from(table){const q={select(){return q},eq(){return q},order(){return q},single:async()=>({data:window.__profil}),then(resolve){return Promise.resolve(window.__error?{error:{message:'Indisponible'}}:{data:table==='professionnel_badges'?window.__badges:[]}).then(resolve)}};return q},
    rpc:async(name,args)=>{window.__calls.push({name,args});if(window.__error)return {error:{message:'Indisponible'}};
-   if(name==='demander_badges_professionnel'){args.p_metiers.forEach(m=>window.__badges.push({professionnel_id:'p1',metier:m,decision:'en_attente',convoyeurs:{prenom:'Test',nom:'Pro'}}));window.__profil.metiers.push(...args.p_metiers)}
+   if(name==='demander_badges_professionnel'){args.p_metiers.forEach(m=>window.__badges.push({professionnel_id:'p1',metier:m,decision:'en_attente',convoyeurs:{prenom:'Test',nom:'Pro',statut:'actif'}}));window.__profil.metiers.push(...args.p_metiers)}
    if(name==='decider_badge_professionnel')window.__badges.find(x=>x.metier===args.p_metier).decision=args.p_decision;
    return {data:null,error:null};}
   }}};
@@ -33,6 +33,8 @@ const L=require('./lib');
  await page.evaluate(async()=>{currentRole='admin';initApp({role:'admin',name:'Admin',initials:'A'});showPage('admin-metiers');await chargerValidationMetiers()});
  L.check('Badges métiers masqués pour admin '+mobile,!(await page.locator('#sb-metiers').isVisible()));
  if(mobile){await page.evaluate(()=>openMobileMenu());const lien=page.locator('#mobile-menu-items button').filter({hasText:'Validation des métiers'});L.check('Rubrique accessible mobile',await lien.isVisible());await lien.click();}else L.check('Rubrique accessible PC',await page.locator('#nav-admin-metiers').isVisible());
+ await page.evaluate(async()=>{window.__badges.push({professionnel_id:'old-candidate',metier:'nettoyage',decision:'en_attente',convoyeurs:{prenom:'Ancienne',nom:'Candidature',statut:'video_attendue'}});await chargerValidationMetiers()});
+ L.check('Candidatures non actives exclues '+mobile,!(await page.locator('#admin-metiers-liste').innerText()).includes('Ancienne Candidature'));
  L.check('Une ligne par professionnel '+mobile,await page.locator('.validation-metiers-ligne').count()===1);
  await page.evaluate(async()=>{window.__row=document.querySelector('.validation-metiers-ligne');await chargerValidationMetiers(true)});
  L.check('Actualisation sans remplacement inutile '+mobile,await page.evaluate(()=>window.__row===document.querySelector('.validation-metiers-ligne')));

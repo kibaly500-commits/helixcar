@@ -15093,7 +15093,7 @@ async function chargerValidationMetiers(silencieux) {
     if (r.error) throw r.error;
     if (generation !== _validationMetiersGeneration || currentRole !== 'admin' || (window.HCSync && !window.HCSync.safe(cycle))) return;
     const groupes = new Map();
-    (r.data || []).forEach(b => { if (!groupes.has(b.professionnel_id)) groupes.set(b.professionnel_id, []); groupes.get(b.professionnel_id).push(b); });
+    (r.data || []).filter(b => b.convoyeurs?.statut === 'actif').forEach(b => { if (!groupes.has(b.professionnel_id)) groupes.set(b.professionnel_id, []); groupes.get(b.professionnel_id).push(b); });
     const contenu = Array.from(groupes.values()).sort((a,b) => Number(b.some(x=>x.decision==='en_attente'))-Number(a.some(x=>x.decision==='en_attente'))).map(badges => {
       const c=badges[0].convoyeurs || {}, nom=[c.prenom,c.nom].filter(Boolean).join(' ') || 'Professionnel';
       return '<div class="validation-metiers-ligne" data-professionnel="' + escapeHtml(badges[0].professionnel_id) + '"><b>' + escapeHtml(nom) + '</b><div class="validation-metiers-badges">' + badges.map(b => {
