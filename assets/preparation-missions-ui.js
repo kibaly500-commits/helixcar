@@ -218,7 +218,7 @@
   window.hcPreparationCarteOpportunite=function(o,options){
     let html=card(o.preparation_annonce);if(options?.partenaire){html+='<div id="opp-msg-'+esc(o.id)+'" class="hc-note" role="status"></div>';
       if(o.ma_candidature_etat==='retenu')html+='<button class="btn btn-outline" '+actionHtml('ouvrirDetailsPreparation',[o.mission_id])+'>Voir les détails de la mission</button>';
-      if(o.ma_candidature_etat)html+='<p>Votre candidature : '+esc(_libEtatCandidature(o.ma_candidature_etat,window._currentConvoyeur))+'</p>';
+      if(o.ma_candidature_etat)html+='<p>Votre candidature : '+esc(_libEtatCandidaturePartenaire(o.ma_candidature_etat,window._currentConvoyeur))+'</p>';
       else if(o.statut==='a_pourvoir')html+='<button class="btn btn-primary" id="opp-postuler-'+esc(o.id)+'" '+actionHtml('postulerOpportunite',[o.id])+'>Postuler</button>';
     }return '<div class="hc-prep-public" data-opportunite="'+esc(o.id)+'">'+html+'</div>';
   };

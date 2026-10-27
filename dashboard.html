@@ -3593,6 +3593,9 @@ function _libEtatCandidature(etat, partenaire) {
   var feminin = { preselectionne: 'Présélectionnée', retenu: 'Retenue', non_retenu: 'Non retenue' }[etat] || masculin;
   return _accordPartenaire(partenaire, masculin, feminin);
 }
+function _libEtatCandidaturePartenaire(etat, partenaire) {
+  return ['retenu','non_retenu'].includes(etat) ? _libEtatCandidature(etat, partenaire) : 'Candidature envoyée';
+}
 var _oppCourante = null;
 
 function _oppLibCategorie(c) { return LIB_ACTIVITE_DECISION[c] || c || '—'; }
@@ -3616,6 +3619,7 @@ function _oppCompteur(o) {
 // La carte telle que le partenaire la voit. Même rendu pour l'aperçu de
 // l'administrateur (« Ne pas publier lors de l'ouverture de l'aperçu »).
 function _oppCarteHtml(o, options) {
+  if (options && options.partenaire && o.ma_candidature_etat === 'preselectionne') o = {...o, ma_candidature_etat:'a_etudier'};
   if (o.preparation_annonce && window.hcPreparationCarteOpportunite) return window.hcPreparationCarteOpportunite(o, options || {});
   options = options || {};
   var badges = (o.badges_requis || []).map(function (b) {
@@ -3647,7 +3651,7 @@ function _oppCarteHtml(o, options) {
     html += '<div id="opp-msg-' + escapeHtml(o.id) + '" class="hc-note" role="status"></div>';
     if (o.ma_candidature_etat) {
       html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
-        + 'Votre candidature : ' + escapeHtml(_libEtatCandidature(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
+        + 'Votre candidature : ' + escapeHtml(_libEtatCandidaturePartenaire(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
         + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
         + '</div>';
     } else if (o.statut === 'a_pourvoir') {

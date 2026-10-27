@@ -140,6 +140,12 @@ window.fetch=function(url){
       const b=host.querySelector('button');
       return b.dataset.hcAction==='postulerOpportunite' && b.dataset.hcA0===__partenaire[0].id;
     }));
+    check('Présélection interne : affichage partenaire inchangé', await page.evaluate(()=>{
+      const carte=etat=>_oppCarteHtml({...__partenaire[0],ma_candidature_etat:etat},{partenaire:true});
+      return carte('a_etudier')===carte('preselectionne') && carte('preselectionne').includes('Candidature envoyée');
+    }));
+    check('Présélection reste visible pour admin',await page.evaluate(()=>_libEtatCandidature('preselectionne',{})==='Présélectionné'));
+    check('Décisions finales visibles au professionnel',await page.evaluate(()=>_libEtatCandidaturePartenaire('retenu',{})==='Retenu'&&_libEtatCandidaturePartenaire('non_retenu',{})==='Non retenu'));
     await capturerQA(page,'o01-opportunite-desktop','#convoyeur-opportunites-liste');
     await page.evaluate(async () => {__erreur=true;await postulerOpportunite('TEST-QA-CLAUDE-HELIXCAR-ouverte');__erreur=false;});
     message = await page.locator('#opp-msg-TEST-QA-CLAUDE-HELIXCAR-ouverte').textContent();
