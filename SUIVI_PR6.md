@@ -30,3 +30,6 @@
 - Recette complète, convoyage puis autres métiers : devis/paiement → offre selon badges validés → candidature → décision/attribution admin → notification → fiche mission → début → fin → validation HelixCar → archives → disponibilité pour facturation → génération/envoi facture professionnel → réception et suivi admin.
 - Vérifier les validations obligatoires, l'absence de doublons et la séparation des comptes. Préserver EDL/lettre de voiture pour convoyage uniquement.
 - Cette liste reste à réaliser : les tests de fidélité clients précédents ne valident pas ces intégrations.
+- Complément : simuler la fidélité de bout en bout (crédit après paiement/réalisation, pas de doublons, seuils 2 000/10 000/12 000, plusieurs box, suivi admin/client) sans modifier les soldes réels.
+- Revoir partiellement l'état des lieux convoyage : ergonomie, fonctionnement et photos/illustrations à identifier avec le propriétaire puis remplacer.
+- Actualiser les couleurs/identité HelixCar de la lettre de voiture ; vérifier le PDF et l'impression, conserver les données et signatures.
