@@ -93,6 +93,7 @@
         finally { context = null; }
       });
       if (role() === 'admin') {
+        if (!['admin-dashboard','admin-infos'].includes(cycle.page) && typeof chargerCentreInformationsAdmin === 'function') tasks.push(chargerCentreInformationsAdmin(true));
         if (typeof majCompteursMenuAdmin === 'function') tasks.push(majCompteursMenuAdmin());
         if (typeof majBadgeDemandes === 'function') tasks.push(majBadgeDemandes(true));
         if (typeof majBadgeCandidatures === 'function') tasks.push(majBadgeCandidatures());

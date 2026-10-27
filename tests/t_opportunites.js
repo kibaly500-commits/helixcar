@@ -289,6 +289,26 @@ window.fetch=function(url){
     check('Menu : compteurs restaurés après reconstruction',JSON.stringify(compteurs.reconstruit)===JSON.stringify(compteurs.initial));
     check('Menu : erreur réseau conserve les compteurs',JSON.stringify(compteurs.erreur)===JSON.stringify(compteurs.initial));
     check('Menu : zéro reste affiché',compteurs.zeros.every(n=>n==='0')&&compteurs.visibles);
+    const infos=await page.evaluate(()=>{
+      _adminInfosCharge=true;_adminInfosDossiers=[{client:{id:'a'},lignes:[{statut:'attendue'},{statut:'attendue'}]},{client:{id:'b'},lignes:[{statut:'transmise'}]},{client:{id:'c'},lignes:[{statut:'validee'}]}];
+      majCompteurInformationsAdmin();const initial=document.getElementById('badge-admin-infos').textContent;
+      document.getElementById('admin-infos-recherche').value='aucun';majCompteurInformationsAdmin();const filtre=document.getElementById('badge-admin-infos').textContent;
+      _adminInfosDossiers[0].lignes=[{statut:'validee'}];majCompteurInformationsAdmin();const valide=document.getElementById('badge-admin-infos').textContent;
+      _adminInfosDossiers=[];majCompteurInformationsAdmin();return {initial,filtre,valide,zero:document.getElementById('badge-admin-infos').textContent};
+    });
+    check('Informations : compte les dossiers, pas les champs',infos.initial==='2');
+    check('Informations : recherche sans effet sur le total',infos.filtre==='2');
+    check('Informations : validation et zéro actualisés',infos.valide==='1'&&infos.zero==='0');
+    check('Métiers : compteur visible à zéro',await page.locator('#badge-admin-metiers').textContent()==='0');
+    await page.evaluate(async()=>{
+      currentRole='admin';const c={prenom:'Compte',nom:'Validé',statut:'actif'};
+      window.__badgesTest=[{professionnel_id:'1',metier:'convoyage',decision:'oui',convoyeurs:c},{professionnel_id:'2',metier:'nettoyage',decision:'en_attente',convoyeurs:{...c,nom:'En attente'}},{professionnel_id:'2',metier:'convoyage',decision:'non',convoyeurs:c}];
+      sbAuth.from=()=>({select:()=>({order:async()=>({data:__badgesTest})})});await chargerValidationMetiers();
+    });
+    check('Métiers : seuls les badges en attente sont listés',await page.locator('#admin-metiers-liste .validation-metier').count()===1 && !(await page.locator('#admin-metiers-liste').textContent()).includes('Compte Validé'));
+    check('Métiers : compteur égal aux demandes restantes',await page.locator('#badge-admin-metiers').textContent()==='1');
+    await page.evaluate(async()=>{__badgesTest[1].decision='oui';await chargerValidationMetiers();});
+    check('Métiers : dernière validation retire le compte et passe à zéro',await page.locator('#admin-metiers-liste .validation-metiers-ligne').count()===0 && await page.locator('#badge-admin-metiers').textContent()==='0');
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

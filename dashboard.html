@@ -2282,9 +2282,9 @@ const NAVS = {
     { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions', badgeDynamique: true },
     { id: 'admin-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
-    { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
+    { id: 'admin-infos', icon: '📝', label: 'Informations manquantes', badgeDynamique: true },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
-    { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers' },
+    { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers', badgeDynamique: true },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
@@ -2641,6 +2641,7 @@ async function finaliserSessionClient(email, alertEl, authUserId, signOutSiEchec
 // ne le simule.
 
 // Informations manquantes : les valeurs et décisions viennent des RPC autorisées.
+var _adminInfosCharge = false;
 var _adminInfosMeta = {}, _adminInfosDossiers = [], _adminInfosSelection = null, _adminInfosGeneration = 0, _adminInfosBusy = false, _adminInfosMobileDetail = false, _adminInfosCorrection = null;
 async function chargerCentreInformationsAdmin(silencieux) {
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
@@ -2702,6 +2703,8 @@ return {client:c,lignes:[],erreur:true};}
       dossiers = dossiers.concat(lot);
       if(generation !== _adminInfosGeneration) return;
     }
+    if (currentRole !== 'admin' || generation !== _adminInfosGeneration) return;
+    _adminInfosCharge = true;
     _adminInfosDossiers = dossiers.filter(function(d){return d.erreur || d.lignes.some(function(l){return ['attendue','transmise','a_corriger'].includes(l.statut);});});
     _adminInfosDossiers.sort(function(a,b){return Number(b.lignes.some(function(l){return l.statut==='transmise';}))-Number(a.lignes.some(function(l){return l.statut==='transmise';}));});
     if(!_adminInfosSelection && _adminInfosDossiers.length) _adminInfosSelection=_adminInfosDossiers[0].client.id;
@@ -2711,7 +2714,13 @@ return {client:c,lignes:[],erreur:true};}
  if (_hcSyncCycle) return;
 if(generation===_adminInfosGeneration){statut.textContent='Le suivi des dossiers est momentanément indisponible. Utilisez Actualiser pour reprendre.';}}
 }
+function majCompteurInformationsAdmin(){
+ if (!_adminInfosCharge || currentRole !== 'admin') return;
+ const n = _adminInfosDossiers.filter(d => d.erreur || d.lignes.some(l => ['attendue','transmise','a_corriger'].includes(l.statut))).length;
+ afficherCompteurMenu('admin-infos',n,'dossiers à compléter ou vérifier');
+}
 function rendreCentreInformationsAdmin(){
+ majCompteurInformationsAdmin();
  var liste=document.getElementById('admin-infos-liste'), detail=document.getElementById('admin-infos-detail');
  if(!liste||!detail)return;
  var filtre=document.getElementById('admin-infos-filtre').value;
@@ -4946,7 +4955,7 @@ function buildNav(role) {
     btn.onclick = () => showPage(item.id);
     nav.appendChild(btn);
   });
-  if (role === 'admin') { majCompteursMenuAdmin(); majBadgeCandidatures(); }
+  if (role === 'admin') { majCompteursMenuAdmin(); majBadgeCandidatures(); majCompteurInformationsAdmin(); }
 }
 
 // Totaux du menu indépendants de la page ouverte, de la recherche et de l'état lu.
@@ -4967,6 +4976,7 @@ async function majCompteursMenuAdmin() {
   };
   // Les erreurs conservent le dernier nombre connu, jamais un faux zéro.
   return Promise.allSettled([
+    _compterLignes('professionnel_badges?select=professionnel_id,convoyeurs!inner(statut)&decision=eq.en_attente&convoyeurs.statut=eq.actif').then(n => appliquer('admin-metiers',n,'badges en attente')),
     sbFetchToutePage('missions?select=id,type_mission,statut').then(rows => {
       const actives = rows.filter(m => !missionArchivee(m));
       appliquer('admin-missions',actives.filter(m => !missionSurPlace(m)).length,'missions non archivées');
@@ -5000,6 +5010,7 @@ async function doLogout() {
   window._hcSortieConfirmee = true;
   window._currentConvoyeur = null;
   window._currentAdmin = null;
+  _adminInfosCharge = false;
   window._currentClient = null;
   window._hcRolesAutorises = [];
   window._hcRoleActif = null;
@@ -15094,15 +15105,16 @@ async function chargerValidationMetiers(silencieux) {
     const r = await sbAuth.from('professionnel_badges').select('professionnel_id,metier,decision,demande_le,convoyeurs(prenom,nom,statut)').order('demande_le',{ascending:false});
     if (r.error) throw r.error;
     if (generation !== _validationMetiersGeneration || currentRole !== 'admin' || (window.HCSync && !window.HCSync.safe(cycle))) return;
+    afficherCompteurMenu('admin-metiers',(r.data || []).filter(b => b.convoyeurs?.statut === 'actif' && b.decision === 'en_attente').length,'badges en attente');
     const groupes = new Map();
-    (r.data || []).filter(b => b.convoyeurs?.statut === 'actif').forEach(b => { if (!groupes.has(b.professionnel_id)) groupes.set(b.professionnel_id, []); groupes.get(b.professionnel_id).push(b); });
+    (r.data || []).filter(b => b.convoyeurs?.statut === 'actif' && b.decision === 'en_attente').forEach(b => { if (!groupes.has(b.professionnel_id)) groupes.set(b.professionnel_id, []); groupes.get(b.professionnel_id).push(b); });
     const contenu = Array.from(groupes.values()).sort((a,b) => Number(b.some(x=>x.decision==='en_attente'))-Number(a.some(x=>x.decision==='en_attente'))).map(badges => {
       const c=badges[0].convoyeurs || {}, nom=[c.prenom,c.nom].filter(Boolean).join(' ') || 'Professionnel';
       return '<div class="validation-metiers-ligne" data-professionnel="' + escapeHtml(badges[0].professionnel_id) + '"><b>' + escapeHtml(nom) + '</b><div class="validation-metiers-badges">' + badges.map(b => {
         const lib=CONV_LIB_METIER[b.metier] || b.metier, statut={oui:'Validé',non:'Refusé',en_attente:'En attente'}[b.decision];
         return '<div class="validation-metier" data-decision="' + escapeHtml(b.decision) + '"><span>' + escapeHtml(lib) + '<small>' + escapeHtml(statut) + '</small></span>' + ['oui','non'].map(d => '<button type="button" class="validation-metier-action" aria-label="' + (d==='oui'?'Valider':'Refuser') + ' : ' + escapeHtml(lib) + ' — ' + escapeHtml(nom) + '" title="' + (d==='oui'?'Valider':'Refuser') + '" ' + (d===b.decision?'disabled ':'') + actionHtml('deciderMetierProfessionnel',[b.professionnel_id,b.metier,d,nom]) + '>' + (d==='oui'?'✓':'✕') + '</button>').join('') + '</div>';
       }).join('') + '</div></div>';
-    }).join('') || '<p>Aucune demande de badge.</p>';
+    }).join('') || '<p>Aucun badge en attente de validation.</p>';
     // Garder les nœuds et le focus lorsque les données sont identiques.
     if (zone.dataset.contenu !== contenu) { zone.innerHTML = contenu; zone.dataset.contenu = contenu; }
   } catch(e) { if (!silencieux) { zone.textContent = 'Impossible de charger les demandes de métiers. Réouvrez cette rubrique pour réessayer.'; delete zone.dataset.contenu; } }
