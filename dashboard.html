@@ -225,7 +225,15 @@ input::-ms-reveal, input::-ms-clear { display: none; }
   font-size: 0.72rem; padding: 2px 8px; border-radius: 100px; margin-top: 3px;
   display: inline-block; font-weight: 600;
 }
-#profil-badges-choix { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0;max-width:760px; }
+#profil-metiers { margin-bottom:28px; }
+.profil-badges-section { margin-top:28px;padding-top:24px;border-top:1px solid #e8e8e8; }
+.profil-badges-section h3 { margin:0 0 12px; }
+.profil-badges-section > p { margin:0 0 20px;line-height:1.6; }
+#profil-badges { display:grid;gap:12px;margin:20px 0 26px; }
+#profil-badges p { margin:0;line-height:1.6; }
+#profil-badges-message:not(:empty) { margin:16px 0 24px;line-height:1.6; }
+#profil-badges-message:empty { display:none; }
+#profil-badges-choix { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:24px 0;max-width:760px; }
 #profil-badges-choix .badge-metier-choix { display:flex;align-items:center;justify-content:flex-start;gap:12px;min-width:0;margin:0;padding:12px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:.88rem;font-weight:500;text-transform:none;letter-spacing:normal;line-height:1.4;text-align:left;cursor:pointer; }
 #profil-badges-choix input[type="checkbox"] { flex:0 0 18px;width:18px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--green); }
 #profil-badges-choix .badge-metier-choix:has(input:checked) { border-color:var(--green);background:#f0f7f3; }
@@ -1955,7 +1963,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="form-group" style="margin-top:4px">
             <label>Mes métiers</label>
             <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
-            <div style="margin-top:18px"><h3>Mes badges métiers</h3><p>Chaque métier demandé doit être validé par HelixCar pour accéder aux annonces correspondantes.</p>
+            <div class="profil-badges-section"><h3>Mes badges métiers</h3><p>Chaque métier demandé doit être validé par HelixCar pour accéder aux annonces correspondantes.</p>
             <div id="profil-badges" aria-live="polite"></div>
             <div id="profil-badges-choix"></div>
             <button type="button" class="btn btn-primary" id="demander-badges" onclick="demanderMesBadges()">Demander les badges sélectionnés</button>
