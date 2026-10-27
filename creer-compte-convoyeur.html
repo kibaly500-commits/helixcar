@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HelixCar — Créer mon compte convoyeur</title>
+<title>HelixCar — Créer mon compte professionnel</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -73,8 +73,8 @@
 
 <div class="box">
   <div class="logo" aria-label="HelixCar">HELI<span class="logo-x">X</span>CAR</div>
-  <h2>Créer mon compte convoyeur</h2>
-  <p class="sub" id="cc-sub">Ton dossier est validé ! Choisis un mot de passe pour accéder à ton espace convoyeur et voir les missions disponibles.</p>
+  <h2>Créer mon compte professionnel</h2>
+  <p class="sub" id="cc-sub">Ton dossier est validé ! Choisis un mot de passe pour accéder à ton espace professionnel et voir les missions disponibles.</p>
 
   <div id="form-zone">
     <div class="form-group">
@@ -254,11 +254,11 @@ async function creerCompte() {
     if (dejaUnCompte) {
       // Le compte existe deja et le mot de passe est le bon : on
       // n'en cree surtout pas un second. On ajoute le role.
-      btn.textContent = 'Ajout de ton espace convoyeur…';
+      btn.textContent = 'Ajout de ton espace professionnel…';
       var ajout = await sb.rpc('ajouter_role_partenaire', { p_convoyeur_id: convoyeurId });
       var code = (ajout && ajout.data && ajout.data.code) || '';
       if (ajout && ajout.error) {
-        showError('Ton espace convoyeur n\'a pas pu être ajouté. Réessaie dans quelques instants.');
+        showError('Ton espace professionnel n\'a pas pu être ajouté. Réessaie dans quelques instants.');
         btn.disabled = false; btn.textContent = 'Créer mon compte →';
         return;
       }
@@ -268,7 +268,7 @@ async function creerCompte() {
         return;
       }
       if (code !== 'RATTACHEE' && code !== 'DEJA_RATTACHEE' && code !== 'ROLE_DEJA_PRESENT') {
-        showError('Ce dossier convoyeur ne correspond pas à ce compte. Contacte HelixCar.');
+        showError('Ce dossier professionnel ne correspond pas à ce compte. Contacte HelixCar.');
         btn.disabled = false; btn.textContent = 'Créer mon compte →';
         return;
       }
@@ -277,7 +277,7 @@ async function creerCompte() {
       document.getElementById('cc-sub').style.display = 'none';
       var dejaEl = document.getElementById('cc-success');
       dejaEl.innerHTML = 'Tu as déjà un compte HelixCar avec cette adresse : '
-        + 'ton espace convoyeur vient d\'y être ajouté. '
+        + 'ton espace professionnel vient d\'y être ajouté. '
         + 'Connecte-toi comme d\'habitude, avec le MÊME mot de passe.';
       dejaEl.style.display = 'block';
       return;
@@ -325,8 +325,8 @@ async function creerCompte() {
     var successEl = document.getElementById('cc-success');
     var needsConfirm = !result.data.session; // pas de session = confirmation email requise
     successEl.innerHTML = needsConfirm
-      ? '📬 Dernière étape : va voir tes emails (pense à vérifier les spams) et clique sur le lien de confirmation — tu seras redirigé directement sur ton espace convoyeur, déjà connecté.'
-      : '✅ Compte créé ! Tu peux te connecter directement sur ton espace convoyeur.';
+      ? '📬 Dernière étape : va voir tes emails (pense à vérifier les spams) et clique sur le lien de confirmation — tu seras redirigé directement sur ton espace professionnel, déjà connecté.'
+      : '✅ Compte créé ! Tu peux te connecter directement sur ton espace professionnel.';
     successEl.style.display = 'block';
   } catch (e) {
     showError('Erreur inattendue (voir la console).');

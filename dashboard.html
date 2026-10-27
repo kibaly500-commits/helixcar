@@ -1274,7 +1274,7 @@ body.scroll-verrouille { overflow: hidden; }
              historique n'existe pour les calculer. -->
         <div class="stats-row">
           <div class="stat-card yellow"><div class="stat-label">Candidatures en attente</div><div class="stat-value" id="stat-pending">…</div></div>
-          <div class="stat-card green"><div class="stat-label">Convoyeurs actifs</div><div class="stat-value" id="stat-convoyeurs">…</div></div>
+          <div class="stat-card green"><div class="stat-label">Professionnels actifs</div><div class="stat-value" id="stat-convoyeurs">…</div></div>
           <div class="stat-card blue"><div class="stat-label">Clients inscrits</div><div class="stat-value" id="stat-clients">…</div></div>
           <div class="stat-card orange"><div class="stat-label">Missions en cours</div><div class="stat-value" id="stat-missions">…</div></div>
           <div class="stat-card red"><div class="stat-label">Devis acceptés ce mois</div><div class="stat-value" id="stat-ca">…</div><div class="stat-sub" id="stat-ca-sub"></div></div>
@@ -1284,7 +1284,7 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Dernières inscriptions</div><div class="card-sub">Clients & convoyeurs récents</div></div>
+            <div><div class="card-title">Dernières inscriptions</div><div class="card-sub">Clients & professionnels récents</div></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -1313,11 +1313,15 @@ body.scroll-verrouille { overflow: hidden; }
       </div>
 
       <!-- ADMIN: Candidatures -->
+      <div class="page" id="page-admin-metiers">
+        <div class="card"><div class="card-header"><div><div class="card-title">Validation des métiers</div><p class="card-sub">Validez ou refusez chaque métier demandé. Un compte actif ne vaut pas validation de tous ses badges.</p></div></div>
+        <div id="admin-metiers-liste" style="padding:16px" aria-live="polite"></div></div>
+      </div>
       <div class="page" id="page-admin-candidatures">
         <div class="alert alert-info">📋 Les candidatures ci-dessous sont en attente de votre validation. Vérifiez les pièces jointes avant d'accepter.</div>
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Candidatures convoyeurs</div><div class="card-sub" id="candidatures-count-sub">Chargement…</div></div>
+            <div><div class="card-title">Candidatures professionnels</div><div class="card-sub" id="candidatures-count-sub">Chargement…</div></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -1330,9 +1334,9 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">Convoyeurs actifs</div></div>
+          <div class="card-header"><div class="card-title">Professionnels actifs</div></div>
           <div style="padding:0 20px 12px">
-            <input type="text" id="recherche-convoyeurs" placeholder="🔎 Rechercher un convoyeur (nom, email)…" oninput="filtrerConvoyeursActifs(this.value)" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:9px;font-family:inherit;font-size:.88rem;outline:none;box-sizing:border-box">
+            <input type="text" id="recherche-convoyeurs" placeholder="🔎 Rechercher un professionnel (nom, email)…" oninput="filtrerConvoyeursActifs(this.value)" style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:9px;font-family:inherit;font-size:.88rem;outline:none;box-sizing:border-box">
           </div>
           <div class="table-wrap">
             <table>
@@ -1506,10 +1510,10 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">🧾 Factures en attente de validation</div><div class="card-sub">Générées par les convoyeurs, à vérifier avant paiement</div></div>
+          <div class="card-header"><div class="card-title">🧾 Factures en attente de validation</div><div class="card-sub">Générées par les professionnels, à vérifier avant paiement</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Date émission</th><th>Action</th></tr></thead>
+              <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Date émission</th><th>Action</th></tr></thead>
               <tbody id="fc-admin-attente"><tr><td colspan="6" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
             </table>
           </div>
@@ -1519,7 +1523,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">💰 Factures validées — à payer</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Validée le</th><th>Paiement prévu</th><th>Action</th></tr></thead>
+              <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Validée le</th><th>Paiement prévu</th><th>Action</th></tr></thead>
               <tbody id="fc-admin-a-payer"><tr><td colspan="7" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
             </table>
           </div>
@@ -1529,7 +1533,7 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">Historique des factures payées</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>N° Facture</th><th>Convoyeur</th><th>Missions incluses</th><th>Total</th><th>Payée le</th></tr></thead>
+              <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Payée le</th></tr></thead>
               <tbody id="fc-admin-payees"><tr><td colspan="5" style="color:#888;font-size:.85rem">Chargement…</td></tr></tbody>
             </table>
           </div>
@@ -1572,7 +1576,7 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card" style="border:1.5px solid var(--yellow)">
           <div class="card-header">
-            <div><div class="card-title">🔄 Synchronisation — nouveautés uniquement</div><div class="card-sub">Télécharge un ZIP contenant uniquement ce qui est nouveau depuis ta dernière synchronisation (convoyeurs actifs, clients, missions/EDL, recontacts) — à toi de le classer ensuite. Fonctionne sur n'importe quel navigateur.</div></div>
+            <div><div class="card-title">🔄 Synchronisation — nouveautés uniquement</div><div class="card-sub">Télécharge un ZIP contenant uniquement ce qui est nouveau depuis ta dernière synchronisation (professionnels actifs, clients, missions/EDL, recontacts) — à toi de le classer ensuite. Fonctionne sur n'importe quel navigateur.</div></div>
           </div>
           <div style="padding:16px">
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
@@ -1599,10 +1603,10 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">👥 Convoyeurs — candidatures & actifs</div><div class="card-sub">Télécharge les vrais documents (pièce d'identité, permis, RC pro, RIB) de tous les convoyeurs, classés "En attente de validation" / "Convoyeurs actifs" puis par nom. Lecture seule : rien n'est jamais supprimé de Supabase ici.</div></div>
+            <div><div class="card-title">👥 Professionnels — candidatures & actifs</div><div class="card-sub">Télécharge les vrais documents (pièce d'identité, permis, RC pro, RIB) de tous les professionnels, classés "En attente de validation" / "Professionnels actifs" puis par nom. Lecture seule : rien n'est jamais supprimé de Supabase ici.</div></div>
           </div>
           <div style="padding:16px">
-            <button class="btn btn-primary" id="btn-archiver-convoyeurs" onclick="lancerArchivageConvoyeurs()">📁 Télécharger les dossiers convoyeurs</button>
+            <button class="btn btn-primary" id="btn-archiver-convoyeurs" onclick="lancerArchivageConvoyeurs()">📁 Télécharger les dossiers professionnels</button>
             <div id="archivage-log-convoyeurs" class="log-mono-scroll" style="background:#F8F8F6;border:1px solid #eee;border-radius:8px;padding:12px 14px;font-size:.8rem;font-family:monospace;max-height:220px;overflow-y:auto;color:#333;margin-top:12px"></div>
           </div>
         </div>
@@ -1629,7 +1633,7 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">🧾 Factures convoyeurs</div><div class="card-sub">Une fiche par facture (référence, missions, montant, statut, dates), classées automatiquement Année/Mois — pratique pour la compta</div></div>
+            <div><div class="card-title">🧾 Factures professionnels</div><div class="card-sub">Une fiche par facture (référence, missions, montant, statut, dates), classées automatiquement Année/Mois — pratique pour la compta</div></div>
           </div>
           <div style="padding:16px">
             <button class="btn btn-primary" id="btn-archiver-factures" onclick="lancerArchivageFactures()">📁 Télécharger les factures</button>
@@ -1920,7 +1924,7 @@ body.scroll-verrouille { overflow: hidden; }
       <!-- CONVOYEUR: Profil -->
       <div class="page" id="page-convoyeur-profil">
         <div class="card">
-          <div class="card-header"><div class="card-title" id="profil-partenaire-titre">Mon profil convoyeur</div></div>
+          <div class="card-header"><div class="card-title" id="profil-partenaire-titre">Mon profil professionnel</div></div>
           <div id="profil-statut-note" class="hc-note" role="status"></div>
           <div class="profile-grid">
             <div class="form-group"><label>Prénom</label><input type="text" id="profil-prenom" value=""></div>
@@ -1937,6 +1941,11 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="form-group" style="margin-top:4px">
             <label>Mes métiers</label>
             <div id="profil-metiers" style="display:flex;flex-wrap:wrap;gap:7px;padding-top:4px"></div>
+            <div style="margin-top:18px"><h3>Mes badges métiers</h3><p>Chaque métier demandé doit être validé par HelixCar pour accéder aux annonces correspondantes.</p>
+            <div id="profil-badges" aria-live="polite"></div>
+            <div id="profil-badges-choix" style="display:grid;gap:10px;margin:16px 0"></div>
+            <button type="button" class="btn btn-primary" id="demander-badges" onclick="demanderMesBadges()">Demander les badges sélectionnés</button>
+            <p id="profil-badges-message" role="status"></p></div>
           </div>
           <div class="fid-note">Pour modifier vos coordonnées ou les documents de candidature, contactez HelixCar. Votre RIB de paiement se gère ci-dessous.</div>
         </div>
@@ -1985,11 +1994,11 @@ body.scroll-verrouille { overflow: hidden; }
     <div id="opportunite-corps"></div>
   </div>
 </div>
-<!-- Dossier convoyeur -->
+<!-- Dossier professionnel -->
 <div class="modal-overlay" id="modal-dossier">
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('dossier')">✕</button>
-    <h3 id="dossier-name">Dossier convoyeur</h3>
+    <h3 id="dossier-name">Dossier professionnel</h3>
     <p>Vérifiez les informations avant de valider ou refuser.</p>
     <div id="dossier-content"></div>
     <!-- Décisions par activité : une seule fiche, une décision
@@ -2111,8 +2120,8 @@ body.scroll-verrouille { overflow: hidden; }
 <div class="modal-overlay" id="modal-confirm">
   <div class="modal" style="position:relative;text-align:center">
     <div style="font-size:3rem;margin-bottom:12px">✅</div>
-    <h3 id="confirm-title">Convoyeur validé !</h3>
-    <p id="confirm-msg">Un email de confirmation a été envoyé automatiquement. Le convoyeur a maintenant accès à son espace et aux missions disponibles.</p>
+    <h3 id="confirm-title">Professionnel validé !</h3>
+    <p id="confirm-msg">Un email de confirmation a été envoyé automatiquement. Le professionnel a maintenant accès à son espace et aux missions disponibles.</p>
     <button class="btn btn-primary btn-full" onclick="closeModal('confirm')">Fermer</button>
   </div>
 </div>
@@ -2210,6 +2219,7 @@ let currentRole = 'admin';
 const NAVS = {
   admin: [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
+    { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers' },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
     { id: 'admin-missions',     icon: '🚗', label: 'Missions' },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
@@ -2328,7 +2338,7 @@ async function finaliserSessionConvoyeur(email, alertEl, authUserId, signOutSiEc
   const conv = (rows || [])[0];
 
   if (!conv) {
-    if (alertEl) _hcNoteEl(alertEl, 'Aucun dossier convoyeur trouvé pour cet email.');
+    if (alertEl) _hcNoteEl(alertEl, 'Aucun dossier professionnel trouvé pour cet email.');
     if (signOutSiEchec) await sbAuth.auth.signOut();
     return false;
   }
@@ -4858,7 +4868,7 @@ function initApp(user) {
   document.getElementById('sb-avatar').textContent = user.initials;
   document.getElementById('sb-name').textContent = user.name;
   const roleEl = document.getElementById('sb-role');
-  roleEl.textContent = user.roleLabel || (user.role === 'admin' ? 'Admin' : user.role === 'convoyeur' ? 'Convoyeur' : 'Client');
+  roleEl.textContent = user.roleLabel || (user.role === 'admin' ? 'Admin' : user.role === 'convoyeur' ? 'Professionnel' : 'Client');
   roleEl.className = 'user-role role-' + user.role;
 
   buildNav(user.role);
@@ -4874,7 +4884,7 @@ function buildNav(role) {
   nav.innerHTML = '';
   const sectionLabel = document.createElement('div');
   sectionLabel.className = 'nav-section-label';
-  sectionLabel.textContent = role === 'admin' ? 'Administration' : role === 'convoyeur' ? 'Espace convoyeur' : 'Espace client';
+  sectionLabel.textContent = role === 'admin' ? 'Administration' : role === 'convoyeur' ? 'Espace professionnel' : 'Espace client';
   nav.appendChild(sectionLabel);
 
   NAVS[role].forEach(item => {
@@ -4931,14 +4941,15 @@ async function doLogout() {
 // ── PAGES ──────────────────────────────────────────────────
 const PAGE_TITLES = {
   'admin-dashboard':     ['Tableau de bord', 'Vue d\'ensemble de HelixCar'],
-  'admin-candidatures':  ['Candidatures', 'Gérez les demandes convoyeurs'],
+  'admin-metiers': ['Validation des métiers', 'Chaque badge est validé indépendamment'],
+  'admin-candidatures':  ['Candidatures', 'Gérez les candidatures des professionnels'],
   'admin-missions':      ['Missions', 'Toutes les missions HelixCar'],
   'admin-clients':       ['Clients', 'Base clients HelixCar'],
   'admin-infos': ['Informations manquantes', 'Suivez les dossiers et vérifiez les informations transmises'],
   'admin-devis':         ['Demandes de devis', 'Traitez les demandes de convoyage et envoyez vos devis'],
   'admin-acquisition':   ['Acquisition', 'D\'où viennent vos demandes de convoyage'],
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
-  'admin-facturation':   ['Facturation', 'Validation et paiement des convoyeurs'],
+  'admin-facturation':   ['Facturation', 'Validation et paiement des professionnels'],
   'admin-planning': ['Planning HelixCar', 'Vos réceptions, horaires et remises de clés'],
   'admin-opportunites':  ['Opportunités de missions', 'Besoins publiés aux partenaires, candidatures et attribution'],
   'admin-parametres':    ['Paramètres', 'Votre compte administrateur'],
@@ -5070,6 +5081,8 @@ function showPage(id, options) {
   document.getElementById('topbar-sub').textContent = t[1];
   if (id === 'admin-dashboard') { chargerAccueilAdmin(); }
   if (id === 'admin-clients') { chargerClientsAdmin(); }
+  if (id === 'admin-metiers') { chargerValidationMetiers(); }
+  if (id === 'convoyeur-profil') { chargerMesBadges(); }
   if (id === 'admin-candidatures') { loadCandidatures(); loadConvoyeursActifs(); }
   if (id === 'admin-missions') { loadMissions(); }
   if (id === 'convoyeur-dashboard') { loadDashboardMissionsPreview(); }
@@ -6000,6 +6013,8 @@ function urlSure(u) {
 // Dashboard ne réinvente aucune nomenclature.
 var CONV_ACTIVITES_CONNUES = ['convoyage', 'nettoyage', 'renfort', 'technicien'];
 var CONV_LIB_METIER = {
+  convoyage: 'Convoyage automobile',
+  nettoyage: 'Nettoyage automobile',
   jockey: 'Jockey automobile',
   accueil_preparation: 'Accueil en concession',
   soutien_administratif: 'Soutien administratif',
@@ -6328,7 +6343,7 @@ async function lancerSynchronisation() {
     // ni télécharger. cle = identifiant unique (URL pour un fichier, "prefixe:id" pour un texte).
     const descripteurs = [];
 
-    // 1) Convoyeurs actifs (Documents + Missions effectuées)
+    // 1) Professionnels actifs (Documents + Missions effectuées)
     for (let i = 0; i < (actifs || []).length; i++) {
       const c = actifs[i];
       const nomPersonne = nomDossierSain(((c.prenom || '') + ' ' + (c.nom || '')).trim() || ('convoyeur-' + c.id));
@@ -6419,7 +6434,7 @@ async function lancerSynchronisation() {
       descripteurs.push({ cle: 'fiche-recontact:' + r.id, chemin: 'Demandes de recontact/' + nomPersonne + ' - ' + dateCourte + '/fiche-recontact.txt', valeur: texteFicheRecontact(r), estUrl: false });
     });
 
-    // 4) Factures convoyeurs, classées Année/Mois (d'après la date de génération)
+    // 4) Factures professionnels, classées Année/Mois (d'après la date de génération)
     const missionRefParId = {};
     (missions || []).forEach(function(m) { missionRefParId[m.id] = m.reference; });
     (factures || []).forEach(function(f) {
@@ -6611,7 +6626,7 @@ async function lancerArchivageConvoyeurs() {
   if (!btn || btn.disabled) return;
   if (typeof JSZip === 'undefined') { alert('❌ La librairie JSZip ne s\'est pas chargée (vérifie ta connexion) — réessaie.'); return; }
 
-  const texteInitialBtn = '📁 Télécharger les dossiers convoyeurs';
+  const texteInitialBtn = '📁 Télécharger les dossiers professionnels';
   let succes = false;
   const clesTelechargees = [];
   const logId = 'archivage-log-convoyeurs';
@@ -6630,7 +6645,7 @@ async function lancerArchivageConvoyeurs() {
     const actifs = resultats[1] || [];
 
     if (enAttente.length + actifs.length === 0) {
-      ecrireLogArchive(logId, '✅ Aucun convoyeur trouvé.');
+      ecrireLogArchive(logId, '✅ Aucun professionnel trouvé.');
       return;
     }
     ecrireLogArchive(logId, enAttente.length + ' en attente de validation, ' + actifs.length + ' actif(s).');
@@ -6684,7 +6699,7 @@ async function lancerArchivageConvoyeurs() {
     }
 
     archiverGroupe(enAttente, 'En attente de validation');
-    archiverGroupe(actifs, 'Convoyeurs actifs');
+    archiverGroupe(actifs, 'Professionnels actifs');
 
     if (compteMissions === 0 && tachesTelechargement.length === 0) {
       ecrireLogArchive(logId, '❌ Rien à archiver — le ZIP ne serait pas généré.');
@@ -7350,6 +7365,10 @@ function _boutonDecision(activite, valeur, courante) {
 async function rendreDecisionsPartenaire(convoyeur) {
   const zone = document.getElementById('dossier-decisions');
   if (!zone) return;
+  if (normaliserMetiers(convoyeur && convoyeur.metiers).length) {
+    zone.innerHTML = '<p>Chaque badge est géré dans la rubrique Validation des métiers.</p><button type="button" class="btn btn-dark" ' + actionHtml('showPage', ['admin-metiers']) + '>Validation des métiers</button>';
+    return;
+  }
   const activites = normaliserActivites(convoyeur && convoyeur.activites);
   _partenaireFiche = {
     id: convoyeur ? convoyeur.id : null,
@@ -7374,7 +7393,7 @@ async function rendreDecisionsPartenaire(convoyeur) {
 
   let html = '<div style="margin-top:16px;border-top:1px solid rgba(0,0,0,.08);padding-top:14px">' +
     '<div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:10px">' +
-    'Décisions par activité</div>';
+    'Décisions historiques par activité</div><p>Les badges actuels se gèrent dans Validation des métiers.</p>';
 
   activites.forEach(function (a) {
     const courante = decisions[a] || 'en_attente';
@@ -7760,13 +7779,13 @@ function _libelleCivilite(c) {
     : 'Non renseignée';
 }
 function _appliquerCiviliteEspacePartenaire(c) {
-  const role = _accordPartenaire(c, 'Convoyeur', 'Convoyeuse');
+  const role = _accordPartenaire(c, 'Professionnel', 'Professionnelle');
   const roleEl = document.getElementById('sb-role');
   if (roleEl) roleEl.textContent = role;
   const section = document.querySelector('#sidebar-nav .nav-section-label');
-  if (section) section.textContent = _accordPartenaire(c, 'Espace convoyeur', 'Espace convoyeuse');
+  if (section) section.textContent = _accordPartenaire(c, 'Espace professionnel', 'Espace professionnelle');
   const titre = document.getElementById('profil-partenaire-titre');
-  if (titre) titre.textContent = _accordPartenaire(c, 'Mon profil convoyeur', 'Mon profil convoyeuse');
+  if (titre) titre.textContent = _accordPartenaire(c, 'Mon profil professionnel', 'Mon profil professionnelle');
 }
 
 function _badgeEtatPartenaire(c) {
@@ -7779,7 +7798,7 @@ function afficherConvoyeursActifs(rows) {
   const tbody = document.getElementById('convoyeurs-actifs-table');
   if (!tbody) return;
   if (!rows || rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucun convoyeur trouvé</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucun professionnel trouvé</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(function(c) {
@@ -7881,7 +7900,7 @@ function voirConvoyeurSb(id) {
       : '<span class="badge badge-pending">⏳ Manquant</span>';
   };
 
-  document.getElementById('dossier-name').textContent = _accordPartenaire(c, 'Convoyeur', 'Convoyeuse') + ' — ' + nom;
+  document.getElementById('dossier-name').textContent = _accordPartenaire(c, 'Professionnel', 'Professionnelle') + ' — ' + nom;
   document.getElementById('dossier-content').innerHTML = `
     <div class="detail-row"><span class="detail-label">N° ${_accordPartenaire(c, 'convoyeur', 'convoyeuse')}</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${id}</span></div>
     <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
@@ -8007,7 +8026,7 @@ async function validerConvoyeur(id, name, email, civilite) {
     loadCandidatures();
     loadConvoyeursActifs();
   } catch (e) {
-    alert('❌ ' + (e && e.message ? e.message : 'Erreur lors de la validation.') + ' ' + _accordPartenaire(partenaire, 'Le convoyeur', 'La convoyeuse') + ' n\'a pas été mis' + _accordPartenaire(partenaire, '', 'e') + ' à jour.');
+    alert('❌ ' + (e && e.message ? e.message : 'Erreur lors de la validation.') + ' ' + _accordPartenaire(partenaire, 'Le professionnel', 'La professionnelle') + ' n\'a pas été mis' + _accordPartenaire(partenaire, '', 'e') + ' à jour.');
     loadCandidatures();
   }
 }
@@ -8024,7 +8043,7 @@ function refuserConvoyeur(id) {
   }).then(function() {
     loadCandidatures();
   }).catch(function(e) {
-    alert('❌ Erreur lors du refus (voir la console). Le convoyeur n\'a pas été mis à jour dans Supabase.');
+    alert('❌ Erreur lors du refus (voir la console). Le professionnel n\'a pas été mis à jour dans Supabase.');
     loadCandidatures();
   });
 }
@@ -8697,7 +8716,7 @@ function loadMissionsConvoyeur() {
   if (!tbody) return;
   const conv = window._currentConvoyeur;
   if (!conv) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Session convoyeur introuvable — reconnecte-toi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Session professionnel introuvable — reconnecte-toi.</td></tr>';
     return;
   }
   if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
@@ -8770,7 +8789,7 @@ function loadMissionsConvoyeur() {
 
 function accepterMission(id) {
   const conv = window._currentConvoyeur;
-  if (!conv) { alert('Session convoyeur introuvable — reconnecte-toi.'); return; }
+  if (!conv) { alert('Session professionnel introuvable — reconnecte-toi.'); return; }
   if (!confirm('Accepter cette mission ?')) return;
   sbFetch('missions?id=eq.' + id, {
     method: 'PATCH',
@@ -9245,7 +9264,7 @@ function loadHistoriqueConvoyeur() {
   if (!tbody) return;
   const conv = window._currentConvoyeur;
   if (!conv) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Session convoyeur introuvable — reconnecte-toi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Session professionnel introuvable — reconnecte-toi.</td></tr>';
     return;
   }
   if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
@@ -9464,7 +9483,7 @@ function recalculerTotalFactureConvoyeur() {
 
 function genererFactureConvoyeur() {
   const conv = window._currentConvoyeur;
-  if (!conv) { alert('Session convoyeur introuvable — reconnecte-toi.'); return; }
+  if (!conv) { alert('Session professionnel introuvable — reconnecte-toi.'); return; }
   if (window._factureBloqueeJusquau) {
     alert('⏳ Tu dois attendre le ' + window._factureBloqueeJusquau.toLocaleDateString('fr-FR') + ' pour générer une nouvelle facture (délai de 5 jours ouvrés entre deux factures).');
     return;
@@ -14961,6 +14980,67 @@ if (document.readyState === 'interactive' || document.readyState === 'complete')
 }
 
 
+var _badgesChargement = 0;
+async function chargerMesBadges() {
+  const cycle = window.HCSync ? window.HCSync.capture() : null;
+  const zone = document.getElementById('profil-badges');
+  const choix = document.getElementById('profil-badges-choix');
+  const bouton = document.getElementById('demander-badges');
+  const c = window._currentConvoyeur, jeton = ++_badgesChargement;
+  if (!zone || !choix || !c || !sbAuth) return;
+  zone.textContent = 'Chargement des badges…'; choix.innerHTML = ''; bouton.disabled = true;
+  try {
+    const r = await sbAuth.from('professionnel_badges').select('metier,decision').eq('professionnel_id', c.id);
+    if (r.error) throw r.error;
+    if (jeton !== _badgesChargement || window._currentConvoyeur !== c || (window.HCSync && !window.HCSync.safe(cycle))) return;
+    const lignes = r.data || [], lib = {oui:'Validé',non:'Refusé',en_attente:'En attente'};
+    zone.innerHTML = lignes.length ? lignes.map(b => '<p><b>' + escapeHtml(CONV_LIB_METIER[b.metier] || b.metier) + '</b> — ' + escapeHtml(lib[b.decision] || 'En attente') + '</p>').join('') : '<p>Aucun badge demandé.</p>';
+    const libres = Object.keys(CONV_LIB_METIER).filter(m => !lignes.some(b => b.metier === m));
+    choix.innerHTML = libres.map(m => '<label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="badge-metier" value="' + m + '">' + escapeHtml(CONV_LIB_METIER[m]) + '</label>').join('');
+    bouton.disabled = !libres.length;
+  } catch (e) { zone.textContent = 'Impossible de charger vos badges. Réessayez en ouvrant votre profil.'; }
+}
+async function demanderMesBadges() {
+  const bouton = document.getElementById('demander-badges'), message = document.getElementById('profil-badges-message');
+  const metiers = Array.from(document.querySelectorAll('input[name="badge-metier"]:checked')).map(x => x.value);
+  if (!metiers.length) { message.textContent = 'Sélectionnez au moins un métier.'; return; }
+  bouton.disabled = true;
+  try {
+    const r = await sbAuth.rpc('demander_badges_professionnel', {p_metiers:metiers});
+    if (r.error) throw r.error;
+    const c = window._currentConvoyeur;
+    const profil = await sbAuth.from('convoyeurs').select('*').eq('id',c.id).single();
+    if (!profil.error && profil.data && window._currentConvoyeur === c) { window._currentConvoyeur=profil.data; remplirProfilConvoyeur(profil.data); }
+    message.textContent = 'Demandes enregistrées. Chaque badge reste soumis à la validation de HelixCar.';
+    await chargerMesBadges();
+  } catch (e) { message.textContent = 'La demande n’a pas pu être enregistrée. Réessayez.'; bouton.disabled = false; }
+}
+var _validationMetiersGeneration = 0;
+async function chargerValidationMetiers() {
+  const cycle = window.HCSync ? window.HCSync.capture() : null;
+  const zone = document.getElementById('admin-metiers-liste'), generation = ++_validationMetiersGeneration;
+  if (!zone || currentRole !== 'admin') return;
+  zone.textContent = 'Chargement des demandes…';
+  try {
+    const r = await sbAuth.from('professionnel_badges').select('professionnel_id,metier,decision,demande_le,convoyeurs(prenom,nom,statut)').order('demande_le',{ascending:false});
+    if (r.error) throw r.error;
+    if (generation !== _validationMetiersGeneration || currentRole !== 'admin' || (window.HCSync && !window.HCSync.safe(cycle))) return;
+    const lignes = (r.data || []).slice().sort((a,b) => Number(b.decision==='en_attente') - Number(a.decision==='en_attente'));
+    zone.innerHTML = lignes.length ? lignes.map(b => {
+      const c=b.convoyeurs || {}, nom=[c.prenom,c.nom].filter(Boolean).join(' ') || 'Professionnel';
+      return '<div style="padding:14px 0;border-bottom:1px solid #ddd;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><b>' + escapeHtml(nom) + '</b><br>' + escapeHtml(CONV_LIB_METIER[b.metier] || b.metier) + ' · ' + escapeHtml({oui:'Validé',non:'Refusé',en_attente:'En attente'}[b.decision]) + '</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + ['oui','non','en_attente'].map(d => '<button type="button" class="btn btn-sm" ' + (d===b.decision?'disabled ':'') + actionHtml('deciderMetierProfessionnel',[b.professionnel_id,b.metier,d,nom]) + '>' + {oui:'Valider',non:'Refuser',en_attente:'Mettre en attente'}[d] + '</button>').join('') + '</div></div>';
+    }).join('') : '<p>Aucune demande de badge.</p>';
+  } catch(e) { zone.textContent = 'Impossible de charger les demandes de métiers. Réouvrez cette rubrique pour réessayer.'; }
+}
+async function deciderMetierProfessionnel(id,metier,decision,nom) {
+  if (currentRole !== 'admin' || !confirm(nom + ' — ' + (CONV_LIB_METIER[metier] || metier) + '\n' + {oui:'Valider ce badge ?',non:'Refuser ce badge ?',en_attente:'Remettre ce badge en attente ?'}[decision])) return;
+  try {
+    const r=await sbAuth.rpc('decider_badge_professionnel',{p_professionnel:id,p_metier:metier,p_decision:decision});
+    if(r.error) throw r.error;
+    await chargerValidationMetiers();
+  } catch(e) { alert('La décision n’a pas été enregistrée. Réessayez.'); }
+}
+
 // ── REGISTRE DES ACTIONS ────────────────────────────────────
 // Résolu ici, une fois toutes les fonctions déclarées. Un attribut
 // data-hc-action ne peut donc appeler QUE ce qui figure dans cette
@@ -14980,7 +15060,7 @@ function declencherChampFichier(id) {
   'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',
-  'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite',
+  'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite', 'deciderMetierProfessionnel',
   'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
   'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',

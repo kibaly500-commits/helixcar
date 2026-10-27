@@ -78,7 +78,7 @@ const fs = require('fs');
   L.check('B4 : les anciennes candidatures sans civilité conservent le masculin',
     accords.ancien.join('|') === 'Convoyeur|Retenu', JSON.stringify(accords.ancien));
   L.check('B5 : les badges et l’espace personnel suivent aussi le féminin',
-    /Bloquée/.test(accords.badgeFemme) && accords.role === 'Convoyeuse' && accords.profil === 'Mon profil convoyeuse',
+    /Bloquée/.test(accords.badgeFemme) && accords.role === 'Professionnelle' && accords.profil === 'Mon profil professionnelle',
     JSON.stringify(accords));
   L.check('B6 : le dashboard récupère la civilité dans les candidatures d’opportunité',
     /select=id,prenom,nom,civilite,activites,statut,bloque/.test(dashboard));

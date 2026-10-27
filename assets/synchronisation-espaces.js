@@ -7,6 +7,7 @@
   var loaders = {
     'admin-dashboard': ['chargerAccueilAdmin'], 'admin-clients': ['chargerClientsAdmin'],
     'admin-candidatures': ['loadCandidatures', 'loadConvoyeursActifs'],
+    'admin-metiers': ['chargerValidationMetiers'],
     'admin-missions': ['loadMissions'], 'admin-opportunites': ['loadOpportunitesAdmin'],
     'admin-facturation': ['loadFacturationAdmin'], 'admin-devis': ['loadDemandesDevis'],
     'admin-infos': ['chargerCentreInformationsAdmin'], 'admin-recontact': ['loadRecontacts'],
@@ -70,6 +71,7 @@
     if (res.error || !res.data || !safe(cycle)) return;
     window._currentConvoyeur = res.data;
     remplirProfilConvoyeur(res.data);
+    if (typeof chargerMesBadges === 'function') await chargerMesBadges();
   };
   async function refresh() {
     clearTimeout(debounce); debounce = null;

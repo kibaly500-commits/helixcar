@@ -381,6 +381,8 @@ const futur = dansNJours;
     'supabase/migrations/20261010193552_organisation_interne_retrait_veille.sql',
     'supabase/migrations/20261010211000_garde_cinq_jours.sql',
   ];
+  PERIMETRE_PR6.push('supabase/migrations/20261027114006_validation_metiers_professionnels.sql',
+    'supabase/migrations/20261027113400_correction_chemin_rib_prive.sql');
   const horsPerimetre = f => PERIMETRE.indexOf(f) === -1 && !PERIMETRE_PR6.includes(f)
     && !f.startsWith('migrations/') && !f.startsWith('tests/')
     && !f.startsWith('supabase/functions/') && !f.startsWith('supabase/templates/');
@@ -388,7 +390,7 @@ const futur = dansNJours;
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
-      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 59,
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 61,
     PERIMETRE.length + ' entrées historiques, ' + PERIMETRE_PR6.length + ' entrées PR6');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.
@@ -414,6 +416,17 @@ const futur = dansNJours;
   // exactement une chose : le PATCH anonyme sur convoyeurs.auth_user_id,
   // que la RLS refusait en silence, et l'adresse d'aperçu codée en dur.
   const RETRAITS_CONVOYEUR = [
+    // PR6 métiers : intitulés génériques Professionnel, sans changement de parcours.
+    "<title>HelixCar — Créer mon compte convoyeur</title>",
+    "<h2>Créer mon compte convoyeur</h2>",
+    "<p class=\"sub\" id=\"cc-sub\">Ton dossier est validé ! Choisis un mot de passe pour accéder à ton espace convoyeur et voir les missions disponibles.</p>",
+    "btn.textContent = 'Ajout de ton espace convoyeur…';",
+    "showError('Ton espace convoyeur n\\'a pas pu être ajouté. Réessaie dans quelques instants.');",
+    "showError('Ce dossier convoyeur ne correspond pas à ce compte. Contacte HelixCar.');",
+    "+ 'ton espace convoyeur vient d\\'y être ajouté. '",
+    "? '📬 Dernière étape : va voir tes emails (pense à vérifier les spams) et clique sur le lien de confirmation — tu seras redirigé directement sur ton espace convoyeur, déjà connecté.'",
+    ": '✅ Compte créé ! Tu peux te connecter directement sur ton espace convoyeur.';",
+
     "method: 'PATCH',", "'apikey': SUPABASE_KEY,",
     "'Authorization': 'Bearer ' + SUPABASE_KEY,", "'Content-Type': 'application/json',",
     "'Prefer': 'return=minimal'", "body: JSON.stringify({ auth_user_id: result.data.user.id })",
