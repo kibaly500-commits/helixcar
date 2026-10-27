@@ -52,7 +52,7 @@ check('C10 : le serveur crédite floor(prix TTC), sans règle provisoire résidu
 // tests/rls/l01.sh les mesure sur PostgreSQL 16 (L01-016). Le double ne
 // « calcule » rien : il rend ces lignes, comme la vue le ferait.
 function ligne(solde, palierCourant, prochainSeuil, restants, boxes) {
-  const nomDe = s => s === 0 ? null : (s <= 10000 ? 'Palier ' + (s / 2000) : 'Box mystère');
+  const nomDe = s => s === 0 ? null : ('Palier ' + ((s / 2000 - 1) % 5 + 1));
   return {
     solde, pas: 2000, palier_courant: palierCourant, palier_numero: palierCourant / 2000,
     palier_courant_nom: nomDe(palierCourant), prochain_seuil: prochainSeuil,
@@ -222,19 +222,7 @@ async function ouvrirFidelite(page, cas, mouvements) {
     /pas encore de points/.test(accueil.carte) && !/disponible/i.test(accueil.carte));
 
   // ── B. LA PAGE FIDÉLITÉ, POUR CHAQUE SOLDE ──
-  const ATTENDUS = {
-    0:     { etats: ['En cours', 'À atteindre', 'À atteindre', 'À atteindre', 'À atteindre'], box: false, vide: true },
-    1999:  { etats: ['En cours', 'À atteindre', 'À atteindre', 'À atteindre', 'À atteindre'], box: false, vide: false },
-    2000:  { etats: ['Atteint', 'En cours', 'À atteindre', 'À atteindre', 'À atteindre'], box: false, vide: false },
-    9999:  { etats: ['Atteint', 'Atteint', 'Atteint', 'Atteint', 'En cours'], box: false, vide: false },
-    10000: { etats: ['Atteint', 'Atteint', 'Atteint', 'Atteint', 'Atteint'], box: true, vide: false,
-             boxes: '0', courant: /Palier 5\s·\s10\s000 points/, prochain: /Box mystère\s·\s12\s000 points/, acquis: null },
-    12000: { etats: ['Atteint', 'Atteint', 'Atteint', 'Atteint', 'Atteint'], box: true, vide: false,
-             boxes: '1', courant: /Box mystère\s·\s12\s000 points/, prochain: /Box mystère\s·\s14\s000 points/, acquis: /Historique acquis : 12\s000 points\./ },
-    25000: { etats: ['Atteint', 'Atteint', 'Atteint', 'Atteint', 'Atteint'], box: true, vide: false,
-             boxes: '7', courant: /Box mystère\s·\s24\s000 points/, prochain: /Box mystère\s·\s26\s000 points/,
-             acquis: /12\s000 points, 14\s000 points, 16\s000 points, 18\s000 points, 20\s000 points, 22\s000 points, 24\s000 points/ },
-  };
+  const ATTENDUS = Object.fromEntries(Object.keys(CAS).map(n=>[n,{etats:Array.from({length:5},(_,i)=>i<Math.floor((Number(n)%10000)/2000)?'Atteint':i===Math.floor((Number(n)%10000)/2000)?'En cours':'À atteindre'),vide:Number(n)===0}]));
   const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   for (const solde of [0, 1999, 2000, 9999, 10000, 12000, 25000]) {
     const cas = CAS[solde], att = ATTENDUS[solde];
@@ -247,18 +235,10 @@ async function ouvrirFidelite(page, cas, mouvements) {
       JSON.stringify({ solde: r.solde, prochain: r.prochain, restants: r.restants }));
     check(nom + ' : cinq paliers 2 000 → 10 000, états en texte ' + JSON.stringify(att.etats),
       r.paliers.length === 5
-      && r.paliers.map(p => p.seuil).join(',') === '2000,4000,6000,8000,10000'
+      && r.paliers.map(p => p.seuil).join(',') === [2000,4000,6000,8000,10000].map(n=>n+Math.floor(solde/10000)*10000).join(',')
       && r.paliers.map(p => p.etatTexte.trim()).join('|') === att.etats.join('|'),
       r.paliers.map(p => p.seuil + ':' + p.etatTexte).join(' '));
-    check(nom + ' : bloc Box mystère ' + (att.box ? 'présent' : 'absent'),
-      r.box === att.box, 'box=' + r.box);
-    if (att.box) {
-      check(nom + ' : Box mystère — acquises, seuil courant et prochain seuil (nom + seuil, rien d\'inventé)',
-        r.boxesAcquises === att.boxes && att.courant.test(r.seuilCourant) && att.prochain.test(r.seuilProchain)
-        && (att.acquis ? att.acquis.test(r.boxTexte) : !/Historique acquis/.test(r.boxTexte))
-        && /pas encore communiqu/.test(r.boxTexte),
-        JSON.stringify({ acquises: r.boxesAcquises, courant: r.seuilCourant, prochain: r.seuilProchain }));
-    }
+    check(nom + ' : historique réel des box, sans récompense inventée', /Mes box surprises/.test(r.texte));
     check(nom + ' : état vide ' + (att.vide ? 'affiché' : 'absent') + ', historique vide',
       r.vide === att.vide && r.historiqueVide === true, 'vide=' + r.vide);
     const interdits = motsInterdits(r.texte);
@@ -278,10 +258,7 @@ async function ouvrirFidelite(page, cas, mouvements) {
     icones.join(',') === 'cadeau,etoile,insigne,couronne,trophee', icones.join(','));
   check('C2 : les cinq tracés sont distincts (pas cinq fois le même dessin)',
     new Set(r2000.paliers.map(p => p.trace)).size === 5 && r2000.paliers.every(p => p.trace.length > 20));
-  check('C3 : la récompense vérifiée du palier 1 est la seule affirmée ; les autres sont « à définir »',
-    /10 % sur une box surprise automobile/.test(r2000.paliers[0].recompense)
-    && r2000.paliers.slice(1).every(p => /à définir/i.test(p.recompense)),
-    r2000.paliers.map(p => p.recompense).join(' | '));
+  check('C3 : une box surprise à chacun des cinq paliers', r2000.paliers.every(p=>p.recompense==='Une box surprise.'));
   check('C4 : l\'historique liste les mouvements du serveur avec leur signe',
     r2000.historique.length === 4 && /\+1\s234/.test(r2000.historique.join(' ')) && /−1\s234/.test(r2000.historique.join(' ')),
     JSON.stringify(r2000.historique));

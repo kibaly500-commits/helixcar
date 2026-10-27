@@ -1927,9 +1927,9 @@ body.scroll-verrouille { overflow: hidden; }
           <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="client-missions-sub"></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Partenaire</th><th>Statut</th><th>Évaluation</th></tr></thead>
+              <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
               <tbody id="client-missions-table">
-                <tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1956,6 +1956,10 @@ body.scroll-verrouille { overflow: hidden; }
            « disponible » et ne peut rien écrire dans le registre.
            Décision C10 : cinq paliers en points (2 000 → 10 000), puis
            une Box mystère tous les 2 000 points, sans plafond. -->
+      <div class="page" id="page-admin-recompenses">
+        <div class="card"><div class="card-header"><div><div class="card-title">Récompenses</div><div class="card-sub">Une box surprise pour chaque palier débloqué.</div></div><select id="recompenses-filtre" aria-label="Afficher les récompenses" onchange="loadRecompensesAdmin()"><option value="a_traiter">À préparer et à envoyer</option><option value="envoyee">Historique des envois</option><option value="toutes">Toutes les récompenses</option></select></div>
+        <p id="recompenses-message" role="status"></p><div class="table-wrap"><table><thead><tr><th>Client</th><th>Palier</th><th>Débloquée le</th><th>Statut</th><th>Envoi</th><th>Action</th></tr></thead><tbody id="recompenses-table"></tbody></table></div></div>
+      </div>
       <div class="page" id="page-client-fidelite">
         <div id="client-fidelite-page">
           <div class="card"><div class="fid-note">Chargement…</div></div>
@@ -2087,6 +2091,7 @@ body.scroll-verrouille { overflow: hidden; }
 <!-- LECTEUR VIDÉO SÉCURISÉ — la source est une URL SIGNÉE TEMPORAIRE,
      obtenue après contrôle d'autorisation, et effacée à la fermeture.
      Aucune URL n'est conservée dans le DOM au-delà de la lecture. -->
+<div class="modal-overlay" id="modal-recap-mission-client" role="dialog" aria-modal="true" aria-labelledby="recap-mission-client-titre"><div class="modal"><div class="modal-header"><h2 id="recap-mission-client-titre">Récapitulatif de la mission</h2><button class="modal-close" onclick="closeModal('recap-mission-client')" aria-label="Fermer">×</button></div><div id="recap-mission-client-contenu"></div></div></div>
 <div class="modal-overlay" id="modal-video-candidature">
   <div class="modal" style="position:relative;max-width:760px">
     <button class="modal-close" onclick="fermerVideoCandidature()">✕</button>
@@ -2287,6 +2292,7 @@ const NAVS = {
     { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers', badgeDynamique: true },
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
+    { id: 'admin-recompenses', icon: '🎁', label: 'Récompenses', badgeDynamique: true },
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
     { id: 'admin-recontact',    icon: '📬', label: 'Demandes recontact' },
     { id: 'admin-archivage',    icon: '📦', label: 'Archivage' },
@@ -3335,18 +3341,31 @@ async function chargerMissionsSuiviClient() {
   });
 }
 function _phaseMissionClient(m) {
-  if (m.statut === 'annulee') return 'Annulée';
-  if (m._paiement === 'inconnu') return 'Paiement à vérifier';
-  if (m._paiement !== 'paye') return 'En attente de paiement';
-  if (m.statut === 'terminee') return 'Terminée';
-  if (m.statut === 'fini') return 'Réalisation terminée — à valider';
-  if (['en_cours','restitution_requise','restitution_en_cours'].includes(m.statut)) return 'En cours';
-  if (m.statut === 'acceptee') return 'Planifiée';
+  if(m.statut==='annulee')return 'Annulée';
+  if(m.statut==='terminee')return 'Terminée';
+  if(['en_cours','restitution_requise','restitution_en_cours','fini'].includes(m.statut))return 'En cours';
+  if(missionSurPlace(m)&&m.statut==='acceptee'&&['En cours','À confirmer'].includes(statutIntervention(Object.assign({},m,{convoyeur_id:true})).texte))return 'En cours';
   return 'En préparation';
 }
-function _partenaireMissionClient(m) {
-  const confirmee = ['acceptee','en_cours','restitution_requise','restitution_en_cours','fini','terminee'].includes(m.statut);
-  return confirmee && m.convoyeur_prenom ? m.convoyeur_prenom : 'En attente d’attribution';
+function _partenaireMissionClient() { return ''; }
+let recapMissionClientGeneration=0;
+async function ouvrirRecapMissionClient(id) {
+  const generation=++recapMissionClientGeneration;
+  const zone=document.getElementById('recap-mission-client-contenu');zone.textContent='Chargement…';openModal('recap-mission-client');
+  try {
+    const r=await sbAuth.from('v_mes_missions').select('*').eq('id',id).single();
+    if(generation!==recapMissionClientGeneration)return;
+    if(r.error||!r.data)throw Error('indisponible');
+    const m=r.data,surPlace=missionSurPlace(m);
+    const champs=[['Référence',referenceMission(m)],['Prestation',_missionPrestationClient(m)],['Statut',_phaseMissionClient(m)]];
+    if(surPlace){
+      champs.push(['Lieu',[m.adresse_intervention,m.ville_intervention].filter(Boolean).join(', ')],['Période',[_dvDate(m.date_intervention),m.date_fin_intervention?_dvDate(m.date_fin_intervention):''].filter(Boolean).join(' au ')],['Horaires',m.heure_intervention||[m.heure_debut_intervention,m.heure_fin_intervention].filter(Boolean).join(' – ')],['Nombre de véhicules',m.nb_vehicules]);
+    }else{
+      champs.push(['Véhicule',[m.marque_modele,m.immatriculation].filter(Boolean).join(' · ')],['Départ',[m.adresse_depart,m.ville_depart].filter(Boolean).join(', ')],['Arrivée',[m.adresse_arrivee,m.ville_arrivee].filter(Boolean).join(', ')],['Prise en charge',m.date_prise_en_charge?new Date(m.date_prise_en_charge).toLocaleString('fr-FR'):''],['Livraison',m.date_livraison?new Date(m.date_livraison).toLocaleString('fr-FR'):'']);
+    }
+    if(m.consignes)champs.push(['Consignes',m.consignes]);
+    zone.innerHTML=champs.filter(c=>c[1]!==null&&c[1]!==undefined&&c[1]!=='').map(c=>'<div class="detail-row"><span class="detail-label">'+escapeHtml(c[0])+'</span><span class="detail-val" style="white-space:pre-line">'+escapeHtml(String(c[1]))+'</span></div>').join('');
+  }catch(e){if(generation!==recapMissionClientGeneration)return;zone.textContent='Ce récapitulatif est momentanément indisponible. Fermez puis réessayez.';}
 }
 
 async function loadMissionsClient() {
@@ -3355,7 +3374,7 @@ async function loadMissionsClient() {
   const tbody = document.getElementById('client-missions-table');
   if (!tbody) return;
   const sub = document.getElementById('client-missions-sub');
-  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
+  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
   let missions = [];
   try { missions = await chargerMissionsSuiviClient();
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
@@ -3363,12 +3382,12 @@ async function loadMissionsClient() {
   catch (e) {
  if (_hcSyncCycle) return;
 
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Le suivi de vos missions est momentanément indisponible. Utilisez Actualiser pour reprendre.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Le suivi de vos missions est momentanément indisponible. Utilisez Actualiser pour reprendre.</td></tr>';
     return;
   }
   if (sub) sub.textContent = missions.length ? missions.length + ' mission(s)' : '';
   if (!missions.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">'
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">'
       + 'Aucune mission pour le moment. Vos missions apparaîtront ici dès que leur préparation sera finalisée.</td></tr>';
     return;
   }
@@ -3381,9 +3400,8 @@ async function loadMissionsClient() {
       + '<td>' + escapeHtml(_missionPrestationClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
-      + '<td>' + escapeHtml(_partenaireMissionClient(m)) + '</td>'
-      + '<td><span class="badge badge-progress">' + escapeHtml(_phaseMissionClient(m)) + '</span><br><small>' + (m._paiement === 'paye' ? 'Devis payé' : m._paiement === 'inconnu' ? 'Paiement à vérifier' : 'Devis non payé') + '</small></td>'
-      + '<td>' + evaluation + '</td></tr>';
+      + '<td><span class="badge badge-progress">' + escapeHtml(_phaseMissionClient(m)) + '</span></td>'
+      + '<td><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirRecapMissionClient',[m.id])+'>Voir le récapitulatif</button> '+evaluation+'</td></tr>';
   }).join('');
 }
 
@@ -4121,15 +4139,36 @@ function loadParametresAdmin() {
 // 2 à 5 et le contenu de la Box mystère ne sont pas définis, et un
 // avantage ne se décide pas sur un solde lu dans une page.
 
-// Les cinq paliers initiaux : seuil, nom, icône, et ce qui est VÉRIFIÉ.
-// Seule la récompense du palier 1 est validée ; les autres sont « à
-// définir » — on ne les invente pas.
+// Cinq paliers renouvelés à chaque cycle de 10 000 points.
+var RECOMPENSE_LIB = {a_preparer:'À préparer',prete:'Prête',envoyee:'Envoyée',suspendue:'Suspendue après ajustement des points'};
+var _recompensesGeneration=0;
+async function loadRecompensesAdmin() {
+  if(currentRole!=='admin')return;
+  const generation=++_recompensesGeneration, cycle=window.HCSync&&window.HCSync.capture();
+  const zone=document.getElementById('recompenses-table'), message=document.getElementById('recompenses-message');
+  try {
+    const rows=await sbFetchToutePage('v_recompenses_admin?order=debloquee_le.desc,id.asc');
+    if(currentRole!=='admin'||generation!==_recompensesGeneration||(cycle&&!window.HCSync.safe(cycle)))return;
+    afficherCompteurMenu('admin-recompenses',rows.filter(r=>['a_preparer','prete'].includes(r.statut)).length,'box à préparer ou envoyer');
+    const filtre=document.getElementById('recompenses-filtre').value;
+    const liste=rows.filter(r=>filtre==='toutes'||(filtre==='a_traiter'?['a_preparer','prete'].includes(r.statut):r.statut===filtre));
+    const html=liste.map(r=>'<tr><td><strong>'+escapeHtml([r.prenom,r.nom].filter(Boolean).join(' ')||r.societe||'Client')+'</strong><br>'+escapeHtml(r.numero_client||'')+'<br><small>'+escapeHtml(r.email||'')+'</small></td><td>Cycle '+r.cycle+' · Palier '+r.palier+'<br>'+_fidPoints(r.seuil)+'<br>Box surprise</td><td>'+escapeHtml(_fidDate(r.debloquee_le))+'</td><td>'+escapeHtml(RECOMPENSE_LIB[r.statut]||r.statut)+'</td><td>'+escapeHtml(_fidDate(r.envoyee_le)||'—')+'</td><td>'+(['a_preparer','prete'].includes(r.statut)?'<button class="btn btn-sm btn-primary" '+actionHtml('avancerRecompense',[r.id,r.statut==='a_preparer'?'prete':'envoyee'])+'>'+(r.statut==='a_preparer'?'Marquer prête':'Confirmer l’envoi')+'</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="6">Aucune récompense dans cette rubrique.</td></tr>';
+    if(zone.innerHTML!==html)zone.innerHTML=html;
+  }catch(e){message.textContent='Les récompenses sont momentanément indisponibles. Réessayez avec Actualiser.';}
+}
+async function avancerRecompense(id,statut) {
+  if(currentRole!=='admin'||!confirm(statut==='envoyee'?'Confirmer que cette box a été envoyée ?':'Confirmer que cette box est prête ?'))return;
+  const message=document.getElementById('recompenses-message');
+  try {const r=await sbAuth.rpc('avancer_recompense',{p_id:id,p_statut:statut});if(r.error||!r.data?.ok)throw Error('refus');await loadRecompensesAdmin();message.textContent=statut==='envoyee'?'Envoi enregistré.':'Box marquée prête.';}
+  catch(e){message.textContent='La modification n’a pas été confirmée. Actualisez puis réessayez.';}
+}
+
 var FIDELITE_PALIERS = [
-  { seuil: 2000,  nom: 'Palier 1', icone: 'cadeau',  recompense: 'Réduction de 10 % sur une box surprise automobile.' },
-  { seuil: 4000,  nom: 'Palier 2', icone: 'etoile',  recompense: 'Récompense à définir.' },
-  { seuil: 6000,  nom: 'Palier 3', icone: 'insigne', recompense: 'Récompense à définir.' },
-  { seuil: 8000,  nom: 'Palier 4', icone: 'couronne', recompense: 'Récompense à définir.' },
-  { seuil: 10000, nom: 'Palier 5', icone: 'trophee', recompense: 'Récompense à définir.' }
+  { seuil: 2000,  nom: 'Palier 1', icone: 'cadeau',  recompense: 'Une box surprise.' },
+  { seuil: 4000,  nom: 'Palier 2', icone: 'etoile',  recompense: 'Une box surprise.' },
+  { seuil: 6000,  nom: 'Palier 3', icone: 'insigne', recompense: 'Une box surprise.' },
+  { seuil: 8000,  nom: 'Palier 4', icone: 'couronne', recompense: 'Une box surprise.' },
+  { seuil: 10000, nom: 'Palier 5', icone: 'trophee', recompense: 'Une box surprise.' }
 ];
 var FIDELITE_DERNIER_SEUIL_INITIAL = 10000;
 
@@ -4181,11 +4220,13 @@ async function chargerFideliteClient() {
   if (!_sbAuthPret()) throw new Error('Session requise.');
   var vue = await sbAuth.from('v_ma_fidelite').select('*').limit(1);
   if (vue.error) throw new Error(vue.error.message);
+  var boxes = await sbAuth.from('fidelite_recompenses').select('id,seuil,statut,debloquee_le,envoyee_le').order('seuil', { ascending: false });
+  if(boxes.error)throw new Error(boxes.error.message);
   var hist = await sbAuth.from('fidelite_mouvements')
     .select('id, points, motif, detail, created_at')
     .order('created_at', { ascending: false }).limit(50);
   if (hist.error) throw new Error(hist.error.message);
-  return { fidelite: (vue.data || [])[0] || null, mouvements: hist.data || [] };
+  return { fidelite: (vue.data || [])[0] || null, mouvements: hist.data || [], recompenses: boxes.data || [] };
 }
 
 // Les valeurs serveur, contrôlées une fois pour toutes. null si la
@@ -4254,7 +4295,9 @@ function _fidHtmlResume(o, prefixe) {
 }
 
 function _fidHtmlPaliers(o) {
-  var items = FIDELITE_PALIERS.map(function (p) {
+  var debutCycle = Math.floor(Math.max(0,o.solde)/10000)*10000;
+  var items = FIDELITE_PALIERS.map(function (initial) {
+    var p = Object.assign({},initial,{seuil:debutCycle+initial.seuil});
     var etat = _fidEtatPalier(o, p.seuil);
     return '<li class="fid-palier ' + etat.cls + '" data-seuil="' + p.seuil + '" data-etat="' + escapeHtml(etat.texte) + '">'
       + '<div class="fid-palier-icone">' + _fidIcone(p.icone) + '</div>'
@@ -4265,35 +4308,10 @@ function _fidHtmlPaliers(o) {
       +   '<div class="fid-palier-recompense">' + escapeHtml(p.recompense) + '</div>'
       + '</div></li>';
   }).join('');
-  return '<ol class="fid-paliers" id="fid-paliers">' + items + '</ol>'
-    + '<div class="fid-note" style="margin-top:14px">Au-delà de ' + _fidPoints(FIDELITE_DERNIER_SEUIL_INITIAL)
-    + ', chaque nouveau palier de 2\u00a0000 points ouvre une Box mystère.</div>';
+  return '<div class="fid-note">Cycle '+(debutCycle/10000+1)+'</div><ol class="fid-paliers" id="fid-paliers">'+items+'</ol><div class="fid-note" style="margin-top:14px">Une box surprise à chaque palier. Votre progression continue au cycle suivant, sans remise à zéro de vos points.</div>';
 }
-
-// Au-delà de 10 000 points : ce qui est acquis, le seuil courant et le
-// prochain seuil — nom et seuil, rien sur le contenu, qui n'est pas défini.
-function _fidHtmlBoxMystere(o) {
-  if (o.palierCourant < FIDELITE_DERNIER_SEUIL_INITIAL) return '';
-  var acquis = [];
-  for (var s = FIDELITE_DERNIER_SEUIL_INITIAL + 2000; s <= o.palierCourant; s += 2000) acquis.push(s);
-  var courant = o.palierCourant > FIDELITE_DERNIER_SEUIL_INITIAL
-    ? 'Box mystère · ' + _fidPoints(o.palierCourant)
-    : escapeHtml(o.palierCourantNom || 'Palier 5') + ' · ' + _fidPoints(o.palierCourant);
-  return '<div class="card" id="fid-box-mystere">'
-    + '<div class="card-header"><div><div class="card-title">Box mystère</div>'
-    + '<div class="card-sub">Un palier tous les 2\u00a0000 points au-delà de 10\u00a0000, sans plafond.</div></div></div>'
-    + '<div class="detail-row"><span class="detail-label">Boxes mystère acquises</span>'
-    +   '<span class="detail-val" id="fid-boxes-acquises">' + _fidNombre(o.boxesAcquises) + '</span></div>'
-    + '<div class="detail-row"><span class="detail-label">Seuil courant</span>'
-    +   '<span class="detail-val" id="fid-seuil-courant">' + courant + '</span></div>'
-    + '<div class="detail-row"><span class="detail-label">Prochain seuil</span>'
-    +   '<span class="detail-val" id="fid-seuil-prochain">Box mystère · ' + _fidPoints(o.prochainSeuil) + '</span></div>'
-    + (acquis.length
-        ? '<div class="fid-note" style="margin-top:12px">Historique acquis : '
-          + acquis.map(function (s) { return _fidPoints(s); }).join(', ') + '.</div>'
-        : '')
-    + '<div class="fid-note" style="margin-top:8px">Le contenu et la valeur de la Box mystère ne sont pas encore communiqués.</div>'
-    + '</div>';
+function _fidHtmlBoxMystere(o,boxes) {
+  return '<div class="card" id="fid-box-mystere"><div class="card-title">Mes box surprises</div>'+(boxes.length?boxes.map(r=>'<div class="detail-row"><span class="detail-label">'+_fidPoints(r.seuil)+' · Box surprise</span><span class="detail-val">'+escapeHtml(RECOMPENSE_LIB[r.statut]||r.statut)+(r.envoyee_le?' · '+escapeHtml(_fidDate(r.envoyee_le)):'')+'</span></div>').join(''):'<p class="fid-note">Votre première box se débloque à 2 000 points.</p>')+'</div>';
 }
 
 function _fidHtmlHistorique(mouvements) {
@@ -4323,7 +4341,7 @@ function rendreFidelitePage(donnees) {
     + _fidHtmlResume(o) + '</div>'
     + '<div class="card"><div class="card-header"><div class="card-title">Les cinq paliers</div></div>'
     + _fidHtmlPaliers(o) + '</div>'
-    + _fidHtmlBoxMystere(o)
+    + _fidHtmlBoxMystere(o,(donnees && donnees.recompenses)||[])
     + '<div class="card"><div class="card-header"><div class="card-title">Historique des points</div></div>'
     + _fidHtmlHistorique((donnees && donnees.mouvements) || []) + '</div>';
 }
@@ -4976,6 +4994,7 @@ async function majCompteursMenuAdmin() {
   };
   // Les erreurs conservent le dernier nombre connu, jamais un faux zéro.
   return Promise.allSettled([
+    _compterLignes('fidelite_recompenses?select=id&statut=in.(a_preparer,prete)').then(n => appliquer('admin-recompenses',n,'box à préparer ou envoyer')),
     _compterLignes('professionnel_badges?select=professionnel_id,convoyeurs!inner(statut)&decision=eq.en_attente&convoyeurs.statut=eq.actif').then(n => appliquer('admin-metiers',n,'badges en attente')),
     sbFetchToutePage('missions?select=id,type_mission,statut').then(rows => {
       const actives = rows.filter(m => !missionArchivee(m));
@@ -5061,6 +5080,7 @@ const PAGE_TITLES = {
   'client-missions':     ['Mes missions', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mes missions', 'Vos missions terminées à évaluer, et vos évaluations envoyées'],
+  'admin-recompenses': ['Récompenses', 'Préparation et envoi des box surprises'],
   'client-fidelite':     ['Programme de fidélité', 'Vos points HelixCar'],
   'client-profil':       ['Mon profil', 'Vos informations de compte'],
 };
@@ -5187,6 +5207,7 @@ function showPage(id, options) {
   if (id === 'convoyeur-historique') { loadHistoriqueConvoyeur(); }
   if (id === 'convoyeur-facturation') { loadFacturationConvoyeur(); }
   if (id === 'client-dashboard') { loadDemandesClient(); loadFideliteCarte(); loadMissionsResumeClient(); }
+  if (id === 'admin-recompenses') { loadRecompensesAdmin(); }
   if (id === 'client-fidelite') { loadFideliteClient(); }
   if (id === 'client-infos') { loadInfosClient(); }
   if (id === 'client-missions') { loadMissionsClient(); }
@@ -15144,7 +15165,7 @@ function declencherChampFichier(id) {
 
 [
   'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
-  'avancerIntervention', 'choisirNoteEvaluation', 'evaluerMissionClient',
+  'ouvrirRecapMissionClient', 'avancerRecompense', 'avancerIntervention', 'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite',
   'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite', 'deciderMetierProfessionnel',

@@ -10,7 +10,7 @@
     'admin-metiers': ['chargerValidationMetiers'],
     'admin-planning': ['chargerPlanningHelixCar'],
     'admin-missions': ['loadMissions'], 'admin-autres-missions': ['loadMissions'], 'admin-opportunites': ['loadOpportunitesAdmin'],
-    'admin-facturation': ['loadFacturationAdmin'], 'admin-devis': ['loadDemandesDevis'],
+    'admin-recompenses': ['loadRecompensesAdmin'], 'admin-facturation': ['loadFacturationAdmin'], 'admin-devis': ['loadDemandesDevis'],
     'admin-infos': ['chargerCentreInformationsAdmin'], 'admin-recontact': ['loadRecontacts'],
     'admin-acquisition': ['loadAcquisition'], 'admin-parametres': ['loadParametresAdmin'],
     'client-dashboard': ['loadDemandesClient', 'loadFideliteCarte', 'loadMissionsResumeClient'],
