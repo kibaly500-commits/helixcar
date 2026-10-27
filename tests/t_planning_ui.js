@@ -30,6 +30,14 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  });
  await page.waitForSelector('[data-planning-id="p0"]');
  assert.equal(await page.locator('[data-planning-id]').count(),2);
+ // Une ancienne réception non confirmée est archivée sans inventer de remise de clés.
+ await page.evaluate(()=>{const old=JSON.parse(JSON.stringify(__rows[0]));old.id='past';old.mission_id='past-mission';old.plan.mission.date_livraison='2000-01-01T10:00';__rows.push(old)});
+ await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="past"]').count(),0);
+ await page.locator('#hc-planning-state').selectOption('archives');assert.match(await page.locator('[data-planning-id="past"]').innerText(),/Rendez-vous passé/);
+ assert.match(await page.locator('[data-planning-id="past"]').innerText(),/clés non confirmée/);
+ assert.equal(await page.evaluate(()=>__states.some(s=>s.preparation_id==='past')),false);
+ await page.evaluate(()=>{__rows.splice(__rows.findIndex(r=>r.id==='past'),1)});await page.locator('#hc-planning-state').selectOption('actifs');await page.locator('#hc-planning-refresh').click();
+
 
  await page.evaluate(()=>{window.__savedTime=__rows[0].plan.mission.date_livraison;__rows[0].plan.mission.date_livraison='2026-11-08';});
  await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="p0"]').count(),0);
