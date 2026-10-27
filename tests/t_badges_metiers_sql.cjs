@@ -99,5 +99,15 @@ async function rejects(n,sql,label){let refused=false;try{await as(n,sql)}catch(
  await root(`update public.convoyeurs set statut='en_attente' where id='${uid(100)}';update public.convoyeurs set statut='actif' where id='${uid(100)}';`);
  check('Réactivation : aucun nouveau badge automatiquement accordé',(await as(4,"select decision from public.professionnel_badges where metier='diagnostic'")).rows[0].decision==='en_attente');
  await rejects(4,`delete from private.professionnel_validation_initiale`,'Journal initial inaccessible au professionnel');
+ // Toutes les combinaisons des huit métiers, avec des missions distinctes.
+ const metiers=['convoyage','nettoyage','jockey','accueil_preparation','soutien_administratif','mecanique','carrosserie','diagnostic'];
+ await root(`delete from public.opportunite_candidatures;delete from public.opportunites;update public.convoyeurs set bloque=false,metiers=array[${metiers.map(m=>`'${m}'`).join(',')}] where id='${uid(20)}';`);
+ for(const [i,m] of metiers.entries()) await root(`insert into public.clients values('${uid(200+i)}','{"specialite":"${m}"}');insert into public.missions values('${uid(300+i)}','${uid(200+i)}',null,'${i<2?m:'professionnel'}');insert into public.opportunites values('${uid(400+i)}','${uid(300+i)}');`);
+ for(let mask=0;mask<256;mask++) {
+  await root(metiers.map((m,i)=>`update public.professionnel_badges set decision='${mask&(1<<i)?'oui':i%2?'non':'en_attente'}' where professionnel_id='${uid(20)}' and metier='${m}';`).join(''));
+  const visible=(await as(2,'select * from public.v_opportunites_partenaire order by id')).rows.map(x=>x.id);
+  assert.deepStrictEqual(visible,metiers.flatMap((m,i)=>mask&(1<<i)?[uid(400+i)]:[]),'Combinaison de badges '+mask);
+ }
+ check('256 combinaisons des 8 métiers : annonces exactes, refus et attente exclus',true);
  console.log(`=== ${pass} PASS / 0 FAIL ===`);await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});

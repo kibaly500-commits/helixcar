@@ -30,6 +30,8 @@ const L=require('./lib');
  L.check('Deux badges demandés ensemble '+mobile,(await page.evaluate(()=>window.__calls.find(x=>x.name==='demander_badges_professionnel').args.p_metiers.length))===2);
  L.check('Demandes affichées en attente '+mobile,(await page.locator('#profil-badges').innerText()).match(/En attente/g)?.length===2);
  L.check('Badges demandés grisés sous le nom '+mobile,(await page.locator('#sb-metiers [data-decision="en_attente"] small').allTextContents()).join('|') === 'En attente|En attente');
+ await page.evaluate(() => rendreBadgesIdentite({metiers:['diagnostic','nettoyage','jockey','convoyage']}, [{metier:'diagnostic',decision:'en_attente'},{metier:'nettoyage',decision:'oui'},{metier:'jockey',decision:'non'},{metier:'convoyage',decision:'oui'}]));
+ L.check('Validés avant les badges en attente ou refusés '+mobile,(await page.locator('#sb-metiers .sb-metier').evaluateAll(xs=>xs.map(x=>x.dataset.decision))).join('|')==='oui|oui|en_attente|non');
  await page.evaluate(async()=>{currentRole='admin';initApp({role:'admin',name:'Admin',initials:'A'});showPage('admin-metiers');await chargerValidationMetiers()});
  L.check('Badges métiers masqués pour admin '+mobile,!(await page.locator('#sb-metiers').isVisible()));
  if(mobile){await page.evaluate(()=>openMobileMenu());const lien=page.locator('#mobile-menu-items button').filter({hasText:'Validation des métiers'});L.check('Rubrique accessible mobile',await lien.isVisible());await lien.click();}else L.check('Rubrique accessible PC',await page.locator('#nav-admin-metiers').isVisible());

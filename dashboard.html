@@ -15020,7 +15020,10 @@ function rendreBadgesIdentite(c, badges) {
   const zone = document.getElementById('sb-metiers');
   if (!zone || currentRole !== 'convoyeur') return;
   zone.hidden = false;
-  const metiers = normaliserMetiers(c && c.metiers);
+  const metiers = normaliserMetiers(c && c.metiers).slice().sort((a, b) => {
+    const valide = m => (badges || []).some(x => x.metier === m && x.decision === 'oui');
+    return Number(valide(b)) - Number(valide(a));
+  });
   zone.innerHTML = metiers.length ? metiers.map(m => {
     const b = (badges || []).find(x => x.metier === m);
     const decision = b && ['oui','non'].includes(b.decision) ? b.decision : 'en_attente';
