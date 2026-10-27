@@ -165,21 +165,23 @@ window.fetch=function(url){
       await page.setViewportSize({width,height:844});
       await page.evaluate(async()=>{
         window._currentConvoyeur={id:'test-pro'};
-        Object.assign(__opportunites[1],{ma_candidature_etat:null,acceptation_directe:true});__partenaire=[__opportunites[1]];
-        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-        document.getElementById('page-convoyeur-missions').classList.add('active');
+        window.__missions=['acceptee','en_cours','edl_termine','fini','terminee','annulee'].map((statut,i)=>({id:'m'+i,convoyeur_id:'test-pro',reference:'REF-'+i,statut,type_mission:'convoyage',ville_depart:'Paris',ville_arrivee:'Lyon'}));
+        __missions.push({id:'intrus',convoyeur_id:'autre',statut:'en_cours',ville_depart:'SECRET-AUTRE'}, {id:'libre',convoyeur_id:null,statut:'en_attente',ville_depart:'NON-ATTRIBUEE'});
+        sbFetchToutePage=async()=>__missions;
+        currentRole='convoyeur';buildNav('convoyeur');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-convoyeur-missions').classList.add('active');
         await loadMissionsConvoyeur();await loadDashboardMissionsPreview();
       });
-      check('Missions : Postuler sans Accepter '+width,(await page.locator('#conv-missions-table button').allTextContents()).join() === 'Postuler');
-      check('Missions : même annonce publiée que les opportunités '+width,(await page.locator('#conv-missions-table').innerText()).includes('Renfort'));
-      check('Missions : aucun débordement '+width,await page.locator('#conv-missions-table').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
-      await page.evaluate(()=>{__journal=[];__reponseCandidature=null;});
-      await page.locator('#missions-opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').click();
-      await page.waitForTimeout(100);
-      check('Missions : candidature enregistrée sans acceptation '+width,await page.evaluate(()=>__journal.filter(x=>x.rpc).every(x=>x.rpc==='postuler_opportunite') && __journal.some(x=>x.rpc==='postuler_opportunite')));
-      check('Missions : confirmation dans la bonne rubrique '+width,(await page.locator('#missions-opp-msg-TEST-QA-CLAUDE-HELIXCAR-ouverte').innerText()).includes('est enregistrée'));
-      await page.waitForTimeout(750);
-      check('Missions : état à étudier après relecture '+width,await page.locator('#conv-missions-table [data-ma-candidature="a_etudier"]').count()===1);
+      const texte=await page.locator('#conv-missions-table').innerText();
+      check('Mes missions : groupes en cours, réalisées et historique '+width,['À réaliser et en cours','Réalisées — en attente','Historique — missions terminées'].every(t=>texte.includes(t)));
+      check('Mes missions : aucun autre compte ni mission libre '+width,!/SECRET-AUTRE|NON-ATTRIBUEE/.test(texte));
+      check('Mes missions : aucune acceptation ni candidature '+width,!/Postuler|Accepter/.test(texte));
+      check('Mes missions : actions opérationnelles conservées '+width,texte.includes('État des lieux départ')&&texte.includes('Envoyer la lettre signée'));
+      check('Mes missions : six missions attribuées '+width,await page.locator('#conv-missions-table tr:not(.mes-missions-section)').count()===6);
+      check('Mes missions : navigation unifiée '+width,await page.evaluate(()=>NAVS.convoyeur.some(x=>x.label==='Mes missions')&&!NAVS.convoyeur.some(x=>x.id==='convoyeur-historique')));
+      check('Accueil : uniquement missions encore à réaliser '+width,await page.locator('#conv-dashboard-missions-preview .mission-card').count()===3);
+      check('Mes missions : aucun débordement '+width,await page.locator('#conv-missions-table').evaluate(el=>el.closest('.table-wrap').scrollWidth<=el.closest('.table-wrap').clientWidth+1));
+      await page.evaluate(async()=>{__missions=[];await loadMissionsConvoyeur()});
+      check('Mes missions : état vide '+width,(await page.locator('#conv-missions-table').innerText()).includes('Aucune mission attribuée'));
     }
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }

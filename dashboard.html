@@ -1711,7 +1711,7 @@ body.scroll-verrouille { overflow: hidden; }
           <button type="button" class="btn btn-dark btn-sm" onclick="showPage('convoyeur-profil');setTimeout(function(){var e=document.getElementById('conv-rib-carte');if(e)e.scrollIntoView({behavior:'smooth',block:'center'});},0)">Ajouter mon RIB</button>
         </div>
         <div class="stats-row">
-          <div class="stat-card yellow"><div class="stat-label">Missions disponibles</div><div class="stat-value" id="conv-stat-dispo">—</div><div class="stat-sub" id="conv-stat-dispo-sub"></div></div>
+          <div class="stat-card yellow"><div class="stat-label">Missions en cours</div><div class="stat-value" id="conv-stat-dispo">—</div><div class="stat-sub" id="conv-stat-dispo-sub"></div></div>
           <div class="stat-card green"><div class="stat-label">Missions ce mois</div><div class="stat-value" id="conv-stat-mois">—</div></div>
           <div class="stat-card blue"><div class="stat-label">Km parcourus</div><div class="stat-value" id="conv-stat-km">—</div></div>
           <div class="stat-card orange"><div class="stat-label">Gains ce mois (€)</div><div class="stat-value" id="conv-stat-gains">—</div></div>
@@ -1720,7 +1720,7 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Missions disponibles</div><div class="card-sub">Consultez les missions et proposez votre candidature</div></div>
+            <div><div class="card-title">Missions en cours</div><div class="card-sub">Vos missions attribuées, à réaliser ou déjà commencées</div></div>
             <button class="btn btn-sm btn-dark" onclick="showPage('convoyeur-missions')">Voir tout</button>
           </div>
           <div class="mission-grid" id="conv-dashboard-missions-preview">
@@ -1732,8 +1732,11 @@ body.scroll-verrouille { overflow: hidden; }
       <!-- CONVOYEUR: Missions -->
       <div class="page" id="page-convoyeur-missions">
         <div class="card">
-          <div class="card-header"><div class="card-title">Toutes les missions disponibles</div><div class="card-sub" id="conv-missions-sub"></div></div>
-          <div id="conv-missions-table"></div>
+          <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="conv-missions-sub"></div></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Mission</th><th>Véhicule</th><th>Prise en charge</th><th>Livraison</th><th>Rémunération</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody id="conv-missions-table"></tbody>
+          </table></div>
         </div>
       </div>
 
@@ -2260,8 +2263,7 @@ const NAVS = {
   ],
   convoyeur: [
     { id: 'convoyeur-dashboard',   icon: '📊', label: 'Tableau de bord' },
-    { id: 'convoyeur-missions',    icon: '🚗', label: 'Missions disponibles' },
-    { id: 'convoyeur-historique',  icon: '📁', label: 'Historique' },
+    { id: 'convoyeur-missions',    icon: '🚗', label: 'Mes missions' },
     { id: 'convoyeur-facturation', icon: '🧾', label: 'Mes factures' },
     { id: 'convoyeur-opportunites', icon: '📣', label: 'Opportunités de missions', badgeDynamique: true },
     { id: 'convoyeur-profil',      icon: '👤', label: 'Mon profil' },
@@ -2496,10 +2498,10 @@ async function envoyerRibPartenaire(input) {
 async function remplirStatsAccueilConvoyeur(conv) {
   const setStat = function(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; };
   try {
-    const disponibles = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
+    const disponibles = await chargerMissionsEnCours();
     setStat('conv-stat-dispo', String((disponibles || []).length));
     const debutAujourdhui = new Date(); debutAujourdhui.setHours(0, 0, 0, 0);
-    const nouvellesAujourdhui = (disponibles || []).filter(function(m) { return m.publiee_le && new Date(m.publiee_le) >= debutAujourdhui; }).length;
+    const nouvellesAujourdhui = (disponibles || []).filter(function(m) { return m.created_at && new Date(m.created_at) >= debutAujourdhui; }).length;
     const subEl = document.getElementById('conv-stat-dispo-sub');
     if (subEl) subEl.textContent = nouvellesAujourdhui > 0 ? nouvellesAujourdhui + ' nouvelle(s) aujourd\'hui' : '';
 
@@ -4874,6 +4876,8 @@ function initApp(user) {
   // Show mobile bottom nav
   const mbn = document.getElementById('mobile-bottom-nav');
   if (mbn) mbn.style.display = 'flex';
+  document.getElementById('mbn-missions').innerHTML = '<span class="mbn-icon">🚗</span>' + (user.role === 'convoyeur' ? 'Mes missions' : 'Missions');
+  document.getElementById('mbn-history').innerHTML = '<span class="mbn-icon">📁</span>' + (user.role === 'convoyeur' ? 'Opportunités' : 'Historique');
 
   document.getElementById('sb-avatar').textContent = user.initials;
   document.getElementById('sb-name').textContent = user.name;
@@ -4970,7 +4974,7 @@ const PAGE_TITLES = {
   'convoyeur-facturation': ['Mes factures', 'Générez vos factures et suivez vos paiements'],
   'convoyeur-opportunites': ['Opportunités de missions', 'Les besoins publiés par HelixCar pour lesquels vous pouvez postuler'],
   'convoyeur-dashboard':  ['Tableau de bord', 'Bienvenue'],
-  'convoyeur-missions':   ['Missions disponibles', 'Postulez aux missions correspondant à vos métiers validés'],
+  'convoyeur-missions':   ['Mes missions', 'Retrouvez vos missions à réaliser, en cours et passées'],
   'convoyeur-historique': ['Historique', 'Vos missions passées'],
   'convoyeur-profil':     ['Mon profil', 'Vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue'],
@@ -5039,6 +5043,7 @@ window.addEventListener('beforeunload', function (event) {
 });
 
 function showPage(id, options) {
+  if (id === 'convoyeur-historique') id = 'convoyeur-missions';
   options = options || {};
   // Une ouverture normale depuis le menu ou l'alerte affiche la liste
   // complète. Seul le bouton « Voir ses demandes » conserve le compte
@@ -8678,33 +8683,30 @@ function annulerMission(id) {
 }
 
 // ── MISSIONS CÔTÉ CONVOYEUR (Supabase) ───────────────────────
+const STATUTS_MISSIONS_EN_COURS = ['acceptee','en_cours','restitution_requise','restitution_en_cours','edl_termine'];
+async function chargerMissionsEnCours() {
+  const conv = window._currentConvoyeur;
+  if (!conv) return [];
+  const rows = await sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(' + STATUTS_MISSIONS_EN_COURS.join(',') + ')&order=created_at.desc');
+  return (rows || []).filter(m => m.convoyeur_id === conv.id && STATUTS_MISSIONS_EN_COURS.includes(m.statut));
+}
 async function loadDashboardMissionsPreview() {
   const el = document.getElementById('conv-dashboard-missions-preview');
   const cycle = window.HCSync && window.HCSync.capture();
   if (!el || !window._currentConvoyeur) return;
   try {
-    const rows = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
+    const rows = await chargerMissionsEnCours();
     if (cycle && !window.HCSync.safe(cycle)) return;
-    el.innerHTML = rows.length ? rows.slice(0, 3).map(o =>
-      '<div class="mission-card"><div class="mission-route">' + escapeHtml(o.intitule || 'Mission') + '</div>'
-      + '<div class="mission-details">' + escapeHtml(o.zone_generale || 'Lieu à préciser') + ' · ' + escapeHtml(_oppPeriode(o)) + '</div>'
-      + '<button class="btn btn-sm btn-primary" ' + actionHtml('showPage', ['convoyeur-missions']) + '>Voir la mission</button></div>'
-    ).join('') : '<p>Aucune mission disponible pour le moment.</p>';
+    el.innerHTML = rows.length ? rows.slice(0, 3).map(m =>
+      '<div class="mission-card"><div class="mission-route">' + escapeHtml(m.reference || 'Mission attribuée') + '</div>'
+      + '<div class="mission-details">' + escapeHtml(m.marque_modele || m.prestation || '') + '</div>'
+      + (MISSION_STATUT_BADGE[m.statut] || '')
+      + '<button class="btn btn-sm btn-primary" ' + actionHtml('showPage', ['convoyeur-missions']) + '>Suivre la mission</button></div>'
+    ).join('') : '<p>Aucune mission en cours. Retrouvez les annonces dans Opportunités de missions.</p>';
   } catch (e) { if (!cycle) el.textContent = 'Impossible de charger les missions.'; }
 }
 
-async function loadMissionsConvoyeur() {
-  const zone = document.getElementById('conv-missions-table');
-  const cycle = window.HCSync && window.HCSync.capture();
-  if (!zone || !window._currentConvoyeur) return;
-  try {
-    const rows = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
-    if (cycle && !window.HCSync.safe(cycle)) return;
-    document.getElementById('conv-missions-sub').textContent = rows.length + ' mission(s) disponible(s) — candidature soumise à la sélection de HelixCar';
-    const html = rows.length ? rows.map(o => _oppCarteHtml(o, {partenaire:true}).replaceAll('id="opp-', 'id="missions-opp-')).join('') : '<p>Aucune mission publiée disponible pour vos métiers validés.</p>';
-    if (zone.innerHTML !== html) zone.innerHTML = html;
-  } catch (e) { if (!cycle) zone.textContent = 'Impossible de charger les missions. Réessayez.'; }
-}
+function loadMissionsConvoyeur() { return chargerMissionsAttribuees(true); }
 
 // Compatibilité avec une ancienne page : jamais d’attribution depuis le navigateur.
 function accepterMission() { showPage('convoyeur-missions'); }
@@ -9159,12 +9161,13 @@ function validerPrestationNettoyage(missionId) {
   });
 }
 
-function loadHistoriqueConvoyeur() {
+function loadHistoriqueConvoyeur() { return loadMissionsConvoyeur(); }
+function chargerMissionsAttribuees(enCours) {
   var _hcSyncTasks = [];
 
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
 
-  const tbody = document.getElementById('conv-historique-table');
+  const tbody = document.getElementById(enCours ? 'conv-missions-table' : 'conv-historique-table');
   if (!tbody) return;
   const conv = window._currentConvoyeur;
   if (!conv) {
@@ -9173,13 +9176,15 @@ function loadHistoriqueConvoyeur() {
   }
   if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
 
-  _hcSyncTasks.push(sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(acceptee,en_cours,restitution_requise,restitution_en_cours,edl_termine,fini,terminee)&order=created_at.desc')
+  _hcSyncTasks.push(sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(acceptee,en_cours,restitution_requise,restitution_en_cours,edl_termine,fini,terminee,annulee)&order=created_at.desc')
     .then(function(rows) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
-      const sub = document.getElementById('conv-historique-sub');
+      rows = (rows || []).filter(m => m.convoyeur_id === conv.id && [...STATUTS_MISSIONS_EN_COURS,'fini','terminee','annulee'].includes(m.statut));
+      const sub = document.getElementById(enCours ? 'conv-missions-sub' : 'conv-historique-sub');
       if (sub) sub.textContent = (rows || []).length + ' mission(s)';
 
+      if (!enCours) {
       const nb = (rows || []).length;
       const caTotal = (rows || []).reduce(function(s, m) { return s + (m.prix_ttc || 0); }, 0);
       const kmTotal = (rows || []).reduce(function(s, m) { return s + (m.distance_km || 0); }, 0);
@@ -9189,9 +9194,10 @@ function loadHistoriqueConvoyeur() {
       setStat('hist-stat-kmmoy', (nb > 0 ? Math.round(kmTotal / nb) : 0).toLocaleString('fr-FR') + ' km');
       setStat('hist-stat-moycourse', (nb > 0 ? Math.round(caTotal / nb) : 0).toLocaleString('fr-FR') + ' €');
       setStat('hist-stat-vh', String(nb));
+      }
 
       if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Aucune mission acceptée pour le moment</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">' + 'Aucune mission attribuée pour le moment' + '</td></tr>';
         return;
       }
       return chargerPhotosMissions(rows).then(function () {
@@ -9208,7 +9214,13 @@ function loadHistoriqueConvoyeur() {
     }));
 
   function rendreHistorique(rows) {
-      tbody.innerHTML = rows.map(function(m) {
+      const groupe = m => STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? 0 : m.statut === 'fini' ? 1 : 2;
+      const titres = ['À réaliser et en cours', 'Réalisées — en attente de confirmation', 'Historique — missions terminées ou annulées'];
+      let precedent = -1;
+      tbody.innerHTML = rows.slice().sort((a,b) => groupe(a)-groupe(b)).map(function(m) {
+        const g = groupe(m);
+        const section = g !== precedent ? '<tr class="mes-missions-section"><th colspan="7" style="padding:20px 12px 10px;text-align:left">' + titres[g] + '</th></tr>' : '';
+        precedent = g;
         const estNettoyage = m.type_mission === 'nettoyage';
         const vehicule = estNettoyage
           ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—')
@@ -9230,7 +9242,7 @@ function loadHistoriqueConvoyeur() {
           ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
              + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
           : datePec;
-        return '<tr><td><strong>' + intitule + '</strong>'
+        return section + '<tr><td><strong>' + intitule + '</strong>'
           + (estNettoyage && m.prestation ? '<br><span style="font-size:.72rem;color:#888">'
               + escapeHtml(m.prestation) + '</span>' : '')
           + (estNettoyage && m.contact_nom ? '<br><span style="font-size:.72rem;color:#888">Contact : '
@@ -9338,7 +9350,7 @@ function loadFacturationConvoyeur() {
         if (!m.lettre_voiture_signee_url) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
             + '<div><strong>' + escapeHtml(m.reference) + '</strong> · ' + escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee)
-            + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Historique)</span></div>'
+            + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Mes missions)</span></div>'
             + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
             + '</div>';
         }
@@ -9688,7 +9700,7 @@ function mbnGo(type, btn) {
   const role = currentRole;
   const pageMap = {
     admin: { home:'admin-dashboard', missions:'admin-missions', history:'admin-clients', profil:'admin-parametres' },
-    convoyeur: { home:'convoyeur-dashboard', missions:'convoyeur-missions', history:'convoyeur-historique', profil:'convoyeur-profil' },
+    convoyeur: { home:'convoyeur-dashboard', missions:'convoyeur-missions', history:'convoyeur-opportunites', profil:'convoyeur-profil' },
     client: { home:'client-dashboard', missions:'client-missions', history:'client-missions', profil:'client-profil' },
   };
   const page = pageMap[role] && pageMap[role][type];
