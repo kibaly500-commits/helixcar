@@ -1596,7 +1596,7 @@ body.scroll-verrouille { overflow: hidden; }
            dur (classements, incidents et notes inventés) : aucune table,
            aucune fonction serveur ne les portait. Elles sont retirées avec
            leurs entrées de menu, plutôt que laissées comme exemples. -->
-      <!-- ADMIN: Opportunités de missions — LOT O01 (migration 108).
+      <!-- ADMIN: Offres de mission — LOT O01 (migration 108).
            Un brouillon est préparé automatiquement pour chaque nouvelle
            mission ; l'administrateur relit, corrige, envoie ; puis étudie
            les candidatures et sélectionne. Deux états publics seulement :
@@ -1609,7 +1609,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-admin-opportunites">
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Opportunités de missions</div><div class="card-sub" id="opportunites-sub">Besoins publiés aux partenaires éligibles, sans coordonnées ni identité client</div></div>
+            <div><div class="card-title">Offres de mission</div><div class="card-sub" id="opportunites-sub">Besoins publiés aux partenaires éligibles, sans coordonnées ni identité client</div></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -1795,7 +1795,7 @@ body.scroll-verrouille { overflow: hidden; }
            au client qu'aucun service n'envoie, et « Ma notation » affichait
            une note et des avis inventés à TOUT partenaire connecté. Les deux
            pages sont retirées avec leurs entrées de menu. -->
-      <!-- CONVOYEUR: Opportunités de missions — LOT O01. La liste vient de
+      <!-- CONVOYEUR: Offres de mission — LOT O01. La liste vient de
            v_opportunites_partenaire : seules les opportunités « À pourvoir »
            pour lesquelles au moins un métier requis est validé, plus celles
            où le partenaire a déjà candidaté. Jamais le client, jamais
@@ -1803,7 +1803,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-convoyeur-opportunites">
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Opportunités de missions</div><div class="card-sub" id="convoyeur-opportunites-sub">Missions indépendantes publiées par HelixCar pour vos métiers validés</div></div>
+            <div><div class="card-title">Offres de mission</div><div class="card-sub" id="convoyeur-opportunites-sub">Missions indépendantes publiées par HelixCar pour vos métiers validés</div></div>
           </div>
           <div id="convoyeur-opportunites-liste"><div class="fid-note">Chargement…</div></div>
         </div>
@@ -2277,18 +2277,18 @@ let currentRole = 'admin';
 const NAVS = {
   admin: [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
-    { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers' },
-    { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
+    { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
     { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage' },
     { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions' },
+    { id: 'admin-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
-    { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
-    { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
+    { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
+    { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers' },
+    { id: 'admin-clients',      icon: '👥', label: 'Clients' },
+    { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
     { id: 'admin-recontact',    icon: '📬', label: 'Demandes recontact' },
-    { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
-    { id: 'admin-opportunites', icon: '📣', label: 'Opportunités de missions', badgeDynamique: true },
     { id: 'admin-archivage',    icon: '📦', label: 'Archivage' },
     { id: 'admin-parametres',   icon: '⚙️', label: 'Paramètres & RIB' },
   ],
@@ -2296,7 +2296,7 @@ const NAVS = {
     { id: 'convoyeur-dashboard',   icon: '📊', label: 'Tableau de bord' },
     { id: 'convoyeur-missions',    icon: '🚗', label: 'Mes missions' },
     { id: 'convoyeur-facturation', icon: '🧾', label: 'Mes factures' },
-    { id: 'convoyeur-opportunites', icon: '📣', label: 'Opportunités de missions', badgeDynamique: true },
+    { id: 'convoyeur-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
     { id: 'convoyeur-profil',      icon: '👤', label: 'Mon profil' },
   ],
   client: [
@@ -5004,11 +5004,11 @@ const PAGE_TITLES = {
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
   'admin-facturation':   ['Facturation', 'Validation et paiement des professionnels'],
   'admin-planning': ['Planning HelixCar', 'Vos réceptions, horaires et remises de clés'],
-  'admin-opportunites':  ['Opportunités de missions', 'Besoins publiés aux partenaires, candidatures et attribution'],
+  'admin-opportunites':  ['Offres de mission', 'Besoins publiés aux partenaires, candidatures et attribution'],
   'admin-parametres':    ['Paramètres', 'Votre compte administrateur'],
   'admin-archivage':     ['Archivage', 'Libère l\'espace de stockage Supabase en rapatriant les fichiers de mission sur ton ordinateur'],
   'convoyeur-facturation': ['Mes factures', 'Générez vos factures et suivez vos paiements'],
-  'convoyeur-opportunites': ['Opportunités de missions', 'Les besoins publiés par HelixCar pour lesquels vous pouvez postuler'],
+  'convoyeur-opportunites': ['Offres de mission', 'Les besoins publiés par HelixCar pour lesquels vous pouvez postuler'],
   'convoyeur-dashboard':  ['Tableau de bord', 'Bienvenue'],
   'convoyeur-missions':   ['Mes missions', 'Retrouvez vos missions à réaliser, en cours et passées'],
   'convoyeur-historique': ['Historique', 'Vos missions passées'],
@@ -8836,7 +8836,7 @@ async function loadDashboardMissionsPreview() {
       + '<div class="mission-details">' + escapeHtml(m.marque_modele || m.prestation || '') + '</div>'
       + (MISSION_STATUT_BADGE[m.statut] || '')
       + '<button class="btn btn-sm btn-primary" ' + actionHtml('showPage', ['convoyeur-missions']) + '>Suivre la mission</button></div>'
-    ).join('') : '<p>Aucune mission en cours. Retrouvez les annonces dans Opportunités de missions.</p>';
+    ).join('') : '<p>Aucune mission en cours. Retrouvez les annonces dans Offres de mission.</p>';
   } catch (e) { if (!cycle) el.textContent = 'Impossible de charger les missions.'; }
 }
 
