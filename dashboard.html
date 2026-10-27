@@ -225,6 +225,16 @@ input::-ms-reveal, input::-ms-clear { display: none; }
   font-size: 0.72rem; padding: 2px 8px; border-radius: 100px; margin-top: 3px;
   display: inline-block; font-weight: 600;
 }
+.validation-metiers-ligne { display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;padding:18px 0;border-bottom:1px solid #e8e8e8;align-items:start; }
+.validation-metiers-badges { display:flex;flex-wrap:wrap;gap:10px; }
+.validation-metier { display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ddd;border-radius:9px;background:#fafafa; }
+.validation-metier small { display:block;font-size:.72rem;color:#777;margin-top:4px; }
+.validation-metier[data-decision="oui"] { background:#f0f7f3;border-color:#c9dfd1; }
+.validation-metier-action { width:32px;height:32px;flex-shrink:0;border:1px solid #ddd;border-radius:6px;background:white;font-size:17px;cursor:pointer; }
+.validation-metier-action[title="Valider"] { color:#267347; }
+.validation-metier-action[title="Refuser"] { color:#a33c3c; }
+.validation-metier-action:disabled { opacity:.3;cursor:default; }
+@media(max-width:600px) { .validation-metiers-ligne { grid-template-columns:minmax(0,1fr);gap:12px; }.validation-metier { max-width:100%; }.validation-metier span { min-width:0;overflow-wrap:anywhere; }.validation-metier-action { width:44px;height:44px; } }
 #profil-metiers { margin-bottom:28px; }
 .profil-badges-section { margin-top:28px;padding-top:24px;border-top:1px solid #e8e8e8; }
 .profil-badges-section h3 { margin:0 0 12px; }
@@ -15073,21 +15083,27 @@ async function demanderMesBadges() {
   } catch (e) { message.textContent = 'La demande n’a pas pu être enregistrée. Réessayez.'; bouton.disabled = false; }
 }
 var _validationMetiersGeneration = 0;
-async function chargerValidationMetiers() {
+async function chargerValidationMetiers(silencieux) {
   const cycle = window.HCSync ? window.HCSync.capture() : null;
   const zone = document.getElementById('admin-metiers-liste'), generation = ++_validationMetiersGeneration;
   if (!zone || currentRole !== 'admin') return;
-  zone.textContent = 'Chargement des demandes…';
+  if (!zone.hasChildNodes()) zone.textContent = 'Chargement des demandes…';
   try {
     const r = await sbAuth.from('professionnel_badges').select('professionnel_id,metier,decision,demande_le,convoyeurs(prenom,nom,statut)').order('demande_le',{ascending:false});
     if (r.error) throw r.error;
     if (generation !== _validationMetiersGeneration || currentRole !== 'admin' || (window.HCSync && !window.HCSync.safe(cycle))) return;
-    const lignes = (r.data || []).slice().sort((a,b) => Number(b.decision==='en_attente') - Number(a.decision==='en_attente'));
-    zone.innerHTML = lignes.length ? lignes.map(b => {
-      const c=b.convoyeurs || {}, nom=[c.prenom,c.nom].filter(Boolean).join(' ') || 'Professionnel';
-      return '<div style="padding:14px 0;border-bottom:1px solid #ddd;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap"><div><b>' + escapeHtml(nom) + '</b><br>' + escapeHtml(CONV_LIB_METIER[b.metier] || b.metier) + ' · ' + escapeHtml({oui:'Validé',non:'Refusé',en_attente:'En attente'}[b.decision]) + '</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + ['oui','non','en_attente'].map(d => '<button type="button" class="btn btn-sm" ' + (d===b.decision?'disabled ':'') + actionHtml('deciderMetierProfessionnel',[b.professionnel_id,b.metier,d,nom]) + '>' + {oui:'Valider',non:'Refuser',en_attente:'Mettre en attente'}[d] + '</button>').join('') + '</div></div>';
-    }).join('') : '<p>Aucune demande de badge.</p>';
-  } catch(e) { zone.textContent = 'Impossible de charger les demandes de métiers. Réouvrez cette rubrique pour réessayer.'; }
+    const groupes = new Map();
+    (r.data || []).forEach(b => { if (!groupes.has(b.professionnel_id)) groupes.set(b.professionnel_id, []); groupes.get(b.professionnel_id).push(b); });
+    const contenu = Array.from(groupes.values()).sort((a,b) => Number(b.some(x=>x.decision==='en_attente'))-Number(a.some(x=>x.decision==='en_attente'))).map(badges => {
+      const c=badges[0].convoyeurs || {}, nom=[c.prenom,c.nom].filter(Boolean).join(' ') || 'Professionnel';
+      return '<div class="validation-metiers-ligne" data-professionnel="' + escapeHtml(badges[0].professionnel_id) + '"><b>' + escapeHtml(nom) + '</b><div class="validation-metiers-badges">' + badges.map(b => {
+        const lib=CONV_LIB_METIER[b.metier] || b.metier, statut={oui:'Validé',non:'Refusé',en_attente:'En attente'}[b.decision];
+        return '<div class="validation-metier" data-decision="' + escapeHtml(b.decision) + '"><span>' + escapeHtml(lib) + '<small>' + escapeHtml(statut) + '</small></span>' + ['oui','non'].map(d => '<button type="button" class="validation-metier-action" aria-label="' + (d==='oui'?'Valider':'Refuser') + ' : ' + escapeHtml(lib) + ' — ' + escapeHtml(nom) + '" title="' + (d==='oui'?'Valider':'Refuser') + '" ' + (d===b.decision?'disabled ':'') + actionHtml('deciderMetierProfessionnel',[b.professionnel_id,b.metier,d,nom]) + '>' + (d==='oui'?'✓':'✕') + '</button>').join('') + '</div>';
+      }).join('') + '</div></div>';
+    }).join('') || '<p>Aucune demande de badge.</p>';
+    // Garder les nœuds et le focus lorsque les données sont identiques.
+    if (zone.dataset.contenu !== contenu) { zone.innerHTML = contenu; zone.dataset.contenu = contenu; }
+  } catch(e) { if (!silencieux) { zone.textContent = 'Impossible de charger les demandes de métiers. Réouvrez cette rubrique pour réessayer.'; delete zone.dataset.contenu; } }
 }
 async function deciderMetierProfessionnel(id,metier,decision,nom) {
   if (currentRole !== 'admin' || !confirm(nom + ' — ' + (CONV_LIB_METIER[metier] || metier) + '\n' + {oui:'Valider ce badge ?',non:'Refuser ce badge ?',en_attente:'Remettre ce badge en attente ?'}[decision])) return;

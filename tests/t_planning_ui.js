@@ -36,9 +36,13 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.evaluate(()=>{__rows[0].plan.mission.date_livraison=__savedTime;});await page.locator('#hc-planning-refresh').click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const first=page.locator('[data-planning-id="p0"]');assert.match(await first.innerText(),/3 rue Exemple, 75001 Paris/);
- assert.equal(await first.locator('[data-planning-action="cles"]').isDisabled(),true);
+ assert.equal(await first.locator('[data-planning-action="cles"]').isDisabled(),false);
+ await first.locator('[data-planning-action="cles"]').click();assert.match(await first.innerText(),/Confirmez d’abord/);
  await first.locator('[data-planning-action="confirmer"]').click();assert.match(await first.innerText(),/Horaire confirmé/);
  assert.equal(await page.locator('[data-planning-action="trafic"]').count(),0);
+ await first.locator('[data-planning-action="non"]').click();assert.equal(await first.count(),1);
+ await page.evaluate(async()=>{window.__card=document.querySelector('[data-planning-id="p0"]');await HCPlanning.load();await HCPlanning.load();});
+ assert.equal(await page.evaluate(()=>window.__card===document.querySelector('[data-planning-id="p0"]')),true);
  assert.match(await first.innerText(),/Votre intervention : réceptionner/);
  assert.match(await first.innerText(),/Prise en charge chez le client/);assert.match(await first.innerText(),/09:00/);assert.match(await first.innerText(),/45 minutes de battement/);
  const outgoing=page.locator('[data-planning-id="p1"]');assert.match(await outgoing.innerText(),/Livraison attendue chez le client/);assert.match(await outgoing.innerText(),/14:00/);assert.match(await outgoing.innerText(),/8 rue Livraison, 78000 Versailles/);assert.match(await outgoing.innerText(),/Récupération la veille de la livraison/);
@@ -102,7 +106,9 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  // Les missions déjà publiées conservent leur organisation existante.
  await page.evaluate(()=>{__source.brouillons[0].mission_id='mission-publiee';__rows[0].mission_id='mission-publiee';});
  await page.locator('#hc-planning-refresh').click();
- assert.equal(await page.locator('[data-planning-id="p0"], [data-planning-id="p1"]').count(),2);
+ // Seule p0 est publiée ; p1 est un ancien brouillon, toujours exclu.
+ assert.equal(await page.locator('[data-planning-id="p0"]').count(),1);
+ assert.equal(await page.locator('[data-planning-id="p1"]').count(),0);
  await page.evaluate(()=>{__blocked={'self':'Network error'};});await page.locator('#hc-planning-refresh').click();await page.waitForFunction(()=>document.getElementById('hc-planning-list').innerText.includes('vérification des dossiers'));
  assert.equal(await page.locator('[data-planning-id]').count(),0);
  await page.locator('#hc-planning-kind').selectOption('apres_stockage');assert.equal(await page.locator('[data-planning-id]').count(),0);

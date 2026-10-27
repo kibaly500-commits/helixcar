@@ -2,9 +2,10 @@
 (function(){
 'use strict';
 const C=HCPlanningCalcul,esc=v=>escapeHtml(String(v??''));
-let rows=[],records=new Map(),retourRecords=new Map(),ticket=0;
+let rows=[],records=new Map(),retourRecords=new Map(),ticket=0,busy=false;
 const panel=()=>document.getElementById('hc-planning-list');
 const fmt=v=>v?String(v).replace(/(\d{4})-(\d{2})-(\d{2})T?(\d{2}:\d{2})?.*/,(_,y,m,d,h)=>`${d}/${m}/${y}${h?' à '+h:''}`):'À fixer';
+const minute=v=>String(v||'').replace(' ','T').slice(0,16);
 const hasTime=r=>/T\d{2}:\d{2}/.test(schedule(r.plan)||'');
 const schedule=p=>p.kind==='retour_reception'?p.retour_reception:p.kind==='retour_remise'?p.retour_remise:p.kind==='avant_stockage'?p.mission.date_livraison:p.mission.date_prise_en_charge;
 async function action(id,kind){
@@ -28,7 +29,7 @@ function returnRows(data){
 }
 function returnCard(r){
  const p=r.plan,incoming=p.kind==='retour_reception',state=retourRecords.get(r.baseId)||{},s=records.get(r.id)||{},time=schedule(p);
- const confirmed=s.horaire_confirme&&s.horaire_confirme.slice(0,16)===time?.slice(0,16);
+ const confirmed=s.horaire_confirme&&minute(s.horaire_confirme)===minute(time);
  const who=r.missions?.convoyeurs,d=p.retour_helixcar.demande||{};
  const person=incoming?(who?[who.prenom,who.nom].filter(Boolean).join(' '):'Convoyeur à attribuer'):(d.contact||'Client');
  const status=p.retour_helixcar.transfert?(state.reception_effectuee_le?'Chez HelixCar — prochaine livraison dans une mission séparée':'En attente du retour à Noisy'):state.remise_effectuee_le?'Véhicule remis au client':state.reception_effectuee_le?'Chez HelixCar — en attente de récupération client':'En attente de réception du convoyeur';
@@ -41,7 +42,7 @@ function returnCard(r){
  +(conflict?'<p class="hc-planning-warning">Un autre rendez-vous confirmé chevauche ces 20 minutes de remise.</p>':'')
  +(!incoming?'<p>Rendez-vous souhaité : '+esc(C.retourDemande(p).replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'))+' · '+esc(d.telephone||'Téléphone à compléter')+'</p>':'')
  +'<p>'+(s.cles_effectuees_le?'Effectué le '+esc(_dvDateHeure(s.cles_effectuees_le)):confirmed?'Horaire confirmé':'Horaire à confirmer')+'</p><div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Voir la préparation</button>'
- +(!s.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="'+(incoming?'confirmer_reception':'confirmer_remise')+'"'+(!time||(!incoming&&!state.reception_confirmee)?' disabled':'')+'>Confirmer cet horaire</button><button type="button" class="btn btn-outline" data-planning-action="'+(incoming?'recevoir':'remettre')+'"'+(!confirmed||(!incoming&&!state.reception_effectuee_le)?' disabled':'')+'>'+(incoming?'Véhicule réceptionné':'Véhicule remis au client')+'</button>':'')
+ +(!s.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="'+(incoming?'confirmer_reception':'confirmer_remise')+'"'+(!time||(!incoming&&!state.reception_confirmee)?' disabled':'')+'>'+(confirmed?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(incoming?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="'+(incoming?'recevoir':'remettre')+'">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')
  +'</div><p class="hc-planning-feedback" role="status"></p></article>';
 }
 // Les passages clients proviennent de la demande, sans mission artificielle.
@@ -67,7 +68,10 @@ function clientRows(clients){
  return result;
 }
 async function load(){
- const current=++ticket;rows=[];records.clear();retourRecords.clear();panel().textContent='Chargement du planning…';
+ if(busy)return;
+ const cycle=window.HCSync?window.HCSync.capture():null;
+ const current=++ticket;
+ if(!panel().hasChildNodes())panel().textContent='Chargement du planning…';
  try{
   if(_hcNavigationRole!=='admin')return;
   const [data,states,clients,returns]=await Promise.all([sbFetchToutePage('preparations_missions?select=id,client_id,cle,empreinte,plan,mission_id,clients(numero_client),missions!preparations_missions_mission_id_fkey(reference,statut,convoyeurs!missions_convoyeur_id_fkey(prenom,nom))&order=updated_at.desc'),sbFetchToutePage('planning_helixcar?select=*'),sbFetchToutePage('clients?select=*,vehicules(id,marque_modele,immatriculation,livraison_apres_stockage,heure_recuperation_client),devis(statut,paiement_statut)&type_service=eq.stockage&order=created_at.desc'),sbFetchToutePage('planning_restitutions?select=*')]);
@@ -92,21 +96,23 @@ async function load(){
    }));
    if(current!==ticket||_hcNavigationRole!=='admin')return;
   }
+  if(window.HCSync&&!window.HCSync.safe(cycle))return;
   rows=[...candidates,...passages,...retours].filter(r=>ready.has(r.client_id)&&(r.returnEvent||hasTime(r))&&(r.clientPassage||r.mission_id||currentKeys.get(r.client_id)?.has(r.cle||r.plan.key)));records=new Map(states.map(r=>[r.preparation_id,r]));retourRecords=new Map(returns.map(r=>[r.preparation_id,r]));syncRetourStates();render();
- }catch(e){if(current===ticket)panel().textContent='Le planning reste à actualiser. '+e.message;}
+ }catch(e){if(current===ticket){rows=[];records.clear();retourRecords.clear();panel().textContent='Le planning reste à actualiser. '+e.message;delete panel().dataset.contenu;}}
 }
+function setContent(html){if(panel().dataset.contenu!==html){panel().innerHTML=html;panel().dataset.contenu=html;}}
 function render(){
  const day=document.getElementById('hc-planning-day').value;
  const kind=document.getElementById('hc-planning-kind').value;
  const archived=document.getElementById('hc-planning-state').value==='archives';
  const list=rows.filter(r=>Boolean(records.get(r.id)?.cles_effectuees_le)===archived&&(!day||(records.get(r.id)?.horaire_confirme||schedule(r.plan)||r.plan.date_debut||'').slice(0,10)===day)&&(!kind||r.plan.kind===kind||(kind==='avant_stockage'&&r.plan.kind==='retour_reception')||(kind==='apres_stockage'&&r.plan.kind==='retour_remise')));
  list.sort((a,b)=>String(records.get(a.id)?.horaire_confirme||schedule(a.plan)||a.plan.date_debut).localeCompare(String(records.get(b.id)?.horaire_confirme||schedule(b.plan)||b.plan.date_debut)));
- if(!list.length){panel().innerHTML=archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les réceptions et remises effectuées sont disponibles dans Archives.</div>';return;}
- panel().innerHTML=list.map(r=>{
+ if(!list.length){setContent(archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les réceptions et remises effectuées sont disponibles dans Archives.</div>');return;}
+ setContent(list.map(r=>{
   if(r.returnEvent)return returnCard(r);
   const p=r.plan,s=records.get(r.id),inbound=p.kind==='avant_stockage',time=schedule(p);
   if(r.clientPassage)return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(inbound?'À réceptionner · Client':'À remettre · Client')+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule à préciser')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients.numero_client||'Dossier')+' · '+esc(r.person)+'</p></div><strong>'+esc(fmt(time))+(time&&!time.includes('T')?' · Heure à préciser':'')+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+(inbound?'Le client vous apporte le véhicule.':'Le client vient récupérer le véhicule auprès de vous.')+'</strong></p><p>Horaire communiqué par le client.</p><details class="hc-prep-private"><summary>Coordonnées du client</summary><p>'+esc(r.person)+' · '+esc(r.phone||'Téléphone non renseigné')+'</p></details><p class="hc-planning-feedback" role="status"></p></article>';
-  const stale=s?.horaire_confirme&&(s.empreinte_confirmee!==r.empreinte||s.horaire_confirme.slice(0,16)!==time?.slice(0,16));
+  const stale=s?.horaire_confirme&&(s.empreinte_confirmee!==r.empreinte||minute(s.horaire_confirme)!==minute(time));
   const collisions=s?.horaire_confirme&&!s.cles_effectuees_le&&rows.some(other=>{
    const o=records.get(other.id);if(other.id===r.id||!o?.horaire_confirme||o.cles_effectuees_le)return false;
    try{return C.overlap(C.slot(p.kind,s.horaire_confirme.slice(0,16)),C.slot(other.plan.kind,o.horaire_confirme.slice(0,16)));}catch{return false;}
@@ -120,22 +126,30 @@ function render(){
   +(collisions?'<p class="hc-planning-warning">Un autre rendez-vous confirmé chevauche ces 20 minutes de remise.</p>':'')
   +'<p><strong>'+ (inbound?'Votre intervention : réceptionner le véhicule au point HelixCar.':'Votre intervention : remettre le véhicule au convoyeur au point HelixCar.')+'</strong></p>'
   +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">'+(r.mission_id||s?.cles_effectuees_le?'Consulter la mission':'Préparer les horaires')+'</button>'
-  +(!s?.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>Confirmer cet horaire</button><button type="button" class="btn btn-outline" data-planning-action="cles"'+(!s?.horaire_confirme||stale?' disabled':'')+'>'+(inbound?'Clés reçues':'Clés remises')+'</button>':'')+'</div><p class="hc-planning-feedback" role="status"></p></article>';
- }).join('');
+  +(!s?.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>'+(s?.horaire_confirme&&!stale?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(inbound?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="cles">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')+'</div><p class="hc-planning-feedback" role="status"></p></article>';
+ }).join(''));
 }
 const section=document.getElementById('page-admin-planning');
 section.addEventListener('change',e=>{if(e.target.matches('input,select'))render();});
 section.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b)return;if(b.id==='hc-planning-refresh'){await load();return;}
  const card=b.closest('[data-planning-id]'),r=rows.find(x=>x.id===card?.dataset.planningId);if(!r)return;
+ if(busy)return;busy=true;++ticket;
  const out=card.querySelector('.hc-planning-feedback');b.disabled=true;out.textContent='';
  try{
   const kind=b.dataset.planningAction;
-  if(kind==='ouvrir'){await ouvrirPreparationDemande(r.client_id);return;}
+  if(kind==='modifier'&&r.mission_id){out.textContent='Cette mission est déjà publiée : ses horaires sont verrouillés dans la préparation.';return;}
+  if(kind==='ouvrir'||kind==='modifier'){await ouvrirPreparationDemande(r.client_id);return;}
+  if(kind==='non'){out.textContent='Rendez-vous conservé à venir : les clés ne sont pas encore '+(r.plan.kind.includes('reception')||r.plan.kind==='avant_stockage'?'reçues.':'remises.');return;}
+  if(['cles','recevoir','remettre'].includes(kind)){
+   const s=records.get(r.id),time=schedule(r.plan);
+   if(!s?.horaire_confirme||minute(s.horaire_confirme)!==minute(time)||(!r.returnEvent&&s.empreinte_confirmee!==r.empreinte)){out.textContent='Confirmez d’abord l’horaire actuel, puis indiquez Oui pour les clés.';return;}
+  }
   if(!confirm(['cles','recevoir','remettre'].includes(kind)?'Confirmer que la remise physique des clés a eu lieu ?':'Confirmer ce rendez-vous HelixCar ?'))return;
   await action(r.id,kind);render();
- }catch(err){out.textContent=err.message;}finally{b.disabled=false;}
+ }catch(err){out.textContent=err.message;}finally{b.disabled=false;busy=false;}
 });
 window.HCPlanning={load,action};
-window.addEventListener('hc-session-fermee',()=>{++ticket;rows=[];records.clear();retourRecords.clear();panel().textContent='';});
+window.chargerPlanningHelixCar=load;
+window.addEventListener('hc-session-fermee',()=>{++ticket;rows=[];records.clear();retourRecords.clear();panel().textContent='';delete panel().dataset.contenu;});
 })();

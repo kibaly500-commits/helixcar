@@ -8,6 +8,7 @@
     'admin-dashboard': ['chargerAccueilAdmin'], 'admin-clients': ['chargerClientsAdmin'],
     'admin-candidatures': ['loadCandidatures', 'loadConvoyeursActifs'],
     'admin-metiers': ['chargerValidationMetiers'],
+    'admin-planning': ['chargerPlanningHelixCar'],
     'admin-missions': ['loadMissions'], 'admin-opportunites': ['loadOpportunitesAdmin'],
     'admin-facturation': ['loadFacturationAdmin'], 'admin-devis': ['loadDemandesDevis'],
     'admin-infos': ['chargerCentreInformationsAdmin'], 'admin-recontact': ['loadRecontacts'],

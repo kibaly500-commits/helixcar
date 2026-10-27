@@ -329,7 +329,8 @@
     if(!state||state.preview||!e.target.dataset?.field)return;
     const p=state.plans[Number(e.target.dataset.plan)],key=e.target.dataset.field;
     if(!p||p.saved?.mission_id||!draftFields.includes(key))return;
-    p[key]=e.target.type==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value;
+    if(e.target.type==='time')readEdits();
+    else p[key]=e.target.type==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value;
     if(key==='distance'){p.distance_aller=p.distance;p.distance_basis='outbound_v1';}
     editVersion++;backup();queueSave();
   });
