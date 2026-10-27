@@ -306,9 +306,12 @@ window.emailjs = { init: function () {},
     /Réponse reçue · À vérifier/.test(bloc) && !/Validée/.test(bloc) && !/Reçue/.test(bloc), bloc.slice(0, 260));
 
   // Valider
-  const validation = await page.evaluate(async () => {
+  await page.evaluate(() => {
     window.__journal = [];
-    await changerDecisionInformation('dem-conv', 'contact_pc_nom', 'validee');
+    document.querySelector('#fiche-demande-infos [data-hc-action="changerDecisionInformation"][data-hc-a1="contact_pc_nom"][data-hc-a2="validee"]').click();
+  });
+  await page.waitForFunction(()=>__infosParDemande['dem-conv'].find(l=>l.cle==='contact_pc_nom').statut==='validee');
+  const validation = await page.evaluate(() => {
     return {
       journal: window.__journal.filter(j => j.op === 'update'),
       etatServeur: window.__infosParDemande['dem-conv'].filter(l => l.cle === 'contact_pc_nom')[0].statut

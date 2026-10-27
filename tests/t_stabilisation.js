@@ -849,22 +849,22 @@ async function modesParVehicule(page, n) {
       const etat = {};
       _demandesDevisListe = [lu, neuve1];
       _appliquerCompteurDemandes(_compterNonLues());
-      etat.depart = (document.getElementById('badge-admin-devis') || {}).textContent;
+      etat.depart = document.getElementById('alerte-nouvelles-demandes').textContent.split(' ')[0];
       // Une nouvelle demande arrive.
       _demandesDevisListe = [lu, neuve1, neuve2];
       _appliquerCompteurDemandes(_compterNonLues());
-      etat.apresNouvelle = (document.getElementById('badge-admin-devis') || {}).textContent;
+      etat.apresNouvelle = document.getElementById('alerte-nouvelles-demandes').textContent.split(' ')[0];
       // L'administrateur en lit une.
       neuve1.vue_admin_at = '2026-09-08T10:00:00Z';
       _rafraichirEtatLecture();
-      etat.apresLecture = (document.getElementById('badge-admin-devis') || {}).textContent;
+      etat.apresLecture = document.getElementById('alerte-nouvelles-demandes').textContent.split(' ')[0];
       // Deux rafraîchissements de suite ne comptent pas deux fois.
       _rafraichirEtatLecture();
       _rafraichirEtatLecture();
-      etat.apresDeuxRafraichissements = (document.getElementById('badge-admin-devis') || {}).textContent;
+      etat.apresDeuxRafraichissements = document.getElementById('alerte-nouvelles-demandes').textContent.split(' ')[0];
       return etat;
     });
-    check('I4 : le badge part du nombre réel de demandes non lues',
+    check('I4 : l’alerte part du nombre réel de demandes non lues',
       compteur.depart === '1', JSON.stringify(compteur));
     check('I5 : il s\'incrémente dès qu\'une demande arrive',
       compteur.apresNouvelle === '2', JSON.stringify(compteur));
@@ -1328,7 +1328,7 @@ window.jspdf = { jsPDF: function () {
       pro.okCat === true && pro.okMet === true && pro.categorie === 'renfort',
       JSON.stringify(pro));
     check('N10 : le métier « Soutien administratif » est réellement sélectionnable (t_metiers)',
-      pro.mission === 'soutien_administratif' && pro.libelle === 'Soutien administratif',
+      pro.mission === 'soutien_administratif' && pro.libelle === 'Assistant administratif automobile',
       JSON.stringify(pro));
     // LOT F01 (F01-023..027) — ANCIEN COMPORTEMENT ADAPTÉ : le parcours
     // tenait tout entier dans l'étape 2 et « Continuer » menait de 2 au

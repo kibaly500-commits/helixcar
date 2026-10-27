@@ -21,6 +21,7 @@ for(const m of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)) {
    var sbAuth={auth:{onAuthStateChange(cb){window.authCallback=cb;},getSession:async()=>({data:{session:{user:{id:'user-a'},access_token:'fake'}}})},realtime:{setAuth:async()=>{}},channel(topic,config){if(!config.config.private)throw Error('Public channel');return {on(type,event,cb){listeners.push({topic,cb});return this;},subscribe(){return this;}};},removeChannel(){removed++;}};
    async function chargerMissionsSuiviClient(){reads++;await new Promise(r=>setTimeout(r,delay));return rows;}
    function escapeHtml(x){return String(x);}
+   function referenceMission(m){return m.reference_courte||m.reference;}function actionHtml(){return '';}
    function _missionPrestationClient(){return 'Convoyage';}function _missionLieuClient(){return 'Paris';}function _missionDateClient(){return '';}
    function _partenaireMissionClient(){return '';}function _phaseMissionClient(m){return m.statut;}
    ${loader}

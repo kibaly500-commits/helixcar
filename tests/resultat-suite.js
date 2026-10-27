@@ -1,7 +1,7 @@
 // Les suites historiques, les assertions et node:test ont des sorties distinctes.
 // Un code d'erreur, un signal ou un FAIL explicite ne devient jamais un succès.
 function resultatSuite(sortie, statut) {
-  const legacy = sortie.match(/===\s*(\d+)\s+PASS\s*\/\s*(\d+)\s+FAIL\s*===/);
+  const legacy = sortie.match(/^(?:===\s*)?(\d+)\s+PASS\s*\/\s*(\d+)\s+FAIL(?:\s*===)?\s*$/m);
   const nodePass = sortie.match(/^[ℹ#]\s+pass\s+(\d+)\s*$/m);
   const nodeFail = sortie.match(/^[ℹ#]\s+fail\s+(\d+)\s*$/m);
   const lignesPass = (sortie.match(/^PASS\b/gm) || []).length;

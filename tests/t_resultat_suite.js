@@ -8,9 +8,11 @@ for (const [sortie, code, pass, fail] of [
   ['PASS première assertion\nAssertionError', 1, 1, 1],
   ['=== 12 PASS / 0 FAIL ===', 1, 12, 1],
   ['FAIL contrôle\n=== 12 PASS / 0 FAIL ===', 0, 12, 1],
+  ['5 PASS / 0 FAIL', 0, 5, 0],
+  ['5 PASS / 2 FAIL', 1, 5, 2],
   ['', 0, 0, 1],
   ['PASS contrôle', null, 1, 1],
 ]) {
   assert.deepEqual(resultat(sortie, code), {pass, fail, etat: fail ? 'ÉCHEC' : 'OK'});
 }
-console.log('=== 9 PASS / 0 FAIL ===');
+console.log('=== 11 PASS / 0 FAIL ===');

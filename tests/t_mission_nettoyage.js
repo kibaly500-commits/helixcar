@@ -340,11 +340,10 @@ window.fetch = function(u, o){
   });
   await page.waitForTimeout(500);
   const dispo = await page.evaluate(() => (document.getElementById('conv-missions-table') || {}).textContent || '');
-  check('C1 : un nettoyeur voit la mission de nettoyage', /Lilas|Lyon/.test(dispo), dispo.slice(0, 200));
+  check('C1 : une mission non attribuée ne figure pas dans Mes missions', /Aucune mission attribuée/.test(dispo), dispo.slice(0, 200));
   check('C2 : et PAS la mission de convoyage',
     !/HC-2026-0001/.test(dispo) && !/Paris → Lyon/.test(dispo), dispo.slice(0, 200));
-  check('C3 : la rémunération affichée est la sienne, pas le prix client',
-    /240 €/.test(dispo) && !/480 €/.test(dispo), dispo.slice(0, 250));
+  check('C3 : aucune acceptation directe ne contourne la candidature', !/Accepter/.test(dispo));
 
   await page.evaluate(() => {
     _currentConvoyeur = { id: 'p-conv', prenom: 'TEST-QA', nom: 'Convoyeur', activites: ['convoyage'] };
@@ -364,17 +363,13 @@ window.fetch = function(u, o){
     showPage('convoyeur-historique');
   });
   await page.waitForTimeout(500);
-  let histo = await page.evaluate(() => (document.getElementById('conv-historique-table') || {}).textContent || '');
-  check('D1 : la mission acceptée apparaît dans son historique', /Lilas/.test(histo), histo.slice(0, 200));
-  check('D2 : avec ses consignes d\'intervention', /Contact/.test(histo), histo.slice(0, 250));
-  check('D3 : deux boutons photo sont proposés', /Avant \(0\)/.test(histo) && /Après \(0\)/.test(histo), histo.slice(0, 250));
-  check('D4 : et « Intervention terminée » est REFUSÉ sans photo',
-    await page.evaluate(() => {
-      const b = Array.from(document.querySelectorAll('#conv-historique-table button'))
-        .filter(x => /Intervention terminée/.test(x.textContent))[0];
-      return !!b && b.disabled === true;
-    }));
-
+  let histo = await page.evaluate(() => (document.getElementById('conv-interventions-table') || {}).textContent || '');
+  check('D1 : la mission attribuée apparaît dans Mes missions', /Lyon/.test(histo), histo.slice(0, 200));
+  check('D2 : le détail contient ses consignes d’intervention', await page.locator('#conv-interventions-table').textContent().then(t=>t.includes('Contact')&&t.includes('Lilas')));
+  check('D3 : aucun état des lieux, lettre de voiture ni photo obligatoire', !/Avant \(0\)|Après \(0\)|État des lieux|Lettre de voiture/.test(histo));
+  check('D4 : le suivi ne demande pas de clic de démarrage ou de fin', !/Intervention terminée|Commencer/.test(histo));
+  check('D4 bis : seul le montant partenaire est affiché', /240 €/.test(histo)&&!/480 €/.test(histo));
+  // Compatibilité de lecture des anciennes photos : facultatives et privées.
   const missionId = await page.evaluate(() =>
     window.__db.missions.filter(x => x.type_mission === 'nettoyage')[0].id);
   async function deposer(etape) {
@@ -403,14 +398,9 @@ window.fetch = function(u, o){
 
   await deposer('apres');
   await page.waitForTimeout(300);
-  histo = await page.evaluate(() => (document.getElementById('conv-historique-table') || {}).textContent || '');
-  check('D9 : les compteurs suivent', /Avant \(1\)/.test(histo) && /Après \(1\)/.test(histo), histo.slice(0, 250));
-  check('D10 : « Intervention terminée » devient alors possible',
-    await page.evaluate(() => {
-      const b = Array.from(document.querySelectorAll('#conv-historique-table button'))
-        .filter(x => /Intervention terminée/.test(x.textContent))[0];
-      return !!b && b.disabled === false;
-    }));
+  histo = await page.evaluate(() => (document.getElementById('conv-interventions-table') || {}).textContent || '');
+  check('D9 : les anciennes photos restent tracées', await page.evaluate(()=>__db.mission_photos.length===2));
+  check('D10 : leur dépôt ne change pas le statut de mission', await page.evaluate(()=>__db.missions.find(m=>m.type_mission==='nettoyage').statut==='acceptee'));
 
   // Un format refusé ne part pas.
   await page.evaluate(() => { window.__alertes = []; });
@@ -431,13 +421,10 @@ window.fetch = function(u, o){
     JSON.stringify(apresPdf));
 
   // ══ E. FIN D'INTERVENTION ET VALIDATION ══
-  await page.evaluate(() => terminerMissionNettoyage(
-    window.__db.missions.filter(x => x.type_mission === 'nettoyage')[0].id));
-  await page.waitForTimeout(400);
-  let m = await page.evaluate(() => window.__db.missions.filter(x => x.type_mission === 'nettoyage')[0]);
-  check('E1 : le partenaire déclare l\'intervention terminée', m.statut === 'fini', m.statut);
-  check('E2 : mais il ne la VALIDE pas lui-même',
-    !m.prestation_validee_le, JSON.stringify(m.prestation_validee_le));
+  let m = await page.evaluate(() => window.__db.missions.find(x => x.type_mission === 'nettoyage'));
+  const final = await page.evaluate(m=>statutIntervention(m,new Date('2026-11-04T16:00:00Z')),m);
+  check('E1 : à la fin de la dernière journée, la mission attend confirmation', final.texte==='À confirmer');
+  check('E2 : le calendrier ne valide pas la mission lui-même', !m.prestation_validee_le&&m.statut==='acceptee');
 
   await page.evaluate(() => {
     currentRole = 'admin';

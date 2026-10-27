@@ -2930,10 +2930,10 @@ async function rendreInfosDemandeAdmin(c) {
     if (l.statut === 'transmise' || l.statut === 'a_corriger' || l.statut === 'validee') {
       actions = '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
         + '<button class="btn btn-sm btn-primary"'
-        + actionHtml('choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', [c.id, l.cle, 'validee'])
+        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'validee'])
         + '>Valider cette réponse</button>'
         + '<button class="btn btn-sm btn-secondary"'
-        + actionHtml('choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
+        + actionHtml('changerDecisionInformation', [c.id, l.cle, 'a_corriger'])
         + '>Demander une correction</button>'
         + '</div>';
     }

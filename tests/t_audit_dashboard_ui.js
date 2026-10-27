@@ -14,9 +14,10 @@ const L=require('./lib');const {urlFichier}=require('./env');
    document.getElementById('app').classList.add('visible');
    document.getElementById('mobile-bottom-nav').style.display='flex';
    window.qaLong=()=>{const d=document.createElement('div');d.className='qa-long';d.style.height='1800px';d.textContent='TEST QA — contenu long';return d;};
-   return {pages:[...document.querySelectorAll('.page')].map(e=>e.id.slice(5)),modals:[...document.querySelectorAll('.modal-overlay')].map(e=>e.id.slice(6))};
+   return {pages:[...document.querySelectorAll('.page')].map(e=>e.id.slice(5)).filter(id=>id!=='convoyeur-historique'),modals:[...document.querySelectorAll('.modal-overlay')].map(e=>e.id.slice(6))};
   });
   console.log('INVENTAIRE '+JSON.stringify(inventaire));
+  L.check('Ancienne rubrique Historique redirigée vers Mes missions',await page.evaluate(()=>{currentRole='convoyeur';showPage('convoyeur-historique');return document.getElementById('page-convoyeur-missions').classList.contains('active');}));
   for(const [w,h] of [[375,812],[390,844],[430,932],[844,390],[1280,900]]){
    await page.setViewportSize({width:w,height:h});
    for(const id of inventaire.pages){

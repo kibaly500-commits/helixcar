@@ -183,7 +183,7 @@ async function ouvrirRubrique(page, cle) {
 
   let recap = await page.evaluate(() => (document.getElementById('recap-demande') || {}).textContent.replace(/\s+/g, ' '));
   L.check('E2 : récap contient le besoin', /Technicien automobile/.test(recap), recap.slice(0, 300));
-  L.check('E3 : récap contient la spécialité', /Diagnostic/.test(recap));
+  L.check('E3 : récap contient la spécialité', /Technicien en diagnostic automobile/.test(recap));
   // LOT D4 — et le récapitulatif ne montre plus aucun véhicule.
   L.check('E4 : le récapitulatif ne contient aucun véhicule',
     !/Informations? sur les? véhicules?|Nombre de véhicules|Véhicule 1/.test(recap),

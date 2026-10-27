@@ -31,13 +31,13 @@ async function ouvrirRubrique(page, cle) {
   }));
   const valeurs = metiers.missions.map(m => m.valeur);
   L.check('A1 : « Accueil en concession » remplace l\'ancien libellé',
-    metiers.libelles.accueil_preparation === 'Accueil en concession'
-    && metiers.missions.some(m => m.texte === 'Accueil en concession'), JSON.stringify(metiers.missions));
+    metiers.libelles.accueil_preparation === 'Chargé d’accueil en concession automobile'
+    && metiers.missions.some(m => m.texte === 'Chargé d’accueil en concession automobile'), JSON.stringify(metiers.missions));
   L.check('A2 : plus aucune mention de « Accueil et préparation des véhicules »',
     !JSON.stringify(metiers).includes('Accueil et préparation'));
   L.check('A3 : « Soutien administratif » est proposé',
     valeurs.includes('soutien_administratif')
-    && metiers.libelles.soutien_administratif === 'Soutien administratif', JSON.stringify(valeurs));
+    && metiers.libelles.soutien_administratif === 'Assistant administratif automobile', JSON.stringify(valeurs));
   L.check('A4 : Jockey, Une autre mission et Je souhaite être conseillé sont conservés',
     valeurs.includes('jockey') && valeurs.includes('autre') && valeurs.includes('conseil'), JSON.stringify(valeurs));
   L.check('A5 : l\'exemple de spécialité est « Technicien vitrage automobile »',

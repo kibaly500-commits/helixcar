@@ -60,8 +60,8 @@ async function etat(page) {
   L.check('A1 : tous les métiers proposés sont affichés',
     ATTENDUS.every(c => lignes.some(l => l.cle === c)), JSON.stringify(lignes.map(l => l.cle)));
   L.check('A2 : « Accueil en concession » et « Soutien administratif » en font partie',
-    lignes.some(l => /Accueil en concession/.test(l.nom))
-    && lignes.some(l => /Soutien administratif/.test(l.nom)));
+    lignes.some(l => /Chargé d’accueil en concession/.test(l.nom))
+    && lignes.some(l => /Assistant administratif/.test(l.nom)));
   L.check('A3 : chaque métier porte un bouton +',
     lignes.every(l => l.plus === '+'), JSON.stringify(lignes.map(l => l.plus)));
   L.check('A4 : chaque métier annonce à quelle famille il appartient',

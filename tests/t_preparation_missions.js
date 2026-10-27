@@ -19,7 +19,7 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  const clean={...c,type_service:'nettoyage',nettoyage_details:{type_nettoyage:'interieur_exterieur',nombre_vehicules_approx:4,adresse_ville:'Créteil',date_souhaitee:'2026-11-08',date_fin:'2026-11-08',creneau_debut:'09:00',creneau_fin:'12:00'}};
  const prof={...c,type_service:'professionnel',professionnel_details:{categorie:'technicien',specialite:'diagnostic',nombre_professionnels:2,adresse_ville:'Nanterre',date_debut:'2026-11-08',date_fin:'2026-11-09',heure_debut:'09:00',heure_fin:'17:00'}};
  for(const sample of [clean,prof]){const x=planner.build(sample,[])[0];L.check(sample.type_service+' : pas de trajet artificiel',x.kind==='intervention'&&!('ville_depart' in x.mission));L.check(sample.type_service+' : données préremplies',x.rows.some(r=>r.value.includes('09:00 - ')));}
- L.check('Professionnels : métier et nombre repris',planner.build(prof,[])[0].category==='technicien'&&planner.build(prof,[])[0].nb_professionnels===2);
+ L.check('Professionnels : métier et nombre repris',planner.build(prof,[])[0].category==='technicien'&&planner.build(prof,[]).length===2&&planner.build(prof,[]).every(p=>p.nb_professionnels===1));
  const browser=await L.launch();try{for(const width of [390,1280]){const page=await browser.newPage({viewport:{width,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(()=>{window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},rpc:async()=>({data:null})})};});await page.goto(urlFichier('dashboard.html'));
  await page.evaluate(({c,v})=>{window.__calls=[];window.__prix=9876.54;window.__filters=[];sbAuth.from=table=>{if(table!=='devis')throw Error('Table inattendue');const q={select(){return q},eq(k,v){__filters.push([k,v]);return q},maybeSingle:async()=>({data:{prix:__prix}})};return q;};window.__source={client:c,vehicules:[v],devis_id:'dv1',reference:'DEV-QA',empreinte:'hash',brouillons:[]};sbAuth.rpc=async(name,args)=>{__calls.push(name);if(name==='source_preparation_missions')return {data:__source};if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map((p,i)=>({id:'p'+i,cle:p.key,empreinte:'hash',plan:p,annonce:p.public}));return {data:__source};}throw Error('Publication interdite dans ce test');};document.getElementById('login-screen').style.display='none';_devisParClient[c.id]={statut:'accepte',paiement_statut:'paye'};}, {c,v});
  const button=await page.evaluate(c=>_blocDevisHtml(c),c);L.check(width+' bouton depuis devis payé',button.includes('Préparer les missions'));
@@ -51,6 +51,7 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  await page.locator('#hc-prep-close').click();await page.evaluate(()=>ouvrirPreparationDemande('client-1'));L.check(width+' brouillon retrouvé',await page.locator('[data-field="remuneration"]').inputValue()==='250');
  L.check(width+' sans débordement',await page.locator('#modal-preparation-missions .hc-prep-modal').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
  await page.evaluate(async()=>{__source.brouillons=[];__source.vehicules[0].vin=null;await ouvrirPreparationDemande('client-1');});
+ await page.locator('[data-field="remuneration"]').fill('250');await page.locator('[data-field="distance"]').fill('465');
  await page.locator('.hc-prep-private summary').click();
  L.check(width+' VIN manquant affiché dans les informations privées',await page.locator('.hc-prep-private').innerText().then(t=>t.includes('VIN du véhicule livré')&&t.includes('À compléter dans la demande')));
  await page.locator('[data-prep-view="preview"]').first().click();
@@ -75,7 +76,7 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
    const price=cards[1].querySelector('[data-field="remuneration"]').value;
    __source=original;await ouvrirPreparationDemande('client-1');return {text,hour,price};
  });
- L.check(width+' ancien brouillon recalculé sans perdre le prix',!repaired.text.includes('18/11/2026')&&repaired.text.includes('10/11/2026')&&repaired.hour===''&&repaired.price==='123');
+ L.check(width+' ancien brouillon recalculé et prix arrondi au palier de 5 €',!repaired.text.includes('18/11/2026')&&repaired.text.includes('10/11/2026')&&repaired.hour===''&&repaired.price==='125',JSON.stringify(repaired));
  await page.evaluate(async()=>{window.__beforeVehicleTest=JSON.parse(JSON.stringify(__source));__source.brouillons=[];__source.vehicules[0].date_livraison='2026-11-14';await ouvrirPreparationDemande('client-1');});
  await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').first().click();await page.locator('[data-vehicle-value]').fill('Peugeot 3008');await page.locator('[data-save-vehicle]').click();
  L.check(width+' même correction sur les deux trajets du véhicule',await page.evaluate(()=>__source.brouillons.length===2&&__source.brouillons.every(b=>b.plan.mission.marque_modele==='Peugeot 3008')));

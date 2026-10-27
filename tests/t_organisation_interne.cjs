@@ -16,8 +16,8 @@ test('retour à Noisy conserve les deux rendez-vous internes',()=>{const p=P.bui
 test('client récupère lui-même : aucun départ convoyeur',()=>{assert.equal(P.build(c,[{...v,livraison_apres_stockage:false}]).length,1);});
 test('services sans convoyage inchangés',()=>{for(const type_service of ['nettoyage','professionnel']){const p=P.build({type_service},[])[0];assert.equal(p.kind,'intervention');assert(!p.retrait_veille);}});
 const ui=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
-const adoptSource=ui.slice(ui.indexOf('  function adopt('),ui.indexOf('  window.ouvrirPreparationDemande='));
-const adopt=new Function('HCPreparation','HCPlanningCalcul','let state;'+adoptSource+';return s=>{adopt(s);return state;}')(P,C);
+const adoptSource=ui.slice(ui.indexOf('  function stable('),ui.indexOf('  window.ouvrirPreparationDemande='));
+const adopt=new Function('HCPreparation','HCPlanningCalcul','HCMissionBudget','let state;'+adoptSource+';return s=>{adopt(s);return state;}')(P,C,require('../assets/mission-budget.js'));
 test('ancien brouillon : date recalculée et ancienne heure effacée',()=>{
  const old=P.build(c,[retour])[1];old.date_debut='2026-11-22';old.heure_retrait='08:00';old.mission.date_prise_en_charge='2026-11-22T08:00';old.remuneration=170;
  const state=adopt({client:c,vehicules:[retour],empreinte:'hash',brouillons:[{cle:old.key,empreinte:'hash',plan:old}]});const p=state.plans.find(p=>p.kind==='apres_stockage');assert.equal(p.date_debut,'2026-11-21');assert.equal(p.heure_retrait,'');assert.equal(p.mission.date_prise_en_charge,null);assert.equal(p.remuneration,170);assert.equal(p.date_fin,'2026-11-27');
@@ -25,4 +25,4 @@ test('ancien brouillon : date recalculée et ancienne heure effacée',()=>{
 test('missions publiées préservées',()=>{const old=P.build(c,[v])[1];old.date_debut='2026-11-22';old.heure_retrait='08:00';const state=adopt({client:c,vehicules:[v],empreinte:'hash',brouillons:[{cle:old.key,empreinte:'hash',plan:old,mission_id:'published'}]});assert.equal(state.plans[0].date_debut,'2026-11-22');assert.equal(state.plans[0].heure_retrait,'08:00');});
 const cardSource=ui.slice(ui.indexOf('  function card('),ui.indexOf('  window.hcPreparationCarteOpportunite='));
 const card=new Function('esc','display','money',cardSource+';return card;')(String,String,String);
-test('aperçu partenaire montre la garde et exclut les coordonnées privées',()=>{const p=P.build(c,[{...retour,adresse_depart_rue:'SECRET-ADRESSE',restit_contact_tel:'SECRET-TEL'}])[1];const html=card(P.publicData(p));assert.match(html,/Garde du véhicule récupéré/);assert.match(html,/Chez le même convoyeur/);assert(!html.includes('SECRET'));});
+test('aperçu partenaire montre les deux trajets et exclut les coordonnées privées',()=>{const p=P.build(c,[{...retour,adresse_depart_rue:'SECRET-ADRESSE',restit_contact_tel:'SECRET-TEL'}])[1];const html=card(P.publicData(p));assert.match(html,/aria-label="Livraison"/);assert.match(html,/aria-label="Restitution"/);assert.match(html,/2026-11-27/);assert(!html.includes('SECRET'));});

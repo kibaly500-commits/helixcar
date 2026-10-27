@@ -45,11 +45,12 @@ function check(libelle, condition, detail) {
   check('R6 : la liste complète reste accessible', avant.metiers === 8, String(avant.metiers));
   check('R7 : les trois critères de sélection sont utiles et non répétitifs',
     avant.profils.join('|') === 'Disponible demain|Compétence vérifiée|Sur votre site', avant.profils.join(' | '));
-  check('R8 : le bloc est compact et la confirmation donne une disponibilité concrète',
-    avant.hauteur < 600 && /Disponible demain à 8 h 30/.test(avant.confirmation),
+  // Les intitulés complets ajoutent des lignes ; le bloc doit rester dans un écran de 900 px.
+  check('R8 : le bloc tient dans la hauteur de l’écran desktop et la confirmation donne une disponibilité concrète',
+    avant.hauteur < 900 * .85 && /Disponible demain à 8 h 30/.test(avant.confirmation),
     JSON.stringify({ hauteur: avant.hauteur, confirmation: avant.confirmation }));
   check('R9 : les huit intitulés métiers utilisent les bons noms professionnels',
-    avant.metiersLibelles.join('|') === 'Jockey automobile|Préparateur automobile|Soutien administratif|Carrossier|Accueil en concession|Opérateur de parc|Mécanicien|Diagnostiqueur automobile',
+    avant.metiersLibelles.join('|') === 'Jockey automobile|Préparateur automobile|Assistant administratif automobile|Carrossier automobile|Chargé d’accueil en concession automobile|Opérateur de parc automobile|Mécanicien automobile|Technicien en diagnostic automobile',
     avant.metiersLibelles.join(' | '));
 
   await page.locator('.renfort-metiers summary').click();

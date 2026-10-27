@@ -483,8 +483,8 @@ window.fetch = function(u, o){
   check('F1 : le navigateur ne déclare plus lui-même le validateur',
     !/prestation_validee_par:\s*[^,\n}]*(auth|user|conv)/i.test(src)
     || /prestation_validee_par := v_uid/.test(fs.readFileSync(fichier('migrations/97_missions_verrou_serveur.sql'), 'utf8')));
-  check('F2 : un refus serveur pour photos manquantes est expliqué au lieu d\'être brut',
-    /non constatée\|photo/.test(src) || /non constatée/.test(src));
+  check('F2 : une validation refusée affiche un message lisible',
+    /La validation n’a pas pu être enregistrée/.test(src));
   const mig97 = fs.readFileSync(fichier('migrations/97_missions_verrou_serveur.sql'), 'utf8');
   check('F3 : le contrôle des photos existe côté serveur, pas seulement dans l\'écran',
     /mission_photos_completes/.test(mig97) && /statut = 'terminee'/.test(mig97));
