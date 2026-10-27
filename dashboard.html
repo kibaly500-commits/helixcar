@@ -1765,7 +1765,14 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CONVOYEUR: Facturation -->
       <div class="page" id="page-convoyeur-facturation">
-        <div class="alert alert-info"><span>💡 Une mission terminée doit d'abord être <strong>validée par HelixCar</strong>, et, pour un convoyage, sa <strong>lettre de voiture signée envoyée</strong> (depuis Mes missions), avant de pouvoir être facturée. Regroupez ensuite plusieurs missions prêtes en une seule facture. Paiement sous <strong>9 jours ouvrés</strong> après validation de la facture. Vous pouvez générer une nouvelle facture tous les <strong>5 jours ouvrés</strong>.</span></div>
+        <div class="alert alert-info" id="facturation-consignes" style="display:block;line-height:1.6">
+          <div><strong>Facturez une mission ou plusieurs, au choix.</strong></div>
+          <div>Les missions doivent être validées par HelixCar. Pour un convoyage, ajoutez aussi la lettre de voiture signée dans « Mes missions ».</div>
+          <div style="margin-top:8px;display:flex;gap:8px 24px;flex-wrap:wrap">
+            <span><strong>Paiement :</strong> sous 9 jours ouvrés après validation de la facture.</span>
+            <span><strong>Nouvelle facture :</strong> tous les 5 jours ouvrés.</span>
+          </div>
+        </div>
         <div class="card">
           <div class="card-header"><div class="card-title">✅ Missions terminées — prêtes à facturer</div></div>
           <div id="fc-conv-missions-list" style="padding:4px 0"><p style="color:#888;font-size:.85rem">Chargement…</p></div>

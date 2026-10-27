@@ -193,11 +193,12 @@ window.fetch=function(url){
       await page.setViewportSize({width,height:844});
       await page.evaluate(async()=>{
         window._currentConvoyeur={id:'test-pro'};
-        window.__missions=['professionnel','nettoyage'].map((type_mission,i)=>({id:'inter'+i,reference:'INT-'+i,convoyeur_id:'test-pro',type_mission,statut:i?'en_cours':'acceptee',prestation:i?'Nettoyage flotte':'Diagnostic',adresse_intervention:'12 rue du Test',ville_intervention:'Noisy',date_intervention:'2026-11-01',date_fin_intervention:'2026-11-10',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30',nb_vehicules:30,consignes:'Contrôler la flotte',remuneration_prevue:300,devis_source_id:'source'}));
+        window.__missions=['professionnel','nettoyage'].map((type_mission,i)=>({id:'inter'+i,reference:'INT-'+i,reference_courte:'HC-2026-000'+(i+1),convoyeur_id:'test-pro',type_mission,statut:i?'en_cours':'acceptee',prestation:i?'Nettoyage flotte':'Diagnostic',adresse_intervention:'12 rue du Test',ville_intervention:'Noisy',date_intervention:'2026-11-01',date_fin_intervention:'2026-11-10',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30',nb_vehicules:30,consignes:'Contrôler la flotte',remuneration_prevue:300,devis_source_id:'source'}));
         sbFetchToutePage=async path=>path.startsWith('missions?')?__missions:[];
         await loadMissionsConvoyeur();
       });
       let t=await page.locator('#conv-interventions-table').innerText();
+      check('Interventions : référence courte professionnelle '+width,t.includes('HC-2026-0001')&&!t.includes('INT-0'));
       check('Interventions : détails et rémunération '+width,['Diagnostic','Nettoyage flotte','Noisy','08:30','17:30','300 €'].every(x=>t.includes(x)));
       check('Interventions : aucun clic de suivi obligatoire '+width,!/Commencer|Intervention terminée|photo|lieux départ|Lettre de voiture/i.test(t));
       check('Interventions : consignes masquées dans la liste '+width,!t.includes('Contrôler la flotte'));
@@ -251,6 +252,11 @@ window.fetch=function(url){
     });
     check('Suivi : écriture bornée au professionnel, au type et au statut',suivi.debut.convoyeur_id==='test-pro'&&suivi.debut.statut==='acceptee'&&suivi.fin.statut==='en_cours'&&suivi.debut.type_mission.includes('nettoyage'));
     check('Suivi : aucun faux succès après refus serveur',suivi.refresh===2&&suivi.alerts===1);
+    check('Facturation : choix explicite une ou plusieurs missions',(await page.locator('#facturation-consignes').textContent()).includes('une mission ou plusieurs, au choix'));
+    check('Facturation : une mission suffit',await page.evaluate(()=>{
+      window._factureBloqueeJusquau=null;const input=document.createElement('input');input.type='checkbox';input.className='fc-conv-check';input.checked=true;input.dataset.montant='100';document.body.appendChild(input);
+      recalculerTotalFactureConvoyeur();const enabled=!document.getElementById('fc-conv-generer-btn').disabled;input.remove();return enabled;
+    }));
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
