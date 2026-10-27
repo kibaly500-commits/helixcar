@@ -198,8 +198,12 @@ window.fetch=function(url){
         await loadMissionsConvoyeur();
       });
       let t=await page.locator('#conv-interventions-table').innerText();
-      check('Interventions : détails et rémunération '+width,['Diagnostic','Nettoyage flotte','Noisy','08:30','17:30','30 véhicule(s)','300 €'].every(x=>t.includes(x)));
-      check('Interventions : commencer et terminer sans photos '+width,t.includes('Commencer l’intervention')&&t.includes('Intervention terminée')&&!/photo|lieux départ|Lettre de voiture/i.test(t));
+      check('Interventions : détails et rémunération '+width,['Diagnostic','Nettoyage flotte','Noisy','08:30','17:30','300 €'].every(x=>t.includes(x)));
+      check('Interventions : aucun clic de suivi obligatoire '+width,!/Commencer|Intervention terminée|photo|lieux départ|Lettre de voiture/i.test(t));
+      check('Interventions : consignes masquées dans la liste '+width,!t.includes('Contrôler la flotte'));
+      await page.locator('#conv-interventions-table summary').first().click();
+      check('Interventions : détails accessibles '+width,(await page.locator('#conv-interventions-table').innerText()).includes('Contrôler la flotte'));
+      await page.locator('#conv-interventions-table summary').first().click();
       check('Interventions : colonnes transport masquées '+width,!(await page.locator('#conv-missions-table').isVisible()));
       check('Interventions : largeur mobile '+width,await page.locator('#conv-interventions-table').evaluate(el=>el.closest('.table-wrap').scrollWidth<=el.closest('.table-wrap').clientWidth+1));
       await page.evaluate(async()=>{
@@ -216,6 +220,11 @@ window.fetch=function(url){
       check('Admin : interventions effacées après relecture vide '+width,!(await page.locator('#interventions-table').isVisible()));
       await page.evaluate(()=>{currentRole='convoyeur';document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-convoyeur-missions').classList.add('active')});
     }
+    const calendrier=await page.evaluate(()=>{
+      const m={id:'date',convoyeur_id:'test-pro',statut:'acceptee',date_intervention:'2026-10-27',date_fin_intervention:'2026-10-28',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30'};
+      return ['2026-10-27T07:29:00Z','2026-10-27T07:30:00Z','2026-10-28T16:31:00Z'].map(t=>statutIntervention(m,new Date(t)).cle).concat(statutIntervention({...m,statut:'terminee'}).cle,statutIntervention({...m,convoyeur_id:null}).cle);
+    });
+    check('Calendrier Paris : avant, début, après, terminé et non attribué',JSON.stringify(calendrier)===JSON.stringify(['a_venir','en_cours','a_confirmer','terminee','acceptee']));
     const suivi=await page.evaluate(async()=>{
       const original=sbAuth.from, reload=loadMissionsConvoyeur, alerte=window.alert;
       let refresh=0, alerts=0, query, erreur=false;

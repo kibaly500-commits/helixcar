@@ -1388,7 +1388,7 @@ body.scroll-verrouille { overflow: hidden; }
           <button class="btn btn-primary" onclick="openNewMission()">+ Créer une mission</button>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Toutes les missions</div><div class="card-sub" id="missions-count-sub"></div></div>
+          <div class="card-header"><div class="card-title">Missions de convoyage</div><div class="card-sub" id="missions-count-sub"></div></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Référence</th><th>Type</th><th>Trajet / Lieu</th><th>Client</th><th>Partenaire</th><th>Véhicule</th><th>⚡ Électrique</th><th>Restitution</th><th>Prise en charge</th><th>Livraison</th><th>Prix TTC</th><th>Statut</th><th>Lettre VdV</th><th>Action</th></tr></thead>
@@ -1399,7 +1399,7 @@ body.scroll-verrouille { overflow: hidden; }
           </div>
         </div>
         <div class="card" id="interventions-table-carte" style="display:none">
-          <div class="card-header"><div class="card-title">Interventions sur place</div></div>
+          <div class="card-header"><div class="card-title">Autres missions</div></div>
           <div class="table-wrap"><table><thead><tr><th>Référence / Prestation</th><th>Lieu / Contact</th><th>Client</th><th>Professionnel</th><th>Période</th><th>Horaires</th><th>Prix TTC</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="interventions-table"></tbody></table></div>
         </div>
       </div>
@@ -1736,14 +1736,14 @@ body.scroll-verrouille { overflow: hidden; }
       <!-- CONVOYEUR: Missions -->
       <div class="page" id="page-convoyeur-missions">
         <div class="card">
-          <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="conv-missions-sub"></div></div>
+          <div class="card-header"><div class="card-title">Missions de convoyage</div><div class="card-sub" id="conv-missions-sub"></div></div>
           <div class="table-wrap"><table>
             <thead><tr><th>Mission</th><th>Véhicule</th><th>Prise en charge</th><th>Livraison</th><th>Rémunération</th><th>Statut</th><th>Actions</th></tr></thead>
             <tbody id="conv-missions-table"></tbody>
           </table></div>
         </div>
         <div class="card" id="conv-interventions-table-carte" style="display:none">
-          <div class="card-header"><div class="card-title">Interventions sur place</div></div>
+          <div class="card-header"><div class="card-title">Autres missions</div></div>
           <div class="table-wrap"><table><thead><tr><th>Prestation / Lieu</th><th>Période</th><th>Horaires</th><th>Rémunération</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="conv-interventions-table"></tbody></table></div>
         </div>
       </div>
@@ -8534,11 +8534,31 @@ function horairesIntervention(m) {
 function lieuIntervention(m) {
   return [m.adresse_intervention,[m.code_postal_intervention,m.ville_intervention].filter(Boolean).join(' ')].filter(Boolean).join(', ') || 'Lieu à préciser';
 }
-function actionsIntervention(m) {
-  if (m.statut === 'acceptee') return '<button class="btn btn-sm btn-primary" ' + actionHtml('avancerIntervention',[m.id,'en_cours']) + '>Commencer l’intervention</button>';
-  if (m.statut === 'en_cours') return '<button class="btn btn-sm btn-primary" ' + actionHtml('avancerIntervention',[m.id,'fini']) + '>Intervention terminée</button>';
-  return m.statut === 'fini' ? '<span class="badge badge-pending">En attente de confirmation HelixCar</span>' : '—';
+function statutIntervention(m, maintenant = new Date()) {
+  if (['terminee','annulee'].includes(m.statut)) return {cle:m.statut,texte:m.statut==='terminee'?'Terminée':'Annulée'};
+  if (!m.convoyeur_id || !['acceptee','en_cours','fini'].includes(m.statut)) return {cle:m.statut,texte:m.statut==='brouillon'?'Brouillon':'À attribuer'};
+  if (m.statut==='fini') return {cle:'a_confirmer',texte:'À confirmer'};
+  if (!m.date_intervention) return {cle:'a_planifier',texte:'À planifier'};
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(maintenant).map(p=>[p.type,p.value]));
+  const now = parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
+  const heures = String(m.heure_intervention||'').match(/\d{2}:\d{2}/g)||[];
+  const debut = String(m.date_intervention).slice(0,10)+'T'+String(m.heure_debut_intervention||heures[0]||'00:00').slice(0,5);
+  const fin = String(m.date_fin_intervention||m.date_intervention).slice(0,10)+'T'+String(m.heure_fin_intervention||heures[1]||'23:59').slice(0,5);
+  return now<debut ? {cle:'a_venir',texte:'À venir'} : now>=fin ? {cle:'a_confirmer',texte:'À confirmer'} : {cle:'en_cours',texte:'En cours'};
 }
+function badgeIntervention(m) {
+  const etat=statutIntervention(m);
+  return '<span class="badge '+(etat.cle==='terminee'?'badge-active':etat.cle==='en_cours'?'badge-progress':'badge-pending')+'" data-intervention-statut="'+escapeHtml(m.id)+'">'+etat.texte+'</span>';
+}
+var interventionsAffichees = new Map();
+// Actualiser seulement les badges, sans déplacer les lignes ni fermer les détails.
+setInterval(function(){
+  document.querySelectorAll('[data-intervention-statut]').forEach(el=>{
+    const m=interventionsAffichees.get(el.dataset.interventionStatut);if(!m)return;
+    const etat=statutIntervention(m);if(el.textContent!==etat.texte){el.textContent=etat.texte;el.className='badge '+(etat.cle==='terminee'?'badge-active':etat.cle==='en_cours'?'badge-progress':'badge-pending');}
+  });
+},60000);
+function actionsIntervention(m) { return ''; }
 var interventionsEnCours = new Set();
 async function avancerIntervention(id, statut) {
   if (!['en_cours','fini'].includes(statut) || interventionsEnCours.has(id) || !window._currentConvoyeur) return;
@@ -8553,19 +8573,22 @@ async function avancerIntervention(id, statut) {
   finally { interventionsEnCours.delete(id); }
 }
 function ligneIntervention(m, admin, actions, client, partenaire) {
-  const statut = m.statut === 'acceptee' ? '<span class="badge badge-progress">À réaliser</span>' : MISSION_STATUT_BADGE[m.statut] || escapeHtml(m.statut);
+  interventionsAffichees.set(String(m.id),m);
+  const statut = badgeIntervention(m);
   const details = '<strong>' + escapeHtml(m.prestation || (m.type_mission === 'nettoyage' ? 'Nettoyage automobile' : 'Intervention professionnelle')) + '</strong>'
     + '<br><small>' + escapeHtml(m.reference || '') + '</small>';
-  const lieu = escapeHtml(lieuIntervention(m))
+  const informations = escapeHtml(lieuIntervention(m))
     + (m.contact_nom || m.contact_tel ? '<br>Contact : ' + escapeHtml([m.contact_nom,m.contact_tel].filter(Boolean).join(' · ')) : '')
     + (m.nb_vehicules ? '<br>' + escapeHtml(String(m.nb_vehicules)) + ' véhicule(s)' : '')
     + (m.consignes ? '<br><span style="white-space:pre-wrap">' + escapeHtml(m.consignes) + '</span>' : '');
+  const lieu = escapeHtml(m.ville_intervention || 'Lieu à préciser');
+  const fiche = '<details><summary class="btn btn-sm btn-outline">Voir les détails</summary><div style="padding:12px 0;max-width:520px;white-space:normal;overflow-wrap:anywhere">'+informations+'</div></details>';
   const montant = admin ? m.prix_ttc : m.remuneration_prevue != null ? m.remuneration_prevue : m.prix_ttc != null ? Math.round(Number(m.prix_ttc)*0.5) : null;
   return '<tr><td>' + details + (admin ? '</td><td>' : '<br>') + lieu + '</td>'
     + (admin ? '<td>' + client + '</td><td>' + partenaire + '</td>' : '')
     + '<td>' + escapeHtml(periodeIntervention(m)) + '</td><td>' + escapeHtml(horairesIntervention(m)) + '</td>'
     + '<td><strong>' + (montant != null ? escapeHtml(String(montant)) + ' €' : '—') + '</strong></td>'
-    + '<td>' + statut + '</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">' + actions + '</div></td></tr>';
+    + '<td>' + statut + '</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">' + fiche + actions + '</div></td></tr>';
 }
 
 function loadMissions() {
@@ -8651,7 +8674,14 @@ function loadMissions() {
         actions = '<button class="btn btn-sm btn-outline" style="margin-right:4px" '
           + actionHtml('ouvrirOpportuniteMission', [m.id]) + '>📣 Opportunité</button>' + (actions === '—' ? '' : actions);
       }
-      if (estSurPlace) { interventions.push(ligneIntervention(m,true,actions,clientNom,convoyeurNom)); return ''; }
+      if (estSurPlace) {
+        if (m.convoyeur_id && ['acceptee','en_cours','fini'].includes(m.statut)) {
+          actions='<button class="btn btn-sm btn-primary" '+actionHtml('confirmerMissionTerminee',[m.id])+'>Confirmer la réalisation</button> <button class="btn btn-sm btn-outline" '+actionHtml('annulerMission',[m.id])+'>Annuler</button>';
+        } else if (!m.convoyeur_id && !['terminee','annulee','brouillon'].includes(m.statut)) {
+          actions='<button class="btn btn-sm btn-outline" '+actionHtml('ouvrirOpportuniteMission',[m.id])+'>Candidatures</button>';
+        }
+        interventions.push(ligneIntervention(m,true,actions,clientNom,convoyeurNom)); return '';
+      }
       // L'URL vient de la base : « javascript:… » y serait exécutable au
       // clic, et un guillemet suffisait à sortir de l'attribut.
       var urlLettre = urlSure(m.lettre_voiture_signee_url);
@@ -9215,12 +9245,13 @@ function chargerMissionsAttribuees(enCours) {
   function rendreHistorique(rows) {
       const groupe = m => STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? 0 : m.statut === 'fini' ? 1 : 2;
       const titres = ['À réaliser et en cours', 'Réalisées — en attente de confirmation', 'Historique — missions terminées ou annulées'];
-      const surPlace = rows.filter(missionSurPlace).sort((a,b)=>groupe(a)-groupe(b));
+      const groupeSurPlace = m => ['terminee','annulee'].includes(m.statut) ? 2 : statutIntervention(m).cle==='a_confirmer' ? 1 : 0;
+      const surPlace = rows.filter(missionSurPlace).sort((a,b)=>groupeSurPlace(a)-groupeSurPlace(b));
       const zone = document.getElementById('conv-interventions-table');
       document.getElementById('conv-interventions-table-carte').style.display = surPlace.length ? '' : 'none';
       let groupeIntervention = -1;
       zone.innerHTML = surPlace.map(m=>{
-        const g = groupe(m), entete = g !== groupeIntervention ? '<tr class="mes-missions-section"><th colspan="6" style="padding:20px 12px 10px;text-align:left">' + titres[g] + '</th></tr>' : '';
+        const g = groupeSurPlace(m), entete = g !== groupeIntervention ? '<tr class="mes-missions-section"><th colspan="6" style="padding:20px 12px 10px;text-align:left">' + ['À venir et en cours','À confirmer',titres[2]][g] + '</th></tr>' : '';
         groupeIntervention = g;
         return entete + ligneIntervention(m,false,actionsIntervention(m));
       }).join('');
