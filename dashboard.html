@@ -1720,7 +1720,7 @@ body.scroll-verrouille { overflow: hidden; }
 
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title">Missions disponibles</div><div class="card-sub">Cliquez pour voir les détails et accepter</div></div>
+            <div><div class="card-title">Missions disponibles</div><div class="card-sub">Consultez les missions et proposez votre candidature</div></div>
             <button class="btn btn-sm btn-dark" onclick="showPage('convoyeur-missions')">Voir tout</button>
           </div>
           <div class="mission-grid" id="conv-dashboard-missions-preview">
@@ -1733,14 +1733,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-convoyeur-missions">
         <div class="card">
           <div class="card-header"><div class="card-title">Toutes les missions disponibles</div><div class="card-sub" id="conv-missions-sub"></div></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Trajet</th><th>Véhicule</th><th>Distance</th><th>Prise en charge</th><th>Livraison</th><th>Prix TTC</th><th>Restitution</th><th>Options</th><th>Action</th></tr></thead>
-              <tbody id="conv-missions-table">
-                <tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div id="conv-missions-table"></div>
         </div>
       </div>
 
@@ -2503,10 +2496,10 @@ async function envoyerRibPartenaire(input) {
 async function remplirStatsAccueilConvoyeur(conv) {
   const setStat = function(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; };
   try {
-    const disponibles = await sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&select=id,created_at');
+    const disponibles = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
     setStat('conv-stat-dispo', String((disponibles || []).length));
     const debutAujourdhui = new Date(); debutAujourdhui.setHours(0, 0, 0, 0);
-    const nouvellesAujourdhui = (disponibles || []).filter(function(m) { return m.created_at && new Date(m.created_at) >= debutAujourdhui; }).length;
+    const nouvellesAujourdhui = (disponibles || []).filter(function(m) { return m.publiee_le && new Date(m.publiee_le) >= debutAujourdhui; }).length;
     const subEl = document.getElementById('conv-stat-dispo-sub');
     if (subEl) subEl.textContent = nouvellesAujourdhui > 0 ? nouvellesAujourdhui + ' nouvelle(s) aujourd\'hui' : '';
 
@@ -3650,9 +3643,7 @@ function _oppCarteHtml(o, options) {
   }
   if (options.partenaire) {
     html += '<div id="opp-msg-' + escapeHtml(o.id) + '" class="hc-note" role="status"></div>';
-    if(o.acceptation_directe && o.statut==='a_pourvoir'){
-      html+='<button class="btn btn-primary" style="margin-top:12px" id="opp-accepter-'+escapeHtml(o.id)+'" '+actionHtml('accepterOpportuniteTest',[o.id])+'>Accepter la mission</button>';
-    } else if (o.ma_candidature_etat) {
+    if (o.ma_candidature_etat) {
       html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
         + 'Votre candidature : ' + escapeHtml(_libEtatCandidature(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
         + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
@@ -3955,21 +3946,7 @@ async function deciderCandidature(candidatureId, etat) {
 }
 
 // ── Partenaire ──
-var acceptationsOpportunitesEnCours = new Set();
-async function accepterOpportuniteTest(id) {
- if(acceptationsOpportunitesEnCours.has(id))return;
- if(!confirm('Accepter cette mission de test et sa rémunération ?'))return;
- acceptationsOpportunitesEnCours.add(id);
- const bouton=document.getElementById('opp-accepter-'+id);if(bouton)bouton.disabled=true;
- try {
-   const session=(await sbAuth.auth.getSession()).data.session;
-   const r=await fetch(SUPABASE_URL+'/functions/v1/mission-accepter-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({opportunite_id:id})});
-   const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.message||'Attribution indisponible');
-   alert(d.message);await loadOpportunitesPartenaire();
-   if(typeof loadHistoriqueConvoyeur==='function')loadHistoriqueConvoyeur();
- } catch(e){_hcNote('opp-msg-'+id,e.message||'Impossible de confirmer. Rechargez les missions.','erreur');}
- finally {acceptationsOpportunitesEnCours.delete(id);if(bouton)bouton.disabled=false;}
-}
+async function accepterOpportuniteTest(id) { return postulerOpportunite(id); }
 async function chargerOpportunitesPartenaire() {
   if (!_sbAuthPret()) return [];
   const { data, error } = await sbAuth.from('v_opportunites_partenaire').select('*').order('publiee_le', { ascending: false });
@@ -4006,8 +3983,9 @@ async function loadOpportunitesPartenaire() {
 
 async function postulerOpportunite(id) {
   if (!_sbAuthPret()) return;
-  const msg = document.getElementById('opp-msg-' + id);
-  const bouton = document.getElementById('opp-postuler-' + id);
+  const prefixe = document.getElementById('page-convoyeur-missions').classList.contains('active') ? 'missions-' : '';
+  const msg = document.getElementById(prefixe + 'opp-msg-' + id);
+  const bouton = document.getElementById(prefixe + 'opp-postuler-' + id);
   if (bouton) { bouton.disabled = true; bouton.textContent = 'Envoi…'; }
   try {
     const res = await sbAuth.rpc('postuler_opportunite', { p_opportunite_id: id });
@@ -4024,7 +4002,7 @@ async function postulerOpportunite(id) {
       _hcNoteEl(msg, msgs[r.code] || 'Votre candidature n\'a pas pu être enregistrée.', r.code === 'DEJA_CANDIDAT' ? 'info' : 'erreur');
     }
     // L'état affiché est relu depuis le serveur, jamais déduit ici.
-    setTimeout(loadOpportunitesPartenaire, 700);
+    setTimeout(() => { loadOpportunitesPartenaire(); loadMissionsConvoyeur(); }, 700);
   } catch (e) {
     console.error('postuler_opportunite :', e && e.message);
     _hcNoteEl(msg, 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
@@ -4992,7 +4970,7 @@ const PAGE_TITLES = {
   'convoyeur-facturation': ['Mes factures', 'Générez vos factures et suivez vos paiements'],
   'convoyeur-opportunites': ['Opportunités de missions', 'Les besoins publiés par HelixCar pour lesquels vous pouvez postuler'],
   'convoyeur-dashboard':  ['Tableau de bord', 'Bienvenue'],
-  'convoyeur-missions':   ['Missions disponibles', 'Acceptez vos prochaines missions'],
+  'convoyeur-missions':   ['Missions disponibles', 'Postulez aux missions correspondant à vos métiers validés'],
   'convoyeur-historique': ['Historique', 'Vos missions passées'],
   'convoyeur-profil':     ['Mon profil', 'Vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue'],
@@ -8700,146 +8678,36 @@ function annulerMission(id) {
 }
 
 // ── MISSIONS CÔTÉ CONVOYEUR (Supabase) ───────────────────────
-function loadDashboardMissionsPreview() {
-  var _hcSyncTasks = [];
-
-  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
-
+async function loadDashboardMissionsPreview() {
   const el = document.getElementById('conv-dashboard-missions-preview');
-  if (!el) return;
-  const conv = window._currentConvoyeur;
-  if (!conv) return;
-  if (!_hcSyncCycle) { el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px">Chargement…</div>'; }
-  _hcSyncTasks.push(sbFetch('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc&limit=3')
-    .then(function(rows) {
-  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
-
-      if (!rows || rows.length === 0) {
-        el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px">Aucune mission disponible pour le moment</div>';
-        return;
-      }
-      el.innerHTML = rows.map(function(m) {
-        const prix = m.prix_ttc != null ? m.prix_ttc + ' €' : '—';
-        const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        return '<div class="mission-card" onclick="showPage(\'convoyeur-missions\')">'
-          + '<div class="mission-route">' + escapeHtml(m.ville_depart) + ' <span class="mission-route-arrow">→</span> ' + escapeHtml(m.ville_arrivee) + '</div>'
-          + '<div class="mission-details">'
-          + '<span class="mission-tag">🚗 ' + escapeHtml(m.type_vehicule || 'Standard') + '</span>'
-          + (m.distance_km ? '<span class="mission-tag">📏 ' + m.distance_km + ' km</span>' : '')
-          + '<span class="mission-tag">📅 ' + datePec + '</span>'
-          + '</div>'
-          + '<div style="display:flex;justify-content:space-between;align-items:center">'
-          + '<div class="mission-price">' + prix + '</div>'
-          + '<span class="badge badge-pending">Disponible</span>'
-          + '</div></div>';
-      }).join('');
-    })
-    .catch(function(e) {
- if (_hcSyncCycle) return;
-
-      el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:20px">Erreur de chargement</div>';
-    }));
-
-  return Promise.allSettled(_hcSyncTasks);
+  const cycle = window.HCSync && window.HCSync.capture();
+  if (!el || !window._currentConvoyeur) return;
+  try {
+    const rows = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
+    if (cycle && !window.HCSync.safe(cycle)) return;
+    el.innerHTML = rows.length ? rows.slice(0, 3).map(o =>
+      '<div class="mission-card"><div class="mission-route">' + escapeHtml(o.intitule || 'Mission') + '</div>'
+      + '<div class="mission-details">' + escapeHtml(o.zone_generale || 'Lieu à préciser') + ' · ' + escapeHtml(_oppPeriode(o)) + '</div>'
+      + '<button class="btn btn-sm btn-primary" ' + actionHtml('showPage', ['convoyeur-missions']) + '>Voir la mission</button></div>'
+    ).join('') : '<p>Aucune mission disponible pour le moment.</p>';
+  } catch (e) { if (!cycle) el.textContent = 'Impossible de charger les missions.'; }
 }
 
-function loadMissionsConvoyeur() {
-  var _hcSyncTasks = [];
-
-  var _hcSyncCycle = window.HCSync && window.HCSync.capture();
-
-  const tbody = document.getElementById('conv-missions-table');
-  if (!tbody) return;
-  const conv = window._currentConvoyeur;
-  if (!conv) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:20px">Session professionnel introuvable — reconnecte-toi.</td></tr>';
-    return;
-  }
-  if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
-
-  // Missions proposées en priorité à ce convoyeur OU sans convoyeur assigné (ouvertes à tous)
-  _hcSyncTasks.push(sbFetchToutePage('missions?or=(and(convoyeur_id.eq.' + conv.id + ',statut.eq.proposee),and(convoyeur_id.is.null,statut.eq.en_attente))&order=created_at.desc')
-    .then(function(rows) {
-  if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
-
-      const sub = document.getElementById('conv-missions-sub');
-      // Un convoyeur ne doit pas se voir proposer un nettoyage, ni un
-      // nettoyeur un convoyage : la mission relève d'un métier, et le
-      // partenaire déclare les siens. La liste ne montre donc que ce
-      // qu'il peut réellement accepter.
-      const activitesPartenaire = normaliserActivites(conv.activites);
-      const visibles = (rows || []).filter(function (m) {
-        return (m.type_mission === 'nettoyage')
-          ? activitesPartenaire.indexOf('nettoyage') !== -1
-          : activitesPartenaire.indexOf('convoyage') !== -1;
-      });
-      if (sub) sub.textContent = visibles.length + ' mission(s) disponible(s)';
-      if (!visibles.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">Aucune mission disponible pour vos métiers</td></tr>';
-        return;
-      }
-      tbody.innerHTML = visibles.map(function(m) {
-        const estNettoyage = m.type_mission === 'nettoyage';
-        const vehicule = estNettoyage
-          ? (m.nb_vehicules ? m.nb_vehicules + ' véhicule(s)' : '—')
-          : (m.marque_modele || '—');
-        const datePec = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const dateLivr = m.date_livraison ? new Date(m.date_livraison).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-        const options = estNettoyage
-          ? (m.prestation ? escapeHtml(m.prestation) : 'Nettoyage')
-          : ([m.nettoyage ? '✨ Nettoyage' : null, m.plateau ? '🚛 Plateau' : null, m.urgence ? '⚡ Urgent' : null, m.electrique ? '🔋 Électrique' : null].filter(Boolean).join(', ') || (m.type_vehicule || 'Standard'));
-        const prioritaire = m.convoyeur_id ? ' <span class="badge badge-active" style="margin-left:4px">Prioritaire</span>' : '';
-        const restitution = estNettoyage ? '—'
-          : (m.restitution ? (m.adresse_restitution ? 'Oui — ' + escapeHtml(m.adresse_restitution) : 'Oui (même adresse)') : 'Non');
-        const intitule = estNettoyage
-          ? ('🧼 ' + escapeHtml([m.adresse_intervention,
-               [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
-               .filter(Boolean).join(', ') || 'Lieu à préciser'))
-          : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
-        const quand = estNettoyage
-          ? ((m.date_intervention ? _dvDate(m.date_intervention) : '—')
-             + (m.heure_intervention ? ' · ' + escapeHtml(m.heure_intervention) : ''))
-          : datePec;
-        return '<tr><td><strong>' + intitule + '</strong>' + prioritaire + '</td>'
-          + '<td>' + vehicule + '</td>'
-          + '<td>' + (estNettoyage ? '—' : (m.distance_km ? m.distance_km + ' km' : '—')) + '</td>'
-          + '<td>' + quand + '</td>'
-          + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
-          + '<td><strong style="color:var(--green)">'
-          // La rémunération du partenaire, pas le prix client : c'est ce
-          // qui l'intéresse, et c'est la même règle que le convoyage.
-          + (m.preparation_id && m.remuneration_prevue != null ? escapeHtml(String(m.remuneration_prevue)) + ' €' : (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—')) + '</strong></td>'
-          + '<td>' + restitution + '</td>'
-          + '<td>' + options + '</td>'
-          + '<td><button class="btn btn-sm btn-primary" ' + actionHtml('accepterMission', [m.id]) + '>Accepter</button></td></tr>';
-      }).join('');
-    })
-    .catch(function(e) {
- if (_hcSyncCycle) return;
-
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Erreur de chargement Supabase — vérifiez la console</td></tr>';
-    }));
-
-  return Promise.allSettled(_hcSyncTasks);
+async function loadMissionsConvoyeur() {
+  const zone = document.getElementById('conv-missions-table');
+  const cycle = window.HCSync && window.HCSync.capture();
+  if (!zone || !window._currentConvoyeur) return;
+  try {
+    const rows = (await chargerOpportunitesPartenaire()).filter(o => o.statut === 'a_pourvoir');
+    if (cycle && !window.HCSync.safe(cycle)) return;
+    document.getElementById('conv-missions-sub').textContent = rows.length + ' mission(s) disponible(s) — candidature soumise à la sélection de HelixCar';
+    const html = rows.length ? rows.map(o => _oppCarteHtml(o, {partenaire:true}).replaceAll('id="opp-', 'id="missions-opp-')).join('') : '<p>Aucune mission publiée disponible pour vos métiers validés.</p>';
+    if (zone.innerHTML !== html) zone.innerHTML = html;
+  } catch (e) { if (!cycle) zone.textContent = 'Impossible de charger les missions. Réessayez.'; }
 }
 
-function accepterMission(id) {
-  const conv = window._currentConvoyeur;
-  if (!conv) { alert('Session professionnel introuvable — reconnecte-toi.'); return; }
-  if (!confirm('Accepter cette mission ?')) return;
-  sbFetch('missions?id=eq.' + id, {
-    method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ convoyeur_id: conv.id, statut: 'acceptee' })
-  }).then(function() {
-    alert('✅ Mission acceptée ! Retrouve-la dans "Historique" pour la faire avancer.');
-    loadMissionsConvoyeur();
-    envoyerEmailFicheMission(id, conv);
-  }).catch(function(e) {
-    alert('❌ Erreur lors de l\'acceptation (voir la console). Elle a peut-être déjà été prise par un autre convoyeur.');
-    loadMissionsConvoyeur();
-  });
-}
+// Compatibilité avec une ancienne page : jamais d’attribution depuis le navigateur.
+function accepterMission() { showPage('convoyeur-missions'); }
 
 function envoyerEmailFicheMission(missionId, conv) {
   if (!window.emailjs || !conv.email) return;

@@ -134,11 +134,11 @@ window.fetch=function(url){
     check('D3a : le bouton classique conserve son action et son identifiant',
       await page.locator('#opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').getAttribute('data-hc-action') === 'postulerOpportunite'
       && await page.locator('#opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').getAttribute('data-hc-a0') === 'TEST-QA-CLAUDE-HELIXCAR-ouverte');
-    check('D3b : l’acceptation directe conserve son propre parcours', await page.evaluate(()=>{
+    check('D3b : une ancienne opportunité directe exige aussi une candidature', await page.evaluate(()=>{
       const host=document.createElement('div');
       host.innerHTML=_oppCarteHtml({...__partenaire[0],acceptation_directe:true},{partenaire:true});
       const b=host.querySelector('button');
-      return b.dataset.hcAction==='accepterOpportuniteTest' && b.dataset.hcA0===__partenaire[0].id;
+      return b.dataset.hcAction==='postulerOpportunite' && b.dataset.hcA0===__partenaire[0].id;
     }));
     await capturerQA(page,'o01-opportunite-desktop','#convoyeur-opportunites-liste');
     await page.evaluate(async () => {__erreur=true;await postulerOpportunite('TEST-QA-CLAUDE-HELIXCAR-ouverte');__erreur=false;});
@@ -161,6 +161,26 @@ window.fetch=function(url){
     check('D11 : état vide réel', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Aucune opportunité disponible'));
     await page.evaluate(async()=>{__erreur=true;await loadOpportunitesPartenaire();__erreur=false;});
     check('D12 : erreur de lecture distincte d’une liste vide', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Les opportunités sont momentanément indisponibles. Utilisez Actualiser pour reprendre.'));
+    for (const width of [1280,390]) {
+      await page.setViewportSize({width,height:844});
+      await page.evaluate(async()=>{
+        window._currentConvoyeur={id:'test-pro'};
+        Object.assign(__opportunites[1],{ma_candidature_etat:null,acceptation_directe:true});__partenaire=[__opportunites[1]];
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.getElementById('page-convoyeur-missions').classList.add('active');
+        await loadMissionsConvoyeur();await loadDashboardMissionsPreview();
+      });
+      check('Missions : Postuler sans Accepter '+width,(await page.locator('#conv-missions-table button').allTextContents()).join() === 'Postuler');
+      check('Missions : même annonce publiée que les opportunités '+width,(await page.locator('#conv-missions-table').innerText()).includes('Renfort'));
+      check('Missions : aucun débordement '+width,await page.locator('#conv-missions-table').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+      await page.evaluate(()=>{__journal=[];__reponseCandidature=null;});
+      await page.locator('#missions-opp-postuler-TEST-QA-CLAUDE-HELIXCAR-ouverte').click();
+      await page.waitForTimeout(100);
+      check('Missions : candidature enregistrée sans acceptation '+width,await page.evaluate(()=>__journal.filter(x=>x.rpc).every(x=>x.rpc==='postuler_opportunite') && __journal.some(x=>x.rpc==='postuler_opportunite')));
+      check('Missions : confirmation dans la bonne rubrique '+width,(await page.locator('#missions-opp-msg-TEST-QA-CLAUDE-HELIXCAR-ouverte').innerText()).includes('est enregistrée'));
+      await page.waitForTimeout(750);
+      check('Missions : état à étudier après relecture '+width,await page.locator('#conv-missions-table [data-ma-candidature="a_etudier"]').count()===1);
+    }
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

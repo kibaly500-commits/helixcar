@@ -109,5 +109,23 @@ async function rejects(n,sql,label){let refused=false;try{await as(n,sql)}catch(
   assert.deepStrictEqual(visible,metiers.flatMap((m,i)=>mask&(1<<i)?[uid(400+i)]:[]),'Combinaison de badges '+mask);
  }
  check('256 combinaisons des 8 métiers : annonces exactes, refus et attente exclus',true);
+ await root(`alter table public.missions add column statut text default 'en_attente';alter table public.opportunites add column nb_professionnels integer default 1;alter table public.opportunite_candidatures add column convoyeur_id uuid;alter table public.opportunite_candidatures add column etat text;grant select,update on public.missions to authenticated;
+ alter table public.missions enable row level security;create policy fixture_access on public.missions for all to authenticated using(true) with check(true);`);
+ const candidatureMigration=fs.readdirSync('supabase/migrations').find(f=>f.endsWith('_candidature_obligatoire_missions.sql'));
+ await root(fs.readFileSync('supabase/migrations/'+candidatureMigration,'utf8'));
+ await root(`create trigger attribuer_preparation_retenue after insert or update of etat on public.opportunite_candidatures for each row execute function public.attribuer_preparation_retenue();grant update on public.opportunite_candidatures to authenticated;`);
+ check('Mission libre : détails privés invisibles',(await as(2,'select * from public.missions')).rows.length===0);
+ check('Mission libre : PATCH direct ne modifie rien',(await as(2,`update public.missions set convoyeur_id='${uid(20)}',statut='acceptee' where id='${uid(300)}' returning id`)).rows.length===0);
+ // Sans RLS, le trigger protège encore les chemins RPC SECURITY DEFINER.
+ await root('alter table public.missions disable row level security');
+ await rejects(2,`update public.missions set convoyeur_id='${uid(20)}',statut='acceptee' where id='${uid(300)}'`,'Auto-attribution bloquée aussi sans RLS');
+ await root(`grant execute on function public.accepter_opportunite_payee_test(uuid) to authenticated`);
+ check('Ancien RPC de recette ne peut plus attribuer',(await as(2,`select public.accepter_opportunite_payee_test('${uid(400)}') as r`)).rows[0].r.code==='CANDIDATURE_REQUISE');
+ await as(1,`insert into public.opportunite_candidatures(opportunite_id,convoyeur_id,etat) values('${uid(400)}','${uid(20)}','retenu')`);
+ await root('alter table public.missions enable row level security');
+ check('Sélection admin attribue aussi une ancienne annonce',(await as(2,'select * from public.missions')).rows.length===1);
+ await as(2,`update public.missions set statut='en_cours' where id='${uid(300)}'`);
+ check('Avancement mission attribuée préservé',(await as(2,`select statut from public.missions where id='${uid(300)}'`)).rows[0].statut==='en_cours');
+ await rejects(2,`update public.missions set convoyeur_id='${uid(30)}' where id='${uid(300)}'`,'Réattribution par le partenaire interdite');
  console.log(`=== ${pass} PASS / 0 FAIL ===`);await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});
