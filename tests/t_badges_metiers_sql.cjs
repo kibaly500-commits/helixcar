@@ -76,5 +76,28 @@ async function rejects(n,sql,label){let refused=false;try{await as(n,sql)}catch(
  await root(`update public.convoyeurs set bloque=true where id='${uid(20)}'`);
  check('Compte bloqué ne voit aucune annonce',(await as(2,'select * from public.v_opportunites_partenaire')).rows.length===0);
  await rejects(2,`select public.demander_badges_professionnel(array['convoyage'])`,'Compte bloqué ne demande pas de badge');
+ await root(`alter table public.convoyeurs add column created_at timestamp default '2020-01-01';
+ insert into auth.users values('${uid(4)}'),('${uid(5)}');
+ insert into public.convoyeurs(id,auth_user_id,statut,metiers) values
+ ('${uid(100)}','${uid(4)}','en_attente',array['mecanique','nettoyage']),
+ ('${uid(101)}','${uid(5)}','actif',array['nettoyage','diagnostic','jockey']);
+ update public.professionnel_badges set demande_le=(select min(demande_le) from public.professionnel_badges) where professionnel_id='${uid(101)}' and metier in ('nettoyage','jockey');
+ update public.professionnel_badges set decision='non',decide_le=now() where professionnel_id='${uid(101)}' and metier='jockey';`);
+ const migrationInitiale=fs.readdirSync('supabase/migrations').find(f=>f.endsWith('_validation_initiale_badges.sql'));
+ await root(fs.readFileSync('supabase/migrations/'+migrationInitiale,'utf8'));
+ let init=(await as(5,'select metier,decision from public.professionnel_badges')).rows;
+ check('Reprise : métier initial du compte actif validé',init.find(b=>b.metier==='nettoyage').decision==='oui');
+ check('Reprise : ajout postérieur reste en attente',init.find(b=>b.metier==='diagnostic').decision==='en_attente');
+ check('Reprise : refus explicite conservé',init.find(b=>b.metier==='jockey').decision==='non');
+ check('Candidature non validée : badges encore en attente',(await as(4,'select * from public.professionnel_badges')).rows.every(b=>b.decision==='en_attente'));
+ await rejects(4,`update public.convoyeurs set statut='actif' where id='${uid(100)}'`,'Auto-validation de candidature impossible');
+ await root(`update public.convoyeurs set statut='actif' where id='${uid(100)}'`);
+ check('Validation initiale : les deux métiers sont validés',(await as(4,'select * from public.professionnel_badges')).rows.every(b=>b.decision==='oui'));
+ check('Validation initiale : accès nettoyage et mécanique uniquement',(await as(4,'select * from public.v_opportunites_partenaire order by id')).rows.map(b=>b.id).join() === [uid(60),uid(62)].join());
+ await as(4,`select public.demander_badges_professionnel(array['diagnostic'])`);
+ check('Ajout après validation : toujours en attente',(await as(4,"select decision from public.professionnel_badges where metier='diagnostic'")).rows[0].decision==='en_attente');
+ await root(`update public.convoyeurs set statut='en_attente' where id='${uid(100)}';update public.convoyeurs set statut='actif' where id='${uid(100)}';`);
+ check('Réactivation : aucun nouveau badge automatiquement accordé',(await as(4,"select decision from public.professionnel_badges where metier='diagnostic'")).rows[0].decision==='en_attente');
+ await rejects(4,`delete from private.professionnel_validation_initiale`,'Journal initial inaccessible au professionnel');
  console.log(`=== ${pass} PASS / 0 FAIL ===`);await db.close();
 })().catch(e=>{console.error(e);process.exit(1)});
