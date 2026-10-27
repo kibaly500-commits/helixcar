@@ -2278,8 +2278,8 @@ const NAVS = {
   admin: [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
     { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
-    { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage' },
-    { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions' },
+    { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage', badgeDynamique: true },
+    { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions', badgeDynamique: true },
     { id: 'admin-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes' },
@@ -3704,8 +3704,7 @@ async function chargerOpportunitesAdmin() {
 function _majBadgeOpportunitesAdmin(liste) {
   const b = document.getElementById('badge-admin-opportunites');
   if (!b) return;
-  const n = liste.reduce(function (a, o) { return a + Number(o.nb_a_etudier || 0); }, 0);
-  if (n > 0) { b.textContent = String(n); b.style.display = ''; } else { b.textContent = ''; b.style.display = 'none'; }
+  afficherCompteurMenu('admin-opportunites', liste.length, 'offres publiées');
 }
 async function loadOpportunitesAdmin() {
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
@@ -4947,6 +4946,39 @@ function buildNav(role) {
     btn.onclick = () => showPage(item.id);
     nav.appendChild(btn);
   });
+  if (role === 'admin') { majCompteursMenuAdmin(); majBadgeCandidatures(); }
+}
+
+// Totaux du menu indépendants de la page ouverte, de la recherche et de l'état lu.
+var _compteursMenuGeneration = 0;
+function afficherCompteurMenu(id, n, libelle) {
+  const badge = document.getElementById('badge-' + id);
+  if (!badge) return;
+  const texte = String(n);
+  if (badge.textContent !== texte) badge.textContent = texte;
+  badge.style.display = '';
+  badge.title = texte + ' ' + libelle;
+}
+async function majCompteursMenuAdmin() {
+  if (currentRole !== 'admin') return;
+  const generation = ++_compteursMenuGeneration;
+  const appliquer = (id,n,libelle) => {
+    if (currentRole === 'admin' && generation === _compteursMenuGeneration) afficherCompteurMenu(id,n,libelle);
+  };
+  // Les erreurs conservent le dernier nombre connu, jamais un faux zéro.
+  return Promise.allSettled([
+    sbFetchToutePage('missions?select=id,type_mission,statut').then(rows => {
+      const actives = rows.filter(m => !missionArchivee(m));
+      appliquer('admin-missions',actives.filter(m => !missionSurPlace(m)).length,'missions non archivées');
+      appliquer('admin-autres-missions',actives.filter(missionSurPlace).length,'missions non archivées');
+    }),
+    sbFetchToutePage('clients?select=id,statut,type_service,ville_depart,ville_arrivee,marque_modele').then(rows => {
+      appliquer('admin-devis',rows.filter(_estDemandeDeDevis).length,'demandes de devis');
+    }),
+    _compterLignes('v_opportunites_admin?select=id&publiee_le=not.is.null&statut=neq.brouillon').then(n => {
+      appliquer('admin-opportunites',n,'offres publiées');
+    })
+  ]);
 }
 
 // Lot A01 — la déconnexion ferme VRAIMENT la session (attendue), remet
@@ -8152,12 +8184,12 @@ var _clientsAdminListe = [];
 // Le compteur du menu est mis à jour dès l'entrée dans l'espace
 // administrateur, sans attendre une navigation.
 function majBadgeCandidatures() {
-  _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
+  return _compterLignes('convoyeurs?select=id&statut=eq.en_attente')
     .then(function (n) {
       var sousCandidatures = document.getElementById('candidatures-count-sub');
       if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
-      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
+      if (bdg) { bdg.textContent = n; bdg.style.display = ''; bdg.title = n + ' candidatures en attente'; }
     })
     .catch(function () {});
 }
@@ -8306,7 +8338,7 @@ function chargerAccueilAdmin() {
       var sousCandidatures = document.getElementById('candidatures-count-sub');
       if (sousCandidatures) sousCandidatures.textContent = n + (n > 1 ? ' candidatures en attente' : ' candidature en attente');
       var bdg = document.getElementById('badge-candidatures');
-      if (bdg) { bdg.textContent = n; bdg.style.display = n > 0 ? '' : 'none'; }
+      if (bdg) { bdg.textContent = n; bdg.style.display = ''; bdg.title = n + ' candidatures en attente'; }
       var al = document.getElementById('alerte-candidatures');
       if (al) {
         al.textContent = n > 0
@@ -14789,11 +14821,7 @@ function _appliquerCompteurDemandes(n) {
   if (n === _badgeDemandesAffiche) return;   // rien n'a changé : on ne touche pas au DOM
   _badgeDemandesAffiche = n;
 
-  var badge = document.getElementById('badge-admin-devis');
-  if (badge) {
-    badge.textContent = n;
-    badge.style.display = n > 0 ? '' : 'none';
-  }
+  // Le menu compte toutes les demandes ; cette alerte reste réservée aux non lues.
   var alerte = document.getElementById('alerte-nouvelles-demandes');
   if (alerte) {
     if (n > 0) {

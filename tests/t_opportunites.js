@@ -269,6 +269,26 @@ window.fetch=function(url){
     });
     check('Opportunité : référence courte dans la liste',(await page.locator('#opportunites-table').textContent()).includes('HC-2026-0009'));
     check('Opportunité : référence courte dans le détail',(await page.locator('#opportunite-titre').textContent()).includes('HC-2026-0009'));
+    const compteurs = await page.evaluate(async()=>{
+      currentRole='admin';
+      window.__menuMissions=[{type_mission:'convoyage',statut:'en_cours'},{type_mission:null,statut:'acceptee'},{type_mission:'convoyage',statut:'terminee'},{type_mission:'nettoyage',statut:'acceptee'},{type_mission:'professionnel',statut:'annulee'}];
+      window.__menuDemandes=[{type_service:'nettoyage',vue_admin_at:'2026-10-01'},{ville_depart:'Paris'},{statut:'compte_cree',type_service:'convoyage'},{}];
+      sbFetchToutePage=async path=>{if(window.__menuErreur)throw Error('réseau');return path.startsWith('missions?')?__menuMissions:__menuDemandes;};
+      _compterLignes=async path=>{if(window.__menuErreur)throw Error('réseau');return path.startsWith('convoyeurs?')?6:3;};
+      buildNav('admin');await majCompteursMenuAdmin();await majBadgeCandidatures();
+      const lire=()=>['admin-missions','admin-autres-missions','admin-devis','admin-opportunites','candidatures'].map(id=>document.getElementById('badge-'+id).textContent);
+      const initial=lire();_appliquerCompteurDemandes(0);const apresLecture=lire();
+      buildNav('admin');await majCompteursMenuAdmin();const reconstruit=lire();
+      window.__menuErreur=true;await majCompteursMenuAdmin();const erreur=lire();window.__menuErreur=false;
+      __menuMissions=[];__menuDemandes=[];_compterLignes=async()=>0;await majCompteursMenuAdmin();await majBadgeCandidatures();
+      const zeros=lire(),visibles=['admin-missions','admin-autres-missions','admin-devis','admin-opportunites','candidatures'].every(id=>document.getElementById('badge-'+id).style.display!=='none');
+      return {initial,apresLecture,reconstruit,erreur,zeros,visibles};
+    });
+    check('Menu : totaux exacts, archives et comptes seuls exclus',JSON.stringify(compteurs.initial)===JSON.stringify(['2','1','2','3','6']));
+    check('Menu : consulter les devis conserve le total',JSON.stringify(compteurs.apresLecture)===JSON.stringify(compteurs.initial));
+    check('Menu : compteurs restaurés après reconstruction',JSON.stringify(compteurs.reconstruit)===JSON.stringify(compteurs.initial));
+    check('Menu : erreur réseau conserve les compteurs',JSON.stringify(compteurs.erreur)===JSON.stringify(compteurs.initial));
+    check('Menu : zéro reste affiché',compteurs.zeros.every(n=>n==='0')&&compteurs.visibles);
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');
