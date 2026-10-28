@@ -74,7 +74,7 @@ window.fetch=function(url){
     await page.addInitScript(INIT);
     await page.goto(urlFichier('dashboard.html'), {waitUntil:'load'});
     await page.evaluate(() => {
-      sbFetchToutePage = async () => [{id:'TEST-QA-CLAUDE-HELIXCAR-partenaire',prenom:'TEST-QA-CLAUDE-HELIXCAR',nom:'Partenaire',activites:['renfort'],statut:'actif'}];
+      sbFetchToutePage = async () => [{id:'TEST-QA-CLAUDE-HELIXCAR-partenaire',prenom:'TEST-QA-CLAUDE-HELIXCAR',nom:'Partenaire',activites:['renfort'],statut:'actif',note:12,numero_partenaire:'PART-0004',nb_missions:1}];
       document.getElementById('app').classList.add('visible');
       // Précondition de cette suite composant : session déjà autorisée.
       // La connexion/RLS est testée ailleurs ; le masque ne doit pas
@@ -115,6 +115,12 @@ window.fetch=function(url){
     await page.evaluate(() => ouvrirOpportuniteAdmin('TEST-QA-CLAUDE-HELIXCAR-ouverte'));
     check('C1 : quatre étapes de candidature', await page.locator('[data-pipeline]').count() === 4);
     check('C2 : profil partenaire accessible dans la candidature', (await page.locator('[data-candidature]').textContent()).includes('Profil'));
+    check('C2a : note et numéro visibles avant sélection', /Note : 12 \/ 20/.test(await page.locator('[data-candidature]').textContent()) && (await page.locator('[data-candidature]').textContent()).includes('PART-0004'));
+    check('C2b : zéro distingué de non noté', await page.evaluate(()=>{
+      const d=_oppCourante, c=d.convoyeurs['TEST-QA-CLAUDE-HELIXCAR-partenaire'];
+      c.note=0;const zero=_oppCandidaturesHtml(d);c.note=null;const vide=_oppCandidaturesHtml(d);c.note=12;
+      return zero.includes('0 / 20') && vide.includes('Non noté');
+    }));
     await page.evaluate(() => deciderCandidature('TEST-QA-CLAUDE-HELIXCAR-candidature','preselectionne'));
     check('C3 : présélection apparaît après relecture serveur', await page.locator('[data-pipeline="preselectionne"] [data-candidature]').count() === 1);
     check('C4 : confirmation de décision reste visible après relecture', (await page.locator('#opportunite-message').textContent()).includes('Décision enregistrée'));
@@ -309,6 +315,24 @@ window.fetch=function(url){
     check('Métiers : compteur égal aux demandes restantes',await page.locator('#badge-admin-metiers').textContent()==='1');
     await page.evaluate(async()=>{__badgesTest[1].decision='oui';await chargerValidationMetiers();});
     check('Métiers : dernière validation retire le compte et passe à zéro',await page.locator('#admin-metiers-liste .validation-metiers-ligne').count()===0 && await page.locator('#badge-admin-metiers').textContent()==='0');
+    await page.evaluate(async()=>{
+      currentRole='admin';
+      const c={id:'TEST-QA-profil',prenom:'Test',nom:'Profil',statut:'actif',metiers:['nettoyage'],activites:['nettoyage'],note:12,numero_partenaire:'PART-0004'};
+      sbFetch=async()=>[c];
+      sbFetchToutePage=async path=>{window.__profilQuery=path;return path.startsWith('missions?')?[{reference_courte:'HC-2026-0001',statut:'terminee',ville_depart:'Paris',ville_arrivee:'Lyon'}]:[c];};
+      window._convoyeursActifsData={};window._candidaturesData={};
+      await ouvrirProfilCandidature(c.id);
+    });
+    check('Profil : ouverture sans cache depuis candidature', (await page.locator('#dossier-content').textContent()).includes('PART-0004'));
+    check('Profil : note et historique effectués', /12 \/ 20/.test(await page.locator('#dossier-content').textContent()) && (await page.locator('#dossier-missions-liste').textContent()).includes('HC-2026-0001'));
+    check('Profil : filtre terminé transmis au serveur', await page.evaluate(()=>__profilQuery.includes('statut=eq.terminee')));
+    await page.evaluate(()=>voirConvoyeurSb('TEST-QA-profil'));
+    check('Fiche : numéro partenaire sans UUID visible', (await page.locator('#dossier-content').textContent()).includes('N° partenaire') && !(await page.locator('#dossier-content').textContent()).includes('TEST-QA-profil'));
+    check('Fiche : accès candidature à la place des métiers', (await page.locator('#dossier-decisions').textContent()).includes('Voir le profil dans Candidatures') && !(await page.locator('#dossier-decisions').textContent()).includes('Validation des métiers'));
+    check('Fiche : blocage rattaché au bon partenaire', await page.evaluate(()=>_partenaireFiche.id==='TEST-QA-profil'));
+    await page.setViewportSize({width:390,height:844});
+    check('Fiche : pas de débordement mobile', await page.evaluate(()=>document.getElementById('modal-dossier').scrollWidth<=window.innerWidth));
+    await page.screenshot({path:'/tmp/pr6-profil-partenaire-mobile.png'});
     check('E1 : aucune exception JavaScript', erreurs.length===0, erreurs.join('; '));
   } finally { await browser.close(); }
   console.log('=== ' + pass + ' PASS / ' + fail + ' FAIL ===');

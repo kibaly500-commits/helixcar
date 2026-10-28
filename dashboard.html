@@ -2065,7 +2065,7 @@ body.scroll-verrouille { overflow: hidden; }
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('dossier')">✕</button>
     <h3 id="dossier-name">Dossier professionnel</h3>
-    <p>Vérifiez les informations avant de valider ou refuser.</p>
+    <p>Profil du partenaire, documents et historique des missions.</p>
     <div id="dossier-content"></div>
     <!-- Décisions par activité : une seule fiche, une décision
          indépendante par activité. Rempli par rendreDecisionsPartenaire(). -->
@@ -3798,7 +3798,7 @@ async function _oppChargerDetail(id) {
   const r = await Promise.all([
     sbAuth.from('v_opportunites_admin').select('*').eq('id', id).limit(1),
     sbAuth.from('opportunite_candidatures').select('id, convoyeur_id, etat, created_at, decidee_le').eq('opportunite_id', id).order('created_at', { ascending: true }),
-    sbFetchToutePage('convoyeurs?select=id,prenom,nom,civilite,activites,statut,bloque')
+    sbFetchToutePage('convoyeurs?select=*')
   ]);
   if (r[0].error) throw new Error(r[0].error.message);
   if (r[1].error) throw new Error(r[1].error.message);
@@ -3865,9 +3865,11 @@ function _oppCandidaturesHtml(detail) {
       else boutons = bt('a_etudier', 'Réétudier');
       html += '<div data-candidature="' + escapeHtml(c.id) + '" style="margin-bottom:6px">'
         + '<strong>' + escapeHtml(nom) + '</strong>'
+        + ' <span class="badge badge-progress" style="font-weight:700">Note : ' + escapeHtml(cv.note == null ? 'Non noté' : cv.note + ' / 20') + '</span>'
+        + ' <span>' + escapeHtml(cv.numero_partenaire || '—') + ' · ' + (cv.nb_missions || 0) + ' mission(s) effectuée(s)</span>'
         + ' <span class="badge badge-pending">' + escapeHtml(etatPersonnel) + '</span>'
         + ' <span style="font-size:.75rem;color:#888">' + escapeHtml((normaliserActivites(cv.activites) || []).map(_oppLibCategorie).join(', ')) + '</span>'
-        + ' <button type="button" class="btn btn-sm btn-outline" style="margin-left:6px" ' + actionHtml('voirConvoyeurSb', [c.convoyeur_id]) + '>Profil</button>'
+        + ' <button type="button" class="btn btn-sm btn-outline" style="margin-left:6px" ' + actionHtml('ouvrirProfilCandidature', [c.convoyeur_id]) + '>Profil</button>'
         + boutons + '</div>';
     });
     html += '</span></div>';
@@ -7347,7 +7349,7 @@ function loadCandidatures() {
           ? '<span class="badge badge-active">✅ Fourni</span>'
           : '<span class="badge badge-pending">⏳ Manquant</span>';
         return '<tr id="cand-' + c.id + '">'
-          + '<td><strong>' + nom + '</strong>' + badgesActivites(c.activites) + '</td>'
+          + '<td><strong>' + nom + '</strong><div>' + escapeHtml(c.numero_partenaire || '—') + '</div>' + badgesActivites(c.activites) + '</td>'
           + '<td>' + escapeHtml(c.email) + '</td>'
           + '<td>' + escapeHtml(c.telephone) + '</td>'
           + '<td>' + escapeHtml(c.experience) + '</td>'
@@ -7388,6 +7390,8 @@ function openDossierSb(id) {
       : '<span class="badge badge-pending">⏳ Manquant</span>';
   };
   document.getElementById('dossier-content').innerHTML = `
+    <div class="detail-row"><span class="detail-label">N° partenaire</span><span class="detail-val">${escapeHtml(c.numero_partenaire || '—')}</span></div>
+    <div class="detail-row"><span class="detail-label">Note</span><span class="detail-val">${escapeHtml(c.note == null ? 'Non noté' : c.note + ' / 20')}</span></div>
     <div class="detail-row"><span class="detail-label">Nom</span><span class="detail-val">${escapeHtml(nom)}</span></div>
     <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
@@ -7404,10 +7408,12 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
+    <div style="margin-top:12px"><strong>Missions effectuées</strong><div id="dossier-missions-liste">Chargement…</div></div>
   `;
   // Décisions par activité + état de blocage RÉELLEMENT enregistré.
   preparerFichePartenaire(c);
   openModal('dossier');
+  chargerMissionsEffectueesPartenaire(id);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -7670,14 +7676,18 @@ function _majBoutonBlocage(bloque, partenaire) {
 
 // Prépare la fiche ouverte : identité, état de blocage RÉEL (jamais une
 // valeur supposée) et décisions par activité.
-async function preparerFichePartenaire(convoyeur) {
+async function preparerFichePartenaire(convoyeur, profilSeulement) {
+  _partenaireFiche = { id: convoyeur.id, nom: [convoyeur.prenom, convoyeur.nom].filter(Boolean).join(' '), civilite: convoyeur.civilite || null, activites: normaliserActivites(convoyeur.activites), decisions: {} };
   window._currentConvNom = (((convoyeur && convoyeur.prenom) || '') + ' ' + ((convoyeur && convoyeur.nom) || '')).trim()
     || 'ce partenaire';
   window._currentConvBlocked = !!(convoyeur && convoyeur.bloque);
   _majBoutonBlocage(window._currentConvBlocked, convoyeur);
   const groupeMotif = document.getElementById('block-reason-group');
   if (groupeMotif) groupeMotif.style.display = 'none';
-  await rendreDecisionsPartenaire(convoyeur);
+  if (profilSeulement) {
+    const zone = document.getElementById('dossier-decisions');
+    if (zone) zone.innerHTML = '<button type="button" class="btn btn-dark" ' + actionHtml('ouvrirProfilCandidature', [convoyeur.id]) + '>Voir le profil dans Candidatures</button>';
+  } else await rendreDecisionsPartenaire(convoyeur);
 }
 
 // ── RE-VÉRIFICATION D'UNE SESSION PARTENAIRE DÉJÀ OUVERTE ───
@@ -7935,7 +7945,7 @@ function afficherConvoyeursActifs(rows) {
     const actionCreationCompte = c.auth_user_id
       ? ''
       : '<button class="btn btn-sm btn-outline" ' + actionHtml('renvoyerLienCreationPartenaire', [c.id]) + '>✉ Renvoyer le lien</button>';
-    return '<tr' + (bloque ? ' class="blocked"' : '') + '><td><strong>' + nom + '</strong></td><td>' + escapeHtml(c.email) + '</td>'
+    return '<tr' + (bloque ? ' class="blocked"' : '') + '><td><strong>' + nom + '</strong><div>' + escapeHtml(c.numero_partenaire || '—') + '</div></td><td>' + escapeHtml(c.email) + '</td>'
       + '<td>' + (c.nb_missions || 0) + '</td><td>' + (c.km_total || 0) + ' km</td>'
       + '<td>' + _badgeEtatPartenaire(c) + '</td>'
       + '<td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" ' + actionHtml('voirConvoyeurSb', [c.id]) + '>Voir</button>'
@@ -7951,7 +7961,7 @@ function filtrerConvoyeursActifs(texte) {
   const filtres = tous.filter(function(c) {
     const nom = ((c.prenom || '') + ' ' + (c.nom || '')).toLowerCase();
     const email = (c.email || '').toLowerCase();
-    return nom.indexOf(t) !== -1 || email.indexOf(t) !== -1;
+    return nom.indexOf(t) !== -1 || email.indexOf(t) !== -1 || (c.numero_partenaire || '').toLowerCase().indexOf(t) !== -1;
   });
   afficherConvoyeursActifs(filtres);
 }
@@ -8007,8 +8017,48 @@ function _lienRibAdmin(c) {
     : '<span class="badge badge-pending">⏳ Manquant</span>';
 }
 
+
+var _profilCandidatureRequete = 0;
+async function ouvrirProfilCandidature(id) {
+  if (currentRole !== 'admin') return;
+  const requete = ++_profilCandidatureRequete;
+  try {
+    const rows = await sbFetch('convoyeurs?id=eq.' + encodeURIComponent(id));
+    if (requete !== _profilCandidatureRequete || currentRole !== 'admin') return;
+    const c = (rows || [])[0];
+    if (!c) throw new Error('Profil indisponible');
+    closeModal('opportunite');
+    closeModal('dossier');
+    showPage('admin-candidatures');
+    window._candidaturesData = window._candidaturesData || {};
+    window._candidaturesData[id] = c;
+    window._convoyeursActifsData = window._convoyeursActifsData || {};
+    window._convoyeursActifsData[id] = c;
+    openDossierSb(id);
+  } catch (e) { alert('Impossible de charger ce profil. Réessayez.'); }
+}
+function chargerMissionsEffectueesPartenaire(id) {
+  const cible = document.getElementById('dossier-missions-liste');
+  return sbFetchToutePage('missions?convoyeur_id=eq.' + encodeURIComponent(id) + '&statut=eq.terminee&order=date_prise_en_charge.desc&select=reference_courte,reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
+    .then(function(rows) {
+      const el = document.getElementById('dossier-missions-liste');
+      if (!el || el !== cible) return;
+      if (!rows || rows.length === 0) { el.textContent = 'Aucune mission effectuée pour le moment.'; return; }
+      el.innerHTML = rows.map(function(m) {
+        const dateStr = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleDateString('fr-FR') : '—';
+        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">'
+          + '<span>' + escapeHtml(referenceMission(m)) + ' · ' + escapeHtml(m.ville_depart || '') + ' → ' + escapeHtml(m.ville_arrivee || '') + ' · ' + dateStr + '</span>'
+          + '<span style="color:#888">' + escapeHtml(m.statut) + '</span></div>';
+      }).join('');
+    })
+    .catch(function() {
+      const el = document.getElementById('dossier-missions-liste');
+      if (el && el === cible) el.textContent = 'Erreur de chargement des missions.';
+    });
+}
+
 function voirConvoyeurSb(id) {
-  const c = (window._convoyeursActifsData || {})[id];
+  const c = (window._convoyeursActifsData || {})[id] || (window._candidaturesData || {})[id];
   if (!c) return;
   const nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim();
   const note = (c.note != null) ? c.note + ' / 20' : 'Non noté';
@@ -8025,7 +8075,7 @@ function voirConvoyeurSb(id) {
 
   document.getElementById('dossier-name').textContent = _accordPartenaire(c, 'Professionnel', 'Professionnelle') + ' — ' + nom;
   document.getElementById('dossier-content').innerHTML = `
-    <div class="detail-row"><span class="detail-label">N° ${_accordPartenaire(c, 'convoyeur', 'convoyeuse')}</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${id}</span></div>
+    <div class="detail-row"><span class="detail-label">N° partenaire</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${escapeHtml(c.numero_partenaire || '—')}</span></div>
     <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
     <div class="detail-row"><span class="detail-label">Missions</span><span class="detail-val" id="dossier-stats-missions">${c.nb_missions || 0}</span></div>
@@ -8044,27 +8094,12 @@ function voirConvoyeurSb(id) {
   // CORRECTION : l'état de blocage était codé en dur à false, si bien que
   // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la
   // ligne réellement enregistrée, comme le fait le contrôle d'accès.
-  preparerFichePartenaire(c);
+  preparerFichePartenaire(c, true);
   document.getElementById('dossier-stats-note').dataset.partenaireId = id;
   openModal('dossier');
   if (window.HCSync) window.HCSync.request(0);
 
-  sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference_courte,reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
-    .then(function(rows) {
-      const el = document.getElementById('dossier-missions-liste');
-      if (!el) return;
-      if (!rows || rows.length === 0) { el.textContent = 'Aucune mission pour le moment.'; return; }
-      el.innerHTML = rows.map(function(m) {
-        const dateStr = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleDateString('fr-FR') : '—';
-        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">'
-          + '<span>' + escapeHtml(referenceMission(m)) + ' · ' + escapeHtml(m.ville_depart || '') + ' → ' + escapeHtml(m.ville_arrivee || '') + ' · ' + dateStr + '</span>'
-          + '<span style="color:#888">' + escapeHtml(m.statut) + '</span></div>';
-      }).join('');
-    })
-    .catch(function() {
-      const el = document.getElementById('dossier-missions-liste');
-      if (el) el.textContent = 'Erreur de chargement des missions.';
-    });
+  chargerMissionsEffectueesPartenaire(id);
 }
 
 async function _appelerValidationPartenaire(convoyeurId, action) {
@@ -15200,7 +15235,7 @@ function declencherChampFichier(id) {
   'ouvrirPhotosMission', 'ouvrirRibPartenaire', 'ouvrirVideoCandidature', 'previsualiserDevis',
   'refuserConvoyeur', 'renvoyerLienCreationPartenaire', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',
-  'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb',
+  'validerMissionPourPaiement', 'validerPrestationNettoyage', 'voirConvoyeurSb', 'ouvrirProfilCandidature',
   'voirDemandesClientAdmin', 'voirPhotosMission'
 ].forEach(function (nom) {
   var fn = window[nom];

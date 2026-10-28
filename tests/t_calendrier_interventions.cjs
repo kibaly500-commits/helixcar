@@ -1,7 +1,14 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const source=fs.readFileSync('dashboard.html','utf8');
 const a=source.indexOf('var filtresMissionsAdmin ='),b=source.indexOf('\nfunction loadMissions()',a);
-let timer;const c={Intl,Date,Map,Set,document:{querySelectorAll:()=>[]},setInterval:fn=>timer=fn,escapeHtml:s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),_dvDate:s=>s};vm.createContext(c);vm.runInContext(source.slice(a,b),c);
+let timer;const c={Intl,Date,Map,Set,document:{querySelectorAll:()=>[]},setInterval:fn=>timer=fn,escapeHtml:s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),_dvDate:s=>s};vm.createContext(c);
+const acorn=require('acorn');
+for(const script of source.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)){
+ const ast=acorn.parse(script[1],{ecmaVersion:'latest'});
+ const fn=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='remunerationFacturable');
+ if(fn)vm.runInContext(script[1].slice(fn.start,fn.end),c);
+}
+vm.runInContext(source.slice(a,b),c);
 let n=0;function check(name,ok){assert.ok(ok,name);console.log('PASS '+name);n++}
 const m={id:'m',convoyeur_id:'p',type_mission:'professionnel',statut:'acceptee',date_intervention:'2026-11-20',date_fin_intervention:'2026-11-30',heure_debut_intervention:'08:30',heure_fin_intervention:'17:30',ville_intervention:'Paris',consignes:'Consignes privées <script>',prestation:'Diagnostic',remuneration_prevue:300};
 for(const [time,key] of [['2026-11-20T07:29Z','a_venir'],['2026-11-20T07:30Z','en_cours'],['2026-11-20T20:00Z','en_cours'],['2026-11-30T08:00Z','en_cours'],['2026-11-30T16:29Z','en_cours'],['2026-11-30T16:30Z','a_confirmer'],['2026-12-01T08:00Z','a_confirmer']])check(time,c.statutIntervention(m,new Date(time)).cle===key);
