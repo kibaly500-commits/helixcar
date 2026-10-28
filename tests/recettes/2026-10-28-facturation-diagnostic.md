@@ -9,3 +9,7 @@ Réparation ciblée de la facture de test non payée : total 0 → 300 EUR, stat
 Vérifications : tests de calcul, soumission, montants invalides, sélection multiple, exclusion des missions déjà facturées, validation HelixCar obligatoire, lettre signée pour convoyage uniquement et délai entre factures. Suites mission_nettoyage (74 contrôles) et d01_dashboard (20 contrôles) réussies.
 
 Limites : ces tests sont locaux avec doubles de données. Le parcours navigateur réel complet jusqu'à facturation n'est pas encore terminé. Le calcul du montant et les contrôles de génération restent côté interface : un renforcement serveur transactionnel (montant, validations, doublons concurrents) reste à traiter séparément. Planning non modifié par ce correctif.
+
+## Règle finale confirmée par le propriétaire
+
+Le montant fixé avant publication est la seule source du prix partenaire. Suppression du repli historique à 50 %, y compris dans Mes missions (convoyage et interventions). Un montant absent ne produit aucune facture à zéro : il est signalé « à vérifier ». Les anciennes factures restent inchangées. Le contrôle de la base montre encore des missions historiques sans remuneration_prevue ; aucun montant n'a été inventé ni déduit du prix client pour ces lignes.

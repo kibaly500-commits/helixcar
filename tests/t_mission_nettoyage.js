@@ -359,6 +359,7 @@ window.fetch = function(u, o){
     _currentConvoyeur = { id: 'p-nett', prenom: 'TEST-QA', nom: 'Nettoyeur', activites: ['nettoyage'] };
     const m = window.__db.missions.filter(x => x.type_mission === 'nettoyage')[0];
     m.convoyeur_id = 'p-nett';
+    m.remuneration_prevue = 225; // Montant fixé par l’admin, distinct de 50 % du prix client.
     m.statut = 'acceptee';
     showPage('convoyeur-historique');
   });
@@ -368,7 +369,7 @@ window.fetch = function(u, o){
   check('D2 : le détail contient ses consignes d’intervention', await page.locator('#conv-interventions-table').textContent().then(t=>t.includes('Contact')&&t.includes('Lilas')));
   check('D3 : aucun état des lieux, lettre de voiture ni photo obligatoire', !/Avant \(0\)|Après \(0\)|État des lieux|Lettre de voiture/.test(histo));
   check('D4 : le suivi ne demande pas de clic de démarrage ou de fin', !/Intervention terminée|Commencer/.test(histo));
-  check('D4 bis : seul le montant partenaire est affiché', /240 €/.test(histo)&&!/480 €/.test(histo));
+  check('D4 bis : seul le montant partenaire est affiché', /225 €/.test(histo)&&!/480 €|240 €/.test(histo));
   // Compatibilité de lecture des anciennes photos : facultatives et privées.
   const missionId = await page.evaluate(() =>
     window.__db.missions.filter(x => x.type_mission === 'nettoyage')[0].id);

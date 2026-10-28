@@ -19,10 +19,13 @@ vm.createContext(ctx); vm.runInContext(source, ctx);
 for(const [m,expected] of [
  [{prix_ttc:null,remuneration_prevue:'300'},300],
  [{prix_ttc:900,remuneration_prevue:300},300],
- [{prix_ttc:900},450],
+ [{prix_ttc:900},null],
  [{prix_ttc:900,remuneration_prevue:0},null],
  [{prix_ttc:900,remuneration_prevue:'invalide'},null],
  [{prix_ttc:null},null],
+ [{prix_ttc:900,remuneration_prevue:''},null],
+ [{type_mission:'convoyage',prix_ttc:800,remuneration_prevue:225},225],
+ [{type_mission:'nettoyage',prix_ttc:600,remuneration_prevue:180},180],
  [{remuneration_prevue:99.99},99.99]
 ]) assert.equal(ctx.remunerationFacturable(m),expected);
 function select(amount){return {getAttribute:k=>k==='data-mission-id'?'mission-test':String(amount)};}
@@ -44,5 +47,5 @@ function select(amount){return {getAttribute:k=>k==='data-mission-id'?'mission-t
  assert.doesNotMatch(list,/data-mission-id="(?:sans-validation|sans-lettre|sans-prix)"/);
  invoices=[{mission_ids:['diagnostic'],reference:'FAC-TEST',montant_total:300}];
  await ctx.loadFacturationConvoyeur();assert.doesNotMatch(elements['fc-conv-missions-list'].innerHTML,/data-mission-id="diagnostic"/);
- console.log('PASS rémunération explicite, diagnostic 300 €, compatibilité historique, montants invalides, total exact et délai de facturation');
+ console.log('PASS rémunération explicite, diagnostic 300 €, aucun repli sur le prix client, montants invalides, total exact et délai de facturation');
 })().catch(e=>{console.error(e);process.exitCode=1;});

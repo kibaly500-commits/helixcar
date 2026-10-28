@@ -8697,7 +8697,7 @@ function ligneIntervention(m, admin, actions, client, partenaire) {
     + (m.consignes ? '<br><span style="white-space:pre-wrap">' + escapeHtml(m.consignes) + '</span>' : '');
   const lieu = escapeHtml(m.ville_intervention || 'Lieu à préciser');
   const fiche = '<details><summary class="btn btn-sm btn-outline">Voir les détails</summary><div style="padding:12px 0;max-width:520px;white-space:normal;overflow-wrap:anywhere">'+informations+'</div></details>';
-  const montant = admin ? m.prix_ttc : m.remuneration_prevue != null ? m.remuneration_prevue : m.prix_ttc != null ? Math.round(Number(m.prix_ttc)*0.5) : null;
+  const montant = admin ? m.prix_ttc : remunerationFacturable(m);
   return '<tr><td>' + details + (admin ? '</td><td>' : '<br>') + lieu + '</td>'
     + (admin ? '<td>' + client + '</td><td>' + partenaire + '</td>' : '')
     + '<td>' + escapeHtml(periodeIntervention(m)) + '</td><td>' + escapeHtml(horairesIntervention(m)) + '</td>'
@@ -9410,7 +9410,7 @@ function chargerMissionsAttribuees(enCours) {
           + '<td>' + quand + '</td>'
           + '<td>' + (estNettoyage ? '—' : dateLivr) + '</td>'
           + '<td><strong style="color:var(--green)">'
-          + (m.preparation_id && m.remuneration_prevue != null ? escapeHtml(String(m.remuneration_prevue)) + ' €' : (m.prix_ttc != null ? Math.round(Number(m.prix_ttc) * 0.50) + ' €' : '—')) + '</strong></td>'
+          + (remunerationFacturable(m) != null ? escapeHtml(String(remunerationFacturable(m))) + ' €' : 'À vérifier') + '</strong></td>'
           + '<td>' + badge + '</td>'
           + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
       }).join('');
@@ -9455,9 +9455,8 @@ function remunerationFacturable(m) {
     const montant = Number(explicite);
     return Number.isFinite(montant) && montant > 0 ? Math.round(montant * 100) / 100 : null;
   }
-  // Compatibilité des anciennes missions : rémunération affichée à 50 % du prix client.
-  const prix = Number(m.prix_ttc);
-  return Number.isFinite(prix) && prix > 0 ? Math.round(prix * 0.5) : null;
+  // Seul le montant partenaire validé pour la publication fait référence.
+  return null;
 }
 
 // --- Côté convoyeur ---
