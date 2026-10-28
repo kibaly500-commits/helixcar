@@ -8011,7 +8011,7 @@ function voirConvoyeurSb(id) {
   const c = (window._convoyeursActifsData || {})[id];
   if (!c) return;
   const nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim();
-  const note = (c.note != null) ? c.note : '—';
+  const note = (c.note != null) ? c.note + ' / 20' : 'Non noté';
   const noteVal = parseFloat(note);
   const noteColor = noteVal >= 16 ? 'var(--green)' : noteVal >= 12 ? 'var(--yellow)' : 'var(--red)';
   // L'URL vient de la base : « javascript:… » s'exécuterait au clic, et
@@ -8028,9 +8028,9 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">N° ${_accordPartenaire(c, 'convoyeur', 'convoyeuse')}</span><span class="detail-val" style="font-family:monospace;font-weight:700;color:var(--blue-mid)">${id}</span></div>
     <div class="detail-row"><span class="detail-label">Civilité</span><span class="detail-val">${escapeHtml(_libelleCivilite(c))}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${escapeHtml(c.email)}</span></div>
-    <div class="detail-row"><span class="detail-label">Missions</span><span class="detail-val">${c.nb_missions || 0}</span></div>
-    <div class="detail-row"><span class="detail-label">Km total</span><span class="detail-val">${c.km_total || 0} km</span></div>
-    <div class="detail-row"><span class="detail-label">Note</span><span class="detail-val" style="color:${noteColor};font-weight:700;font-size:1rem">${note}</span></div>
+    <div class="detail-row"><span class="detail-label">Missions</span><span class="detail-val" id="dossier-stats-missions">${c.nb_missions || 0}</span></div>
+    <div class="detail-row"><span class="detail-label">Km total</span><span class="detail-val" id="dossier-stats-km">${c.km_total || 0} km</span></div>
+    <div class="detail-row"><span class="detail-label">Note</span><span class="detail-val" id="dossier-stats-note" style="color:${c.note == null ? 'inherit' : noteColor};font-weight:700;font-size:1rem">${note}</span></div>
     <div class="detail-row"><span class="detail-label">Statut</span><span class="detail-val" id="dossier-statut-partenaire">${_badgeEtatPartenaire(c)}</span></div>
     ${_partenaireEstBloque(c) ? `<div class="detail-row"><span class="detail-label">Motif du blocage</span><span class="detail-val">${escapeHtml(c.bloque_motif || 'Non précisé')}</span></div>
     <div class="detail-row"><span class="detail-label">${_accordPartenaire(c, 'Bloqué', 'Bloquée')} le</span><span class="detail-val">${escapeHtml((typeof _dateHeureFr === 'function' ? _dateHeureFr(c.bloque_le) : c.bloque_le) || '—')}</span></div>` : ''}
@@ -8045,7 +8045,9 @@ function voirConvoyeurSb(id) {
   // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la
   // ligne réellement enregistrée, comme le fait le contrôle d'accès.
   preparerFichePartenaire(c);
+  document.getElementById('dossier-stats-note').dataset.partenaireId = id;
   openModal('dossier');
+  if (window.HCSync) window.HCSync.request(0);
 
   sbFetchToutePage('missions?convoyeur_id=eq.' + id + '&order=date_prise_en_charge.desc&select=reference_courte,reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
     .then(function(rows) {

@@ -17,7 +17,7 @@
     'client-missions': ['loadMissionsClient'], 'client-infos': ['loadInfosClient'],
     'client-fidelite': ['loadFideliteClient'], 'client-notation': ['loadEvaluationsClient'],
     'client-profil': ['hcSyncProfilClient'],
-    'convoyeur-dashboard': ['loadDashboardMissionsPreview'],
+    'convoyeur-dashboard': ['loadDashboardMissionsPreview', 'hcSyncStatsPartenaire'],
     'convoyeur-missions': ['loadMissionsConvoyeur'],
     'convoyeur-opportunites': ['loadOpportunitesPartenaire'],
     'convoyeur-historique': ['loadHistoriqueConvoyeur'],
@@ -74,10 +74,46 @@
     remplirProfilConvoyeur(res.data);
     if (typeof chargerMesBadges === 'function') await chargerMesBadges();
   };
+  window.hcSyncStatsPartenaire = async function () {
+    var cycle = context, conv = window._currentConvoyeur;
+    if (!conv) return;
+    var res = await sbAuth.from('convoyeurs').select('id,note,nb_missions,km_total').eq('id', conv.id).single();
+    if (res.error || !res.data || !safe(cycle) || window._currentConvoyeur !== conv) return;
+    Object.assign(conv, res.data);
+    var km = document.getElementById('conv-stat-km');
+    if (km) km.textContent = (conv.km_total || 0).toLocaleString('fr-FR');
+  };
+  // Seuls ces textes dérivés peuvent changer dans une fiche ouverte.
+  async function syncStatsDossier() {
+    var target = document.getElementById('dossier-stats-note');
+    if (role() !== 'admin' || !target || !target.closest('.modal-overlay.open')) return;
+    var id = target.dataset.partenaireId, token = epoch, user = session && session.user.id;
+    if (!id) return;
+    var res = await sbAuth.from('convoyeurs').select('id,note,nb_missions,km_total').eq('id', id).single();
+    if (res.error || !res.data || !visible() || token !== epoch || role() !== 'admin' ||
+        !session || session.user.id !== user || document.getElementById('dossier-stats-note') !== target ||
+        !target.closest('.modal-overlay.open')) return;
+    var c = res.data;
+    function set(id, value) {
+      var el = document.getElementById(id);
+      if (el && el.textContent !== String(value)) el.textContent = value;
+    }
+    set('dossier-stats-missions', c.nb_missions || 0);
+    set('dossier-stats-km', (c.km_total || 0) + ' km');
+    set('dossier-stats-note', c.note == null ? 'Non noté' : c.note + ' / 20');
+    target.style.color = c.note == null ? 'inherit' : c.note >= 16 ? 'var(--green)' : c.note >= 12 ? 'var(--yellow)' : 'var(--red)';
+    if (window._convoyeursActifsData && window._convoyeursActifsData[id]) Object.assign(window._convoyeursActifsData[id], c);
+  }
   async function refresh() {
     clearTimeout(debounce); debounce = null;
     if (!visible()) { pending = true; return; }
-    if (running || editing()) { pending = true; plan(); return; }
+    if (running) { pending = true; plan(); return; }
+    if (editing()) {
+      pending = true; running = true;
+      try { await syncStatsDossier(); } catch (e) { /* Nouvelle tentative au prochain signal. */ }
+      finally { running = false; plan(); }
+      return;
+    }
     running = true; pending = false; lastRun = Date.now(); rememberDetails();
     var cycle = { epoch: ++epoch, page: page(), revision: revision };
     var scroll = { x: window.scrollX, y: window.scrollY }, scrollChanged = false;
@@ -167,7 +203,7 @@
     var url = typeof input === 'string' ? input : input && input.url || '';
     var method = (options && options.method || input && input.method || 'GET').toUpperCase();
     var isWrite = url.indexOf(SUPABASE_URL + '/') === 0 && method !== 'GET' && method !== 'OPTIONS' &&
-      (!url.includes('/rpc/') || /\/(enregistrer|valider|corriger|soumettre|accepter|refuser|publier|postuler|annuler|supprimer|confirmer|modifier|finaliser|decider|repondre|mettre)/.test(url));
+      (!url.includes('/rpc/') || /\/(evaluer|enregistrer|valider|corriger|soumettre|accepter|refuser|publier|postuler|annuler|supprimer|confirmer|modifier|finaliser|decider|repondre|mettre)/.test(url));
     var startRevision = revision, startPage = page();
     return originalFetch.apply(this, arguments).then(function (response) {
       if (isWrite && response.ok) (response.status === 204 ? Promise.resolve(null) : response.clone().json()).then(function (body) {
