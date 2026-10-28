@@ -1,0 +1,12 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const P=require('../assets/preparation-missions.js');
+const base={title:'Convoyage',category:'convoyage',rows:[{label:'Départ',value:'Paris'},{label:'Arrivée',value:'Lille'}],mission:{},remuneration:500,carburant_peages:140};
+const ui=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
+const code=ui.slice(ui.indexOf('  function card('),ui.indexOf('  window.hcPreparationCarteOpportunite='));
+const card=new Function('const esc=v=>String(v??""),display=esc,money=v=>Number(v).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});'+code+';return card;')();
+test('500 total dont 140 : montant inclus sauvegardé dans les lignes publiques',()=>{const a=P.publicData(base);assert.equal(a.remuneration,500);assert.equal(a.rows.find(r=>r.label==='Carburant et péages inclus (€)').value,'140');const persisted={title:a.title,category:a.category,rows:a.rows,remuneration:a.remuneration};const html=card(persisted);assert.match(html,/dont 140\s*€ pour carburant et péages/);assert.match(html,/500\s*€/);assert(!/640\s*€/.test(html));});
+test('ancien brouillon ou champ vide : aucune mention inventée',()=>{for(const carburant_peages of [undefined,null,''])assert(!card(P.publicData({...base,carburant_peages})).includes('pour carburant'));});
+test('zéro est une saisie explicite',()=>{assert.match(card(P.publicData({...base,carburant_peages:0})),/dont 0\s*€/);});
+test('frais négatifs, non numériques ou supérieurs au total refusés',()=>{for(const carburant_peages of [-1,501,NaN,Infinity])assert(P.fraisErrors({...base,carburant_peages}).length);for(const remuneration of [null,undefined,''])assert(P.fraisErrors({...base,remuneration}).length);for(const carburant_peages of [0,140,500])assert.deepEqual(P.fraisErrors({...base,carburant_peages}),[]);});
+test('nettoyage et besoins professionnels sans mention convoyage',()=>{for(const category of ['nettoyage','renfort','technicien'])assert(!card(P.publicData({...base,category})).includes('pour carburant'));});
+test('brouillon sérialisé conserve le total et la ventilation',()=>{const p=JSON.parse(JSON.stringify(base));assert.equal(p.carburant_peages,140);assert.equal(p.remuneration,500);assert.deepEqual(P.fraisErrors(p),[]);});

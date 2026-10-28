@@ -1,0 +1,19 @@
+# Forfait kilométrique approuvé
+
+Hors Île-de-France : distance aller uniquement × 0,22 €/km. Ce montant forfaitaire inclut carburant et péages et ne représente pas leur coût exact. Aucun fournisseur de péages n’est nécessaire ni appelé.
+
+En Île-de-France : rémunération forfaitaire et kilomètres, sans frais de route distincts. La garde convoyeur est calculée par période de garde d’un véhicule : 0 € avant 4 jours, 25 € de 4 à moins de 8 jours, 50 € de 8 à moins de 12 jours, puis 25 € par tranche complète de 4 jours. Les périodes de deux véhicules ne sont pas cumulées pour atteindre un palier. Le seuil organisationnel de 5 jours et les dérogations restent inchangés. Le dépôt HelixCar en est exclu.
+
+Le calcul conserve au minimum 30 % du devis. Les 70 % constituent un plafond : chaque mission reçoit son barème kilométrique aller plus ses frais et suppléments, sans redistribution du solde disponible. Le reliquat reste à HelixCar avant ses autres frais. Si le barème dépasse le plafond, seule la part travail est réduite proportionnellement entre les missions modifiables. Les frais, suppléments restitution et garde sont conservés. Si ces coûts et les missions fixées dépassent déjà le plafond, le recalcul est bloqué sans remplacer les prix. L’administration voit le travail de référence et le travail ajusté. Les missions publiées gardent leur prix. Les prix peuvent être ajustés avant validation et le dépassement du budget est signalé.
+
+Les distances existantes ou saisies sont utilisées directement. Les distances vides sont remplies automatiquement à l’ouverture, y compris pour les anciens brouillons. IGN Géoplateforme est disponible sans clé ; ORS peut être utilisé si configuré. Les prix existants sont conservés à l’ouverture. Le bouton global effectue un recalcul explicite. En cas d’adresse imprécise ou de panne, une erreur est affichée et la saisie manuelle reste possible. Aucun abonnement ni repli facturable. Les montants restent en brouillon jusqu’à enregistrement et aucune mission n’est publiée automatiquement.
+
+Le contrôle 30/70 concerne cet écran ; il ne remplace pas une contrainte comptable globale pour d’autres outils. Les tests de calcul sont exécutés ; la validation navigateur authentifiée reste à effectuer.
+
+IGN : itinéraire voiture le plus rapide sur le réseau français, sans exclusion des autoroutes et péages, hors trafic réel. Cache mémoire borné à 300 trajets / 24 h et espacement des appels par instance. La géolocalisation refuse les codes postaux incohérents, les centres de commune et les réponses de confiance insuffisante.
+
+Restitution : 20 € de supplément de rémunération lorsque le trajet de restitution est entièrement en Île-de-France. Sinon, frais retour égaux à 50 % des frais forfaitaires aller (aller conservé intégralement). Seul le kilométrage aller est affiché et utilisé pour le tarif de base. Pour une restitution après stockage répartie sur plusieurs missions, le supplément est affecté à la mission finale une seule fois. Ces montants sont prélevés dans le budget global de 70 %, pas ajoutés au devis client. Un recalcul explicite est nécessaire pour remplacer les prix des brouillons existants.
+
+La distance affichée et le tarif de base utilisent uniquement le premier trajet (aller), jamais la somme aller et restitution. La restitution ajoute uniquement le supplément convenu. Les anciens brouillons sont normalisés depuis distance_aller ; sans cette valeur, le calcul routier est relancé. Les missions publiées sont inchangées.
+
+Arrondi : prix final au multiple de 5 € le plus proche ; en cas de dépassement du plafond global, réduction par pas de 5 € avec le plus faible écart supplémentaire au tarif non arrondi. Les coûts fixes restent couverts, sinon le calcul bloque. Distances positives arrondies au kilomètre entier (minimum 1 km). Les missions déjà publiées restent inchangées.

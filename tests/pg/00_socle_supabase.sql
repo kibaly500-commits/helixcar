@@ -75,6 +75,7 @@ create table if not exists public.convoyeurs (
   activites    text[],
   id_url       text,
   permis_url   text,
+  kbis_url     text,
   rc_pro_url   text,
   rib_iban     text,
   statut       text not null default 'en_attente',
@@ -120,6 +121,18 @@ create table if not exists public.devis (
   statut          text not null default 'brouillon',
   date_generation timestamptz not null default now()
 );
+-- Colonnes REELLEMENT presentes en production, lues et ecrites par la
+-- fonction serveur devis-secure (index.ts) : sans elles, la migration
+-- 106 et son journal ne pourraient pas etre eprouves.
+alter table public.devis
+  add column if not exists date_envoi             timestamptz,
+  add column if not exists date_acceptation       timestamptz,
+  add column if not exists date_refus             timestamptz,
+  add column if not exists motif_refus            text,
+  add column if not exists pdf_path               text,
+  add column if not exists acceptation_token_hash text,
+  add column if not exists date_expiration_token  timestamptz,
+  add column if not exists snapshot_devis         jsonb;
 
 create table if not exists public.missions (
   id           uuid primary key default gen_random_uuid(),
@@ -141,6 +154,13 @@ create table if not exists public.missions (
   distance_km  numeric,
   created_at   timestamptz not null default now()
 );
+-- Colonnes de production lues par la vue v_mes_missions (migration 111)
+-- et par le Dashboard : le schéma réel les porte déjà.
+alter table public.missions
+  add column if not exists date_prise_en_charge timestamptz,
+  add column if not exists date_livraison  timestamptz,
+  add column if not exists marque_modele   text,
+  add column if not exists immatriculation text;
 
 create table if not exists public.clients (
   id                    uuid primary key default gen_random_uuid(),

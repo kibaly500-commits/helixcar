@@ -18,17 +18,17 @@ Chrome Android, Safari iPhone.
 
 | # | Étape | Attendu |
 |---|---|---|
-| 1 | Formulaire partenaire, cocher **Nettoyage** seul | Aucune zone vidéo affichée |
-| 2 | Cocher **Convoyage** | Zone vidéo affichée, « **1 minute maximum** » |
+| 1 | Formulaire partenaire, cocher **Nettoyage** seul | Zone vidéo affichée, « **2 minutes maximum** » |
+| 2 | Cocher **Convoyage** | Zone vidéo affichée, « **2 minutes maximum** » |
 | 3 | Cocher aussi **Renfort** | « **2 minutes maximum** », toujours **une seule** zone |
 | 4 | « Enregistrer une vidéo » sur téléphone | L'appareil photo s'ouvre |
 | 5 | Enregistrer ~20 s puis valider | Nom, taille et **durée** affichés, « Vidéo prête à être envoyée » |
 | 6 | « Choisir un fichier » → **MP4** de ~30 s | Accepté, durée correcte affichée |
 | 7 | Idem avec un **MOV** (iPhone) de ~30 s | Accepté, durée correcte affichée |
 | 8 | Idem avec un **WebM** de ~30 s | Accepté, durée correcte affichée |
-| 9 | MP4 de **1 min 30** avec Convoyage seul | Refusé : « Vidéo trop longue… Remplacez-la » |
-| 10 | Cocher **Renfort** sans rien changer d'autre | La même vidéo **redevient valide** |
-| 11 | Décocher **Renfort** (Convoyage reste) | Elle **repasse** à « à remplacer », **Continuer** rebloqué |
+| 9 | MP4 de **1 min 30** avec Convoyage seul | Accepté : « Vidéo prête à être envoyée » |
+| 10 | Cocher **Renfort** sans rien changer d'autre | La même vidéo reste valide |
+| 11 | Décocher **Renfort** (Convoyage reste) | Elle reste valide, la limite commune ne change pas |
 | 12 | MP4 de **2 min 30** | Refusé même avec Renfort |
 | 13 | Fichier **.avi** ou **.mkv** | « Format non pris en charge » |
 | 14 | Fichier vidéo **> 300 Mo** | « Fichier trop volumineux » |
@@ -37,6 +37,10 @@ Chrome Android, Safari iPhone.
 | 16 | « Supprimer » | Retour aux deux boutons, **Continuer** rebloqué |
 | 17 | Soumettre la candidature | Barre de progression, puis « Vidéo envoyée » |
 | 18 | Couper le réseau pendant l'envoi | Message d'interruption, candidature **non finalisée**, réessai possible |
+| 19 | **Lot V01** — cas réel : MOV iPhone de **1 min 59 s / 214,6 Mo**, métier Renfort | Accepté, envoyé, **« Vidéo envoyée »**, candidature visible dans le Dashboard avec « Voir la vidéo », puis connexion à l'espace partenaire possible après création du compte (la validation métier reste une décision administrateur) |
+| 20 | **Lot V01** — fichier `.txt` renommé en `.mp4` | Refusé à la confirmation : « n'est pas une vidéo MP4, MOV ou WebM lisible », candidature **non finalisée** |
+| 21 | **Lot V01** — couper le réseau **juste après** la barre à 100 % puis relancer | La relance répond immédiatement « Vidéo envoyée » sans renvoyer le fichier (confirmation idempotente) |
+| 22 | **Lot V01** — Dashboard, candidature dont l'envoi a été abandonné | Badge « Envoi en cours, non finalisé », jamais « Manquante » ni « Voir la vidéo » |
 
 > Point 5 particulièrement important sur **Android** : les vidéos issues
 > d'un enregistrement direct n'indiquent parfois pas leur durée dans leur
@@ -76,7 +80,7 @@ mettent en jeu les refus réels de Supabase.
 | 13 | Copier l'URL signée, attendre **> 5 min**, la rouvrir | **Expirée**, plus aucune lecture |
 | 14 | Ouvrir `…/object/public/candidatures-videos/<chemin>` | **Erreur** — le bucket est privé |
 | 15 | Remplacer la vidéo de **A** depuis son espace, puis lister `candidatures/<id A>/` | **Un seul** fichier : aucun orphelin |
-| 16 | Vérifier en base | `video_chemin` renseigné, **aucune URL** stockée, `video_upload_jeton_hash` à `null` après confirmation |
+| 16 | Vérifier en base | `video_chemin`, `video_mime`, `video_taille_octets` et `video_envoyee_le` renseignés **ensemble**, **aucune URL** stockée ; `video_envoi_chemin` vidé ; `video_upload_jeton_consomme_le` renseigné après confirmation (l'empreinte du jeton est conservée pour rendre la confirmation idempotente, mais un jeton consommé n'autorise plus aucune écriture — contrôle 5) |
 | 17 | Inspecter le JavaScript servi au navigateur | Aucune clé `service_role` ; seule la clé `anon` est présente |
 
 ### Commandes utiles
@@ -92,10 +96,17 @@ select o.name, o.created_at
  where o.bucket_id = 'candidatures-videos'
    and not exists (select 1 from public.convoyeurs c where c.video_chemin = o.name);
 
--- 16 : aucune URL en base
-select id, video_chemin, video_envoyee_le, video_upload_jeton_hash
+-- 16 : aucune URL en base, quatre colonnes finales cohérentes, envoi en cours vidé
+select id, video_chemin, video_mime, video_taille_octets, video_envoyee_le,
+       video_envoi_chemin, video_upload_jeton_consomme_le
   from public.convoyeurs
  where video_chemin is not null;
+
+-- 16 bis : envois autorisés jamais finalisés (à réconcilier après 24 h)
+select id, video_envoi_chemin, video_envoi_commence_le
+  from public.convoyeurs
+ where video_envoi_chemin is not null
+   and video_envoi_commence_le < now() - interval '24 hours';
 ```
 
 ```bash
