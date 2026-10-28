@@ -9448,6 +9448,18 @@ const FACTURE_STATUT_BADGE = {
   payee:      '<span class="badge badge-active">✅ Payée</span>'
 };
 
+// Même rémunération que dans Mes missions ; ne jamais confondre avec le prix client.
+function remunerationFacturable(m) {
+  const explicite = m.remuneration_prevue;
+  if (explicite != null && String(explicite).trim() !== '') {
+    const montant = Number(explicite);
+    return Number.isFinite(montant) && montant > 0 ? Math.round(montant * 100) / 100 : null;
+  }
+  // Compatibilité des anciennes missions : rémunération affichée à 50 % du prix client.
+  const prix = Number(m.prix_ttc);
+  return Number.isFinite(prix) && prix > 0 ? Math.round(prix * 0.5) : null;
+}
+
 // --- Côté convoyeur ---
 function loadFacturationConvoyeur() {
   var _hcSyncTasks = [];
@@ -9496,6 +9508,7 @@ function loadFacturationConvoyeur() {
       listEl.innerHTML = '<p style="color:#888;font-size:.85rem">Aucune mission terminée à facturer pour le moment.</p>';
     } else {
       listEl.innerHTML = missionsAFacturer.map(function(m) {
+        const remuneration = remunerationFacturable(m);
         const dateFin = missionSurPlace(m) ? m.date_fin_intervention || m.date_intervention : m.date_livraison;
         const dateTxt = dateFin ? _dvDate(dateFin) : '—';
         const description = missionSurPlace(m) ? escapeHtml(m.prestation || 'Intervention') + ' · ' + escapeHtml(m.ville_intervention || '') : escapeHtml(m.ville_depart) + ' → ' + escapeHtml(m.ville_arrivee);
@@ -9503,22 +9516,26 @@ function loadFacturationConvoyeur() {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
             + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + ' · ⏳ en attente de validation HelixCar</span></div>'
-            + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
+            + '<div><strong style="color:#888">' + (remuneration != null ? remuneration + ' €' : 'À définir') + '</strong></div>'
             + '</div>';
         }
         if (!missionSurPlace(m) && !m.lettre_voiture_signee_url) {
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;opacity:.55">'
             + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
             + '<br><span style="font-size:.78rem;color:#A65E22">📄 Envoie la lettre de voiture signée pour pouvoir facturer cette mission (Mes missions)</span></div>'
-            + '<div><strong style="color:#888">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong></div>'
+            + '<div><strong style="color:#888">' + (remuneration != null ? remuneration + ' €' : 'À définir') + '</strong></div>'
             + '</div>';
+        }
+        if (remuneration == null) {
+          return '<div style="padding:10px 0"><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
+            + '<p role="status">Rémunération à vérifier par HelixCar avant facturation.</p></div>';
         }
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee">'
           + '<div><strong>' + escapeHtml(referenceMission(m)) + '</strong> · ' + description
           + '<br><span style="font-size:.78rem;color:#888">Terminée le ' + dateTxt + '</span></div>'
           + '<div style="display:flex;align-items:center;gap:10px">'
-          + '<strong style="color:var(--green)">' + (m.prix_ttc != null ? m.prix_ttc + ' €' : '—') + '</strong>'
-          + '<input type="checkbox" class="fc-conv-check" data-mission-id="' + m.id + '" data-montant="' + (m.prix_ttc || 0) + '" checked onchange="recalculerTotalFactureConvoyeur()" style="width:16px;height:16px;accent-color:var(--green)">'
+          + '<strong style="color:var(--green)">' + (remuneration != null ? remuneration + ' €' : 'À définir') + '</strong>'
+          + '<input type="checkbox" class="fc-conv-check" data-mission-id="' + m.id + '" data-montant="' + remuneration + '" checked onchange="recalculerTotalFactureConvoyeur()" style="width:16px;height:16px;accent-color:var(--green)">'
           + '</div></div>';
       }).join('');
     }
@@ -9553,7 +9570,7 @@ function recalculerTotalFactureConvoyeur() {
   const totalEl = document.getElementById('fc-conv-total');
   const btn = document.getElementById('fc-conv-generer-btn');
   if (totalEl) totalEl.textContent = total.toLocaleString('fr-FR') + ' €';
-  if (btn) btn.disabled = checks.length === 0 || !!window._factureBloqueeJusquau;
+  if (btn) btn.disabled = checks.length === 0 || total <= 0 || !!window._factureBloqueeJusquau;
 }
 
 function genererFactureConvoyeur() {
@@ -9571,6 +9588,8 @@ function genererFactureConvoyeur() {
     missionIds.push(c.getAttribute('data-mission-id'));
     total += parseFloat(c.getAttribute('data-montant')) || 0;
   });
+  if (!Number.isFinite(total) || total <= 0 || Array.from(checks).some(c => !(Number(c.getAttribute('data-montant')) > 0))) { alert('Rémunération à vérifier par HelixCar avant facturation.'); return; }
+  total = Math.round(total * 100) / 100;
   if (!confirm('Générer une facture de ' + total.toLocaleString('fr-FR') + ' € pour ' + missionIds.length + ' mission(s) ?')) return;
 
   const reference = 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
