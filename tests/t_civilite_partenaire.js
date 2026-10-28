@@ -52,6 +52,7 @@ const fs = require('fs');
 
   const browserDash = await L.launch();
   const dash = await L.newPage(browserDash);
+  await dash.addInitScript(() => { window.supabase = { createClient: () => ({auth:{onAuthStateChange:()=>({}),getSession:async()=>({data:{session:null}})},from:()=>({})}) }; });
   await dash.goto(L.urlFichier('dashboard.html'), { waitUntil: 'load' });
   const accords = await dash.evaluate(() => {
     const femme = { civilite: 'madame' };
@@ -80,8 +81,28 @@ const fs = require('fs');
   L.check('B5 : les badges et l’espace personnel suivent aussi le féminin',
     /Bloquée/.test(accords.badgeFemme) && accords.role === 'Professionnelle' && accords.profil === 'Mon profil professionnelle',
     JSON.stringify(accords));
-  L.check('B6 : le dashboard récupère la civilité dans les candidatures d’opportunité',
-    /select=id,prenom,nom,civilite,activites,statut,bloque/.test(dashboard));
+  const candidature = await dash.evaluate(async () => {
+    const ancienFrom = sbAuth.from, ancienFetch = sbFetchToutePage;
+    try {
+      sbAuth.from = function(table) {
+        const q = { select(){return q;}, eq(){return q;}, order(){return q;},
+          limit(){return q;}, then(resolve) {
+            return Promise.resolve({data: table === 'v_opportunites_admin'
+              ? [{id:'test-offre',statut:'a_pourvoir',nb_professionnels:1}]
+              : [{id:'test-candidature',convoyeur_id:'test-partenaire',etat:'retenu'}]}).then(resolve);
+          }}; return q;
+      };
+      sbFetchToutePage = async path => {
+        const champs = new URLSearchParams(path.split('?')[1]).get('select');
+        const profil = {id:'test-partenaire',prenom:'Test',nom:'Partenaire',civilite:'madame',activites:['renfort'],statut:'actif',bloque:false,note:12};
+        return [Object.fromEntries(Object.entries(profil).filter(([k]) => !champs || champs === '*' || champs.split(',').includes(k)))];
+      };
+      const detail = await _oppChargerDetail('test-offre');
+      return {civilite:detail.convoyeurs['test-partenaire'].civilite,html:_oppCandidaturesHtml(detail)};
+    } finally { sbAuth.from = ancienFrom; sbFetchToutePage = ancienFetch; }
+  });
+  L.check('B6 : la civilité chargée produit une candidature accordée au féminin',
+    candidature.civilite === 'madame' && candidature.html.includes('Retenue'), JSON.stringify(candidature));
   L.check('B7 : la validation transmet la civilité au traitement et à l’email',
     /validerConvoyeur[^\n]+c\.civilite/.test(dashboard)
       && /function validerConvoyeur\(id, name, email, civilite\)/.test(dashboard));
