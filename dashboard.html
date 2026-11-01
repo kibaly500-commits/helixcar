@@ -1606,6 +1606,7 @@ body.scroll-verrouille { overflow: hidden; }
            les candidatures et sélectionne. Deux états publics seulement :
            « À pourvoir » et « Pourvue / clôturée » (décision C03). -->
       <div class="page" id="page-admin-planning">
+        <div id="hc-retards-planning" aria-live="polite"></div>
         <div class="card"><h2>Réceptions et remises de clés</h2><p>Point HelixCar · 12 rue de l’Université, 93160 Noisy-le-Grand</p><p>Uniquement les véhicules à réceptionner ou à remettre par vous au point HelixCar. Vous fixez les horaires après votre vérification du trafic. Repère : 45 minutes de battement. Confirmez la réception ou la remise des clés au moment où elle a lieu.</p></div>
         <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Afficher<select id="hc-planning-state"><option value="actifs">À venir</option><option value="archives">Archives</option></select></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
         <div id="hc-planning-list" aria-live="polite"></div>
@@ -2290,7 +2291,7 @@ const NAVS = {
     { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage', badgeDynamique: true },
     { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions', badgeDynamique: true },
     { id: 'admin-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
-    { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar' },
+    { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar', badgeDynamique: true },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes', badgeDynamique: true },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
     { id: 'admin-metiers', icon: '✓', label: 'Validation des métiers', badgeDynamique: true },
@@ -5004,6 +5005,7 @@ async function majCompteursMenuAdmin() {
   };
   // Les erreurs conservent le dernier nombre connu, jamais un faux zéro.
   return Promise.allSettled([
+    _compterLignes('retards_convoyage?select=id&traite_le=is.null').then(n => appliquer('admin-planning',n,'retards à prendre en compte')),
     _compterLignes('fidelite_recompenses?select=id&statut=in.(a_preparer,prete)').then(n => appliquer('admin-recompenses',n,'box à préparer ou envoyer')),
     _compterLignes('professionnel_badges?select=professionnel_id,convoyeurs!inner(statut)&decision=eq.en_attente&convoyeurs.statut=eq.actif').then(n => appliquer('admin-metiers',n,'badges en attente')),
     sbFetchToutePage('missions?select=id,type_mission,statut').then(rows => {
@@ -9389,7 +9391,7 @@ function chargerMissionsAttribuees(enCours) {
       }
       return Promise.resolve().then(function () {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
- rendreHistorique(rows); });
+ return rendreHistorique(rows); });
     })
     .then(function () {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
@@ -9454,8 +9456,9 @@ function chargerMissionsAttribuees(enCours) {
           + '<td><strong style="color:var(--green)">'
           + (remunerationFacturable(m) != null ? escapeHtml(String(remunerationFacturable(m))) + ' €' : 'À vérifier') + '</strong></td>'
           + '<td>' + badge + '</td>'
-          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '</td></tr>';
+          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + (m.type_mission==='convoyage' && STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? '<span data-retard-mission="'+escapeHtml(m.id)+'"></span>' : '') + '</td></tr>';
       }).join('');
+      if(window.HCRetards)return window.HCRetards.mount(tbody);
   }
 
   return Promise.allSettled(_hcSyncTasks);
@@ -15440,6 +15443,7 @@ function declencherChampFichier(id) {
 <script src="assets/preparation-missions.js"></script>
 <script src="assets/planning-calcul.js"></script>
 <script src="assets/planning-helixcar.js"></script>
+<script src="assets/retards-convoyage.js"></script>
 <script src="assets/remuneration-estimation.js"></script>
 <script src="assets/mission-budget.js"></script>
 <script src="assets/preparation-missions-ui.js"></script>

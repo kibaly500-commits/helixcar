@@ -85,6 +85,7 @@ async function load(){
  if(!panel().hasChildNodes())panel().textContent='Chargement du planning…';
  try{
   if(_hcNavigationRole!=='admin')return;
+  if(window.HCRetards)await window.HCRetards.loadAdmin();
   const [data,states,clients,returns]=await Promise.all([sbFetchToutePage('preparations_missions?select=id,client_id,cle,empreinte,plan,mission_id,clients(numero_client),missions!preparations_missions_mission_id_fkey(reference_courte,reference,statut,convoyeurs!missions_convoyeur_id_fkey(prenom,nom))&order=updated_at.desc'),sbFetchToutePage('planning_helixcar?select=*'),sbFetchToutePage('clients?select=*,vehicules(id,marque_modele,immatriculation,livraison_apres_stockage,heure_recuperation_client),devis(statut,paiement_statut)&type_service=eq.stockage&order=created_at.desc'),sbFetchToutePage('planning_restitutions?select=*')]);
   if(current!==ticket||_hcNavigationRole!=='admin')return;
   const candidates=data.filter(r=>['avant_stockage','apres_stockage'].includes(r.plan?.kind)&&!['annule','annulee'].includes(r.missions?.statut));
