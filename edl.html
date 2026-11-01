@@ -130,7 +130,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;margin-bottom:8px">Code de l’état des lieux</div>
     <p style="font-size:.85rem;color:var(--gr);margin-bottom:24px;line-height:1.6">Ouvrez cette étape depuis « Mes missions » ou saisissez son code. Connectez-vous avec le compte partenaire affecté à la mission.</p>
     <div class="fg" style="margin-bottom:16px">
-      <label>Code de mission</label>
+      <label for="mission-code-input">Code de l’état des lieux</label>
       <input type="text" id="mission-code-input" placeholder="HC-2026-0019/DEP" style="text-transform:uppercase;font-weight:700;letter-spacing:.1em;font-size:1rem;text-align:center" >
     </div>
     <div id="code-error" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px;font-size:.8rem;color:var(--rd);margin-bottom:12px">
@@ -780,7 +780,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 </div>
 
 <!-- STICKY -->
-<div class="sticky" id="sticky">
+<div class="sticky" id="sticky" style="display:none">
   <div class="sticky-inner">
     <button class="btn btn-ol" id="back-btn" onclick="prevStep()" style="width:auto;padding:11px 16px;flex-shrink:0">← Retour</button>
     <button class="btn btn-y" id="next-btn" onclick="nextStep()">Continuer →</button>
@@ -834,7 +834,7 @@ const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function sbFetch(path, options) {
   const session=(await sbAuth.auth.getSession()).data.session;
-  if(!session)throw new Error('Reconnectez-vous à votre espace convoyeur.');
+  if(!session)throw new Error('Reconnectez-vous à votre espace partenaire.');
   options = options || {};
   const headers = Object.assign({
     'apikey': SUPABASE_KEY,
@@ -1027,6 +1027,7 @@ async function validateMissionCode() {
 
     document.getElementById('screen-code').style.display = 'none';
     document.getElementById('step-1').style.display = 'block';
+    document.getElementById('sticky').style.display = 'block';
     document.querySelector('.hdr .logo').insertAdjacentHTML('afterend',
       `<span style="font-size:.72rem;background:rgba(179,38,55,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${edlHtml(HCDocumentsMission.code(currentMission.reference_courte || missionCode, PHASE))}</span>`
     );
