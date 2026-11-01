@@ -35,10 +35,11 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  L.check(width+' correction conservée après réouverture',await page.locator('#hc-prep-body').innerText().then(t=>t.includes('3008 corrigée')));
  await page.locator('[data-edit-vehicle][data-vehicle-key="marque_modele"]').click();await page.locator('[data-vehicle-value]').fill('Peugeot 308');await page.locator('[data-save-vehicle]').click();
  L.check(width+' horaire client conservé sans nouvelle saisie',await page.locator('[data-field="heure_prise_en_charge"]').count()===0&&await page.locator('#hc-prep-body').innerText().then(t=>t.includes('09:00 - 11:00')));
- await page.locator('[data-field="remuneration"]').fill('250');await page.locator('[data-field="distance"]').fill('465');await page.locator('[data-field="motorisation"]').selectOption('Hybride');await page.locator('[data-field="restit_motorisation"]').selectOption('Essence');await page.locator('[data-prep-view="preview"]').first().click();
+ await page.locator('[data-field="distance"]').fill('465');await page.locator('[data-field="remuneration"]').fill('250');await page.locator('[data-field="motorisation"]').selectOption('Hybride');await page.locator('[data-field="restit_motorisation"]').selectOption('Essence');await page.locator('[data-prep-view="preview"]').first().click();
  L.check(width+' total client absent de l’aperçu et des plans enregistrés',await page.locator('.hc-prep-budget').count()===0&&await page.evaluate(()=>!JSON.stringify(__source.brouillons).includes('9876.54')));
  L.check(width+' aucun crayon dans aperçu partenaire',await page.locator('[data-edit-vehicle]').count()===0);
  const content=await page.locator('#hc-prep-body').innerText();L.check(width+' aperçu filtré avec prix total',content.includes('250')&&!content.includes('SECRET')&&!content.includes('rue'));
+ L.check(width+' distance livraison dans le trajet uniquement',await page.locator('[aria-label="Livraison"] .hc-prep-distance').innerText().then(t=>t.includes('465')) && await page.locator('[aria-label="Restitution"] .hc-prep-distance').count()===0);
  L.check(width+' créneau de départ conservé',content.includes('09:00 - 11:00'));
  L.check(width+' modèle dans le bon trajet',await page.locator('[aria-label="Livraison"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Peugeot 308')&&!t.includes('Audi A3'))&&await page.locator('[aria-label="Restitution"] .hc-prep-leg-facts').innerText().then(t=>t.includes('Audi A3')&&!t.includes('Peugeot 308')));
  L.check(width+' flèche centrée sur les villes',await page.locator('.hc-prep-route').first().evaluate(e=>{const city=e.querySelector('.hc-prep-city').getBoundingClientRect(),arrow=e.querySelector('.hc-prep-direction').getBoundingClientRect();return Math.abs(city.y+city.height/2-arrow.y-arrow.height/2)<2;}));
@@ -51,7 +52,7 @@ const c={id:'client-1',type_service:'convoyage',type_client:'professionnel',soci
  await page.locator('#hc-prep-close').click();await page.evaluate(()=>ouvrirPreparationDemande('client-1'));L.check(width+' brouillon retrouvé',await page.locator('[data-field="remuneration"]').inputValue()==='250');
  L.check(width+' sans débordement',await page.locator('#modal-preparation-missions .hc-prep-modal').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
  await page.evaluate(async()=>{__source.brouillons=[];__source.vehicules[0].vin=null;await ouvrirPreparationDemande('client-1');});
- await page.locator('[data-field="remuneration"]').fill('250');await page.locator('[data-field="distance"]').fill('465');
+ await page.locator('[data-field="distance"]').fill('465');await page.locator('[data-field="remuneration"]').fill('250');
  await page.locator('.hc-prep-private summary').click();
  L.check(width+' VIN manquant affiché dans les informations privées',await page.locator('.hc-prep-private').innerText().then(t=>t.includes('VIN du véhicule livré')&&t.includes('À compléter dans la demande')));
  await page.locator('[data-prep-view="preview"]').first().click();

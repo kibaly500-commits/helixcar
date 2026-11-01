@@ -239,19 +239,19 @@
       return '<span class="hc-prep-date">'+display(date||'Date à préciser')+'</span><strong class="hc-prep-time'+(hours?'':' hc-prep-unspecified')+'">'+esc(hours||'Heure à préciser')+'</strong>';
     };
     const vehicle=value=>{const parts=value.split(' · ');return {model:parts.length>1?parts.slice(1).join(' · '):value,type:parts.length>1?parts[0]:''};};
-    const route=(from,to,start,end)=>'<div class="hc-prep-route"><div><span class="hc-prep-route-label">Véhicule à récupérer à</span><strong class="hc-prep-city">'+display(from||'Ville à préciser')+'</strong>'+(start!==null?schedule(start):'')+'</div><span class="hc-prep-direction" aria-hidden="true">→</span><div><span class="hc-prep-route-label">À livrer à</span><strong class="hc-prep-city">'+display(to||'Ville à préciser')+'</strong>'+(end!==null?schedule(end):'')+'</div></div>';
+    const route=(from,to,start,end,distance)=>'<div class="hc-prep-route"><div><span class="hc-prep-route-label">Véhicule à récupérer à</span><strong class="hc-prep-city">'+display(from||'Ville à préciser')+'</strong>'+(start!==null?schedule(start):'')+'</div><span class="hc-prep-direction">'+(distance?'<small class="hc-prep-distance">'+display(distance)+'</small>':'')+'<span aria-hidden="true">→</span></span><div><span class="hc-prep-route-label">À livrer à</span><strong class="hc-prep-city">'+display(to||'Ville à préciser')+'</strong>'+(end!==null?schedule(end):'')+'</div></div>';
     const frais=raw('Carburant et péages inclus (€)');
     const fraisTexte=a.category==='convoyage'&&frais!==''&&Number.isFinite(Number(frais))&&Number(frais)>=0&&a.remuneration!=null&&Number(frais)<=Number(a.remuneration)?'<small class="hc-prep-muted"> (dont '+esc(Math.trunc(Number(frais)).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}))+' pour carburant et péages)</small>':'';
     let h='<section class="hc-prep-card hc-prep-annonce"><div class="hc-prep-mission-summary"><strong>'+esc(a.category==='convoyage'?'Convoyage':a.title)+'</strong><div><span>Rémunération totale</span><strong class="hc-prep-price">'+esc(a.remuneration==null?'À définir':Number(a.remuneration).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:0,maximumFractionDigits:0}))+'</strong>'+fraisTexte+'</div></div>';
     if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
     const delivered=vehicle(raw('Véhicule'));
-    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
-      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance')]])+'</section>';
+    h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'),raw('Distance'))+
+      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
       h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Véhicule à restituer</h4></header>'+route(raw('Arrivée'),destination,raw('Livraison'),raw('Restitution prévue'))+
-        facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance restitution')||'À préciser']])+'</section>';
+        facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
     }
     return h+'</div></section>';
   }

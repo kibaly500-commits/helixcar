@@ -41,7 +41,7 @@ check('C10 : l’espace privé explique l’attribution sans afficher de formule
   && !/1\s*€\s*payé/i.test(SOURCE_VITRINE)
   && SOURCE_VITRINE.includes('Une fois votre prestation terminée, vos points sont automatiquement ajoutés à votre compte')
   && SOURCE_DASHBOARD.includes("Vous n\\'avez pas encore de points. Ils vous sont attribués lorsqu\\'une ")
-  && SOURCE_DASHBOARD.includes('prestation est terminée et payée.</div>')
+  && SOURCE_DASHBOARD.includes('prestation est terminée.</div>')
   && !SOURCE_DASHBOARD.includes('1 € TTC entier payé'));
 check('C10 : le serveur crédite floor(prix TTC), sans règle provisoire résiduelle',
   SOURCE_MIGRATION.includes('v_points := floor(d.prix)::integer')

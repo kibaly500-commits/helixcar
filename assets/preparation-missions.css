@@ -140,3 +140,7 @@
 .hc-prep-tasks dt{display:flex;align-items:center;gap:8px;color:#465363;font-size:14px}
 .hc-prep-tasks dd{margin:6px 0 0;color:#202a36;white-space:pre-wrap;overflow-wrap:anywhere}
 .hc-prep-tasks textarea{box-sizing:border-box;width:100%;min-height:110px;resize:vertical;font:inherit;padding:10px;border:1px solid #cbd2db;border-radius:8px}
+
+.hc-prep-route{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.hc-prep-direction{display:flex;flex-direction:column;align-items:center;gap:6px}
+.hc-prep-distance{font-size:12px;line-height:1.3;color:#465363;white-space:nowrap}

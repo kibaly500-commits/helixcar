@@ -2302,6 +2302,7 @@ const NAVS = {
     { id: 'admin-clients',      icon: '👥', label: 'Clients' },
     { id: 'admin-facturation',  icon: '🧾', label: 'Facturation' },
     { id: 'admin-recompenses', icon: '🎁', label: 'Récompenses', badgeDynamique: true },
+    { id: 'admin-challenge', icon: '🏆', label: 'Challenge partenaires' },
     { id: 'admin-acquisition',  icon: '📈', label: 'Acquisition' },
     { id: 'admin-recontact',    icon: '📬', label: 'Demandes recontact' },
     { id: 'admin-archivage',    icon: '📦', label: 'Archivage' },
@@ -2309,18 +2310,22 @@ const NAVS = {
   ],
   convoyeur: [
     { id: 'convoyeur-dashboard',   icon: '📊', label: 'Tableau de bord' },
-    { id: 'convoyeur-missions',    icon: '🚗', label: 'Mes missions' },
-    { id: 'convoyeur-facturation', icon: '🧾', label: 'Mes factures' },
+    { id: 'convoyeur-missions',    icon: '🚗', label: 'Mes missions', badgeDynamique:true },
+    { id: 'convoyeur-facturation', icon: '🧾', label: 'Mes factures', badgeDynamique:true },
     { id: 'convoyeur-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
     { id: 'convoyeur-profil',      icon: '👤', label: 'Mon profil' },
+    {id:'convoyeur-challenge',icon:'🏆',label:'Challenge trimestriel'},
+    {id:'convoyeur-parametres',icon:'⚙️',label:'Paramètres'},
   ],
   client: [
     { id: 'client-dashboard', icon: '📊', label: 'Tableau de bord' },
-    { id: 'client-missions',  icon: '🚗', label: 'Mes missions' },
-    { id: 'client-infos',     icon: '📝', label: 'Informations à compléter' },
+    { id: 'client-missions',  icon: '🚗', label: 'Mes missions', badgeDynamique:true },
+    { id: 'client-infos',     icon: '📝', label: 'Informations à compléter', badgeDynamique:true },
     { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badgeDynamique: true },
-    { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité' },
+    { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité', badgeDynamique:true },
     { id: 'client-profil',    icon: '👤', label: 'Mon profil' },
+    {id:'client-devis',icon:'📄',label:'Mes devis',badgeDynamique:true},
+    {id:'client-parametres',icon:'⚙️',label:'Paramètres'},
   ],
 };
 
@@ -2862,6 +2867,16 @@ async function deciderInformation(demandeId, cle, decision, motifFourni) {
   return true;
 }
 
+async function validerToutesReponses(id) {
+  if(currentRole!=='admin')return;
+  try {
+    const {error}=await sbAuth.from('demande_informations_manquantes').update({statut:'validee',commentaire:null}).eq('client_id',id).eq('statut','transmise');
+    if(error)throw error;
+    await rendreInfosDemandeAdmin({id});
+    _chargerEtatsInformationsDemandes();
+  } catch(e){alert('Validation impossible. Actualisez puis réessayez.');}
+}
+
 async function changerDecisionInformation(demandeId, cle, decision) {
   try {
     const fait = await deciderInformation(demandeId, cle, decision);
@@ -2904,12 +2919,6 @@ async function rendreInfosDemandeAdmin(c) {
     return;
   }
   if (_infosDemandeEnCours !== c.id) return;   // fiche changée entre-temps
-
-  if (!lignes.length) {
-    zone.innerHTML = '<div style="font-size:.85rem;color:#666;margin-top:16px">'
-      + 'Aucune information n\'est requise pour ce service.</div>';
-    return;
-  }
 
   const demande = (_demandesDevisListe || []).filter(function (x) {
     return String(x.id) === String(c.id);
@@ -2963,6 +2972,8 @@ async function rendreInfosDemandeAdmin(c) {
     + escapeHtml(demande.numero_client || '—') + '</span></div>'
     + '<div class="detail-row"><span class="detail-label">Devis associé</span><span class="detail-val">'
     + escapeHtml(devis && devis.reference ? devis.reference : 'Aucun') + '</span></div>'
+    + (devis && devis.motif_refus ? '<p><strong>Motif du refus du devis :</strong> '+escapeHtml(devis.motif_refus)+'</p>' : '')
+    + (restantes.some(l=>l.statut==='transmise') ? '<button class="btn btn-primary" '+actionHtml('validerToutesReponses',[c.id])+'>Valider toutes les réponses reçues</button>' : '')
     + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes ou à traiter</div>'
     + (restantes.length ? restantes.map(ligneHtml).join('')
         : '<div style="font-size:.85rem;color:#666">Aucune : tout a été reçu et traité.</div>')
@@ -3089,7 +3100,10 @@ window.addEventListener('message', function (ev) {
 // dans le même cadre intégré que la nouvelle demande : même page, même
 // écran de complétion (index.html, #modal-completer), même session. Le
 // client ne quitte plus le Dashboard pour la vitrine.
-function ouvrirCompletionDemande(id) {
+async function ouvrirCompletionDemande(id) {
+  if(currentRole==='client'){
+    try{const ds=await chargerDevisClient();if(ds.find(d=>String(d.client_id)===String(id))?.statut==='refuse'){alert('Ce devis est refusé. Les informations ne sont plus modifiables.');return;}}catch{alert('Impossible de vérifier le devis. Réessayez.');return;}
+  }
   const cadre = document.getElementById('client-demande-cadre');
   if (!cadre) { window.location.href = 'index.html?completer=' + encodeURIComponent(id); return; }
   cadre.setAttribute('src', 'index.html?integre=1&completer=' + encodeURIComponent(id));
@@ -3184,6 +3198,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   const etat = (texte, couleur, message, action, groupe) => ({texte, couleur, message, action:action || null, groupe:groupe || 'cloture'});
   if (['annule','annulee'].includes(d.statut)) return etat('Demande annulée','neutre','Cette demande est clôturée.');
   if (['termine','terminee'].includes(d.statut)) return etat('Prestation terminée','vert','Retrouvez vos documents dans le détail de la demande.');
+  if (!erreurDevis && dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Ce devis est clôturé.');
   const paye = dv && dv.paiement_statut === 'paye';
   // Le paiement confirmé classe le dossier en préparation ; la complétude
   // reste signalée séparément et conserve les contrôles de lancement.
@@ -3300,10 +3315,10 @@ erreurInfos=true;}
         ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>'+deplacementClient+'<br>12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
-      if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';
+      if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations — obligatoire</button>';
       if(p.action==='devis')bouton='<a class="btn btn-sm hc-btn-devis" href="'+lienDevis+'">Voir mon devis →</a>';
       const montant=p.action==='devis' && dv.prix!=null && dv.prix!=='' && Number.isFinite(Number(dv.prix)) ? '<p class="hc-demande-montant">'+escapeHtml(Number(dv.prix).toLocaleString('fr-FR',{style:'currency',currency:'EUR'}))+'</p>' : '';
-      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button></p>' : '';
+      const complement=p.action==='devis' && !erreurInfos && lignes.some(_estRestante) ? '<p class="hc-demande-complement"><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations — obligatoire</button></p>' : '';
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement+pointRemise
@@ -3904,11 +3919,7 @@ async function ouvrirOpportuniteAdmin(id) {
   const o = detail.o;
   if (titre) titre.textContent = (LIB_STATUT_OPPORTUNITE[o.statut] || o.statut) + ' — ' + (o.intitule || 'Opportunité de mission') + (o.mission_reference ? ' (' + o.mission_reference + ')' : '');
   if (o.statut === 'brouillon') {
-    corps.innerHTML = '<div class="fid-note" style="margin-bottom:12px">Brouillon préparé à partir de la mission : relisez et corrigez avant d\'envoyer. L\'aperçu ci-dessous est exactement ce que verront les partenaires. Rien n\'est publié tant que vous n\'avez pas cliqué sur « Envoyer ».</div>'
-      + _oppFormulaireHtml(o)
-      + '<div style="font-weight:700;font-size:.9rem;margin:18px 0 8px">Aperçu partenaire</div>'
-      + '<div id="opp-apercu">' + _oppCarteHtml(o, { apercu: true }) + '</div>';
-    _oppBrancherApercu();
+    corps.innerHTML = '<p>Préparez et publiez cette mission depuis sa demande de devis.</p>';
   } else {
     corps.innerHTML = '<div id="opp-apercu">' + _oppCarteHtml(o, { apercu: true }) + '</div>'
       + '<div class="detail-row"><span class="detail-label">Publiée le</span><span class="detail-val">' + escapeHtml(o.publiee_le ? _dvDateHeure(o.publiee_le) : '—') + '</span></div>'
@@ -3962,40 +3973,8 @@ async function enregistrerOpportunite(id) {
   }
 }
 
-async function publierOpportunite(id) {
-  if (!_sbAuthPret()) return;
-  // Le brouillon est enregistré tel qu'affiché, puis publié : ce que
-  // l'administrateur voit dans l'aperçu est ce qui part.
-  const r0 = await enregistrerOpportunite(id);
-  if (!r0 || !r0.ok) return;
-  if (!confirm('Envoyer cette opportunité aux partenaires éligibles ? Elle deviendra visible dans leur espace.')) return;
-  try {
-    const res = await sbAuth.rpc('publier_opportunite', { p_id: id });
-    if (res && res.error) throw new Error(res.error.message);
-    const r = (res && res.data) || {};
-    let message, ton;
-    if (r.ok && r.code === 'PUBLIEE') {
-      message = 'Opportunité publiée : visible par les partenaires éligibles (' + (r.notifications_a_envoyer || 0) + ' notification(s) à envoyer, e-mails non branchés).';
-      ton = 'succes';
-    } else if (r.code === 'DEJA_PUBLIEE') {
-      message = 'Cette opportunité était déjà publiée.';
-      ton = 'info';
-    } else {
-      const msgs = { DESCRIPTION_VIDE: 'La description publique est vide.', INTITULE_VIDE: 'L\'intitulé est vide.',
-                     BADGES_REQUIS_VIDES: 'Choisissez au moins un métier requis.', CLOTUREE: 'Cette opportunité est clôturée.',
-                     NB_PROFESSIONNELS_INVALIDE: 'Le nombre de professionnels doit être au moins 1.', NON_AUTORISE: 'Seul un administrateur peut publier.' };
-      _hcNote('opportunite-message', msgs[r.code] || 'L\'opportunité n\'a pas pu être envoyée.', 'erreur');
-      return;
-    }
-    await ouvrirOpportuniteAdmin(id);
-    // L'ouverture remet la note à zéro : présenter le résultat APRÈS
-    // la relecture, sinon confirmations et refus disparaissent aussitôt.
-    _hcNote('opportunite-message', message, ton);
-    loadOpportunitesAdmin();
-  } catch (e) {
-    console.error('publier_opportunite :', e && e.message);
-    _hcNote('opportunite-message', /Informations manquantes|Paiement non confirme|tarif convoyeur/.test(e.message||'') ? e.message : 'L\'envoi n\'a pas abouti. Réessayez.', 'erreur');
-  }
+async function publierOpportunite() {
+  alert('La publication se fait depuis Demandes de devis → Préparer les missions.');
 }
 
 async function deciderCandidature(candidatureId, etat) {
@@ -4020,7 +3999,7 @@ async function deciderCandidature(candidatureId, etat) {
     loadOpportunitesAdmin();
   } catch (e) {
     console.error('decider_candidature :', e && e.message);
-    _hcNote('opportunite-message', /Créneau indisponible|Horaires de mission/.test(e.message)?e.message:'La décision n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
+    _hcNote('opportunite-message', /Créneau indisponible|Horaires de mission|Ajoutez votre photo de profil/.test(e.message)?e.message:'La décision n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
   }
 }
 
@@ -4084,7 +4063,7 @@ async function postulerOpportunite(id) {
     setTimeout(() => { loadOpportunitesPartenaire(); loadMissionsConvoyeur(); }, 700);
   } catch (e) {
     console.error('postuler_opportunite :', e && e.message);
-    _hcNoteEl(msg, /Créneau indisponible|Horaires de mission/.test(e.message)?e.message:'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
+    _hcNoteEl(msg, /Créneau indisponible|Horaires de mission|Ajoutez votre photo de profil/.test(e.message)?e.message:'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
     if (bouton) { bouton.disabled = false; bouton.textContent = 'Postuler'; }
   }
 }
@@ -4226,7 +4205,7 @@ function _fidDate(iso) {
   try { return new Date(iso).toLocaleDateString('fr-FR'); } catch (e) { return ''; }
 }
 var FIDELITE_MOTIFS = {
-  prestation_payee: 'Prestation terminée et payée',
+  prestation_payee: 'Prestation terminée',
   remboursement:    'Remboursement — points retirés',
   annulation:       'Annulation — points retirés',
   ajustement_admin: 'Ajustement HelixCar'
@@ -4306,7 +4285,7 @@ function _fidHtmlResume(o, prefixe) {
     + '</div>'
     + (vide
         ? '<div class="fid-note" id="' + prefixe + 'fid-vide">Vous n\'avez pas encore de points. Ils vous sont attribués lorsqu\'une '
-          + 'prestation est terminée et payée.</div>'
+          + 'prestation est terminée.</div>'
         : '');
 }
 
@@ -4352,7 +4331,7 @@ function rendreFidelitePage(donnees) {
   if (!o) { zone.innerHTML = '<div class="card">' + _fidHtmlIndisponible() + '</div>'; return; }
   zone.innerHTML =
       '<div class="card"><div class="card-header"><div><div class="card-title">Programme de fidélité</div>'
-    + '<div class="card-sub">Vos points, calculés par HelixCar à partir de vos prestations terminées et payées.</div></div></div>'
+    + '<div class="card-sub">Vos points, calculés par HelixCar à partir de vos prestations terminées.</div></div></div>'
     + _fidHtmlResume(o) + '</div>'
     + '<div class="card">'
     + _fidHtmlPaliers(o) + '</div>'
@@ -4489,6 +4468,8 @@ async function loadInfosClient() {
   let demandes = [];
   try {
     demandes = await chargerDemandesClient();
+    const devisInfos=await chargerDevisClient();
+    demandes=demandes.filter(d=>devisInfos.find(v=>v.client_id===d.id)?.statut!=='refuse');
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
   } catch (e) {
@@ -4583,10 +4564,11 @@ async function loadInfosClient() {
     blocs.push(
       '<div class="card" style="margin-bottom:16px" data-demande="' + escapeHtml(d.id) + '" data-complet="' + (complet ? '1' : '0') + '">'
       + '<div class="card-header"><div>' + entete + '</div>'
-      + (!complet ? '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations →</button>' : '')
+      + (!complet ? '<button class="btn btn-sm btn-primary"' + actionHtml('ouvrirCompletionDemande', [d.id]) + '>Compléter mes informations — obligatoire</button>' : '')
       + '</div>' + corps + '</div>');
   });
 
+  afficherCompteurMenu('client-infos',restantesTotal,'informations à compléter');
   if (!blocs.length) {
     zone.innerHTML = '<div class="hc-infos-message" id="client-infos-vide"><strong>Votre dossier est à jour</strong>'
       + 'Aucune information ne manque actuellement. Merci !</div>';
@@ -5097,6 +5079,11 @@ const PAGE_TITLES = {
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mes missions', 'Vos missions terminées à évaluer, et vos évaluations envoyées'],
   'admin-recompenses': ['Récompenses', 'Préparation et envoi des box surprises'],
+  'admin-challenge':['Challenge partenaires','Classement trimestriel'],
+  'convoyeur-challenge':['Challenge trimestriel','Vos missions réalisées'],
+  'client-devis':['Mes devis','Vos propositions et décisions'],
+  'client-parametres':['Paramètres','Personnalisez votre espace'],
+  'convoyeur-parametres':['Paramètres','Personnalisez votre espace'],
   'client-fidelite':     ['Programme de fidélité', 'Vos points HelixCar'],
   'client-profil':       ['Mon profil', 'Vos informations de compte'],
 };
@@ -5230,6 +5217,7 @@ function showPage(id, options) {
   if (id === 'client-notation') { loadEvaluationsClient(); }
   if (id === 'client-profil') { loadProfilClient(); }
   if (id === 'admin-recontact') { loadRecontacts(); }
+  if(window.HCParcours) HCParcours.ouvrir(id);
   if (id === 'admin-parametres') { loadParametresAdmin(); }
   if (id === 'admin-opportunites') { loadOpportunitesAdmin(); }
   if (id === 'admin-planning' && window.HCPlanning) { window.HCPlanning.load(); }
@@ -5837,7 +5825,7 @@ async function sbAuthReferencesDevis() {
 // canonique en tête. C'est lui — jamais la référence humaine DEV-…, ni
 // un attribut du DOM — que l'envoi transmet au serveur.
 const CHAMPS_DEVIS_DASHBOARD = 'id, reference, client_id, prix, statut, date_generation, date_envoi, ' +
-  'date_acceptation, date_refus, version, version_envoyee, version_acceptee, consulte_le, paiement_statut';
+  'date_acceptation, date_refus, motif_refus, version, version_envoyee, version_acceptee, consulte_le, paiement_statut';
 
 // LOT Q01 — CAUSE RACINE de « Identifiant interne du devis introuvable ».
 // L'insertion partait en `return=minimal` : le serveur ne renvoyait
@@ -7368,7 +7356,7 @@ function loadCandidatures() {
           + '<td>' + rcBadge + '</td>'
           + '<td>' + dateStr + '</td>'
           + '<td style="display:flex;gap:6px;flex-wrap:wrap">'
-          + '<button class="btn btn-sm btn-outline" ' + actionHtml('openDossierSb', [c.id]) + '>Dossier</button>'
+          + '<button class="btn btn-sm btn-outline" ' + actionHtml('openDossierSb', [c.id]) + '>Voir le profil</button>'
           + '<button class="btn btn-sm btn-green" ' + actionHtml('validerConvoyeur', [c.id, nomBrut, c.email, c.civilite || null]) + '>✓ Valider</button>'
           + '<button class="btn btn-sm btn-red" ' + actionHtml('refuserConvoyeur', [c.id]) + '>✗ Refuser</button>'
           + '</td></tr>';
@@ -7419,12 +7407,14 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
+    <div id="hc-portrait-admin"></div>
     <div style="margin-top:12px"><strong>Missions effectuées</strong><div id="dossier-missions-liste">Chargement…</div></div>
   `;
   // Décisions par activité + état de blocage RÉELLEMENT enregistré.
   preparerFichePartenaire(c);
   openModal('dossier');
   chargerMissionsEffectueesPartenaire(id);
+  if(window.HCParcours) HCParcours.portraitAdmin(c);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8111,6 +8101,7 @@ function voirConvoyeurSb(id) {
   if (window.HCSync) window.HCSync.request(0);
 
   chargerMissionsEffectueesPartenaire(id);
+  if(window.HCParcours) HCParcours.portraitAdmin(c);
 }
 
 async function _appelerValidationPartenaire(convoyeurId, action) {
@@ -9507,7 +9498,7 @@ function compterJoursOuvresEntre(dateDebut, dateFin) {
 
 const FACTURE_STATUT_BADGE = {
   en_attente: '<span class="badge badge-pending">⏳ En attente</span>',
-  validee:    '<span class="badge" style="background:rgba(181,68,75,.2);color:#8C3238">💰 À payer</span>',
+  validee:    '<span class="badge" style="background:rgba(181,68,75,.2);color:#8C3238">En attente de règlement</span>',
   payee:      '<span class="badge badge-active">✅ Payée</span>'
 };
 
@@ -9693,14 +9684,14 @@ function loadFacturationAdmin() {
 
   _hcSyncTasks.push(Promise.all([
     sbFetchToutePage('factures_convoyeur?order=date_generation.desc'),
-    sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
+    sbFetchToutePage('convoyeurs?select=id,prenom,nom,rib_iban'),
     sbFetchToutePage('missions?select=id,reference_courte,reference')
   ]).then(function(results) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
     const factures = results[0] || [];
     const convoyeurs = {};
-    (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); });
+    (results[1] || []).forEach(function(c) { convoyeurs[c.id] = (c.prenom || '') + ' ' + (c.nom || ''); window._convoyeursActifsData=window._convoyeursActifsData||{};window._convoyeursActifsData[c.id]=Object.assign({},window._convoyeursActifsData[c.id]||{},c); });
     const missionsRef = {};
     (results[2] || []).forEach(function(m) { missionsRef[m.id] = referenceMission(m); });
 
@@ -9743,7 +9734,7 @@ function loadFacturationAdmin() {
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
             + '<td>' + dateValTxt + '</td>'
             + '<td>' + datePaieTxt + '</td>'
-            + '<td><button class="btn btn-sm btn-dark" ' + actionHtml('marquerFacturePayee', [f.id]) + '>💸 Marquer payée</button></td></tr>';
+            + '<td>'+_lienRibAdmin((window._convoyeursActifsData||{})[f.convoyeur_id])+' <button class="btn btn-sm btn-dark" ' + actionHtml('marquerFacturePayee', [f.id]) + '>💸 Marquer payée</button></td></tr>';
         }).join('');
 
     payeesEl.innerHTML = payees.length === 0
@@ -15265,7 +15256,7 @@ function declencherChampFichier(id) {
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
   'envoyerLettreVoitureSignee', 'genererDevis', 'marquerDemandeNonLue',
   'marquerFacturePayee', 'modifierPrixDevis', 'openDossierSb',
-  'loadInfosClient', 'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
+  'validerToutesReponses', 'loadInfosClient', 'ouvrirCompletionDemande', 'ouvrirFicheDemande', 'ouvrirLettreVoiture',
   'ouvrirPhotosMission', 'ouvrirRibPartenaire', 'ouvrirVideoCandidature', 'previsualiserDevis',
   'refuserConvoyeur', 'renvoyerLienCreationPartenaire', 'showPage', 'supprimerConvoyeur', 'terminerMission',
   'terminerMissionNettoyage', 'validerConvoyeur',
@@ -15483,5 +15474,7 @@ function declencherChampFichier(id) {
 <script src="assets/admin-demandes-informations.js"></script>
 <script src="assets/synchronisation-espaces.js"></script>
 <script src="assets/admin-demandes.js"></script>
+<script src="assets/parcours-comptes.js"></script>
+<link rel="stylesheet" href="assets/parcours-comptes.css">
 </body>
 </html>
