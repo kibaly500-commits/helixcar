@@ -17,7 +17,7 @@ const {lancerNavigateur}=require('./env');
  await page.evaluate(()=>ouvrirPreparationDemande('c'));
  const distance=page.locator('[data-field=distance]'),total=page.locator('[data-field=remuneration]'),fees=page.locator('[data-field=carburant_peages]');
  await distance.fill('235');assert.equal(await total.inputValue(),'195');assert.equal(await fees.inputValue(),'51.7');
- await distance.fill('776');assert.equal(await total.inputValue(),'450');assert.equal(await fees.inputValue(),'170.72');assert.match(await page.locator('[data-price-summary]').innerText(),/279,26/);
+ await distance.fill('776');assert.equal(await total.inputValue(),'450');assert.equal(await fees.inputValue(),'170.72');assert.match(await page.locator('[data-price-summary]').textContent(),/279,26/);
  await total.fill('425');await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>__saved[0].remuneration),425);
  await distance.fill('500');assert.equal(await total.inputValue(),'340');
  await distance.fill('');assert.equal(await total.inputValue(),'');assert.equal(await fees.inputValue(),'');
