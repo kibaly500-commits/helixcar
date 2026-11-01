@@ -52,6 +52,7 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #F4F5F6; color: #1
 .field-value { padding: 8px 11px; font-size: 15px; font-weight: 600; color: #16161A; min-height: 20px; }
 .field-value.empty { color: #bbb; font-weight: 400; font-style: italic; font-size: 12.5px; }
 
+.horaire-consigne{font-size:11px;line-height:1.5;margin-bottom:8px;color:#8D1E2C}.heure-manuelle{padding:6px 11px 10px;font-size:14px;font-weight:600}.heure-manuelle small{display:block;font-size:9px;font-weight:400;color:#555;margin-top:4px}
 /* SIGNATURES */
 .sig-row { display: flex; gap: 16px; }
 .sig-col { flex: 1; border: 1.5px solid #182126; border-radius: 9px; padding: 10px 13px; }
@@ -79,7 +80,7 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #F4F5F6; color: #1
 
   <div class="doc-header">
     <div class="brand">
-      <img src="logo-helixcar.png" alt="HelixCar" style="width:150px;height:55px;object-fit:contain">
+      <img src="assets/logo-helixcar-blanc.png" alt="HelixCar — Services automobiles" style="width:175px;height:58px;object-fit:contain;background:#182126;padding:10px 12px;border-radius:5px">
     </div>
     <div class="doc-ref">
       <h1>Lettre de voiture</h1>
@@ -126,10 +127,10 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #F4F5F6; color: #1
   </div>
 
   <div class="section">
-    <div class="section-title">Dates</div>
+    <div class="section-title">Dates et heures réelles</div><p class="horaire-consigne">Heures réelles à renseigner par le partenaire au départ et à l’arrivée, avant signature.</p>
     <div class="grid-2">
-      <div class="field"><div class="field-label">Date et heure de départ</div><div class="field-value empty" id="f-date-depart">à compléter</div></div>
-      <div class="field"><div class="field-label">Date et heure d'arrivée</div><div class="field-value empty" id="f-date-arrivee">à compléter</div></div>
+      <div class="field"><div class="field-label">Date de départ</div><div class="field-value empty" id="f-date-depart">à compléter</div><div class="heure-manuelle">Heure réelle : ____ h ____<small>À renseigner par le partenaire</small></div></div>
+      <div class="field"><div class="field-label">Date d’arrivée</div><div class="field-value empty" id="f-date-arrivee">à compléter</div><div class="heure-manuelle">Heure réelle : ____ h ____<small>À renseigner par le partenaire</small></div></div>
     </div>
   </div>
 
@@ -157,8 +158,35 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #F4F5F6; color: #1
 </div>
 
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js"></script>
 <script>
+// Render an isolated A4 document: no screen scroll, responsive breakpoint or
+// html2pdf pagination can shift the content or append a blank second page.
+async function creerPdfLettre(pageEl) {
+  const frame=document.createElement('iframe');
+  frame.setAttribute('aria-hidden','true');
+  frame.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;pointer-events:none';
+  document.body.appendChild(frame);
+  try {
+    const doc=frame.contentDocument;
+    doc.open();doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');doc.close();
+    const base=doc.createElement('base');base.href=document.baseURI;doc.head.appendChild(base);
+    document.querySelectorAll('style,link[rel="stylesheet"]').forEach(el=>doc.head.appendChild(el.cloneNode(true)));
+    const style=doc.createElement('style');
+    style.textContent='html,body{margin:0!important;padding:0!important;width:794px!important;background:white!important}.page{width:794px!important;height:auto!important;min-height:1122px!important;margin:0!important;padding:49px 56px!important;overflow:visible!important;box-shadow:none!important;gap:16px!important}.page>*{flex-shrink:0}.doc-header{flex-wrap:nowrap!important}.grid-3{grid-template-columns:1fr 1fr 1fr!important}.sig-row{flex-direction:row!important}';
+    doc.head.appendChild(style);
+    const copy=pageEl.cloneNode(true);copy.hidden=false;doc.body.appendChild(copy);
+    await Promise.all(Array.from(copy.querySelectorAll('img')).map(img=>img.decode()));
+    if(doc.fonts)await doc.fonts.ready;
+    const canvas=await html2canvas(copy,{scale:2,useCORS:true,backgroundColor:'#ffffff',scrollX:0,scrollY:0,windowWidth:794,windowHeight:1123});
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    const ratio=Math.min(210/canvas.width,297/canvas.height);
+    const width=canvas.width*ratio,height=canvas.height*ratio;
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',(210-width)/2,0,width,height);
+    return pdf.output('blob');
+  } finally {frame.remove();}
+}
 function telechargerPDF() {
   var btn = document.getElementById('pdf-btn');
   var texteInitial = btn.textContent;
@@ -180,17 +208,7 @@ function telechargerPDF() {
   var polices = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
 
   polices.then(function() {
-    var rect = pageEl.getBoundingClientRect();
-    var opt = {
-      margin: 0,
-      filename: nomFichier,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 1000, windowHeight: 1200, onclone: function(doc){var el=doc.querySelector('.page');el.style.cssText='width:210mm;height:297mm;margin:0;padding:13mm 15mm;overflow:hidden';} },
-      jsPDF: { unit: 'mm', format: [210, 297], orientation: 'portrait' },
-      pagebreak: { mode: 'avoid-all' }
-    };
-
-    return html2pdf().set(opt).from(pageEl).outputPdf('blob');
+    return creerPdfLettre(pageEl);
   }).then(function(blob) {
     if (!blob || blob.size === 0) {
       throw new Error('PDF vide généré (blob de taille 0)');
@@ -257,7 +275,7 @@ async function sbFetch(path, options) {
 function renseigner(id,value,fallback='À compléter'){
  const el=document.getElementById(id);el.textContent=value===0?'0':(value||fallback);el.classList.toggle('empty',value==null||value==='');
 }
-function dateDocument(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toLocaleString('fr-FR',{timeZone:'Europe/Paris'});}
+function dateDocument(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});}
 (async function chargerLettre(){
  const status=document.getElementById('document-status');
  try{
@@ -296,7 +314,7 @@ function dateDocument(value){if(!value)return null;const d=new Date(value);retur
   renseigner('f-signataire-arrivee',restitution?m.restit_contact_nom:m.contact_arrivee_nom);
   document.querySelector('.page').hidden=false;
   document.getElementById('print-btn').disabled=false;document.getElementById('pdf-btn').disabled=false;
-  status.textContent='Mission '+(m.reference_courte||m.reference)+' · '+(restitution?'Restitution':'Trajet aller')+' — Vérifiez les informations avant signature. Les horaires sans état des lieux sont prévisionnels.';
+  status.textContent='Mission '+(m.reference_courte||m.reference)+' · '+(restitution?'Restitution':'Trajet aller')+' — Vérifiez les informations avant signature. Les dates sans état des lieux sont prévisionnelles. Les heures réelles sont à remplir manuellement par le partenaire avant signature.';
  }catch(e){status.textContent=e.message||'Chargement impossible. Réessayez depuis votre espace.';}
 })();
 
