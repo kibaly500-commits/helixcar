@@ -4304,15 +4304,42 @@ function _fidHtmlPaliers(o) {
   }).join('');
   return '<div class="fid-parcours-entete"><div><div class="card-title">Vos paliers fidélité</div><p class="fid-parcours-description">Chaque palier atteint débloque une box surprise.</p></div><span class="fid-parcours-badge"><strong>Parcours '+(debutCycle/10000+1)+'</strong><span>· '+_fidNombre(debutCycle)+' à '+_fidNombre(debutCycle+10000)+' points</span></span></div><ol class="fid-paliers" id="fid-paliers">'+items+'</ol>';
 }
+// Listes fidélité : trois lignes au départ, commandes indépendantes.
+function _fidHtmlListe(id, lignes) {
+  var ancienne = document.getElementById(id);
+  var limite = Math.max(3, Number(ancienne && ancienne.dataset.visibles) || 3);
+  limite = Math.min(limite, Math.max(3, lignes.length));
+  return '<div id="' + id + '" data-visibles="' + limite + '">'
+    + lignes.map(function(ligne, i) { return '<div data-fid-ligne style="display:' + (i < limite ? 'block' : 'none') + '">' + ligne + '</div>'; }).join('')
+    + (lignes.length > 3 ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">'
+      + '<button type="button" class="btn btn-outline btn-sm" data-fid-plus aria-controls="' + id + '" aria-label="Voir plus — ' + (id === 'fid-box-liste' ? 'Mes box surprises' : 'Historique des points') + '" style="min-height:44px;display:' + (limite < lignes.length ? 'inline-flex' : 'none') + '"' + actionHtml('changerListeFidelite', [id, 'plus']) + '>Voir plus</button>'
+      + '<button type="button" class="btn btn-outline btn-sm" data-fid-moins aria-controls="' + id + '" aria-label="Voir moins — ' + (id === 'fid-box-liste' ? 'Mes box surprises' : 'Historique des points') + '" style="min-height:44px;display:' + (limite > 3 ? 'inline-flex' : 'none') + '"' + actionHtml('changerListeFidelite', [id, 'moins']) + '>Voir moins</button></div>' : '')
+    + '</div>';
+}
+function changerListeFidelite(id, sens) {
+  if (id !== 'fid-box-liste' && id !== 'fid-historique') return;
+  var liste = document.getElementById(id);
+  if (!liste) return;
+  var lignes = liste.querySelectorAll('[data-fid-ligne]');
+  var limite = sens === 'moins' ? 3 : Math.min(lignes.length, (Number(liste.dataset.visibles) || 3) + 3);
+  liste.dataset.visibles = String(limite);
+  lignes.forEach(function(ligne, i) { ligne.style.display = i < limite ? 'block' : 'none'; });
+  var plus = liste.querySelector('[data-fid-plus]'), moins = liste.querySelector('[data-fid-moins]');
+  if (plus) plus.style.display = limite < lignes.length ? 'inline-flex' : 'none';
+  if (moins) moins.style.display = limite > 3 ? 'inline-flex' : 'none';
+  var focus = sens === 'moins' ? plus : (limite >= lignes.length ? moins : plus);
+  if (focus) focus.focus({preventScroll:true});
+}
+
 function _fidHtmlBoxMystere(o,boxes) {
-  return '<div class="card" id="fid-box-mystere"><div class="card-title">Mes box surprises</div>'+(boxes.length?boxes.map(r=>'<div class="detail-row"><span class="detail-label">'+_fidPoints(r.seuil)+' · Box surprise</span><span class="detail-val">'+escapeHtml(r.statut==='a_preparer'?'En cours de préparation':(RECOMPENSE_LIB[r.statut]||r.statut))+(r.envoyee_le?' · '+escapeHtml(_fidDate(r.envoyee_le)):'')+'</span></div>').join(''):'<p class="fid-note">Votre première box se débloque à 2 000 points.</p>')+'</div>';
+  return '<div class="card" id="fid-box-mystere"><div class="card-title">Mes box surprises</div>'+(boxes.length?_fidHtmlListe('fid-box-liste',boxes.map(r=>'<div class="detail-row"><span class="detail-label">'+_fidPoints(r.seuil)+' · Box surprise</span><span class="detail-val">'+escapeHtml(r.statut==='a_preparer'?'En cours de préparation':(RECOMPENSE_LIB[r.statut]||r.statut))+(r.envoyee_le?' · '+escapeHtml(_fidDate(r.envoyee_le)):'')+'</span></div>')):'<p class="fid-note">Votre première box se débloque à 2 000 points.</p>')+'</div>';
 }
 
 function _fidHtmlHistorique(mouvements) {
   if (!mouvements.length) {
     return '<div class="fid-note" id="fid-historique-vide">Aucun mouvement pour l\'instant.</div>';
   }
-  return '<div id="fid-historique">' + mouvements.map(function (m) {
+  return _fidHtmlListe('fid-historique', mouvements.map(function (m) {
     var pts = _fidEntier(m.points);
     if (pts === null) return '';
     var cls = pts > 0 ? 'fid-plus' : (pts < 0 ? 'fid-moins' : '');
@@ -4321,7 +4348,7 @@ function _fidHtmlHistorique(mouvements) {
       + '<span class="detail-label">' + escapeHtml(_fidDate(m.created_at)) + ' · ' + escapeHtml(libelle) + '</span>'
       + '<span class="detail-val ' + cls + '">' + (pts > 0 ? '+' : '') + _fidNombre(pts) + '</span>'
       + '</div>';
-  }).join('') + '</div>';
+  }).filter(Boolean));
 }
 
 function rendreFidelitePage(donnees) {
@@ -15247,7 +15274,7 @@ function declencherChampFichier(id) {
 }
 
 [
-  'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
+  'changerListeFidelite', 'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
   'ouvrirRecapMissionClient', 'avancerRecompense', 'avancerIntervention', 'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
   'deciderCandidature', 'postulerOpportunite', 'choisirPeriodeMissionsPartenaire',
