@@ -7901,6 +7901,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <label for="conv-doc-permis" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Permis de conduire <span class="field-required">*</span> <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-permis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
           </div>
+          <div class="hc-doc-zone" id="conv-zone-photo" data-doc-id="conv-doc-photo" style="margin-bottom:14px">
+            <label for="conv-doc-photo" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Photo professionnelle <span class="field-required">*</span> <span class="field-optional-hint">— JPG ou PNG, 5 Mo maximum</span></label>
+            <input type="file" id="conv-doc-photo" accept="image/jpeg,image/png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+          </div>
           <div class="hc-doc-zone" id="conv-zone-kbis" data-doc-id="conv-doc-kbis" style="margin-bottom:14px">
             <label for="conv-doc-kbis" style="display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:6px">Justificatif d'immatriculation (Kbis ou attestation RNE) <span class="field-required">*</span> <span class="field-optional-hint">— PDF, JPG ou PNG</span></label>
             <input type="file" id="conv-doc-kbis" accept=".pdf,.jpg,.jpeg,.png" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
@@ -12874,6 +12878,7 @@ function construireRecapConvoyeur() {
     : '';
   var docs = _recapLigne('Pièce d\'identité', _recapNomFichier('conv-doc-identite') || 'Non ajouté') +
              _recapLigne('Permis de conduire', _recapNomFichier('conv-doc-permis') || 'Non ajouté') +
+             _recapLigne('Photo professionnelle', _recapNomFichier('conv-doc-photo') || 'Non ajoutée') +
              _recapLigne('Justificatif d\'immatriculation', _recapNomFichier('conv-doc-kbis') || 'Non ajouté') +
              _recapLigne('RC Pro', _recapNomFichier('conv-doc-rcpro') || (_partenaireAvecConvoyage() ? 'Non ajouté' : 'Facultative — non ajoutée'));
   // La vidéo est obligatoire pour toute candidature portant au moins
@@ -15403,12 +15408,14 @@ function resetClientForm() {
 var DOCS_PARTENAIRE = [
   { input: 'conv-doc-identite', zone: 'conv-zone-identite', libelle: "la pièce d'identité", prefixe: 'identite' },
   { input: 'conv-doc-permis',   zone: 'conv-zone-permis',   libelle: 'le permis de conduire', prefixe: 'permis' },
+  { input: 'conv-doc-photo', zone: 'conv-zone-photo', libelle: 'la photo professionnelle', prefixe: 'photo' },
   { input: 'conv-doc-kbis',     zone: 'conv-zone-kbis',     libelle: "le justificatif d'immatriculation", prefixe: 'kbis' },
   { input: 'conv-doc-rcpro',    zone: 'conv-zone-rcpro',    libelle: 'la RC professionnelle', prefixe: 'rcpro', requis: function () { return _partenaireAvecConvoyage(); } }
 ];
 function _fichierPresent(inputId) {
   var el = document.getElementById(inputId);
-  return !!(el && el.files && el.files.length > 0);
+  var f=el && el.files && el.files[0];
+  return !!f && (inputId!=='conv-doc-photo' || (['image/jpeg','image/png'].includes(f.type) && f.size>0 && f.size<=5242880));
 }
 function _docsPartenaireManquants() {
   return DOCS_PARTENAIRE.filter(function (d) {
@@ -16405,18 +16412,26 @@ function _convEnvoyerVersUrlSignee(chemin, token) {
 // Enchainement complet : autorisation -> depot -> confirmation.
 // Retourne { ok } ou { erreur }. Le chemin de stockage n'est jamais
 // decide ni transmis par le navigateur.
+async function _convEnvoyerPhotoInscription() {
+  if(!_fichierPresent('conv-doc-photo'))return {erreur:'Ajoutez votre photo professionnelle (JPG ou PNG, 5 Mo maximum).'};
+  var f=document.getElementById('conv-doc-photo').files[0], bytes=new Uint8Array(await f.arrayBuffer()), texte='';
+  for(var i=0;i<bytes.length;i+=8192)texte+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+  return _convAppelerFonctionVideo('photo',{jeton:_convJetonEnvoi,mime:f.type,base64:btoa(texte)});
+}
 function uploadVideoCandidature() {
   return new Promise(function (resolve) {
     if (!_convVideoRequise() || !_convVideo) { resolve({ ignore: true }); return; }
     if (!_convJetonEnvoi) { resolve({ erreur: 'Autorisation d\'envoi absente.' }); return; }
     _convEnvoiAnnule = false;   // chaque tentative repart d'un etat propre
 
-    _convAppelerFonctionVideo('autoriser', {
+    _convEnvoyerPhotoInscription().then(function(photo){
+      if(photo.erreur)throw new Error(photo.erreur);
+      return _convAppelerFonctionVideo('autoriser', {
       jeton: _convJetonEnvoi,
       mime: _convVideo.mime,
       taille_octets: _convVideo.taille,
       duree_secondes: _convVideo.duree
-    }).then(function (autorisation) {
+    });}).catch(function(e){return {erreur:e.message||'Photo non envoyée. Réessayez.'};}).then(function (autorisation) {
       if (autorisation.erreur) { resolve({ erreur: autorisation.erreur }); return; }
       // LOT V01 — IDEMPOTENCE. La confirmation précédente a réussi côté
       // serveur mais sa réponse s'est perdue (réseau coupé juste après,
@@ -16476,6 +16491,7 @@ document.addEventListener('change', function (e) {
 document.addEventListener('change', function (e) {
   var el = e.target;
   if (!el || !el.id) return;
+  if(el.id==='conv-doc-photo' && el.files.length && !_fichierPresent(el.id)){_showGroupError('conv-zone-photo','Choisissez une photo JPG ou PNG de 5 Mo maximum.');return;}
   DOCS_PARTENAIRE.forEach(function (d) {
     if (el.id === d.input && _fichierPresent(d.input) && typeof _clearGroupError === 'function') {
       _clearGroupError(d.zone);
@@ -22414,7 +22430,7 @@ document.addEventListener('click', function (e) {
         var action=document.createElement('span'); action.className='hc-doc-btn-action'; action.textContent='Remplacer';
         btn.appendChild(txt); btn.appendChild(action);
       } else {
-        txt.textContent='Ajouter le document';
+        txt.textContent=inputId==='conv-doc-photo'?'Ajouter une photo professionnelle':'Ajouter le document';
         var plus=document.createElement('span'); plus.className='hc-doc-btn-plus'; plus.textContent='+';
         btn.appendChild(plus); btn.appendChild(txt);
       }
@@ -23611,8 +23627,8 @@ console.log('HelixCar ' + window.HC_VERSION);
   document.addEventListener('DOMContentLoaded',start);if(document.readyState!=='loading')setTimeout(start,0);
 
   // Point 4 (V57) — équivalent convoyeur, séparé et indépendant.
-  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){moConv.disconnect();try{lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}finally{var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}},20);});
-  function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
+  var moConv=new MutationObserver(function(){clearTimeout(moConv._t);moConv._t=setTimeout(function(){moConv.disconnect();try{lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-photo','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}finally{var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}},20);});
+  function startConv(){var m=document.getElementById('modal-convoyeur');if(m)moConv.observe(m,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});lockStepperConvoyeur();if(typeof window.enhanceSelectExperienceConvoyeur==='function')window.enhanceSelectExperienceConvoyeur();if(typeof window.enhanceDocZone==='function'){['conv-doc-identite','conv-doc-permis','conv-doc-photo','conv-doc-kbis','conv-doc-rcpro'].forEach(window.enhanceDocZone);}}
   document.addEventListener('DOMContentLoaded',startConv);if(document.readyState!=='loading')setTimeout(startConv,0);
 })();
 </script>

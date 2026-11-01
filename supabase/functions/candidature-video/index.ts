@@ -1,3 +1,4 @@
+import {recevoirPortrait} from "./portrait.mjs";
 import {verifierObjet} from "./verification.ts";
 import {reconcilierVideos} from "./reconciliation.ts";
 // deno-lint-ignore-file no-explicit-any
@@ -598,6 +599,7 @@ export async function traiterRequete(sb: any, req: Request, env: Record<string,s
 
   const action = corps?.action;
   const ACTIONS: Record<string, (sb: any, req: Request, corps: any, cors: Record<string, string>) => Promise<Response>> = {
+    photo: (sb,req,corps,cors)=>recevoirPortrait(sb,req,corps,cors,resoudreCandidature),
     autoriser: actionAutoriser,
     prolonger: actionProlonger,
     reconcilier: actionReconcilier,
