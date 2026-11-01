@@ -32,7 +32,7 @@
    const moi=lignes[0];
    html+=moi?'<div class="hc-podium"><div>Votre position<strong>'+esc(moi.rang)+(moi.rang===1?'er':'e')+'</strong></div><div>Vos missions validées<strong>'+esc(moi.missions)+'</strong></div><div>'+ (d.termine?'Prime du trimestre':'Prime prévisionnelle')+'<strong>'+esc(moi.recompense)+' €</strong></div></div>':'<p>Vous n’avez pas encore de mission comptabilisée pour ce trimestre.</p>';
   }
-  html+='<small>En cas d’égalité, le partenaire ayant atteint ce nombre de missions en premier passe devant.</small>';
+  html+='<small>🏁 Même nombre de missions ? La place revient à celui ou celle qui a atteint ce total en premier. À vous de jouer !</small>';
   if(admin)html+='<p role="status" style="margin-top:20px;padding:14px;border:1px solid var(--accent);border-radius:8px;color:var(--ink)"><strong>'+(d.termine?'Trimestre clos — règlement des primes à vérifier.':'Rappel de règlement')+'</strong><br>Les primes sont à régler après la clôture du trimestre, à partir du '+esc(dateFr(d.fin))+'.'+(d.termine?' Vérifiez les versements déjà effectués avant tout règlement.':' Le classement reste provisoire jusque-là.')+'</p>';
   else if(!d.termine)html+='<p>Votre position et votre prime restent provisoires jusqu’à la clôture du trimestre.</p>';
   return html;
