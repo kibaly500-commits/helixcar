@@ -46,7 +46,8 @@ export async function handleFreeRoute(body,headers,{fetcher=fetch,env=process.en
   if(!plan||plan.category!=='convoyage')throw Error('Mission non trouvée');
   if(plan.mission.plateau)throw Error('Transport plateau non pris en charge');
   const legs=[[plan.mission.adresse_depart,plan.mission.adresse_arrivee]];
-  if(plan.mission.restitution)legs.push([plan.mission.adresse_arrivee,plan.mission.adresse_restitution]);
+  // L’interface utilise uniquement l’aller : une restitution non géocodable
+  // ne doit pas empêcher cette estimation ni ajouter des appels inutiles.
   const routes=[];
   for(const [from,to] of legs)routes.push(await routeFree(from,to,{fetcher,key:env.ORS_FREE_API_KEY}));
   return {status:200,body:{fingerprint:source.empreinte,routes,source:env.ORS_FREE_API_KEY?'OpenStreetMap © contributeurs · openrouteservice by HeiGIT':'IGN Géoplateforme · BD TOPO / Base Adresse Nationale'}};

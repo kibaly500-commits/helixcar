@@ -13,6 +13,17 @@
   const el=id=>document.getElementById(id);
   window.addEventListener('hc-session-fermee',()=>{++generation;clearTimeout(autosaveTimer);autoDrafts.clear();pricingDrafts.clear();state=null;totalDevis=null;el('hc-prep-ref').textContent='';el('hc-prep-body').textContent='';closeModal('preparation-missions');});
   function note(t,error){el('hc-prep-message').textContent=t;el('hc-prep-message').className=error?'hc-note hc-note--erreur visible':'hc-note visible';el('hc-prep-message').style.display=t?'block':'none';}
+  async function requestRoute(source,p,session){
+    const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation}),signal:AbortSignal.timeout(55000)});
+    let data;
+    try{data=await response.json();}catch(_){throw Error('Le service de calcul ne répond pas correctement. Réessayez dans un instant.');}
+    if(!response.ok)throw Error(data.error||'Calcul routier indisponible. Réessayez dans un instant.');
+    return data;
+  }
+  function routeNote(index,message){
+    const target=modal.querySelector('[data-route-status="'+index+'"]');
+    if(target)target.textContent=message;
+  }
   async function rpc(name,args){const r=await sbAuth.rpc(name,args);if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Réponse indisponible');return r.data;}
   function stable(value){
     if(value==null||typeof value!=='object')return JSON.stringify(value);
@@ -117,15 +128,14 @@
     for(const [i,p] of snapshot.plans.entries()){
       if(p.saved?.mission_id)continue;
       note('Calcul automatique : mission '+(i+1)+' sur '+snapshot.plans.length+'…');
+      routeNote(i,'Calcul des kilomètres en cours…');
       try{
         let minutes=null,source='Distance renseignée ou conservée';
         if(!(Number(p.distance)>0&&Number.isFinite(Number(p.distance)))||(p.mission.restitution&&!(Number(p.distance_aller)>0))){
           const session=(await sbAuth.auth.getSession()).data?.session;
           if(!session?.access_token)throw Error('Renseignez les kilomètres ou reconnectez-vous au calcul routier.');
-          const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:snapshot.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
-          const data=await response.json();
+          const data=await requestRoute(snapshot.source,p,session);
           if(ticket!==generation||state!==snapshot)return;
-          if(!response.ok)throw Error('Kilomètres automatiques indisponibles. Saisissez la distance aller uniquement, puis relancez le calcul.');
           if(data.fingerprint!==snapshot.source.empreinte)throw Error('Demande modifiée : rechargez la préparation.');
           const routes=data.routes;
           if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
@@ -135,11 +145,11 @@
         }
         const local=HCMissionBudget.local(p),custody=HCMissionBudget.guardPricing(p);
         autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',pricingPolicy:'rounded_v1',local,source,minutes,rate:local?0:0.22});
-      }catch(e){failures.push('Mission '+(i+1)+' : '+e.message);}
+      }catch(e){failures.push('Mission '+(i+1)+' : '+(e.name==='TimeoutError'?'Délai du calcul dépassé. Réessayez ou renseignez les kilomètres.':e.message));}
     }
     if(ticket!==generation||state!==snapshot)return;
     render();
-    if(failures.length){note('Calcul incomplet. '+failures.join(' · ')+'. Aucun prix existant remplacé.',true);return;}
+    if(failures.length){snapshot.plans.forEach((p,i)=>routeNote(i,failures.find(f=>f.startsWith('Mission '+(i+1)+' : '))||''));note('Calcul incomplet. '+failures.join(' · ')+'. Aucun prix existant remplacé.',true);return;}
     snapshot.plans.filter(p=>!p.saved?.mission_id).forEach(p=>Object.assign(autoDrafts.get(p.key),HCMissionBudget.travelPricing(p,snapshot.plans)));
     const items=snapshot.plans.map(p=>{
       if(p.saved?.mission_id||(automatic&&p.remuneration!=null&&p.remuneration!==''))return {key:p.key,locked:true,total:Number(p.remuneration)};
@@ -270,7 +280,7 @@
       if(!auto&&p.calcul_interne)h+='<p class="hc-prep-muted">Ancien calcul enregistré : relancez le calcul pour adapter les tarifs au budget client.</p>';
       if(auto)h+='<aside class="hc-prep-internal"><strong>'+esc(auto.local?'Île-de-France · prix forfaitaire':'Hors Île-de-France · forfait HelixCar')+'</strong><p>'+esc(p.distance)+' km aller'+(auto.minutes==null?'':' · '+esc(auto.minutes)+' min hors trafic')+'</p><p>Garde convoyeur : '+(auto.periods?esc(auto.periods.filter(d=>d>0).join(' + ')||0)+' jour(s) · 25 € par tranche complète de 4 jours, par véhicule = '+esc(money(auto.guard)):'Ancien calcul enregistré. Recalculez les brouillons pour appliquer les nouveaux paliers.')+'</p>'+(auto.local?'':'<p>Frais de route inclus : '+esc(auto.outboundKm??p.distance)+' km aller × 0,22 € = '+esc(money(auto.outboundFees??auto.fees))+'</p>')+(auto.returnFees>0?'<p>Restitution hors Île-de-France : 50 % des frais de l’aller ('+esc(money(auto.referenceFees))+') = '+esc(money(auto.returnFees))+'</p>':'')+(auto.extra>0?'<p>Supplément restitution Île-de-France : '+esc(money(auto.extra))+'</p>':'')+(auto.adjusted?'<p><strong>Adapté au budget client</strong> · Travail au barème : '+esc(money(auto.standardWork))+' ; travail ajusté : '+esc(money(auto.work))+'</p>':'')+(auto.work==null?'':'<p>Travail : '+esc(money(auto.work))+' · Total proposé : '+esc(money(auto.total))+'</p>')+'<small>'+esc(auto.source)+' · Forfait carburant et péages, sans calcul de leur coût réel. Vous pouvez ajuster les montants avant validation.</small></aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=(HCMissionBudget.local(p)?'':input(p,i,'carburant_peages','Dont forfait carburant et péages (€)'))+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p data-route-status="'+i+'" role="status" aria-live="polite"></p><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
@@ -370,15 +380,17 @@
         readEdits();
         const session=(await sbAuth.auth.getSession()).data?.session;
         if(!session?.access_token)throw Error('Reconnectez-vous pour demander une estimation.');
-        const response=await fetch('/api/route-gratuite',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({clientId:state.source.client.id,key:p.key,vehiculeId:p.vehicule_id,organisation:p.organisation})});
-        const data=await response.json();
-        if(!response.ok)throw Error(data.error||'Calcul routier indisponible');
+        b.textContent='Calcul en cours…';routeNote(i,'Calcul des kilomètres en cours…');
+        const data=await requestRoute(state.source,p,session);
         if(data.fingerprint!==state.source.empreinte)throw Error('La demande a changé. Rechargez les missions.');
         const routes=data.routes||[];
         if(!routes.length)throw Error('Aucun itinéraire calculé');
         const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
+        if(!Number.isFinite(distance)||distance<=0)throw Error('Distance non calculable.');
         p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
+        editVersion++;backup();queueSave();
         render();
+        routeNote(i,'Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km (aller uniquement).');
         note('Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km · '+Number(routes[0].minutes||0)+' min de conduite hors trafic. Cliquez sur Calculer les tarifs des missions pour appliquer le forfait de frais de route.');
       }
       if(b.hasAttribute('data-edit-tasks')){
@@ -444,7 +456,7 @@
         adopt(await rpc('source_preparation_missions',{p_client_id:state.source.client.id}));state.preview=true;render();note('Mission publiée dans les opportunités partenaires.');
         await loadOpportunitesAdmin();
       }
-    }catch(err){note(err.message,true);}finally{busy=false;b.disabled=false;}
+    }catch(err){const message=err.name==='TimeoutError'?'Délai du calcul dépassé. Réessayez ou renseignez les kilomètres.':err.message;note(message,true);if(b.hasAttribute('data-estimate-free'))routeNote(Number(b.dataset.estimateFree),message);}finally{busy=false;b.disabled=false;if(b.hasAttribute('data-estimate-free'))b.textContent='Estimer les kilomètres gratuitement';}
   });
   const detail=document.createElement('div');detail.id='modal-preparation-detail';detail.className='modal-overlay';
   detail.innerHTML='<div class="modal hc-prep-modal"><div class="hc-prep-head"><h3>Détails de la mission</h3><button type="button" class="btn btn-outline">Fermer</button></div><div class="hc-prep-detail-body"></div></div>';

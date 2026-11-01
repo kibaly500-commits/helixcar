@@ -4,7 +4,7 @@ const text=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
 const code=text.slice(text.indexOf('  async function calculateAll('),text.indexOf('  function budgetErrors('));
 const plan=(key,ret)=>({key,category:'convoyage',distance:ret?447.2:223.9,distance_aller:ret?223.9:undefined,kind:'direct',organisation:{},mission:{adresse_depart:'75012 Paris',adresse_arrivee:'59000 Lille',restitution:ret,adresse_restitution:'75012 Paris'}});
 const plans=[plan('return',true),plan('oneway',false)];
-const c={state:{plans},generation:1,totalDevis:1000,readEdits(){},note(){},render(){},money:String,autoDrafts:new Map(),HCMissionBudget:B,HCRemunerationEstimation:E};
+const c={state:{plans},generation:1,totalDevis:1000,readEdits(){},routeNote(){},note(){},render(){},money:String,autoDrafts:new Map(),HCMissionBudget:B,HCRemunerationEstimation:E};
 vm.createContext(c);vm.runInContext(code,c);
 (async()=>{
  await c.calculateAll();

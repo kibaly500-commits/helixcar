@@ -44,3 +44,15 @@ console.log('PASS itinéraire gratuit : URL 2026, kilométrage, absence de péag
 r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:authorized,env:{HERE_ROUTING_API_KEY:'must-not-be-used'}});
 assert.equal(r.status,200);assert.equal(r.body.routes[0].provider,'IGN Géoplateforme');
 console.log('PASS mode gratuit : aucun repli HERE même si sa clé est configurée.');
+
+// Une restitution invalide ne doit pas bloquer le kilométrage aller.
+const withReturn=async(url,opts)=>{
+ const response=await authorized(url,opts);
+ if(!url.endsWith('/rpc/source_preparation_missions'))return response;
+ const source=await response.json();
+ Object.assign(source.vehicules[0],{restitution_concernee:true,restit_adresse_rue:'Adresse introuvable',restit_ville:'Ville de test',restit_date:'2026-11-11'});
+ return {ok:true,json:async()=>source};
+};
+r=await handleFreeRoute({clientId:'00000000-0000-4000-8000-000000000001',key:'v1:direct'},auth,{fetcher:withReturn,env:{}});
+assert.equal(r.status,200);assert.equal(r.body.routes.length,1);assert.equal(r.body.routes[0].km,225);
+console.log('PASS restitution non géocodable : aller calculé seul sans blocage.');

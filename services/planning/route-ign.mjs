@@ -25,7 +25,7 @@ export async function routeIgn(from,to,{fetcher=fetch}={}){
   return p.join(',');
  };
  const start=await point(from),end=await point(to);
- const d=await request('https://data.geopf.fr/navigation/itineraire?'+new URLSearchParams({resource:'bdtopo-osrm',start,end,profile:'car',optimization:'fastest',distanceUnit:'kilometer',timeUnit:'minute',getSteps:'false',getBbox:'false'}),fetcher);
+ const d=await request('https://data.geopf.fr/navigation/itineraire?'+new URLSearchParams({resource:'bdtopo-valhalla',start,end,profile:'car',optimization:'fastest',distanceUnit:'kilometer',timeUnit:'minute',getSteps:'false',getBbox:'false'}),fetcher);
  if(!Number.isFinite(d.distance)||d.distance<=0||!Number.isFinite(d.duration)||d.duration<=0)throw Error('Itinéraire IGN non calculable.');
  const result={km:Math.round(d.distance*10)/10,minutes:Math.ceil(d.duration),provider:'IGN Géoplateforme',tollsEuros:null,tollsStatus:'forfait_kilometrique',traffic:'non_inclus',fastestMotorwayConfirmed:false};
  if(fetcher===fetch){if(cache.size>=300)cache.delete(cache.keys().next().value);cache.set(key,{result,expires:Date.now()+86400000});}
