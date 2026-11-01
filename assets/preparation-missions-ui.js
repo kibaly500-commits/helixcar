@@ -20,6 +20,12 @@
     if(!response.ok)throw Error(data.error||'Calcul routier indisponible. Réessayez dans un instant.');
     return data;
   }
+  function routeDuration(p){
+    const value=p.calcul_interne?.minutes;
+    if(typeof value!=='number'||!Number.isFinite(value)||value<=0)return 'Durée de route à estimer';
+    const minutes=Math.ceil(value),hours=Math.floor(minutes/60),rest=minutes%60;
+    return 'Environ '+(hours?hours+' h'+(rest?' '+String(rest).padStart(2,'0'):''):rest+' min')+' de route · aller uniquement, hors trafic et pauses';
+  }
   function routeNote(index,message){
     const target=modal.querySelector('[data-route-status="'+index+'"]');
     if(target)target.textContent=message;
@@ -30,7 +36,7 @@
     if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
     return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}';
   }
-  const draftFields=['remuneration','distance','distance_aller','distance_basis','carburant_peages','motorisation','restit_motorisation','heure_remise','heure_retrait','heure_prise_en_charge','retour_reception','retour_remise'];
+  const draftFields=['calcul_interne','remuneration','distance','distance_aller','distance_basis','carburant_peages','motorisation','restit_motorisation','heure_remise','heure_retrait','heure_prise_en_charge','retour_reception','retour_remise'];
   function draftKey(source){const admin=window._currentAdmin;return admin?.id&&source?.client?.id?'hc-prep-draft:'+admin.id+':'+source.client.id+':'+source.devis_id:null;}
   function backup(){
     if(!state)return;const key=draftKey(state.source);if(!key)return;
@@ -130,7 +136,7 @@
       note('Calcul automatique : mission '+(i+1)+' sur '+snapshot.plans.length+'…');
       routeNote(i,'Calcul des kilomètres en cours…');
       try{
-        let minutes=null,source='Distance renseignée ou conservée';
+        let minutes=p.calcul_interne?.minutes??null,source='Distance renseignée ou conservée';
         if(!(Number(p.distance)>0&&Number.isFinite(Number(p.distance)))||(p.mission.restitution&&!(Number(p.distance_aller)>0))){
           const session=(await sbAuth.auth.getSession()).data?.session;
           if(!session?.access_token)throw Error('Renseignez les kilomètres ou reconnectez-vous au calcul routier.');
@@ -142,6 +148,7 @@
           p.distance=HCMissionBudget.wholeKm(routes[0].km);p.distance_basis='outbound_v1';
           p.distance_aller=p.distance;
           minutes=routes[0].minutes;source=data.source;
+          p.calcul_interne={...p.calcul_interne,minutes};
         }
         const local=HCMissionBudget.local(p),custody=HCMissionBudget.guardPricing(p);
         autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',pricingPolicy:'rounded_v1',local,source,minutes,rate:local?0:0.22});
@@ -169,7 +176,7 @@
     const raw=work+travel.fees+custody.guard+travel.extra;
     // Arrondi conservé ; le minimum travail et les suppléments restent couverts.
     const total=Math.max(Math.round(raw/5)*5,Math.ceil((35+travel.fees+custody.guard+travel.extra)/5)*5);
-    const a={...autoDrafts.get(p.key),...travel,...custody,local:false,pricingPolicy:'distance_tiers_v3',distanceBasis:'outbound_v1',source:'Barème HelixCar',work,total,rounding:Math.round((total-raw)*100)/100,adjusted:false};
+    const a={...p.calcul_interne,...autoDrafts.get(p.key),...travel,...custody,local:false,pricingPolicy:'distance_tiers_v3',distanceBasis:'outbound_v1',source:'Barème HelixCar',work,total,rounding:Math.round((total-raw)*100)/100,adjusted:false};
     p.remuneration=total;p.carburant_peages=travel.fees;p.calcul_interne={...a};autoDrafts.set(p.key,a);
   }
   function priceSummary(p){
@@ -302,7 +309,7 @@
       if(p.stockage)h+='<p class="hc-prep-internal">Organisation interne · stockage HelixCar du '+display(p.stockage)+' (absent de l’annonce partenaire)</p>';
       if(p.category==='convoyage')h+='<aside class="hc-prep-internal" data-price-summary="'+i+'">'+priceSummary(p)+'</aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
-      if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont forfait carburant et péages (€)')+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p data-route-status="'+i+'" role="status" aria-live="polite"></p><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
+      if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont forfait carburant et péages (€)')+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<p data-route-duration="'+i+'" role="status" style="grid-column:1/-1;font-weight:600">'+esc(routeDuration(p))+'</p><button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p data-route-status="'+i+'" role="status" aria-live="polite"></p><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
         if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
@@ -363,7 +370,7 @@
     if(!p||p.saved?.mission_id||!draftFields.includes(key))return;
     if(e.target.type==='time')readEdits();
     else p[key]=e.target.type==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value;
-    if(key==='distance'){p.distance_aller=p.distance;p.distance_basis='outbound_v1';refreshDistancePrices(p);}
+    if(key==='distance'){p.distance_aller=p.distance;p.distance_basis='outbound_v1';if(p.calcul_interne)p.calcul_interne.minutes=null;if(autoDrafts.has(p.key))autoDrafts.get(p.key).minutes=null;refreshDistancePrices(p);const duration=modal.querySelector('[data-route-duration="'+e.target.dataset.plan+'"]');if(duration)duration.textContent=routeDuration(p);}
     editVersion++;backup();queueSave();
   });
   window.addEventListener('beforeunload',()=>{if(state&&!state.preview)backup();});
@@ -409,7 +416,8 @@
         if(!routes.length)throw Error('Aucun itinéraire calculé');
         const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
         if(!Number.isFinite(distance)||distance<=0)throw Error('Distance non calculable.');
-        p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;refreshDistancePrices(p);
+        p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
+        autoDrafts.set(p.key,{...autoDrafts.get(p.key),minutes:routes[0].minutes});refreshDistancePrices(p);
         editVersion++;backup();queueSave();
         render();
         routeNote(i,'Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km (aller uniquement).');

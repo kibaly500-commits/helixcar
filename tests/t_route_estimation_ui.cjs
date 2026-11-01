@@ -2,11 +2,13 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const source=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
 const helper=source.slice(source.indexOf('  async function requestRoute('),source.indexOf('  function routeNote('));
 const listener=source.slice(source.indexOf("  modal.addEventListener('click',async"),source.indexOf('  const detail=document.createElement'));
+const durationContext={};vm.runInNewContext(helper,durationContext);
+for(const [minutes,label] of [[144,'2 h 24'],[120,'2 h'],[45,'45 min'],[null,'à estimer'],[0,'à estimer']])assert.ok(durationContext.routeDuration({calcul_interne:{minutes}}).includes(label));
 async function run(response){
  let click,request,localMessage='',saved=0;
  const p={key:'v1:direct',vehicule_id:'v1',category:'convoyage',organisation:{},remuneration:500};
  const button={id:'',dataset:{estimateFree:'0'},disabled:false,textContent:'Estimer les kilomètres gratuitement',hasAttribute:k=>k==='data-estimate-free'};
- const context={state:{source:{client:{id:'test-client'},empreinte:'current'},plans:[p]},busy:false,generation:1,editVersion:0,
+ const context={state:{source:{client:{id:'test-client'},empreinte:'current'},plans:[p]},autoDrafts:new Map(),busy:false,generation:1,editVersion:0,
   modal:{addEventListener:(name,fn)=>{click=fn;}},sbAuth:{auth:{getSession:async()=>({data:{session:{access_token:'test-session'}}})}},SUPABASE_KEY:'test-key',AbortSignal,
   fetch:async(url,options)=>{request={url,options};assert.equal(button.disabled,true);assert.equal(button.textContent,'Calcul en cours…');if(response instanceof Error)throw response;return response;},
   refreshDistancePrices(){},readEdits(){},render(){},note(){},routeNote:(i,message)=>{localMessage=message;},backup(){saved++;},queueSave(){},HCMissionBudget:{wholeKm:Math.round}};
