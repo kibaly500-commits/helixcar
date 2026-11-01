@@ -20,3 +20,5 @@
 .hc-profil-partenaire .user-info{width:100%;flex:none}
 .hc-profil-partenaire .user-name{white-space:normal;overflow-wrap:anywhere}
 .hc-profil-partenaire .sb-metiers{justify-content:center}
+
+.hc-mode-sombre .sidebar .user-name,.hc-mode-sombre #sb-name{color:#f3f5f8!important}

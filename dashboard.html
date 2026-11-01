@@ -4009,7 +4009,21 @@ async function chargerOpportunitesPartenaire() {
   if (!_sbAuthPret()) return [];
   const { data, error } = await sbAuth.from('v_opportunites_partenaire').select('*').order('publiee_le', { ascending: false });
   if (error) throw new Error(error.message);
-  return (data || []).filter(o=>o.ma_candidature_etat!=='retenu');
+  // Une attribution effective prime sur une ancienne candidature non synchronisée.
+  const conv = window._currentConvoyeur;
+  let missionsAttribuees = [];
+  if (conv && conv.id) {
+    const resultat = await sbAuth.from('missions').select('id,statut').eq('convoyeur_id', conv.id);
+    if (resultat.error) throw new Error(resultat.error.message);
+    missionsAttribuees = resultat.data || [];
+  }
+  const attribuees = new Set(missionsAttribuees.map(m=>m.id));
+  const jourParis = new Intl.DateTimeFormat('fr-CA', {timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  return (data || []).filter(o=>{
+    const fin = String(o.date_fin || o.date_debut || '').slice(0,10);
+    return o.statut === 'a_pourvoir' && o.ma_candidature_etat !== 'retenu'
+      && !attribuees.has(o.mission_id) && (!/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin >= jourParis);
+  });
 }
 async function loadOpportunitesPartenaire() {
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
@@ -9057,7 +9071,8 @@ function _lienLettreVoiture(reference) {
 function _boutonEdl(reference, etape, libelle) {
   return '<button class="btn btn-sm btn-primary"'
     + actionHtml('allerVersEdl', [reference, etape])
-    + ' style="margin-right:4px">' + libelle + '</button>';
+    + ' style="margin-right:4px">' + libelle + '</button>'
+    + '<small style="display:block;margin:6px 0;overflow-wrap:anywhere">Code : ' + escapeHtml(reference + '/' + ({depart:'DEP',arrivee:'ARR',restitution_depart:'RDEP',restitution_arrivee:'RARR'}[etape] || '')) + '</small>';
 }
 function _lienLettreSignee(m) {
   var u = urlSure(m && m.lettre_voiture_signee_url);
@@ -9102,7 +9117,7 @@ const CONV_MISSION_ACTIONS = {
 
 function allerVersEdl(reference, phase) {
   window._hcSortieConfirmee = true;
-  window.location.href = 'edl.html?mission=' + encodeURIComponent(reference) + '&phase=' + phase;
+  window.location.href = 'edl.html?code=' + encodeURIComponent(reference + '/' + ({depart:'DEP',arrivee:'ARR',restitution_depart:'RDEP',restitution_arrivee:'RARR'}[phase] || '')) + '&phase=' + encodeURIComponent(phase);
 }
 
 function envoyerLettreVoitureSignee(input, missionId, reference) {
@@ -9471,7 +9486,7 @@ function chargerMissionsAttribuees(enCours) {
         // avant et après, puis la fin d'intervention.
         const action = m.convoyeur_id!==conv.id ? '<button class="btn btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Consulter la mission</button>' : estNettoyage
           ? _actionsMissionNettoyage(m)
-          : (CONV_MISSION_ACTIONS[m.statut] || function() { return '—'; })(m.id, m.reference, m);
+          : (CONV_MISSION_ACTIONS[m.statut] || function() { return '—'; })(m.id, m.reference_courte || m.reference, m);
         const intitule = estNettoyage
           ? ('🧼 ' + escapeHtml([m.adresse_intervention,
                [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]

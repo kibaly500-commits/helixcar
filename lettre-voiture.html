@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HelixCar — Lettre de Voiture</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/documents-mission.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'DM Sans', Arial, sans-serif; background: #E9E9E4; color: #16161A; }
+body { font-family: 'DM Sans', Arial, sans-serif; background: #F4F5F6; color: #16161A; }
 
 @media print {
   @page { size: A4; margin: 0; }
@@ -16,9 +18,9 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #E9E9E4; color: #1
   .page { box-shadow: none !important; margin: 0 !important; width: 210mm !important; height: 289mm !important; }
 }
 
-.no-print { text-align: center; padding: 16px; background: #E9E9E4; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
-.print-btn { background: #0A1628; color: #F5C518; border: none; padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
-.print-btn:hover { background: #16294A; }
+.no-print { text-align: center; padding: 16px; background: #F4F5F6; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.print-btn { background: #B32637; color: #FFFFFF; border: none; padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.print-btn:hover { background: #8D1E2C; }
 .print-btn:disabled { opacity: .6; cursor: default; }
 .no-print .hint { width: 100%; font-size: 11px; color: #666; margin-top: 4px; }
 
@@ -30,49 +32,54 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #E9E9E4; color: #1
 }
 
 /* HEADER */
-.doc-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; border-bottom: 2.5px solid #0A1628; }
+.doc-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; border-bottom: 2.5px solid #182126; }
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand-badge { width: 36px; height: 36px; background: #F5C518; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #0A1628; }
-.brand-name { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; color: #0A1628; letter-spacing: -.01em; }
+.brand-badge { width: 36px; height: 36px; background: #FFFFFF; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #182126; }
+.brand-name { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; color: #182126; letter-spacing: -.01em; }
 .doc-ref { text-align: right; }
-.doc-ref h1 { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #0A1628; text-transform: uppercase; letter-spacing: .07em; }
+.doc-ref h1 { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #182126; text-transform: uppercase; letter-spacing: .07em; }
 .doc-ref .sub { font-size: 10.5px; color: #888; margin-top: 3px; }
 
 /* SECTIONS */
-.section-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #0A1628; margin-bottom: 7px; }
-.section-title::after { content: ''; flex: 1; height: 1px; background: #E3E1D9; }
+.section-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #182126; margin-bottom: 7px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: #DDE2E5; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
-.field { border: 1px solid #E3E1D9; border-radius: 7px; background: #FAFAF8; overflow: hidden; }
-.field-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #999; background: #F1F0EA; padding: 4px 11px; border-bottom: 1px solid #E3E1D9; }
+.field { border: 1px solid #DDE2E5; border-radius: 7px; background: #FAFAFA; overflow: hidden; }
+.field-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #999; background: #F1F3F4; padding: 4px 11px; border-bottom: 1px solid #DDE2E5; }
 .field-value { padding: 8px 11px; font-size: 15px; font-weight: 600; color: #16161A; min-height: 20px; }
 .field-value.empty { color: #bbb; font-weight: 400; font-style: italic; font-size: 12.5px; }
 
 /* SIGNATURES */
 .sig-row { display: flex; gap: 16px; }
-.sig-col { flex: 1; border: 1.5px solid #0A1628; border-radius: 9px; padding: 10px 13px; }
-.sig-col .sig-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #0A1628; margin-bottom: 7px; }
-.sig-box { border: 1px dashed #C7C5BB; border-radius: 6px; height: 66px; background: #FAFAF8; }
+.sig-col { flex: 1; border: 1.5px solid #182126; border-radius: 9px; padding: 10px 13px; }
+.sig-col .sig-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #182126; margin-bottom: 7px; }
+.sig-box { border: 1px dashed #C7C5BB; border-radius: 6px; height: 66px; background: #FAFAFA; }
 
-.doc-footer { text-align: center; font-size: 10px; color: #999; padding-top: 10px; border-top: 1px solid #E3E1D9; }
+.doc-footer { text-align: center; font-size: 10px; color: #999; padding-top: 10px; border-top: 1px solid #DDE2E5; }
+
+[hidden]{display:none!important}.document-scroll{overflow-x:auto;width:100%}.field-value{overflow-wrap:anywhere}.doc-header{border-bottom-color:#B32637}.section-title{color:#B32637}
+@media print{.document-scroll{overflow:visible}.page[hidden]{display:none!important}}
+@media screen and (max-width:650px){.page{width:100%;height:auto;min-height:0;margin:0;padding:22px 16px;gap:22px;overflow:visible}.grid-3{grid-template-columns:1fr}.doc-header{gap:12px;flex-wrap:wrap}.sig-row{flex-direction:column}.field-value{font-size:13px}.no-print{padding:12px}.print-btn{min-height:44px}}
 </style>
 </head>
 <body>
 
 <div class="no-print">
-  <button class="print-btn" onclick="window.print()">🖨️ Imprimer</button>
-  <button class="print-btn" id="pdf-btn" onclick="telechargerPDF()">📥 Enregistrer en PDF</button>
-  <span class="hint">Sur mobile, le bouton "Enregistrer en PDF" ouvre le menu Partager de ton téléphone → choisis "Enregistrer dans Fichiers" (iPhone) ou "Enregistrer sur l'appareil" (Android). Une fois signée, envoie une photo directement depuis ton espace convoyeur (Historique → "📸 Envoyer la lettre signée") une fois la mission terminée.</span>
+  <button class="print-btn" id="print-btn" disabled onclick="window.print()">🖨️ Imprimer</button>
+  <button class="print-btn" id="pdf-btn" disabled onclick="telechargerPDF()">📥 Enregistrer en PDF</button>
+  <span class="hint">Sur mobile, le bouton "Enregistrer en PDF" ouvre le menu Partager de ton téléphone → choisis "Enregistrer dans Fichiers" (iPhone) ou "Enregistrer sur l'appareil" (Android). Une fois signée, envoie une photo directement depuis ton espace partenaire (Historique → "📸 Envoyer la lettre signée") une fois la mission terminée.</span>
 </div>
 
-<div class="page">
+<p id="document-status" class="no-print" role="status">Chargement de la mission…</p>
+<div class="no-print" id="trajet-choix" hidden><a id="trajet-aller">Trajet aller</a> · <a id="trajet-restitution">Trajet de restitution</a></div>
+<div class="document-scroll"><div class="page" hidden>
 
   <div class="doc-header">
     <div class="brand">
-      <div class="brand-badge">HC</div>
-      <div class="brand-name">HelixCar</div>
+      <img src="logo-helixcar.png" alt="HelixCar" style="width:150px;height:55px;object-fit:contain">
     </div>
     <div class="doc-ref">
       <h1>Lettre de voiture</h1>
@@ -149,6 +156,7 @@ body { font-family: 'DM Sans', Arial, sans-serif; background: #E9E9E4; color: #1
 
 </div>
 
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 function telechargerPDF() {
@@ -177,7 +185,7 @@ function telechargerPDF() {
       margin: 0,
       filename: nomFichier,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: Math.ceil(rect.width), windowHeight: Math.ceil(rect.height) },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 1000, windowHeight: 1200, onclone: function(doc){var el=doc.querySelector('.page');el.style.cssText='width:210mm;height:297mm;margin:0;padding:13mm 15mm;overflow:hidden';} },
       jsPDF: { unit: 'mm', format: [210, 297], orientation: 'portrait' },
       pagebreak: { mode: 'avoid-all' }
     };
@@ -221,5 +229,77 @@ function telechargerPDF() {
 }
 </script>
 
+<script>
+const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
+const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function sbFetch(path, options) {
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Reconnectez-vous à votre espace convoyeur.');
+  options = options || {};
+  const headers = Object.assign({
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + session.access_token,
+    'Content-Type': 'application/json'
+  }, options.headers || {});
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, { headers }))
+    .then(function(r) {
+      if (!r.ok) {
+        return r.text().then(function(txt) { throw new Error('Supabase ' + r.status + ': ' + txt); });
+      }
+      if (r.status === 204) return null;
+      return r.text().then(function(txt) { return txt ? JSON.parse(txt) : null; });
+    });
+}
+
+
+function renseigner(id,value,fallback='À compléter'){
+ const el=document.getElementById(id);el.textContent=value===0?'0':(value||fallback);el.classList.toggle('empty',value==null||value==='');
+}
+function dateDocument(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toLocaleString('fr-FR',{timeZone:'Europe/Paris'});}
+(async function chargerLettre(){
+ const status=document.getElementById('document-status');
+ try{
+  const params=new URLSearchParams(location.search),ref=params.get('mission');
+  if(!ref)throw new Error('Ouvrez la lettre de voiture depuis une mission de votre espace.');
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Connectez-vous à votre espace partenaire sur cet appareil, puis rouvrez la lettre.');
+  const m=await HCDocumentsMission.chercher(sbFetch,ref);
+  if(!m)throw new Error('Mission introuvable ou inaccessible à ce compte.');
+  const [admins,partners]=await Promise.all([
+   sbFetch('admins?auth_user_id=eq.'+encodeURIComponent(session.user.id)+'&actif=eq.true&select=id'),
+   sbFetch('convoyeurs?auth_user_id=eq.'+encodeURIComponent(session.user.id)+'&select=id,prenom,nom')
+  ]);
+  if(!admins.length&&!partners.some(p=>p.id===m.convoyeur_id))throw new Error('Cette mission ne vous est pas attribuée.');
+  const conv=partners.find(p=>p.id===m.convoyeur_id)||(await sbFetch('convoyeurs?id=eq.'+encodeURIComponent(m.convoyeur_id)+'&select=id,prenom,nom'))[0];
+  const restitution=params.get('trajet')==='restitution';
+  if(restitution&&!m.restitution)throw new Error('Cette mission ne comporte pas de trajet de restitution.');
+  if(m.restitution){
+   document.getElementById('trajet-choix').hidden=false;
+   for(const trajet of ['aller','restitution'])document.getElementById('trajet-'+trajet).href='lettre-voiture.html?mission='+encodeURIComponent(ref)+'&trajet='+trajet;
+  }
+  const edls=await sbFetch('etats_des_lieux?mission_id=eq.'+encodeURIComponent(m.id)+'&select=phase,km,created_at&order=created_at.desc');
+  const depart=edls.find(e=>e.phase===(restitution?'restitution_depart':'depart'));
+  const arrivee=edls.find(e=>e.phase===(restitution?'restitution_arrivee':'arrivee'));
+  renseigner('f-nom-conv',conv?.nom);renseigner('f-prenom-conv',conv?.prenom);
+  renseigner('f-modele',restitution?(m.restit_marque_modele||m.marque_modele):m.marque_modele);
+  renseigner('f-immat',restitution?(m.restit_immatriculation||m.immatriculation):m.immatriculation);
+  renseigner('f-vin',restitution?(m.restit_vin||m.vin):m.vin);
+  renseigner('f-reference',(m.reference_courte||m.reference)+(restitution?' — Restitution':''));
+  renseigner('f-lieu-depart',restitution?(m.adresse_arrivee||m.ville_arrivee):(m.adresse_depart||m.ville_depart));
+  renseigner('f-lieu-arrivee',restitution?m.adresse_restitution:(m.adresse_arrivee||m.ville_arrivee));
+  renseigner('f-date-depart',dateDocument(depart?.created_at||(restitution?m.date_restitution_depart:m.date_prise_en_charge)));
+  renseigner('f-date-arrivee',dateDocument(arrivee?.created_at||(restitution?m.date_restitution_arrivee:m.date_livraison)));
+  renseigner('f-km-depart',depart?.km,'À relever');renseigner('f-km-arrivee',arrivee?.km,'À relever');
+  renseigner('f-signataire-depart',restitution?m.contact_arrivee_nom:m.contact_depart_nom);
+  renseigner('f-signataire-arrivee',restitution?m.restit_contact_nom:m.contact_arrivee_nom);
+  document.querySelector('.page').hidden=false;
+  document.getElementById('print-btn').disabled=false;document.getElementById('pdf-btn').disabled=false;
+  status.textContent='Mission '+(m.reference_courte||m.reference)+' · '+(restitution?'Restitution':'Trajet aller')+' — Vérifiez les informations avant signature. Les horaires sans état des lieux sont prévisionnels.';
+ }catch(e){status.textContent=e.message||'Chargement impossible. Réessayez depuis votre espace.';}
+})();
+
+</script>
 </body>
 </html>
