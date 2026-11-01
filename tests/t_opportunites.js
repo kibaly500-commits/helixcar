@@ -36,8 +36,9 @@ function table(nom) {
 window.supabase = {createClient(){return {
   auth:{onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};},getSession:async()=>({data:{session:{access_token:'TEST-QA-CLAUDE-HELIXCAR-token',user:{id:'TEST-QA-CLAUDE-HELIXCAR-user'}}}}),signOut:async()=>({})},
   from:table,
-  rpc:async function(nom,params){
+  rpc:async function(nom,params={}){
     window.__journal.push({rpc:nom,params});
+    if(nom==='missions_du_partenaire')return {data:window.__missions||[]};
     if(window.__erreur) return {data:null,error:{message:'SQL 23514 details secrets'}};
     const o=window.__opportunites.find(o=>o.id===params.p_id || o.id===params.p_opportunite_id);
     if(nom==='modifier_opportunite'){ Object.assign(o,params.p_champs); return {data:{ok:true,code:'MODIFIEE'},error:null}; }
@@ -169,6 +170,8 @@ window.fetch=function(url){
     await page.setViewportSize({width:390,height:844});
     check('D10 : carte partenaire visible sans débordement mobile', await page.locator('#convoyeur-opportunites-liste .opp-carte').isVisible() && await page.locator('#convoyeur-opportunites-liste .opp-carte').evaluate(el=>el.clientWidth>0 && el.scrollWidth<=el.clientWidth+1));
     await capturerQA(page,'o01-candidature-mobile','#convoyeur-opportunites-liste');
+    await page.evaluate(async()=>{__partenaire=[{...__opportunites[1],ma_candidature_etat:'retenu'}];await loadOpportunitesPartenaire();});
+    check('Offre retenue retirée de la liste',await page.locator('#convoyeur-opportunites-vide').count()===1);
     await page.evaluate(async()=>{__partenaire=[];await loadOpportunitesPartenaire();});
     check('D11 : état vide réel', (await page.locator('#convoyeur-opportunites-liste').textContent()).includes('Aucune opportunité disponible'));
     await page.evaluate(async()=>{__erreur=true;await loadOpportunitesPartenaire();__erreur=false;});
@@ -184,17 +187,32 @@ window.fetch=function(url){
         await loadMissionsConvoyeur();await loadDashboardMissionsPreview();
       });
       const texte=await page.locator('#conv-missions-table').innerText();
-      check('Mes missions : groupes en cours, réalisées et historique '+width,['À réaliser et en cours','Réalisées — en attente','Historique — missions terminées'].every(t=>texte.includes(t)));
+      check('Mes missions : actuelles uniquement '+width,texte.includes('À réaliser et en cours')&&!texte.includes('Missions passées'));
       check('Mes missions : aucun autre compte ni mission libre '+width,!/SECRET-AUTRE|NON-ATTRIBUEE/.test(texte));
       check('Mes missions : aucune acceptation ni candidature '+width,!/Postuler|Accepter/.test(texte));
       check('Mes missions : actions opérationnelles conservées '+width,texte.includes('État des lieux départ')&&texte.includes('Envoyer la lettre signée'));
-      check('Mes missions : six missions attribuées '+width,await page.locator('#conv-missions-table tr:not(.mes-missions-section)').count()===6);
+      check('Mes missions : trois missions actuelles '+width,await page.locator('#conv-missions-table tr:not(.mes-missions-section)').count()===3);
+      await page.locator('#conv-missions-passees').click();await page.waitForTimeout(100);
+      check('Mes missions : trois missions passées '+width,await page.locator('#conv-missions-table tr:not(.mes-missions-section)').count()===3);
+      check('Mes missions : document encore accessible '+width,(await page.locator('#conv-missions-table').innerText()).includes('Lettre de voiture'));
+      await page.locator('#conv-missions-actuelles').click();await page.waitForTimeout(100);
       check('Mes missions : navigation unifiée '+width,await page.evaluate(()=>NAVS.convoyeur.some(x=>x.label==='Mes missions')&&!NAVS.convoyeur.some(x=>x.id==='convoyeur-historique')));
       check('Accueil : uniquement missions encore à réaliser '+width,await page.locator('#conv-dashboard-missions-preview .mission-card').count()===3);
       check('Mes missions : aucun débordement '+width,await page.locator('#conv-missions-table').evaluate(el=>el.closest('.table-wrap').scrollWidth<=el.closest('.table-wrap').clientWidth+1));
       await page.evaluate(async()=>{__missions=[];await loadMissionsConvoyeur()});
-      check('Mes missions : état vide '+width,(await page.locator('#conv-missions-table').innerText()).includes('Aucune mission attribuée'));
+      check('Mes missions : état vide '+width,(await page.locator('#conv-missions-table').innerText()).includes('Aucune mission actuelle'));
     }
+    await page.evaluate(async()=>{
+      __missions=[{id:'later',convoyeur_id:'test-pro',statut:'acceptee',type_mission:'convoyage',ville_depart:'Plus tard',date_prise_en_charge:'2026-11-20T10:00'},
+       {id:'next',convoyeur_id:'test-pro',statut:'acceptee',type_mission:'convoyage',ville_depart:'Prochaine',date_prise_en_charge:'2026-11-10T10:00'},
+       {id:'collective',convoyeur_id:null,partenaire_retenu:true,statut:'en_attente',type_mission:'convoyage',ville_depart:'Collective retenue',date_prise_en_charge:'2026-11-30T10:00'}];
+      await choisirPeriodeMissionsPartenaire('actuelles');
+    });
+    check('Mes missions : prochaine en premier',(await page.locator('#conv-missions-table tr:not(.mes-missions-section)').first().innerText()).includes('Prochaine'));
+    check('Mission collective retenue visible sans attribution inventée',(await page.locator('#conv-missions-table').innerText()).includes('Collective retenue'));
+    await page.evaluate(()=>choisirPeriodeMissionsPartenaire('passees'));
+    check('Passées : message vide',(await page.locator('#conv-missions-table').innerText()).includes('Aucune mission passée'));
+    await page.evaluate(()=>choisirPeriodeMissionsPartenaire('actuelles'));
     for (const width of [1280,390]) {
       await page.setViewportSize({width,height:844});
       await page.evaluate(async()=>{

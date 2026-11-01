@@ -1755,6 +1755,10 @@ body.scroll-verrouille { overflow: hidden; }
 
       <!-- CONVOYEUR: Missions -->
       <div class="page" id="page-convoyeur-missions">
+        <div class="hc-prep-toolbar" aria-label="Période des missions">
+          <button type="button" id="conv-missions-actuelles" class="btn btn-primary" onclick="choisirPeriodeMissionsPartenaire('actuelles')" aria-pressed="true">Actuelles</button>
+          <button type="button" id="conv-missions-passees" class="btn btn-outline" onclick="choisirPeriodeMissionsPartenaire('passees')" aria-pressed="false">Passées</button>
+        </div>
         <div class="card">
           <div class="card-header"><div class="card-title">Missions de convoyage</div><div class="card-sub" id="conv-missions-sub"></div></div>
           <div class="table-wrap"><table>
@@ -4016,7 +4020,7 @@ async function deciderCandidature(candidatureId, etat) {
     loadOpportunitesAdmin();
   } catch (e) {
     console.error('decider_candidature :', e && e.message);
-    _hcNote('opportunite-message', 'La décision n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
+    _hcNote('opportunite-message', /Créneau indisponible|Horaires de mission/.test(e.message)?e.message:'La décision n\'a pas abouti. Vérifiez votre connexion.', 'erreur');
   }
 }
 
@@ -4026,7 +4030,7 @@ async function chargerOpportunitesPartenaire() {
   if (!_sbAuthPret()) return [];
   const { data, error } = await sbAuth.from('v_opportunites_partenaire').select('*').order('publiee_le', { ascending: false });
   if (error) throw new Error(error.message);
-  return data || [];
+  return (data || []).filter(o=>o.ma_candidature_etat!=='retenu');
 }
 async function loadOpportunitesPartenaire() {
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
@@ -4080,7 +4084,7 @@ async function postulerOpportunite(id) {
     setTimeout(() => { loadOpportunitesPartenaire(); loadMissionsConvoyeur(); }, 700);
   } catch (e) {
     console.error('postuler_opportunite :', e && e.message);
-    _hcNoteEl(msg, 'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
+    _hcNoteEl(msg, /Créneau indisponible|Horaires de mission/.test(e.message)?e.message:'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
     if (bouton) { bouton.disabled = false; bouton.textContent = 'Postuler'; }
   }
 }
@@ -9347,8 +9351,20 @@ function validerPrestationNettoyage(missionId) {
   });
 }
 
-function loadHistoriqueConvoyeur() { return loadMissionsConvoyeur(); }
+var periodeMissionsPartenaire='actuelles';
+window.addEventListener('hc-session-fermee',()=>{periodeMissionsPartenaire='actuelles';});
+function choisirPeriodeMissionsPartenaire(periode){
+ periodeMissionsPartenaire=periode==='passees'?'passees':'actuelles';
+ ['actuelles','passees'].forEach(p=>{const b=document.getElementById('conv-missions-'+p);b.className='btn '+(p===periodeMissionsPartenaire?'btn-primary':'btn-outline');b.setAttribute('aria-pressed',String(p===periodeMissionsPartenaire));});
+ return loadMissionsConvoyeur();
+}
+function loadHistoriqueConvoyeur() { return choisirPeriodeMissionsPartenaire('passees'); }
+function dateTriMissionPartenaire(m,passees){
+ return passees?(m.date_fin_intervention||m.date_restitution_arrivee||m.date_restitution_depart||m.date_livraison||m.date_intervention||m.created_at||''):
+ (['restitution_requise','restitution_en_cours'].includes(m.statut)?m.date_restitution_depart:m.date_prise_en_charge)||m.date_intervention||m.created_at||'';
+}
 function chargerMissionsAttribuees(enCours) {
+  const periode=periodeMissionsPartenaire,passees=periode==='passees';
   var _hcSyncTasks = [];
 
   var _hcSyncCycle = window.HCSync && window.HCSync.capture();
@@ -9362,11 +9378,13 @@ function chargerMissionsAttribuees(enCours) {
   }
   if (!_hcSyncCycle) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">Chargement…</td></tr>'; }
 
-  _hcSyncTasks.push(sbFetchToutePage('missions?convoyeur_id=eq.' + conv.id + '&statut=in.(acceptee,en_cours,restitution_requise,restitution_en_cours,edl_termine,fini,terminee,annulee)&order=created_at.desc')
+  _hcSyncTasks.push(sbAuth.rpc('missions_du_partenaire').then(r=>{if(r.error)throw Error(r.error.message);return r.data||[];})
     .then(function(rows) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
-      rows = (rows || []).filter(m => m.convoyeur_id === conv.id && [...STATUTS_MISSIONS_EN_COURS,'fini','terminee','annulee'].includes(m.statut));
+      if(periode!==periodeMissionsPartenaire)return;
+      rows = (rows || []).filter(m => (m.convoyeur_id===conv.id||m.partenaire_retenu) && (passees?['fini','terminee','annulee'].includes(m.statut):[...STATUTS_MISSIONS_EN_COURS,'en_attente','proposee'].includes(m.statut)));
+      rows.sort((a,b)=>(passees?-1:1)*String(dateTriMissionPartenaire(a,passees)).localeCompare(String(dateTriMissionPartenaire(b,passees))));
       const sub = document.getElementById(enCours ? 'conv-missions-sub' : 'conv-historique-sub');
       if (sub) sub.textContent = (rows || []).length + ' mission(s)';
 
@@ -9386,7 +9404,7 @@ function chargerMissionsAttribuees(enCours) {
         document.getElementById('conv-interventions-table').innerHTML = '';
         document.getElementById('conv-interventions-table-carte').style.display = 'none';
         tbody.closest('.card').style.display = '';
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">' + 'Aucune mission attribuée pour le moment' + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">' + (passees?'Aucune mission passée.':'Aucune mission actuelle.') + '</td></tr>';
         return;
       }
       return Promise.resolve().then(function () {
@@ -9403,9 +9421,9 @@ function chargerMissionsAttribuees(enCours) {
     }));
 
   function rendreHistorique(rows) {
-      const groupe = m => STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? 0 : m.statut === 'fini' ? 1 : 2;
-      const titres = ['À réaliser et en cours', 'Réalisées — en attente de confirmation', 'Historique — missions terminées ou annulées'];
-      const groupeSurPlace = m => ['terminee','annulee'].includes(m.statut) ? 2 : statutIntervention(m).cle==='a_confirmer' ? 1 : 0;
+      const groupe = m => passees?2:0;
+      const titres = ['À réaliser et en cours', 'Réalisées — en attente de confirmation', 'Missions passées'];
+      const groupeSurPlace = m => passees ? 2 : statutIntervention(m).cle==='a_confirmer' ? 1 : 0;
       const surPlace = rows.filter(missionSurPlace).sort((a,b)=>groupeSurPlace(a)-groupeSurPlace(b));
       const zone = document.getElementById('conv-interventions-table');
       document.getElementById('conv-interventions-table-carte').style.display = surPlace.length ? '' : 'none';
@@ -9413,7 +9431,7 @@ function chargerMissionsAttribuees(enCours) {
       zone.innerHTML = surPlace.map(m=>{
         const g = groupeSurPlace(m), entete = g !== groupeIntervention ? '<tr class="mes-missions-section"><th colspan="6" style="padding:20px 12px 10px;text-align:left">' + ['À venir et en cours','À confirmer',titres[2]][g] + '</th></tr>' : '';
         groupeIntervention = g;
-        return entete + ligneIntervention(m,false,actionsIntervention(m));
+        return entete + ligneIntervention(m,false,m.convoyeur_id===conv.id?actionsIntervention(m):'<button class="btn btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Consulter la mission</button>');
       }).join('');
       rows = rows.filter(m=>!missionSurPlace(m));
       tbody.closest('.card').style.display = rows.length || !surPlace.length ? '' : 'none';
@@ -9431,7 +9449,7 @@ function chargerMissionsAttribuees(enCours) {
         const badge = MISSION_STATUT_BADGE[m.statut] || '<span class="badge">' + escapeHtml(m.statut) + '</span>';
         // Une mission de nettoyage a ses propres actions : les photos
         // avant et après, puis la fin d'intervention.
-        const action = estNettoyage
+        const action = m.convoyeur_id!==conv.id ? '<button class="btn btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Consulter la mission</button>' : estNettoyage
           ? _actionsMissionNettoyage(m)
           : (CONV_MISSION_ACTIONS[m.statut] || function() { return '—'; })(m.id, m.reference, m);
         const intitule = estNettoyage
@@ -15241,7 +15259,7 @@ function declencherChampFichier(id) {
   'voirEtatsDesLieuxTest', 'notifierMissionTest', 'ouvrirDocumentPaiementTest', 'reglerTarifBrouillon', 'accepterFactureConvoyeur', 'accepterMission', 'allerVersEdl', 'annulerMission',
   'ouvrirRecapMissionClient', 'avancerRecompense', 'avancerIntervention', 'choisirNoteEvaluation', 'evaluerMissionClient',
   'ouvrirOpportuniteMission', 'ouvrirOpportuniteAdmin', 'enregistrerOpportunite', 'publierOpportunite',
-  'deciderCandidature', 'postulerOpportunite',
+  'deciderCandidature', 'postulerOpportunite', 'choisirPeriodeMissionsPartenaire',
   'apercuDevis', 'bloquerConvoyeur', 'changerDecisionActivite', 'deciderMetierProfessionnel',
   'choisirArchivesMissions', 'rechercherReferenceMission', 'changerDecisionInformation', 'confirmerMissionTerminee', 'creerMissionNettoyage',
   'debloquerConvoyeur', 'declencherChampFichier', 'envoyerDevis',
