@@ -4305,7 +4305,7 @@ function _fidHtmlPaliers(o) {
   return '<div class="fid-parcours-entete"><div><div class="card-title">Vos paliers fidélité</div><p class="fid-parcours-description">Chaque palier atteint débloque une box surprise.</p></div><span class="fid-parcours-badge"><strong>Parcours '+(debutCycle/10000+1)+'</strong><span>· '+_fidNombre(debutCycle)+' à '+_fidNombre(debutCycle+10000)+' points</span></span></div><ol class="fid-paliers" id="fid-paliers">'+items+'</ol>';
 }
 function _fidHtmlBoxMystere(o,boxes) {
-  return '<div class="card" id="fid-box-mystere"><div class="card-title">Mes box surprises</div>'+(boxes.length?boxes.map(r=>'<div class="detail-row"><span class="detail-label">'+_fidPoints(r.seuil)+' · Box surprise</span><span class="detail-val">'+escapeHtml(RECOMPENSE_LIB[r.statut]||r.statut)+(r.envoyee_le?' · '+escapeHtml(_fidDate(r.envoyee_le)):'')+'</span></div>').join(''):'<p class="fid-note">Votre première box se débloque à 2 000 points.</p>')+'</div>';
+  return '<div class="card" id="fid-box-mystere"><div class="card-title">Mes box surprises</div>'+(boxes.length?boxes.map(r=>'<div class="detail-row"><span class="detail-label">'+_fidPoints(r.seuil)+' · Box surprise</span><span class="detail-val">'+escapeHtml(r.statut==='a_preparer'?'En cours de préparation':(RECOMPENSE_LIB[r.statut]||r.statut))+(r.envoyee_le?' · '+escapeHtml(_fidDate(r.envoyee_le)):'')+'</span></div>').join(''):'<p class="fid-note">Votre première box se débloque à 2 000 points.</p>')+'</div>';
 }
 
 function _fidHtmlHistorique(mouvements) {
