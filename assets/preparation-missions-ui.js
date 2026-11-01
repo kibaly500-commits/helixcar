@@ -169,12 +169,12 @@
     const raw=work+travel.fees+custody.guard+travel.extra;
     // Arrondi conservé ; le minimum travail et les suppléments restent couverts.
     const total=Math.max(Math.round(raw/5)*5,Math.ceil((35+travel.fees+custody.guard+travel.extra)/5)*5);
-    const a={...autoDrafts.get(p.key),...travel,...custody,local:false,pricingPolicy:'distance_tiers_v2',distanceBasis:'outbound_v1',source:'Barème HelixCar',work,total,rounding:Math.round((total-raw)*100)/100,adjusted:false};
+    const a={...autoDrafts.get(p.key),...travel,...custody,local:false,pricingPolicy:'distance_tiers_v3',distanceBasis:'outbound_v1',source:'Barème HelixCar',work,total,rounding:Math.round((total-raw)*100)/100,adjusted:false};
     p.remuneration=total;p.carburant_peages=travel.fees;p.calcul_interne={...a};autoDrafts.set(p.key,a);
   }
   function priceSummary(p){
     const a=p.calcul_interne;
-    if(!a||a.pricingPolicy!=='distance_tiers_v2')return '';
+    if(!a||a.pricingPolicy!=='distance_tiers_v3')return '';
     return '<strong>Barème kilométrique HelixCar</strong><p>'+esc(p.distance)+' km aller · Travail : '+esc(money(a.work))+' · Frais : '+esc(money(a.fees))+'</p><p>Garde : '+esc(money(a.guard))+' · Supplément restitution : '+esc(money(a.extra))+' · Arrondi : '+esc(money(a.rounding))+'</p><strong>Total proposé : '+esc(money(a.total))+'</strong>';
   }
   function refreshDistancePrices(changed){
@@ -276,7 +276,7 @@
     let h='<div class="hc-prep-toolbar"><button type="button" class="btn '+(!state.preview?'btn-primary':'btn-outline')+'" data-prep-view="admin">Préparation admin</button><button type="button" class="btn '+(state.preview?'btn-primary':'btn-outline')+'" data-prep-view="preview">Aperçu partenaire</button></div>';
     if(!state.preview)h+='<aside class="hc-prep-budget" aria-label="Repère financier administrateur"><span>Montant total payé par le client</span><strong>'+esc(totalDevis===null?'Montant indisponible':money(totalDevis))+'</strong><small>'+esc(totalDevis==null?'':('Minimum HelixCar (30 %) : '+money(HCMissionBudget.allocate(totalDevis,[]).reserve)+' · Plafond missions (70 %) : '+money(HCMissionBudget.allocate(totalDevis,[]).budget)))+'</small></aside>';
     if(!state.preview){
-      h+='<button type="button" class="btn btn-primary" data-auto-budget>Calculer les tarifs des missions</button><p class="hc-prep-muted">Calcul dès la saisie des kilomètres aller : 0,50 €/km jusqu’à 250 km, puis 0,25 €/km jusqu’à 500 km, puis 0,15 €/km. Tranches cumulatives, travail minimum 35 €. Frais : 0,22 €/km. Gardes et restitutions ajoutées séparément. Total arrondi à 5 € près, sans descendre sous le minimum travail et les suppléments. Vous pouvez ajuster le total ; modifier les kilomètres réapplique le barème. Un dépassement du plafond de 70 % bloque la sauvegarde sans réduire automatiquement le travail. Missions publiées conservées.</p>';
+      h+='<button type="button" class="btn btn-primary" data-auto-budget>Calculer les tarifs des missions</button><p class="hc-prep-muted">Calcul dès la saisie des kilomètres aller : 0,61 €/km jusqu’à 250 km, puis 0,305 €/km jusqu’à 500 km, puis 0,183 €/km. Tranches cumulatives, travail minimum 35 €. Frais : 0,22 €/km. Gardes et restitutions ajoutées séparément. Total arrondi à 5 € près, sans descendre sous le minimum travail et les suppléments. Vous pouvez ajuster le total ; modifier les kilomètres réapplique le barème. Un dépassement du plafond de 70 % bloque la sauvegarde sans réduire automatiquement le travail. Missions publiées conservées.</p>';
       h+='<section class="hc-prep-internal"><h4>Organisation des véhicules</h4><p>Jusqu’à 5 jours inclus : même convoyeur. Au-delà : stockage à Noisy et mission séparée. Chaque dérogation concerne uniquement la période choisie.</p>';
       const seen=new Set();state.plans.forEach(p=>{const id=p.vehicule_id||'principal';if(seen.has(id)||!p.organisation)return;seen.add(id);
         const family=state.plans.filter(x=>(x.vehicule_id||'principal')===id),locked=family.some(x=>x.saved?.mission_id),o=p.organisation;

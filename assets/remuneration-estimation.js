@@ -43,10 +43,11 @@ function partnerProjection(result){
  return {totalEuros:result.partnerPreview.totalEuros,roadFeesIncludedEuros:result.partnerPreview.roadFeesIncludedEuros};
 }
 
-// Barème validé : tranches cumulatives, minimum de travail par mission.
+// Barème revalorisé de 22 % sur le travail : 776 km → 450 € frais inclus après arrondi.
+// Minimum de travail conservé à 35 €, tranches cumulatives.
 const DEFAULT_POLICY=Object.freeze({
- idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.50},{upTo:500,rate:0.25},{upTo:Infinity,rate:0.15}]},
- hors_idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.50},{upTo:500,rate:0.25},{upTo:Infinity,rate:0.15}]}
+ idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.61},{upTo:500,rate:0.305},{upTo:Infinity,rate:0.183}]},
+ hors_idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.61},{upTo:500,rate:0.305},{upTo:Infinity,rate:0.183}]}
 });
 function proposedLabor(km,zone,policy=DEFAULT_POLICY){
  number(km,'Distance totale');
