@@ -23,6 +23,10 @@ function bounds(plan,label,fallback){
  if(!day||!hours.length)throw Error('Horaire client à compléter : '+label);
  return hours.map(h=>instant(day+'T'+h.padStart(5,'0')));
 }
+// Échéance en temps écoulé : 48 h après l'heure civile du rendez-vous à Paris.
+function archiveApres48h(value,now=Date.now()){
+ try{return Number.isFinite(now)&&now>=instant(value)+48*60*MINUTE;}catch{return false;}
+}
 function overlap(a,b){return a.start<b.end&&b.start<a.end;}
 function slot(kind,time){const t=instant(time);return kind==='avant_stockage'?{start:t,end:t+20*MINUTE}:{start:t,end:t+20*MINUTE};}
 // Réception à Noisy : seuil strict de 18 h, battement inclus, heure de Paris.
@@ -86,6 +90,6 @@ function retourDemande(p){
  const d=p.retour_helixcar?.demande||{};
  return [d.date,d.type==='creneau'?[d.debut,d.fin].filter(Boolean).map(x=>x.slice(0,5)).join(' - '):(d.heure||'').slice(0,5)].filter(Boolean).join(' · ');
 }
-const api={receptionNoisy,appliquerReception,retourReceptionMin,retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
+const api={archiveApres48h,receptionNoisy,appliquerReception,retourReceptionMin,retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPlanningCalcul=api;
 })(typeof window==='undefined'?globalThis:window);

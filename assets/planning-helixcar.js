@@ -18,9 +18,15 @@ function past(r){
  const now=parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
  return (value.length===10?value+'T23:59':value)<now;
 }
-const isArchived=r=>!!records.get(r.id)?.cles_effectuees_le;
+const isArchived=r=>(records.get(r.id)?.cles_reponse!=null)||!!records.get(r.id)?.cles_effectuees_le||C.archiveApres48h(minute(eventTime(r)));
+function archiveKeys(r){
+ const s=records.get(r.id)||{},answer=s.cles_reponse??(s.cles_effectuees_le?true:null);
+ const incoming=['avant_stockage','retour_reception'].includes(r.plan.kind);
+ return '<div class="hc-planning-cles"><span>'+(incoming?'Clés reçues ?':'Clés remises ?')+'</span>'+[true,false].map(value=>'<button type="button" class="btn '+(answer===value?'btn-primary':'btn-outline')+'" data-planning-action="'+(value?'archive_oui':'archive_non')+'" aria-pressed="'+(answer===value)+'">'+(value?'Oui':'Non')+'</button>').join('')+'</div>';
+}
 async function action(id,kind){
  const event=rows.find(x=>x.id===id);
+ if(event&&isArchived(event))throw Error('Rendez-vous archivé : consultation uniquement.');
  if(event?.returnEvent){
   const response=await sbAuth.rpc('action_restitution_helixcar',{p_preparation_id:event.baseId,p_action:kind,p_revision:retourRecords.get(event.baseId)?.revision||0});
   if(response.error)throw Error(response.error.message);
@@ -32,7 +38,7 @@ async function action(id,kind){
 function syncRetourStates(){
  for(const row of rows.filter(r=>r.returnEvent)){
   const r=retourRecords.get(row.baseId)||{},incoming=row.plan.kind==='retour_reception';
-  records.set(row.id,{horaire_confirme:incoming?r.reception_confirmee:r.remise_confirmee,cles_effectuees_le:incoming?r.reception_effectuee_le:r.remise_effectuee_le});
+  records.set(row.id,{cles_reponse:incoming?r.reception_reponse:r.remise_reponse,horaire_confirme:incoming?r.reception_confirmee:r.remise_confirmee,cles_effectuees_le:incoming?r.reception_effectuee_le:r.remise_effectuee_le});
  }
 }
 function returnRows(data){
@@ -45,16 +51,16 @@ function returnCard(r){
  const person=incoming?(who?[who.prenom,who.nom].filter(Boolean).join(' '):'Convoyeur à attribuer'):(d.contact||'Client');
  const status=p.retour_helixcar.transfert?(state.reception_effectuee_le?'Chez HelixCar — prochaine livraison dans une mission séparée':'En attente du retour à Noisy'):state.remise_effectuee_le?'Véhicule remis au client':state.reception_effectuee_le?'Chez HelixCar — en attente de récupération client':'En attente de réception du convoyeur';
  const other=rows.find(x=>x.baseId===r.baseId&&x.id!==r.id);
- const conflict=!!time&&!s.cles_effectuees_le&&rows.some(x=>{
+ const conflict=!!time&&!isArchived(r)&&rows.some(x=>{
   const otherState=records.get(x.id);if(x.id===r.id||!eventTime(x)||otherState?.cles_effectuees_le)return false;
   try{return C.overlap(C.slot(p.kind,time.slice(0,16)),C.slot(x.plan.kind,eventTime(x).slice(0,16)));}catch{return false;}
  });
- return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+esc((s.cles_effectuees_le?'Archivé · ':past(r)?'À régulariser · ':'')+(incoming?'Réception — convoyeur → HelixCar':'Remise — HelixCar → client'))+'</span><h3>'+esc(p.mission.restit_marque_modele||'Véhicule récupéré')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||'Dossier')+' · '+esc(person)+'</p></div><strong>'+esc(fmt(time))+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+esc(status)+'</strong></p><p>'+esc(incoming?'Vous réceptionnez le véhicule et les clés du convoyeur.':'Vous remettez le véhicule et les clés au client.')+'</p><p>'+esc(p.retour_helixcar.transfert?'Départ du prochain convoyeur : ':incoming?'Récupération client prévue : ':'Réception du convoyeur prévue : ')+esc(fmt(p.retour_helixcar.transfert?p.retour_remise:other&&schedule(other.plan)))+'</p>'
+ return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+esc((isArchived(r)?'Archivé · ':past(r)?'À régulariser · ':'')+(incoming?'Réception — convoyeur → HelixCar':'Remise — HelixCar → client'))+'</span><h3>'+esc(p.mission.restit_marque_modele||'Véhicule récupéré')+' · '+esc(p.mission.restit_immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients?.numero_client||'Dossier')+' · '+esc(person)+'</p></div><strong>'+esc(fmt(time))+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+esc(status)+'</strong></p><p>'+esc(incoming?'Vous réceptionnez le véhicule et les clés du convoyeur.':'Vous remettez le véhicule et les clés au client.')+'</p><p>'+esc(p.retour_helixcar.transfert?'Départ du prochain convoyeur : ':incoming?'Récupération client prévue : ':'Réception du convoyeur prévue : ')+esc(fmt(p.retour_helixcar.transfert?p.retour_remise:other&&schedule(other.plan)))+'</p>'
  +(conflict?'<p class="hc-planning-warning">Un autre rendez-vous chevauche ces 20 minutes de remise.</p>':'')
  +(!incoming?'<p>Rendez-vous souhaité : '+esc(C.retourDemande(p).replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'))+' · '+esc(d.telephone||'Téléphone à compléter')+'</p>':'')
  +'<p>'+(s.cles_effectuees_le?'Effectué le '+esc(_dvDateHeure(s.cles_effectuees_le)):confirmed?'Horaire confirmé':'Horaire à confirmer')+'</p><div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Consulter la mission</button>'
- +(!s.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="'+(incoming?'confirmer_reception':'confirmer_remise')+'"'+(!time||(!incoming&&!state.reception_confirmee)?' disabled':'')+'>'+(confirmed?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(incoming?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="'+(incoming?'recevoir':'remettre')+'">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')
- +'</div><p class="hc-planning-feedback" role="status"></p></article>';
+ +(!isArchived(r)?'<button type="button" class="btn btn-primary" data-planning-action="'+(incoming?'confirmer_reception':'confirmer_remise')+'"'+(!time||(!incoming&&!state.reception_confirmee)?' disabled':'')+'>'+(confirmed?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(incoming?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="'+(incoming?'recevoir':'remettre')+'">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')
+ +'</div>'+(isArchived(r)?archiveKeys(r):'')+'<p class="hc-planning-feedback" role="status"></p></article>';
 }
 // Les passages clients proviennent de la demande, sans mission artificielle.
 function clientRows(clients){
@@ -119,26 +125,26 @@ function render(){
  const archived=document.getElementById('hc-planning-state').value==='archives';
  const list=rows.filter(r=>isArchived(r)===archived&&(!day||eventTime(r).slice(0,10)===day)&&(!kind||r.plan.kind===kind||(kind==='avant_stockage'&&r.plan.kind==='retour_reception')||(kind==='apres_stockage'&&r.plan.kind==='retour_remise')));
  list.sort((a,b)=>(archived?-1:1)*String(eventTime(a)).localeCompare(String(eventTime(b))));
- if(!list.length){setContent(archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les rendez-vous clôturés sont disponibles dans Archives.</div>');return;}
+ if(!list.length){setContent(archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les rendez-vous clôturés ou passés depuis 48 h sont disponibles dans Archives.</div>');return;}
  setContent(list.map(r=>{
   if(r.returnEvent)return returnCard(r);
   const p=r.plan,s=records.get(r.id),inbound=p.kind==='avant_stockage',time=schedule(p);
-  if(r.clientPassage)return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(s?.cles_effectuees_le?'Archivé · Clés confirmées':past(r)?'À régulariser · Rendez-vous client passé':(inbound?'À réceptionner · Client':'À remettre · Client'))+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule à préciser')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients.numero_client||'Dossier')+' · '+esc(r.person)+'</p></div><strong>'+esc(fmt(time))+(time&&!time.includes('T')?' · Heure à préciser':'')+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+(inbound?'Le client vous apporte le véhicule.':'Le client vient récupérer le véhicule auprès de vous.')+'</strong></p><p>Horaire communiqué par le client.</p><details class="hc-prep-private"><summary>Coordonnées du client</summary><p>'+esc(r.person)+' · '+esc(r.phone||'Téléphone non renseigné')+'</p></details>'+(!s?.cles_effectuees_le?'<div class="hc-prep-toolbar"><span>'+(inbound?'Clés reçues ?':'Clés remises ?')+'</span><button class="btn btn-outline" data-planning-action="cles_client">Oui</button><button class="btn btn-outline" data-planning-action="non">Non</button></div>':'')+'<p class="hc-planning-feedback" role="status"></p></article>';
+  if(r.clientPassage)return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(s?.cles_effectuees_le?'Archivé · Clés confirmées':isArchived(r)?'Archivé · Clés non confirmées':past(r)?'À régulariser · Rendez-vous client passé':(inbound?'À réceptionner · Client':'À remettre · Client'))+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule à préciser')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.clients.numero_client||'Dossier')+' · '+esc(r.person)+'</p></div><strong>'+esc(fmt(time))+(time&&!time.includes('T')?' · Heure à préciser':'')+'</strong></div><p>'+esc(C.POINT)+'</p><p><strong>'+(inbound?'Le client vous apporte le véhicule.':'Le client vient récupérer le véhicule auprès de vous.')+'</strong></p><p>Horaire communiqué par le client.</p><details class="hc-prep-private"><summary>Coordonnées du client</summary><p>'+esc(r.person)+' · '+esc(r.phone||'Téléphone non renseigné')+'</p></details>'+(!isArchived(r)?'<div class="hc-prep-toolbar"><span>'+(inbound?'Clés reçues ?':'Clés remises ?')+'</span><button class="btn btn-outline" data-planning-action="cles_client">Oui</button><button class="btn btn-outline" data-planning-action="non">Non</button></div>':'')+(isArchived(r)?archiveKeys(r):'')+'<p class="hc-planning-feedback" role="status"></p></article>';
   const stale=s?.horaire_confirme&&(s.empreinte_confirmee!==r.empreinte||minute(s.horaire_confirme)!==minute(time));
-  const collisions=!!time&&!s?.cles_effectuees_le&&rows.some(other=>{
+  const collisions=!!time&&!isArchived(r)&&rows.some(other=>{
    const o=records.get(other.id);if(other.id===r.id||!eventTime(other)||o?.cles_effectuees_le)return false;
    try{return C.overlap(C.slot(p.kind,time.slice(0,16)),C.slot(other.plan.kind,eventTime(other).slice(0,16)));}catch{return false;}
   });
   const guide=C.guidance(p);
   const who=r.missions?.convoyeurs,partner=who?[who.prenom,who.nom].filter(Boolean).join(' '):'Partenaire à attribuer';
-  return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(s?.cles_effectuees_le?(inbound?'Archivé · Clés reçues':'Archivé · Clés remises'):past(r)?'À régulariser · Clés non confirmées':(inbound?'À réceptionner':'À remettre'))+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.missions?.reference_courte||r.missions?.reference||r.clients?.numero_client||'Dossier')+' · '+esc(partner)+'</p></div><strong>'+esc(fmt(s?.horaire_confirme||time))+'</strong></div>'
+  return '<article class="card hc-planning-card" data-planning-id="'+esc(r.id)+'"><div class="card-header"><div><span class="badge">'+(s?.cles_effectuees_le?(inbound?'Archivé · Clés reçues':'Archivé · Clés remises'):isArchived(r)?'Archivé · Clés non confirmées':past(r)?'À régulariser · Clés non confirmées':(inbound?'À réceptionner':'À remettre'))+'</span><h3>'+esc(p.mission.marque_modele||'Véhicule')+' · '+esc(p.mission.immatriculation||'Immatriculation à compléter')+'</h3><p>'+esc(r.missions?.reference_courte||r.missions?.reference||r.clients?.numero_client||'Dossier')+' · '+esc(partner)+'</p></div><strong>'+esc(fmt(s?.horaire_confirme||time))+'</strong></div>'
   +'<div class="hc-planning-estimate"><p><strong>'+esc(guide.label)+' :</strong> '+esc(guide.when.replace(/(\d{4})-(\d{2})-(\d{2})/g,'$3/$2/$1'))+'</p><p>'+esc(guide.address)+'</p><p><strong>'+esc(guide.target)+' :</strong> '+esc(fmt(time))+'</p><p>'+esc(C.POINT)+'</p><p><strong>Prévoir 45 minutes de battement.</strong> '+esc(guide.rule)+'</p></div>'
   +'<p>'+(past(r)&&!s?.cles_effectuees_le?'Rendez-vous passé · remise des clés non confirmée':s?.cles_effectuees_le?'Clés '+(inbound?'reçues':'remises')+' le '+esc(_dvDateHeure(s.cles_effectuees_le)):s?.horaire_confirme?'Horaire confirmé':time?'Horaire à confirmer':inbound?'Votre heure de réception reste à fixer':'Votre heure de remise au convoyeur reste à fixer')+'</p>'
-  +(stale?'<p class="hc-planning-warning">La préparation a changé depuis la confirmation. Vérifiez le rendez-vous.</p>':'')
+  +(stale&&!isArchived(r)?'<p class="hc-planning-warning">La préparation a changé depuis la confirmation. Vérifiez le rendez-vous.</p>':'')
   +(collisions?'<p class="hc-planning-warning">Un autre rendez-vous chevauche ces 20 minutes de remise.</p>':'')
   +'<p><strong>'+ (inbound?'Votre intervention : réceptionner le véhicule au point HelixCar.':'Votre intervention : remettre le véhicule au convoyeur au point HelixCar.')+'</strong></p>'
-  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">'+(r.mission_id||s?.cles_effectuees_le?'Consulter la mission':'Préparer les horaires')+'</button>'
-  +(!s?.cles_effectuees_le?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>'+(s?.horaire_confirme&&!stale?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(inbound?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="cles">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')+'</div><p class="hc-planning-feedback" role="status"></p></article>';
+  +'<div class="hc-prep-toolbar"><button type="button" class="btn btn-outline" data-planning-action="ouvrir">Consulter la mission</button>'
+  +(!isArchived(r)?'<button type="button" class="btn btn-primary" data-planning-action="confirmer"'+(!time?' disabled':'')+'>'+(s?.horaire_confirme&&!stale?'Horaire confirmé':'Confirmer cet horaire')+'</button><button type="button" class="btn btn-outline" data-planning-action="modifier">Modifier l’horaire</button><div class="hc-planning-cles"><span>'+(inbound?'Clés reçues ?':'Clés remises ?')+'</span><button type="button" class="btn btn-outline" data-planning-action="cles">Oui</button><button type="button" class="btn btn-outline" data-planning-action="non" aria-pressed="true">Non</button></div>':'')+'</div>'+(isArchived(r)?archiveKeys(r):'')+'<p class="hc-planning-feedback" role="status"></p></article>';
  }).join(''));
 }
 const section=document.getElementById('page-admin-planning');
@@ -152,10 +158,24 @@ section.addEventListener('click',async e=>{
   const kind=b.dataset.planningAction;
   if(kind==='ouvrir'){
    if(r.mission_id)await HC_ACTIONS.ouvrirDetailsPreparation(r.mission_id);
-   else if(isArchived(r)){
+   else{
     const dialog=document.getElementById('modal-preparation-detail');dialog.querySelector('.hc-prep-detail-body').innerHTML=hcPreparationCarteOpportunite({preparation_annonce:HCPreparation.publicData(r.plan)},{detailsOnly:true});openModal('preparation-detail');
-   }else await ouvrirPreparationDemande(r.client_id);
+   }
    return;
+  }
+  if(kind==='archive_oui'||kind==='archive_non'){
+   if(!isArchived(r))throw Error('Actualisez le planning avant de continuer.');
+   const answer=kind==='archive_oui';
+   if(!confirm('Enregistrer « '+(answer?'Oui':'Non')+' » pour les clés ?'))return;
+   if(r.clientPassage){
+    const response=await sbAuth.from('planning_passages_clients').upsert({evenement:r.id,client_id:r.client_id,cles_reponse:answer,cles_effectuees_le:answer?new Date().toISOString():null,cles_effectuees_par:(await sbAuth.auth.getSession()).data.session.user.id}).select().single();
+    if(response.error)throw Error(response.error.message);records.set(r.id,response.data);
+   }else{
+    const response=await sbAuth.rpc('repondre_cles_archive',{p_preparation_id:r.baseId||r.id,p_etape:r.plan.kind,p_reponse:answer,p_revision:(r.returnEvent?retourRecords.get(r.baseId):records.get(r.id))?.revision||0});
+    if(response.error)throw Error(response.error.message);
+    if(r.returnEvent){retourRecords.set(r.baseId,response.data);syncRetourStates();}else records.set(r.id,response.data);
+   }
+   render();return;
   }
   if(isArchived(r)){out.textContent='Rendez-vous archivé : consultation uniquement.';return;}
   if(kind==='modifier'){

@@ -20,6 +20,11 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
     return {data:client?{client,vehicules:client.vehicules,point_remise:HCPlanningCalcul.POINT}:__source};
    }
    if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map((plan,i)=>({id:'p'+i,cle:plan.key,empreinte:'hash',plan}));return {data:__source};}
+   if(name==='repondre_cles_archive'){
+    let state=__states.find(x=>x.preparation_id===args.p_preparation_id);
+    if(!state){state={preparation_id:args.p_preparation_id,revision:0};__states.push(state);}
+    state.cles_reponse=args.p_reponse;state.cles_effectuees_le=args.p_reponse?new Date().toISOString():null;state.revision++;return {data:state};
+   }
    if(name==='modifier_horaire_helixcar'){
     const row=__rows.find(x=>x.id===args.p_preparation_id);row.plan.mission.date_livraison=args.p_horaire;row.plan.heure_remise=args.p_horaire.slice(11);return {data:{ok:true}};
    }
@@ -33,12 +38,20 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  });
  await page.waitForSelector('[data-planning-id="p0"]');
  assert.equal(await page.locator('[data-planning-id]').count(),2);
- // Une ancienne réception reste à régulariser tant que les clés ne sont pas confirmées.
+ // Après 48 h : archive automatique, sans inventer de remise des clés.
  await page.evaluate(()=>{const old=JSON.parse(JSON.stringify(__rows[0]));old.id='past';old.mission_id='past-mission';old.plan.mission.date_livraison='2000-01-01T10:00';__rows.push(old)});
- await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="past"]').count(),1);
- assert.match(await page.locator('[data-planning-id="past"]').innerText(),/À régulariser/);
+ await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="past"]').count(),0);
+ await page.locator('#hc-planning-state').selectOption('archives');
+ assert.match(await page.locator('[data-planning-id="past"]').innerText(),/Archivé · Clés non confirmées/);
+ assert.equal(await page.locator('[data-planning-id="past"] [data-planning-action="modifier"]').count(),0);assert.equal(await page.locator('[data-planning-id="past"] [data-planning-action^="archive_"]').count(),2);
  assert.match(await page.locator('[data-planning-id="past"]').innerText(),/clés non confirmée/);
  assert.equal(await page.evaluate(()=>__states.some(s=>s.preparation_id==='past')),false);
+ await page.locator('[data-planning-id="past"] [data-planning-action="archive_non"]').click();
+ await page.locator('#hc-planning-refresh').click();
+ assert.equal(await page.locator('[data-planning-id="past"] [data-planning-action="archive_non"]').getAttribute('aria-pressed'),'true');
+ await page.locator('[data-planning-id="past"] [data-planning-action="archive_oui"]').click();
+ assert.equal(await page.locator('[data-planning-id="past"] [data-planning-action="archive_oui"]').getAttribute('aria-pressed'),'true');
+
  await page.evaluate(()=>{__rows.splice(__rows.findIndex(r=>r.id==='past'),1)});await page.locator('#hc-planning-state').selectOption('actifs');await page.locator('#hc-planning-refresh').click();
 
 
@@ -46,6 +59,10 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="p0"]').count(),0);
  await page.evaluate(()=>{__rows[0].plan.mission.date_livraison=__savedTime;});await page.locator('#hc-planning-refresh').click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.locator('[data-planning-id="p0"] [data-planning-action="ouvrir"]').click();
+ assert.equal(await page.locator('#modal-preparation-detail input, #modal-preparation-detail [data-prep-publish]').count(),0);
+ assert.equal(await page.locator('#modal-preparation-missions').evaluate(e=>e.classList.contains('open')),false);
+ await page.locator('#modal-preparation-detail button').click();
  const first=page.locator('[data-planning-id="p0"]');assert.match(await first.innerText(),/3 rue Exemple, 75001 Paris/);
  assert.equal(await first.locator('[data-planning-action="cles"]').isDisabled(),false);
  await first.locator('[data-planning-action="cles"]').click();assert.match(await first.innerText(),/Confirmez d’abord/);
