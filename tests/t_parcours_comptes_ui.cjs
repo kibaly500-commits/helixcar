@@ -6,4 +6,16 @@ await page.locator('#hc-theme-client-parametres').selectOption('sombre');await p
 await page.evaluate(async()=>{showPage('client-devis');await HCParcours.ouvrir('client-devis')});assert.match(await page.locator('[data-devis]').innerText(),/DEV-3/);await page.locator('#hc-filtre-devis').selectOption('refuse');assert.match(await page.locator('[data-devis]').innerText(),/DEV-1/);assert.equal(await page.locator('[data-devis] button').count(),0);
 assert.equal(await page.locator('#badge-client-devis').textContent(),'1');assert.equal(await page.locator('#page-client-devis').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
 await page.evaluate(async()=>{currentRole='convoyeur';buildNav('convoyeur');showPage('convoyeur-challenge');await HCParcours.ouvrir('convoyeur-challenge')});assert.match(await page.locator('#page-convoyeur-challenge').innerText(),/PART-0004/);assert.match(await page.locator('#page-convoyeur-challenge').innerText(),/150 €/);assert.equal(await page.locator('#page-convoyeur-challenge tbody tr').count(),1);assert.equal(await page.locator('#page-convoyeur-challenge').evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+await page.evaluate(()=>{
+ const old=sbAuth.from;sbAuth.from=name=>name==='convoyeurs'?{select:()=>({eq:()=>({maybeSingle:async()=>({data:{photo_profil_chemin:'test/photo.jpg'}})})})}:old(name);
+ sbAuth.storage={from:()=>({createSignedUrl:async()=>({data:{signedUrl:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>'}})})};
+ document.getElementById('sb-name').textContent='Partenaire Test';HCParcours.ouvrir('convoyeur-challenge');
+});
+await page.waitForSelector('#sb-avatar img',{state:'attached'});
+assert.equal(await page.locator('#sb-avatar').evaluate(e=>getComputedStyle(e).width),'80px');
+assert.equal(await page.locator('.sidebar-user').evaluate(e=>getComputedStyle(e).flexDirection),'column');
+assert.equal(await page.locator('#sb-avatar img').evaluate(e=>getComputedStyle(e).objectFit),'cover');
+await page.evaluate(()=>{currentRole='client';HCParcours.ouvrir('client-devis');});
+assert.equal(await page.locator('#sb-avatar img').count(),0);
+assert.equal(await page.locator('.hc-profil-partenaire').count(),0);
 assert.deepEqual(errors,[]);await page.close();console.log('PASS parcours '+width+' : devis filtrés, pastilles, réglages persistés, sombre, suppression explicite, challenge réel et absence de débordement');}}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

@@ -12,3 +12,11 @@
 .hc-mode-sombre .btn-secondary,.hc-mode-sombre .topbar button{color:#e5ebf4!important;background:#222b38!important;border-color:#6e7d92!important}
 #hc-portrait img,#hc-portrait-admin img{object-fit:cover;border-radius:8px;margin:10px 0}
 .hc-mode-sombre .hc-prep-city,.hc-mode-sombre .hc-prep-time,.hc-mode-sombre td{color:#eef0f4!important}.hc-mode-sombre .hc-prep-route-label,.hc-mode-sombre .hc-prep-distance,.hc-mode-sombre .hc-prep-date{color:#bdc7d6!important}
+
+/* Portrait du partenaire au-dessus de son identité et de ses métiers. */
+.sidebar-user.hc-profil-partenaire{flex-direction:column;align-items:center;text-align:center;gap:12px;padding:18px 12px}
+.hc-profil-partenaire #sb-avatar{width:80px;height:80px;overflow:hidden;font-size:1.4rem;border:2px solid rgba(255,255,255,.24)}
+.hc-profil-partenaire #sb-avatar img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%}
+.hc-profil-partenaire .user-info{width:100%;flex:none}
+.hc-profil-partenaire .user-name{white-space:normal;overflow-wrap:anywhere}
+.hc-profil-partenaire .sb-metiers{justify-content:center}
