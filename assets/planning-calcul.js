@@ -25,6 +25,30 @@ function bounds(plan,label,fallback){
 }
 function overlap(a,b){return a.start<b.end&&b.start<a.end;}
 function slot(kind,time){const t=instant(time);return kind==='avant_stockage'?{start:t,end:t+20*MINUTE}:{start:t,end:t+20*MINUTE};}
+// Réception à Noisy : seuil strict de 18 h, battement inclus, heure de Paris.
+function receptionNoisy(p,minutes){
+ if(p.kind!=='avant_stockage'||typeof minutes!=='number'||!Number.isFinite(minutes)||minutes<=0)return null;
+ try{
+  const departure=Math.max(...bounds(p,'Prise en charge',p.mission?.date_prise_en_charge));
+  const arrival=civil(departure+(minutes+45)*MINUTE);
+  const report=arrival.slice(11)>='18:00';
+  const day=arrival.slice(0,10);
+  const date=report?new Date(Date.parse(day+'T12:00:00Z')+86400000).toISOString().slice(0,10):day;
+  return {arrival,date,report};
+ }catch(_){return null;}
+}
+function appliquerReception(p){
+ if(p.saved?.mission_id||p.kind!=='avant_stockage')return;
+ const result=receptionNoisy(p,p.calcul_interne?.minutes);
+ if(!result)return;
+ if(p.date_fin!==result.date){p.heure_remise='';p.mission.date_livraison=null;}
+ p.date_fin=result.date;p.reception_calc=result;
+ const row=p.rows.find(r=>r.label==='Livraison');
+ if(row)row.value=result.date+(p.heure_remise?' · '+p.heure_remise:' · Heure de réception à fixer');
+ p.mission.date_livraison=p.heure_remise?result.date+'T'+p.heure_remise:null;
+ p.rows=p.rows.filter(r=>r.label!=='Garde avant réception');
+ if(result.report)p.rows.push({label:'Garde avant réception',value:'Le convoyeur conserve le véhicule pendant la nuit et le remet à Noisy le '+result.date+'.'});
+}
 function guidance(p){
  if(!['avant_stockage','apres_stockage'].includes(p.kind))return null;
  const incoming=p.kind==='avant_stockage',label=incoming?'Prise en charge':'Livraison';
@@ -63,6 +87,6 @@ function retourDemande(p){
  const d=p.retour_helixcar?.demande||{};
  return [d.date,d.type==='creneau'?[d.debut,d.fin].filter(Boolean).map(x=>x.slice(0,5)).join(' - '):(d.heure||'').slice(0,5)].filter(Boolean).join(' · ');
 }
-const api={retourReceptionMin,retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
+const api={receptionNoisy,appliquerReception,retourReceptionMin,retourErrors,retourDemande,POINT,MINUTE,civil,instant,margin,address,bounds,overlap,slot,guidance};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.HCPlanningCalcul=api;
 })(typeof window==='undefined'?globalThis:window);

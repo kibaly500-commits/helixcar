@@ -70,6 +70,8 @@
       if(!s.mission_id&&p.kind==='intervention'&&p.category!=='nettoyage'){result.nb_professionnels=1;result.rows=result.rows.map(r=>r.label==='Professionnels'?{...r,value:'1'}:r);}
       if(!s.mission_id&&p.category==='convoyage'){
         result.missing=p.missing;
+        const reception=HCPlanningCalcul.receptionNoisy(p,result.calcul_interne?.minutes);
+        if(reception)p.date_fin=reception.date;
         // Réactualise aussi les dates calculées d'un ancien brouillon.
         // Une heure saisie pour une autre journée doit être revalidée.
         for(const [dateKey,hourKey,label,missionKey] of [
@@ -107,6 +109,7 @@
       if(p.kind==='avant_stockage'&&p.heure_remise==null)p.heure_remise=p.rows.find(r=>r.label==='Livraison')?.value?.match(/\d{1,2}:\d{2}/)?.[0]||'';
     });
     plans.forEach(p=>{if(p.retour_helixcar)p.missing=[...(p.missing||[]).filter(x=>!x.startsWith('Rendez-vous : ')),...HCPlanningCalcul.retourErrors(p,true).map(x=>'Rendez-vous : '+x)];});
+    plans.forEach(p=>HCPlanningCalcul.appliquerReception(p));
     state={source,plans,preview:false};
   }
   window.ouvrirPreparationDemande=async function(clientId){
@@ -118,7 +121,7 @@
       try{const r=await sbAuth.from('devis').select('prix').eq('id',source.devis_id).eq('client_id',clientId).eq('statut','accepte').eq('paiement_statut','paye').maybeSingle();
         const value=r.data?.prix;if(!r.error&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=0)montant=Number(value);
       }catch(_){}
-      if(ticket!==generation)return;totalDevis=montant;adopt(source);restoreDraft();render();
+      if(ticket!==generation)return;totalDevis=montant;adopt(source);restoreDraft();state.plans.forEach(p=>HCPlanningCalcul.appliquerReception(p));render();
       if(state.plans.length&&state.plans.every(p=>p.category==='convoyage')&&state.plans.some(p=>!p.saved?.mission_id&&(!(Number(p.distance)>0)||(p.mission.restitution&&!(Number(p.distance_aller)>0)))))await calculateAll(ticket,true);
     }
     catch(e){if(ticket===generation){if(!state)el('hc-prep-body').textContent='';note(e.message,true);}}
@@ -148,7 +151,7 @@
           p.distance=HCMissionBudget.wholeKm(routes[0].km);p.distance_basis='outbound_v1';
           p.distance_aller=p.distance;
           minutes=routes[0].minutes;source=data.source;
-          p.calcul_interne={...p.calcul_interne,minutes};
+          p.calcul_interne={...p.calcul_interne,minutes};HCPlanningCalcul.appliquerReception(p);
         }
         const local=HCMissionBudget.local(p),custody=HCMissionBudget.guardPricing(p);
         autoDrafts.set(p.key,{...custody,distanceBasis:'outbound_v1',pricingPolicy:'rounded_v1',local,source,minutes,rate:local?0:0.22});
@@ -243,7 +246,7 @@
     if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
     const delivered=vehicle(raw('Véhicule'));
     h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
-      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance')]])+'</section>';
+      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance')],...(raw('Garde avant réception')?[['Garde avant réception',raw('Garde avant réception')]]:[])])+'</section>';
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
@@ -310,7 +313,7 @@
       if(p.category==='convoyage')h+='<aside class="hc-prep-internal" data-price-summary="'+i+'">'+priceSummary(p)+'</aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont forfait carburant et péages (€)')+input(p,i,'distance','Distance aller uniquement (km)')+motor(p,i,'motorisation','Motorisation');h+='<p data-route-duration="'+i+'" role="status" style="grid-column:1/-1;font-weight:600">'+esc(routeDuration(p))+'</p><button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p data-route-status="'+i+'" role="status" aria-live="polite"></p><p class="hc-prep-muted">Kilomètres calculés automatiquement par IGN en France pour l’aller uniquement. Itinéraire voiture le plus rapide, hors trafic. Vous pouvez corriger la distance si nécessaire.</p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
-        if(p.kind==='avant_stockage')h+=input(p,i,'heure_remise','Heure de réception par vous chez HelixCar','time');
+        if(p.kind==='avant_stockage'){h+='<p data-reception-rule="'+i+'" style="grid-column:1/-1"><strong>Réception à Noisy le '+display(p.date_fin)+'</strong>'+ (p.reception_calc?'<br>Arrivée calculée, battement de 45 min inclus : '+display(p.reception_calc.arrival.replace('T',' · '))+(p.reception_calc.report?'<br>Arrivée à partir de 18 h : report au lendemain. Le convoyeur garde le véhicule pendant la nuit. Choisissez l’heure de réception.':'<br>Arrivée avant 18 h : réception le jour même.'):'<br>Estimez le trajet pour vérifier le seuil de 18 h.')+'</p>'+input(p,i,'heure_remise','Heure de réception le '+String(p.date_fin||'').split('-').reverse().join('/')+' chez HelixCar','time');}
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
       if(p.retour_helixcar?.transfert){
@@ -344,6 +347,7 @@
     if(key==='heure_remise'){p.mission.date_livraison=HCPreparation.stamp(p.date_fin,e.value);p.rows.find(r=>r.label==='Livraison').value=[p.date_fin,e.value].filter(Boolean).join(' · ');}
     if(key==='heure_retrait'||key==='heure_prise_en_charge'){p.mission.date_prise_en_charge=HCPreparation.stamp(p.date_debut,e.value);p.rows.find(r=>r.label==='Prise en charge').value=[p.date_debut,e.value].filter(Boolean).join(' · ');}
   });
+    state.plans.forEach(p=>HCPlanningCalcul.appliquerReception(p));
     state.plans.filter(p=>p.parent_retour_key).forEach(p=>{
       const parent=state.plans.find(x=>x.key===p.parent_retour_key);if(parent)parent.retour_remise=p.mission.date_prise_en_charge||'';
     });
@@ -417,7 +421,7 @@
         const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
         if(!Number.isFinite(distance)||distance<=0)throw Error('Distance non calculable.');
         p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
-        autoDrafts.set(p.key,{...autoDrafts.get(p.key),minutes:routes[0].minutes});refreshDistancePrices(p);
+        autoDrafts.set(p.key,{...autoDrafts.get(p.key),minutes:routes[0].minutes});refreshDistancePrices(p);HCPlanningCalcul.appliquerReception(p);
         editVersion++;backup();queueSave();
         render();
         routeNote(i,'Distance estimée : '+p.distance.toLocaleString('fr-FR')+' km (aller uniquement).');
