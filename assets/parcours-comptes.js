@@ -20,7 +20,35 @@
   const form=z.querySelector('form');form.onsubmit=async(e)=>{e.preventDefault();if(!form.reportValidity())return;const btn=form.querySelector('button'),msg=form.querySelector('[role=status]');btn.disabled=true;try{const r=await sbAuth.functions.invoke('supprimer-compte',{body:{motif:form.elements.motif.value,confirmation:form.elements.confirmation.value}});if(r.error||!r.data?.ok)throw Error(r.data?.error||'Suppression non confirmée. Réessayez.');await sbAuth.auth.signOut();location.href='index.html';}catch(e){msg.textContent=e.message;btn.disabled=false;}};
  }
  async function devis(){const z=zone('client-devis');z.textContent='Chargement…';const rows=await chargerDevisClient();if(currentRole!=='client')return;z.innerHTML='<label for="hc-filtre-devis">Afficher</label><select id="hc-filtre-devis"><option value="attente">En attente de réponse</option><option value="accepte">Devis acceptés</option><option value="refuse">Devis refusés</option><option value="tous">Tous les devis</option></select><div data-devis></div>';const render=()=>{const f=z.querySelector('select').value;const selection=rows.filter(d=>f==='tous'||f==='attente'&&['envoye','consulte'].includes(d.statut)||d.statut===f);z.querySelector('[data-devis]').innerHTML=selection.map(d=>'<article class="hc-devis-item"><strong>'+esc(d.reference)+'</strong><span>'+esc(_etatDevisClient(d)?.texte||d.statut)+'</span><a class="btn btn-outline" href="devis.html?id='+encodeURIComponent(d.id)+'">Consulter le devis</a></article>').join('')||'<p>Aucun devis dans cette rubrique.</p>';};z.querySelector('select').onchange=render;render();afficherCompteurMenu('client-devis',rows.filter(d=>['envoye','consulte'].includes(d.statut)).length,'devis en attente de réponse');}
- async function challenge(id='convoyeur-challenge',precedent=false){const z=zone(id);z.textContent='Chargement…';const paris=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const date=new Date(paris+'T12:00:00');date.setMonth(Math.floor(date.getMonth()/3)*3-(precedent?3:0),1);const trimestre=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-01';const r=await sbAuth.rpc('challenge_partenaire',{p_trimestre:trimestre});if(r.error)throw r.error;if(!['convoyeur','admin'].includes(currentRole))return;const d=r.data;z.innerHTML='<p>Du '+esc(new Date(d.debut+'T12:00:00').toLocaleDateString('fr-FR'))+' au '+esc(new Date(Date.parse(d.fin+'T12:00:00')-86400000).toLocaleDateString('fr-FR'))+'</p><div class="hc-podium"><div>1re place<strong>150 €</strong></div><div>2e place<strong>100 €</strong></div><div>3e place<strong>50 €</strong></div></div><p>Classement des missions terminées et validées par HelixCar pendant le trimestre. Remise à zéro chaque trimestre.</p>'+(d.classement.length?'<table><thead><tr><th>Place</th><th>Partenaire</th><th>Missions</th></tr></thead><tbody>'+d.classement.map(c=>'<tr><td>'+esc(c.rang)+'</td><td>'+esc(c.numero)+(c.moi?' · Vous':'')+'</td><td>'+esc(c.missions)+'</td></tr>').join('')+'</tbody></table>':'<p>Aucune mission comptabilisée pour ce trimestre.</p>')+'<small>En cas d’égalité, le partenaire ayant atteint ce nombre de missions en premier passe devant.</small>';const bouton=document.createElement('button');bouton.className='btn btn-outline';bouton.textContent=precedent?'Voir le trimestre actuel':'Voir le trimestre précédent';bouton.onclick=()=>challenge(id,!precedent).catch(()=>{z.textContent='Classement indisponible. Réessayez.';});z.prepend(bouton);}
+ function contenuChallenge(d,admin){
+  const dateFr=s=>new Date(s+'T12:00:00').toLocaleDateString('fr-FR');
+  const lignes=admin?d.classement:d.classement.filter(c=>c.moi);
+  let html='<p>Du '+esc(dateFr(d.debut))+' au '+esc(new Date(Date.parse(d.fin+'T12:00:00')-86400000).toLocaleDateString('fr-FR'))+'</p>';
+  if(admin)html+='<div class="hc-podium"><div>1re place<strong>150 €</strong></div><div>2e place<strong>100 €</strong></div><div>3e place<strong>50 €</strong></div></div>';
+  html+='<p>Missions terminées et validées par HelixCar pendant le trimestre. Remise à zéro chaque trimestre.</p>';
+  if(admin){
+   html+=lignes.length?'<div style="overflow-x:auto"><table><thead><tr><th>Place</th><th>Partenaire</th><th>Missions</th><th>Prime '+(d.termine?'du trimestre':'prévisionnelle')+'</th></tr></thead><tbody>'+lignes.map(c=>'<tr><td>'+esc(c.rang)+'</td><td>'+esc(c.numero)+'</td><td>'+esc(c.missions)+'</td><td>'+esc(c.recompense)+' €</td></tr>').join('')+'</tbody></table></div>':'<p>Aucune mission comptabilisée pour ce trimestre.</p>';
+  }else{
+   const moi=lignes[0];
+   html+=moi?'<div class="hc-podium"><div>Votre position<strong>'+esc(moi.rang)+(moi.rang===1?'er':'e')+'</strong></div><div>Vos missions validées<strong>'+esc(moi.missions)+'</strong></div><div>'+ (d.termine?'Prime du trimestre':'Prime prévisionnelle')+'<strong>'+esc(moi.recompense)+' €</strong></div></div>':'<p>Vous n’avez pas encore de mission comptabilisée pour ce trimestre.</p>';
+  }
+  html+='<small>En cas d’égalité, le partenaire ayant atteint ce nombre de missions en premier passe devant.</small>';
+  if(admin)html+='<p role="status" style="margin-top:20px;padding:14px;border:1px solid var(--accent);border-radius:8px;color:var(--ink)"><strong>'+(d.termine?'Trimestre clos — règlement des primes à vérifier.':'Rappel de règlement')+'</strong><br>Les primes sont à régler après la clôture du trimestre, à partir du '+esc(dateFr(d.fin))+'.'+(d.termine?' Vérifiez les versements déjà effectués avant tout règlement.':' Le classement reste provisoire jusque-là.')+'</p>';
+  else if(!d.termine)html+='<p>Votre position et votre prime restent provisoires jusqu’à la clôture du trimestre.</p>';
+  return html;
+ }
+ async function challenge(id='convoyeur-challenge',precedent=false){
+  const role=currentRole,z=zone(id);z.textContent='Chargement…';
+  const paris=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const date=new Date(paris+'T12:00:00');date.setMonth(Math.floor(date.getMonth()/3)*3-(precedent?3:0),1);
+  const trimestre=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-01';
+  const r=await sbAuth.rpc('challenge_partenaire',{p_trimestre:trimestre});if(r.error)throw r.error;
+  if(currentRole!==role||!['convoyeur','admin'].includes(role))return;
+  z.innerHTML=contenuChallenge(r.data,role==='admin');
+  const bouton=document.createElement('button');bouton.type='button';bouton.className='btn btn-outline';
+  bouton.textContent=precedent?'Voir le trimestre actuel':'Voir le trimestre précédent';
+  bouton.onclick=()=>challenge(id,!precedent).catch(()=>{z.textContent='Challenge indisponible. Réessayez.';});z.prepend(bouton);
+ }
  let avatarGeneration=0;
  async function portraitMenu(){
   const tour=++avatarGeneration,avatar=el('sb-avatar'),carte=avatar?.closest('.sidebar-user');
