@@ -49,6 +49,27 @@
   bouton.textContent=precedent?'Voir le trimestre actuel':'Voir le trimestre précédent';
   bouton.onclick=()=>challenge(id,!precedent).catch(()=>{z.textContent='Challenge indisponible. Réessayez.';});z.prepend(bouton);
  }
+ function contenuResumeChallenge(d){
+  const moi=(d.classement||[]).find(c=>c.moi);
+  return '<p style="margin:12px 0">Votre progression ce trimestre</p><div class="hc-podium">'
+    + '<div>Votre position<strong>'+(moi?esc(moi.rang)+(moi.rang===1?'er':'e'):'Non classé')+'</strong></div>'
+    + '<div>Missions validées<strong>'+esc(moi?moi.missions:0)+'</strong></div>'
+    + '<div>Prime prévisionnelle<strong>'+esc(moi?moi.recompense:0)+' €</strong></div></div>'
+    + '<p style="margin-top:12px">🏁 Chaque mission terminée et validée compte !</p>'
+    + '<small>Position et prime provisoires jusqu’à la clôture du trimestre.</small>';
+ }
+ async function resumeChallenge(tour){
+  const dashboard=el('page-convoyeur-dashboard');if(!dashboard||currentRole!=='convoyeur')return;
+  let carte=el('hc-challenge-dashboard');
+  if(!carte){carte=document.createElement('div');carte.className='card';carte.id='hc-challenge-dashboard';
+   carte.innerHTML='<div class="card-header"><div class="card-title">Challenge trimestriel</div><button type="button" class="btn btn-outline btn-sm">Voir ma progression</button></div><div data-challenge-resume role="status"></div>';
+   carte.querySelector('button').onclick=()=>showPage('convoyeur-challenge');dashboard.append(carte);
+  }
+  const z=carte.querySelector('[data-challenge-resume]');z.textContent='Chargement de votre progression…';
+  try{const r=await sbAuth.rpc('challenge_partenaire');if(tour!==generation||currentRole!=='convoyeur')return;if(r.error)throw r.error;z.innerHTML=contenuResumeChallenge(r.data);}
+  catch{if(tour===generation&&currentRole==='convoyeur')z.textContent='Progression momentanément indisponible. Consultez la rubrique Challenge trimestriel.';}
+ }
+
  let avatarGeneration=0;
  async function portraitMenu(){
   const tour=++avatarGeneration,avatar=el('sb-avatar'),carte=avatar?.closest('.sidebar-user');
@@ -90,10 +111,10 @@
    const f=await sbAuth.from('factures_convoyeur').select('id').in('statut',['en_attente','validee']);if(!f.error&&currentRole===role)afficherCompteurMenu('convoyeur-facturation',f.data.length,'factures en attente');
   }
  }
- async function ouvrir(id){portraitMenu();const n=++generation;try{if(id==='convoyeur-profil')await portrait();if(id==='client-devis')await devis();if(['convoyeur-challenge','admin-challenge'].includes(id))await challenge(id);if(['client-parametres','convoyeur-parametres'].includes(id))await parametres(id);if(currentRole==='admin'){document.documentElement.classList.remove('hc-mode-sombre');return;}await session();if(n!==generation)return;theme();marquerNouveaux();compteurs().catch(()=>{});}catch{const z=el('page-'+id)?.querySelector('[data-parcours-contenu]');if(z&&n===generation)z.textContent='Chargement impossible. Réouvrez cette rubrique pour réessayer.';}}
+ async function ouvrir(id){portraitMenu();const n=++generation;try{if(id==='convoyeur-dashboard')await resumeChallenge(n);if(id==='convoyeur-profil')await portrait();if(id==='client-devis')await devis();if(['convoyeur-challenge','admin-challenge'].includes(id))await challenge(id);if(['client-parametres','convoyeur-parametres'].includes(id))await parametres(id);if(currentRole==='admin'){document.documentElement.classList.remove('hc-mode-sombre');return;}await session();if(n!==generation)return;theme();marquerNouveaux();compteurs().catch(()=>{});}catch{const z=el('page-'+id)?.querySelector('[data-parcours-contenu]');if(z&&n===generation)z.textContent='Chargement impossible. Réouvrez cette rubrique pour réessayer.';}}
  function marquerNouveaux(){if(!uid||currentRole!=='client')return;document.querySelectorAll('#client-demandes-liste [data-demande]').forEach(card=>{if(card.parentElement.firstElementChild!==card||card.dataset.etatDemande==='cloture')return;const key=card.dataset.demande+':'+card.dataset.etatDemande;if(prefs.nouveautes_lues[key]||card.querySelector('.hc-nouveau'))return;const badge=document.createElement('span');badge.className='hc-nouveau';badge.textContent='Nouveau';card.querySelector('.hc-demande-summary')?.append(badge);const details=card.querySelector('.hc-demande-details');details?.addEventListener('toggle',async()=>{if(!details.open)return;prefs.nouveautes_lues[key]=true;try{await sauver();badge.remove();}catch{delete prefs.nouveautes_lues[key];}},{once:true});});}
  new MutationObserver(()=>marquerNouveaux()).observe(el('client-demandes-liste'),{childList:true});
- window.addEventListener('hc-session-fermee',()=>{uid=null;generation++;avatarGeneration++;el('sb-avatar')?.replaceChildren();el('sb-avatar')?.closest('.sidebar-user')?.classList.remove('hc-profil-partenaire');prefs={theme:'systeme',nouveautes_lues:{}};document.documentElement.classList.remove('hc-mode-sombre');});
+ window.addEventListener('hc-session-fermee',()=>{uid=null;generation++;avatarGeneration++;el('hc-challenge-dashboard')?.remove();el('sb-avatar')?.replaceChildren();el('sb-avatar')?.closest('.sidebar-user')?.classList.remove('hc-profil-partenaire');prefs={theme:'systeme',nouveautes_lues:{}};document.documentElement.classList.remove('hc-mode-sombre');});
  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(uid)theme();});
  window.HCParcours={ouvrir,portraitAdmin:async function(c){if(!c.photo_profil_chemin)return;const cible=document.getElementById('hc-portrait-admin');if(!cible)return;try{const r=await sbAuth.storage.from('portraits-partenaires').createSignedUrl(c.photo_profil_chemin,300);if(r.error||document.getElementById('hc-portrait-admin')!==cible)return;const img=document.createElement('img');img.src=r.data.signedUrl;img.alt='Photo professionnelle du partenaire';img.width=100;img.height=100;cible.append(img);}catch{cible.textContent='Photo momentanément indisponible';}}};
 })();
