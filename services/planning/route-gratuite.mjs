@@ -46,10 +46,13 @@ export async function handleFreeRoute(body,headers,{fetcher=fetch,env=process.en
   if(!plan||plan.category!=='convoyage')throw Error('Mission non trouvée');
   if(plan.mission.plateau)throw Error('Transport plateau non pris en charge');
   const legs=[[plan.mission.adresse_depart,plan.mission.adresse_arrivee]];
-  // L’interface utilise uniquement l’aller : une restitution non géocodable
-  // ne doit pas empêcher cette estimation ni ajouter des appels inutiles.
+  // Le prix utilise uniquement l’aller. La restitution reste une estimation séparée.
   const routes=[];
   for(const [from,to] of legs)routes.push(await routeFree(from,to,{fetcher,key:env.ORS_FREE_API_KEY}));
-  return {status:200,body:{fingerprint:source.empreinte,routes,source:env.ORS_FREE_API_KEY?'OpenStreetMap © contributeurs · openrouteservice by HeiGIT':'IGN Géoplateforme · BD TOPO / Base Adresse Nationale'}};
+  let returnRoute=null;
+  if(plan.mission.restitution&&plan.mission.adresse_restitution){
+   try{returnRoute=await routeFree(plan.mission.adresse_arrivee,plan.mission.adresse_restitution,{fetcher,key:env.ORS_FREE_API_KEY});}catch{/* La distance aller reste utilisable. */}
+  }
+  return {status:200,body:{fingerprint:source.empreinte,routes,returnRoute,source:env.ORS_FREE_API_KEY?'OpenStreetMap © contributeurs · openrouteservice by HeiGIT':'IGN Géoplateforme · BD TOPO / Base Adresse Nationale'}};
  }catch(e){return {status:422,body:{error:e.name==='TimeoutError'?'Service temporairement indisponible':e.message}};}
 }

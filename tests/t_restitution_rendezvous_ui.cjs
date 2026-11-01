@@ -9,7 +9,7 @@ const assert=require('assert'),L=require('./lib');
   const v={id:'v1',position:1,type_vehicule:'berline',marque_modele:'Tesla Model 3',immatriculation:'AA-123-BB',vin:'VIN1',motorisation:'Électrique',adresse_depart_rue:'12 rue Départ',code_postal_depart:'75001',ville_depart:'Paris',adresse_arrivee_rue:'15 rue Arrivée',ville_arrivee:'Caen',date_prise_en_charge:'2026-11-08',heure_prise_en_charge:'09:00',date_livraison:'2026-11-08',heure_livraison:'14:00',restitution_concernee:true,restit_destination:'stockage',restit_recuperation_client:true,restit_adresse_rue:'Point de stockage HelixCar',restit_ville:'Noisy-le-Grand',restit_marque_modele:'Renault Clio',restit_immatriculation:'CC-456-DD',restit_vin:'VIN2',restit_motorisation:'Essence',restit_date:'2026-11-09',restit_heure_type:'creneau',restit_creneau_debut:'10:00',restit_creneau_fin:'12:00',restit_contact_nom:'SECRET-RECUPERATEUR',restit_contact_tel:'0600000000'};
   window.__source={client,vehicules:[v],point_remise:HCPlanningCalcul.POINT,reference:'DEV-TEST',devis_id:'dv1',empreinte:'hash',brouillons:[]};
   window.__states=[];window.__saves=0;
-  sbAuth.from=()=>{const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:{prix:222}})};return q;};
+  sbAuth.from=()=>{const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:{prix:1000}})};return q;};
   sbAuth.rpc=async(name,args)=>{
    if(name==='source_preparation_missions')return {data:__source};
    if(name==='enregistrer_preparation_missions'){__saves++;__source.brouillons=args.p_plans.map(p=>({id:'prep1',client_id:'c1',cle:p.key,empreinte:'hash',plan:p,annonce:p.public,clients:{numero_client:'HC-TEST'}}));return {data:__source};}
@@ -56,7 +56,7 @@ const assert=require('assert'),L=require('./lib');
  assert.equal(await receipt.count(),0);assert.match(await hand.innerText(),/Chez HelixCar — en attente de récupération client/);
  await page.locator('#hc-planning-refresh').click();assert.match(await hand.innerText(),/en attente de récupération client/);
  await hand.locator('[data-planning-action="remettre"]').click();assert.equal(await hand.count(),0);
- await page.locator('#hc-planning-state').selectOption('archives');assert.equal(await page.locator('[data-planning-id]').count(),2);assert.match(await hand.innerText(),/Véhicule remis au client/);
+ await page.locator('#hc-planning-state').selectOption('archives');assert.equal(await page.locator('[data-planning-id]').count(),2);assert.match(await hand.innerText(),/Véhicule remis au client/);assert.equal(await page.locator('[data-planning-action="modifier"]').count(),0);assert.equal(await page.locator('[data-planning-id]').first().getAttribute('data-planning-id'),'prep1:retour_remise');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  console.log('PASS '+width+' : préparation, erreur chronologique, persistance, confidentialité partenaire, deux rendez-vous, réception, remise, archives');
  await page.close();

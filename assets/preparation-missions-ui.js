@@ -36,7 +36,7 @@
     if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
     return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}';
   }
-  const draftFields=['calcul_interne','remuneration','distance','distance_aller','distance_basis','carburant_peages','motorisation','restit_motorisation','heure_remise','heure_retrait','heure_prise_en_charge','retour_reception','retour_remise'];
+  const draftFields=['calcul_interne','remuneration','distance','distance_aller','distance_restitution','distance_basis','carburant_peages','motorisation','restit_motorisation','heure_remise','heure_retrait','heure_prise_en_charge','retour_reception','retour_remise'];
   function draftKey(source){const admin=window._currentAdmin;return admin?.id&&source?.client?.id?'hc-prep-draft:'+admin.id+':'+source.client.id+':'+source.devis_id:null;}
   function backup(){
     if(!state)return;const key=draftKey(state.source);if(!key)return;
@@ -149,7 +149,7 @@
           const routes=data.routes;
           if(!routes?.length||routes.some(r=>!Number.isFinite(r.km)||r.km<=0))throw Error('Distance indisponible');
           p.distance=HCMissionBudget.wholeKm(routes[0].km);p.distance_basis='outbound_v1';
-          p.distance_aller=p.distance;
+          p.distance_aller=p.distance;p.distance_restitution=data.returnRoute?.km==null?null:HCMissionBudget.wholeKm(data.returnRoute.km);
           minutes=routes[0].minutes;source=data.source;
           p.calcul_interne={...p.calcul_interne,minutes};HCPlanningCalcul.appliquerReception(p);
         }
@@ -246,12 +246,12 @@
     if(!rows.some(r=>r.label==='Départ'))return h+facts(rows.map(r=>[r.label,r.value]))+'</section>';
     const delivered=vehicle(raw('Véhicule'));
     h+='<div class="hc-prep-legs'+(raw('Restitution')?' hc-prep-legs--return':'')+'"><section class="hc-prep-leg" aria-label="Livraison"><header class="hc-prep-annonce-head"><h4>Livraison</h4></header>'+route(raw('Départ'),raw('Arrivée'),raw('Prise en charge'),raw('Livraison'))+
-      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance')],...(raw('Garde avant réception')?[['Garde avant réception',raw('Garde avant réception')]]:[])])+'</section>';
+      facts([['Modèle',delivered.model],['Motorisation',raw('Motorisation')],...(delivered.type?[['Catégorie',delivered.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance')]])+'</section>';
     if(raw('Restitution')){
       const returned=vehicle(raw('Restitution')),returnRoute=raw('Trajet de restitution'),prefix=raw('Arrivée')+' · ';
       const destination=returnRoute.startsWith(prefix)?returnRoute.slice(prefix.length):returnRoute.includes(' · ')?returnRoute.split(' · ').slice(1).join(' · '):'';
       h+='<section class="hc-prep-leg" aria-label="Restitution"><header class="hc-prep-annonce-head"><h4>Véhicule à restituer</h4></header>'+route(raw('Arrivée'),destination,raw('Livraison'),raw('Restitution prévue'))+
-        facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')]])+'</section>';
+        facts([['Modèle',returned.model],['Motorisation',raw('Motorisation restitution')],...(returned.type?[['Catégorie',returned.type]]:[]),['Transport',raw('Transport')],['Distance',raw('Distance restitution')||'À préciser']])+'</section>';
     }
     return h+'</div></section>';
   }
@@ -313,7 +313,7 @@
       if(p.category==='convoyage')h+='<aside class="hc-prep-internal" data-price-summary="'+i+'">'+priceSummary(p)+'</aside>';
       h+='<div class="hc-prep-fields">'+input(p,i,'remuneration','Prix total de la mission (€)');
       if(p.category==='convoyage'){h+=input(p,i,'carburant_peages','Dont frais de route (€)')+input(p,i,'distance','Distance aller (km)')+motor(p,i,'motorisation','Motorisation');h+='<p data-route-duration="'+i+'" role="status" style="grid-column:1/-1;font-weight:600">'+esc(routeDuration(p))+'</p><button type="button" class="btn btn-outline" data-estimate-free="'+i+'">Estimer les kilomètres gratuitement</button><p data-route-status="'+i+'" role="status" aria-live="polite"></p>';if(p.mission.restitution)h+=motor(p,i,'restit_motorisation','Motorisation restitution');
-        if(p.kind==='avant_stockage'){h+='<p data-reception-rule="'+i+'" style="grid-column:1/-1"><strong>Réception à Noisy le '+display(p.date_fin)+'</strong>'+ (p.reception_calc?'<br>Arrivée estimée '+esc(p.reception_calc.arrival.slice(11))+' · marge de 45 min incluse.'+(p.reception_calc.report?'<br>Report au lendemain · garde de nuit par le convoyeur.':''):'<br>Estimez le trajet pour vérifier le seuil de 18 h.')+'</p>'+input(p,i,'heure_remise','Heure de réception','time');}
+        if(p.kind==='avant_stockage'){h+='<p data-reception-rule="'+i+'" style="grid-column:1/-1"><strong>Réception à Noisy le '+display(p.date_fin)+'</strong>'+ (p.reception_calc?'<br>Arrivée estimée '+esc(p.reception_calc.arrival.slice(11))+' · marge de 45 min incluse.'+(p.reception_calc.report?'<br>Report au lendemain.':''):'<br>Estimez le trajet pour vérifier le seuil de 18 h.')+'</p>'+input(p,i,'heure_remise','Heure de réception','time');}
         if(p.kind==='apres_stockage')h+=input(p,i,'heure_retrait','Heure de remise au convoyeur la veille','time');}
       h+='</div>';
       if(p.retour_helixcar?.transfert){
@@ -420,7 +420,7 @@
         if(!routes.length)throw Error('Aucun itinéraire calculé');
         const distance=Number(routes[0].km);p.distance_basis='outbound_v1';
         if(!Number.isFinite(distance)||distance<=0)throw Error('Distance non calculable.');
-        p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;
+        p.distance=HCMissionBudget.wholeKm(distance);p.distance_aller=p.distance;p.distance_restitution=data.returnRoute?.km==null?null:HCMissionBudget.wholeKm(data.returnRoute.km);
         autoDrafts.set(p.key,{...autoDrafts.get(p.key),minutes:routes[0].minutes});refreshDistancePrices(p);HCPlanningCalcul.appliquerReception(p);
         editVersion++;backup();queueSave();
         render();
@@ -488,7 +488,7 @@
         if(!confirm('Publier cette mission au prix total de '+money(p.remuneration)+' auprès des partenaires éligibles ?'))return;
         await rpc('publier_preparation_mission',{p_id:p.saved.id});
         adopt(await rpc('source_preparation_missions',{p_client_id:state.source.client.id}));state.preview=true;render();note('Mission publiée dans les opportunités partenaires.');
-        await loadOpportunitesAdmin();
+        await loadOpportunitesAdmin();await chargerMissionsParDemande();
       }
     }catch(err){const message=err.name==='TimeoutError'?'Délai du calcul dépassé. Réessayez ou renseignez les kilomètres.':err.message;note(message,true);if(b.hasAttribute('data-estimate-free'))routeNote(Number(b.dataset.estimateFree),message);}finally{busy=false;b.disabled=false;if(b.hasAttribute('data-estimate-free'))b.textContent='Estimer les kilomètres gratuitement';}
   });
@@ -497,7 +497,7 @@
   document.body.append(detail);detail.querySelector('button').addEventListener('click',()=>closeModal('preparation-detail'));
   HC_ACTIONS.ouvrirDetailsPreparation=async function(id){
     openModal('preparation-detail');const body=detail.querySelector('.hc-prep-detail-body');body.textContent='Chargement…';
-    const fields={reference:'Référence',adresse_depart:'Prise en charge',adresse_arrivee:'Livraison',contact_depart_nom:'Contact prise en charge',contact_depart_tel:'Téléphone prise en charge',contact_arrivee_nom:'Contact livraison',contact_arrivee_tel:'Téléphone livraison',immatriculation:'Immatriculation',vin:'VIN',motorisation:'Motorisation',restit_motorisation:'Motorisation restitution',consignes:'Consignes',adresse_restitution:'Restitution',restit_contact_nom:'Contact restitution',restit_contact_tel:'Téléphone restitution',restit_marque_modele:'Véhicule à restituer',restit_immatriculation:'Immatriculation restitution',restit_vin:'VIN restitution',restit_info:'Consignes de restitution',adresse_intervention:'Lieu d’intervention',code_postal_intervention:'Code postal',ville_intervention:'Ville',contact_nom:'Contact',contact_tel:'Téléphone'};
+    const fields={reference:'Référence',date_prise_en_charge:'Date de prise en charge',date_livraison:'Date de livraison',date_restitution_depart:'Date de restitution',adresse_depart:'Prise en charge',adresse_arrivee:'Livraison',contact_depart_nom:'Contact prise en charge',contact_depart_tel:'Téléphone prise en charge',contact_arrivee_nom:'Contact livraison',contact_arrivee_tel:'Téléphone livraison',immatriculation:'Immatriculation',vin:'VIN',motorisation:'Motorisation',restit_motorisation:'Motorisation restitution',consignes:'Consignes',adresse_restitution:'Restitution',restit_contact_nom:'Contact restitution',restit_contact_tel:'Téléphone restitution',restit_marque_modele:'Véhicule à restituer',restit_immatriculation:'Immatriculation restitution',restit_vin:'VIN restitution',restit_info:'Consignes de restitution',adresse_intervention:'Lieu d’intervention',code_postal_intervention:'Code postal',ville_intervention:'Ville',contact_nom:'Contact',contact_tel:'Téléphone'};
     try{const r=await sbAuth.from('missions').select('reference_courte,'+Object.keys(fields).join(',')).eq('id',id).maybeSingle();if(r.error)throw Error(r.error.message);if(!r.data)throw Error('Mission non accessible.');body.innerHTML='<dl class="hc-prep-facts">'+Object.entries(fields).filter(([k])=>r.data[k]).map(([k,label])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(k==='reference'?(r.data.reference_courte||r.data.reference):r.data[k])+'</dd></div>').join('')+'</dl>';}
     catch(e){body.textContent=e.message;}
   };

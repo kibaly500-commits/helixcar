@@ -31,7 +31,7 @@ const {lancerNavigateur}=require('./env');
  await page.evaluate(()=>ouvrirPreparationDemande('c'));await page.locator('[data-estimate-free]').click();
  assert.match(await page.locator('[data-reception-rule]').innerText(),/12\/11\/2026/);assert.match(await page.locator('[data-reception-rule]').innerText(),/18:39/);
  const reception=page.locator('[data-field=heure_remise]');assert.equal(await reception.inputValue(),'');await reception.fill('09:30');
- await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>__saved[0].mission.date_livraison),'2026-11-12T09:30');assert.ok(await page.evaluate(()=>__saved[0].public.rows.some(r=>r.label==='Garde avant réception')));
+ await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>__saved[0].mission.date_livraison),'2026-11-12T09:30');assert.ok(await page.evaluate(()=>!__saved[0].public.rows.some(r=>r.label==='Garde avant réception')));
  await page.evaluate(()=>ouvrirPreparationDemande('c'));assert.equal(await reception.inputValue(),'09:30');assert.match(await page.locator('[data-reception-rule]').innerText(),/12\/11\/2026/);
  assert.deepEqual(errors,[]);console.log('PASS saisie immédiate, 235/776 km, frais, arrondi, ajustement manuel, distance vide, minimum, estimation IGN et sauvegarde.');
  }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

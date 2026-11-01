@@ -1608,7 +1608,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-admin-planning">
         <div id="hc-retards-planning" aria-live="polite"></div>
         <div class="card"><h2>Réceptions et remises de clés</h2><p>Point HelixCar · 12 rue de l’Université, 93160 Noisy-le-Grand</p><p>Uniquement les véhicules à réceptionner ou à remettre par vous au point HelixCar. Vous fixez les horaires après votre vérification du trafic. Repère : 45 minutes de battement. Confirmez la réception ou la remise des clés au moment où elle a lieu.</p></div>
-        <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Afficher<select id="hc-planning-state"><option value="actifs">À venir</option><option value="archives">Archives</option></select></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
+        <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Afficher<select id="hc-planning-state"><option value="actifs">À venir / À régulariser</option><option value="archives">Archives</option></select></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
         <div id="hc-planning-list" aria-live="polite"></div>
       </div>
       <div class="page" id="page-admin-opportunites">
@@ -3274,7 +3274,7 @@ erreurInfos=true;}
   zone.innerHTML=(!demandes.length?'<p class="hc-demande-message">Vous n’avez pas encore de demande. Utilisez « Faire une nouvelle demande ».</p>':'')+groupes.map(function(g){
     const selection=resultats.filter(r=>(g.etats||[g.cle]).includes(r.presentation.groupe)).sort(function(a,b){
       const ecart = (Date.parse(a.d.created_at)||0)-(Date.parse(b.d.created_at)||0);
-      return (['devis','demandes','preparation'].includes(g.cle) ? -ecart : ecart) || String(a.d.id).localeCompare(String(b.d.id));
+      return (['devis','demandes','preparation','cloture'].includes(g.cle) ? -ecart : ecart) || String(a.d.id).localeCompare(String(b.d.id));
     });
     // La rubrique « Prestations en préparation » reste un repère permanent
     // du parcours client, même tant qu'aucun dossier n'y est encore classé.
@@ -8666,7 +8666,7 @@ function filtrerMissionsAdmin(rows) {
     const f=filtresMissionsAdmin[missionSurPlace(m)?'autres':'convoyage'];
     const texte=[m.reference_courte,m.reference].filter(Boolean).join(' ').toLocaleLowerCase('fr');
     return missionArchivee(m)===f.archives && texte.includes(f.recherche.trim().toLocaleLowerCase('fr'));
-  });
+  }).sort((a,b)=>missionArchivee(a)&&missionArchivee(b)?String(b.date_fin_intervention||b.date_restitution_depart||b.date_livraison||b.created_at||'').localeCompare(String(a.date_fin_intervention||a.date_restitution_depart||a.date_livraison||a.created_at||'')):0);
 }
 function choisirArchivesMissions(type,archives) {
   if(!filtresMissionsAdmin[type])return;
@@ -10915,6 +10915,13 @@ function _blocFiche(titre, lignesHtml) {
 // même liste, mêmes statuts — avec une colonne qui dit de quel métier
 // relève la mission (migration 96).
 var _missionsParDemande = {};
+var _preparationsParDemande = {};
+function preparationDemandeComplete(c){
+ const saved=_preparationsParDemande[String(c.id)];if(!saved?.length||!window.HCPreparation)return false;
+ const exceptions={};saved.forEach(r=>{if(r.plan?.organisation)exceptions[r.plan.vehicule_id||'principal']=r.plan.organisation;});
+ const plans=HCPreparation.preservePublished(HCPreparation.build(c,c._vehicules||c.vehicules||[],HCPlanningCalcul.POINT,exceptions),saved);
+ return plans.length>0&&plans.every(p=>saved.some(r=>r.cle===p.key&&r.mission_id));
+}
 
 function _missionNettoyageDe(c) {
   return _missionsParDemande[String(c && c.id)] || null;
@@ -10939,8 +10946,9 @@ var LIB_STATUT_MISSION = {
 // Charge les missions déjà créées pour les demandes affichées, afin de
 // ne jamais proposer deux fois la création de la même mission.
 function chargerMissionsParDemande() {
-  return sbFetchToutePage('missions?select=id,reference_courte,reference,statut,client_id,type_mission,convoyeur_id'
-                          + '&type_mission=eq.nettoyage')
+  const preparations=sbFetchToutePage('preparations_missions?select=client_id,cle,mission_id,plan').then(rows=>{_preparationsParDemande={};rows.forEach(r=>(_preparationsParDemande[r.client_id]||= []).push(r));}).catch(()=>{_preparationsParDemande={};});
+  return preparations.then(()=> sbFetchToutePage('missions?select=id,reference_courte,reference,statut,client_id,type_mission,convoyeur_id'
+                          + '&type_mission=eq.nettoyage'))
     .then(function (rows) {
       _missionsParDemande = {};
       (rows || []).forEach(function (m) {
@@ -11142,7 +11150,7 @@ function _blocDevisHtml(c) {
       '</div>' +
       '<div style="font-size:.76rem;color:#888;margin-top:8px">Vérifiez le contenu du devis avant de saisir le montant.</div>';
   }
-  if (d && d.statut === 'accepte' && d.paiement_statut === 'paye') html += '<div style="margin-top:14px"><button class="btn btn-primary" '+actionHtml('ouvrirPreparationDemande',[c.id])+'>Préparer les missions</button></div>';
+  if (d && d.statut === 'accepte' && d.paiement_statut === 'paye' && !preparationDemandeComplete(c)) html += '<div style="margin-top:14px"><button class="btn btn-primary" '+actionHtml('ouvrirPreparationDemande',[c.id])+'>Préparer les missions</button></div>';
   html += '</div>';
   return html;
 }

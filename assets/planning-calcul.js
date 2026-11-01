@@ -47,7 +47,6 @@ function appliquerReception(p){
  if(row)row.value=result.date+(p.heure_remise?' · '+p.heure_remise:' · Heure de réception à fixer');
  p.mission.date_livraison=p.heure_remise?result.date+'T'+p.heure_remise:null;
  p.rows=p.rows.filter(r=>r.label!=='Garde avant réception');
- if(result.report)p.rows.push({label:'Garde avant réception',value:'Le convoyeur conserve le véhicule pendant la nuit et le remet à Noisy le '+result.date+'.'});
 }
 function guidance(p){
  if(!['avant_stockage','apres_stockage'].includes(p.kind))return null;
