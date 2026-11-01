@@ -3286,8 +3286,13 @@ erreurInfos=true;}
       const devisAccessible=dv && ['envoye','accepte','refuse'].includes(dv.statut);
       const lienDevis=devisAccessible ? 'devis.html?id='+encodeURIComponent(dv.id) : '';
       const paiement=devisIndisponibles?'inconnu':dv && dv.paiement_statut==='paye'?'paye':'non-paye';
-      const pointRemise= !devisIndisponibles && _aStockage(d) && dv && dv.statut==='accepte' && paiement==='paye'
-        ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
+      const depotClient=d.stockage_acheminement==='depot_client';
+      const recuperationClient=d.stockage_sortie==='recuperation_client';
+      const deplacementClient=depotClient && recuperationClient ? 'Pour déposer et récupérer votre véhicule.'
+        : depotClient ? 'Pour déposer votre véhicule. HelixCar assure la livraison après stockage.'
+        : 'Pour récupérer votre véhicule après stockage. HelixCar assure son acheminement.';
+      const pointRemise= !devisIndisponibles && _aStockage(d) && (depotClient || recuperationClient) && dv && dv.statut==='accepte' && paiement==='paye'
+        ? '<p class="hc-demande-message" data-point-remise><strong>Point de remise HelixCar</strong><br>'+deplacementClient+'<br>12 rue de l’Université, 93160 Noisy-le-Grand</p>' : '';
       const etatDevis=_etatDevisClient(dv);
       let bouton='';
       if(p.action==='completer')bouton='<button class="btn btn-sm btn-primary" '+actionHtml('ouvrirCompletionDemande',[d.id])+'>Compléter mes informations →</button>';

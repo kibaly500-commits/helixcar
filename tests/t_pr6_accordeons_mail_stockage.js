@@ -35,12 +35,28 @@ const {urlFichier}=require('./env');
    }
    for(const [service,statut,paiement,visible] of [['stockage','envoye','paye',false],['stockage','accepte','en_attente',false],['stockage','accepte','paye',true],['convoyage','accepte','paye',false],['stockage','refuse','paye',false]]){
     await p.evaluate(async({service,statut,paiement})=>{
-     chargerDemandesClient=async()=>[{id:'stock-qa',type_service:service,groupe:'preparation'}];
+     chargerDemandesClient=async()=>[{id:'stock-qa',type_service:service,stockage_acheminement:'depot_client',groupe:'preparation'}];
      chargerDevisClient=async()=>[{client_id:'stock-qa',statut,paiement_statut:paiement}];
      await loadDemandesClient();
     },{service,statut,paiement});
     L.check(width+' adresse réservée au stockage accepté et payé : '+service+'/'+statut+'/'+paiement,(await p.locator('[data-point-remise]').count()===1)===visible);
     if(visible)L.check(width+' adresse sans enseigne',await p.locator('[data-point-remise]').innerText().then(t=>t.includes('12 rue de l’Université, 93160 Noisy-le-Grand')&&!/aldi/i.test(t)));
+   }
+   for(const service of ['stockage','convoyage_stockage'])for(const [depot,recuperation] of [[false,false],[true,false],[false,true],[true,true]]){
+    await p.evaluate(async({service,depot,recuperation})=>{
+     chargerDemandesClient=async()=>[{id:'stock-qa',type_service:service,stockage_acheminement:depot?'depot_client':'helixcar',stockage_sortie:recuperation?'recuperation_client':'helixcar',groupe:'preparation'}];
+     chargerDevisClient=async()=>[{client_id:'stock-qa',statut:'accepte',paiement_statut:'paye'}];
+     await loadDemandesClient();
+    },{service,depot,recuperation});
+    const bloc=p.locator('[data-point-remise]');
+    L.check(width+' '+service+' déplacement client '+depot+'/'+recuperation,await bloc.count()===(depot||recuperation?1:0));
+    if(depot||recuperation){
+     const texte=await bloc.innerText();
+     L.check(width+' consigne adaptée '+depot+'/'+recuperation,
+      depot&&recuperation?texte.includes('Pour déposer et récupérer votre véhicule.'):
+      depot?texte.includes('Pour déposer votre véhicule. HelixCar assure la livraison après stockage.'):
+      texte.includes('Pour récupérer votre véhicule après stockage. HelixCar assure son acheminement.'));
+    }
    }
    await p.evaluate(async()=>{chargerDevisClient=async()=>{throw Error('indisponible');};await loadDemandesClient();});
    L.check(width+' pas d’adresse si paiement invérifiable',await p.locator('[data-point-remise]').count()===0);
