@@ -62,7 +62,7 @@ function useOutboundDistance(p){
  if(p.distance!=null)p.distance=wholeKm(Number(p.distance));
  p.distance_aller=p.distance;
 }
-function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return isLocal?0:Math.round(km*22)/100;}
+function roadFees(km,isLocal){amount(km);if(km===0)throw Error('Distance nécessaire');return Math.round(km*22)/100;}
 function localAddresses(...addresses){return addresses.every(a=>/\b(?:75|77|78|91|92|93|94|95)\d{3}\b/.test(a||''));}
 function travelPricing(p,plans=[]){
  const m=p.mission;

@@ -21,13 +21,13 @@ console.log('PASS budget : 30/70, centimes, pondération, frais inclus, publié 
 assert.equal(B.roadFees(934,false),205.48);
 assert.equal(B.roadFees(500,false),110);
 assert.equal(B.roadFees(200,false),44);
-assert.equal(B.roadFees(80,true),0);
+assert.equal(B.roadFees(80,true),17.6);
 assert.throws(()=>B.roadFees(0,false));assert.throws(()=>B.roadFees(NaN,false));
-console.log('PASS forfait 0,22 €/km et exclusion IDF.');
+console.log('PASS forfait 0,22 €/km y compris IDF.');
 const outside={key:'out',vehicule_id:'v',distance:900,distance_aller:500,mission:{adresse_depart:'75012 Paris',adresse_arrivee:'59000 Lille',adresse_restitution:'78000 Versailles',restitution:true}};
 let pricing=B.travelPricing(outside);assert.equal(pricing.outboundFees,110);assert.equal(pricing.returnFees,55);assert.equal(pricing.fees,165);assert.equal(pricing.extra,0);
 const inside={...outside,distance:100,distance_aller:60,mission:{adresse_depart:'75012 Paris',adresse_arrivee:'78000 Versailles',adresse_restitution:'93160 Noisy',restitution:true}};
-pricing=B.travelPricing(inside);assert.equal(pricing.fees,0);assert.equal(pricing.extra,20);
+pricing=B.travelPricing(inside);assert.equal(pricing.fees,13.2);assert.equal(pricing.extra,20);
 const mixed={...outside,mission:{...outside.mission,adresse_depart:'59000 Lille',adresse_arrivee:'75012 Paris',adresse_restitution:'78000 Versailles'}};
 pricing=B.travelPricing(mixed);assert.equal(pricing.fees,110);assert.equal(pricing.extra,20);
 const bridge={...outside,retour_helixcar:{transfert:true}};

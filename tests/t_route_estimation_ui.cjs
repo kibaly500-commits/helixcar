@@ -9,7 +9,7 @@ async function run(response){
  const context={state:{source:{client:{id:'test-client'},empreinte:'current'},plans:[p]},busy:false,generation:1,editVersion:0,
   modal:{addEventListener:(name,fn)=>{click=fn;}},sbAuth:{auth:{getSession:async()=>({data:{session:{access_token:'test-session'}}})}},SUPABASE_KEY:'test-key',AbortSignal,
   fetch:async(url,options)=>{request={url,options};assert.equal(button.disabled,true);assert.equal(button.textContent,'Calcul en cours…');if(response instanceof Error)throw response;return response;},
-  readEdits(){},render(){},note(){},routeNote:(i,message)=>{localMessage=message;},backup(){saved++;},queueSave(){},HCMissionBudget:{wholeKm:Math.round}};
+  refreshDistancePrices(){},readEdits(){},render(){},note(){},routeNote:(i,message)=>{localMessage=message;},backup(){saved++;},queueSave(){},HCMissionBudget:{wholeKm:Math.round}};
  vm.runInNewContext(helper+listener,context);
  await click({target:{closest:()=>button}});
  assert.equal(button.disabled,false);assert.equal(context.busy,false);assert.equal(button.textContent,'Estimer les kilomètres gratuitement');

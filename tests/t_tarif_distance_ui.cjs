@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict'),path=require('path');
+const {lancerNavigateur}=require('./env');
+(async()=>{const browser=await lancerNavigateur();try{
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setContent('<div id="fiche-demande-content"></div>');
+ await page.evaluate(()=>{
+ window.escapeHtml=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+ window.HC_ACTIONS={};window.openModal=()=>{};window.closeModal=()=>{};window._currentAdmin={id:'test'};
+ window.__source={client:{id:'c'},devis_id:'d',empreinte:'h',reference:'QA',brouillons:[]};
+ window.__plan={key:'v:direct',vehicule_id:'v',category:'convoyage',kind:'direct',distance:100,distance_basis:'outbound_v1',remuneration:80,carburant_peages:22,missing:[],rows:[],organisation:{beforeDays:0},mission:{adresse_depart:'75001 Paris',adresse_arrivee:'13001 Marseille'}};
+ window.HCPreparation={build:()=>[JSON.parse(JSON.stringify(__plan))],preservePublished:p=>p,missingVins:()=>[],fraisErrors:()=>[],publicData:p=>p};
+ window.HCPlanningCalcul={retourErrors:()=>[]};
+ window.sbAuth={rpc:async(name,args)=>{if(name==='enregistrer_preparation_missions'){__source.brouillons=args.p_plans.map(p=>({cle:p.key,empreinte:'h',plan:p}));window.__saved=args.p_plans;}return {data:__source};},from:()=>({select(){return this},eq(){return this},maybeSingle:async()=>({data:{prix:2000}})}),auth:{getSession:async()=>({data:{session:{access_token:'test'}}})}};
+ window.SUPABASE_KEY='test';window.fetch=async()=>({ok:true,json:async()=>({fingerprint:'h',routes:[{km:776,minutes:480}]})});
+ });
+ for(const file of ['remuneration-estimation.js','mission-budget.js','preparation-missions-ui.js'])await page.addScriptTag({path:path.resolve('assets',file)});
+ await page.evaluate(()=>ouvrirPreparationDemande('c'));
+ const distance=page.locator('[data-field=distance]'),total=page.locator('[data-field=remuneration]'),fees=page.locator('[data-field=carburant_peages]');
+ await distance.fill('235');assert.equal(await total.inputValue(),'170');assert.equal(await fees.inputValue(),'51.7');
+ await distance.fill('776');assert.equal(await total.inputValue(),'400');assert.equal(await fees.inputValue(),'170.72');assert.match(await page.locator('[data-price-summary]').innerText(),/228,90/);
+ await total.fill('425');await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>__saved[0].remuneration),425);
+ await distance.fill('500');assert.equal(await total.inputValue(),'300');
+ await distance.fill('');assert.equal(await total.inputValue(),'');assert.equal(await fees.inputValue(),'');
+ await distance.fill('70');assert.equal(await total.inputValue(),'55');
+ await page.locator('[data-estimate-free]').click();assert.equal(await total.inputValue(),'400');assert.equal(await distance.inputValue(),'776');
+ await page.waitForTimeout(1000);assert.equal(await page.evaluate(()=>__saved[0].remuneration),400);assert.equal(await page.evaluate(()=>__saved[0].carburant_peages),170.72);
+ assert.deepEqual(errors,[]);console.log('PASS saisie immédiate, 235/776 km, frais, arrondi, ajustement manuel, distance vide, minimum, estimation IGN et sauvegarde.');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

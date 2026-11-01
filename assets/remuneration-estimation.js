@@ -43,10 +43,10 @@ function partnerProjection(result){
  return {totalEuros:result.partnerPreview.totalEuros,roadFeesIncludedEuros:result.partnerPreview.roadFeesIncludedEuros};
 }
 
-// Barème PROPOSÉ, administrativement ajustable. Ne constitue pas une grille approuvée.
+// Barème validé : tranches cumulatives, minimum de travail par mission.
 const DEFAULT_POLICY=Object.freeze({
- idf:{minimum:45,base:20,tiers:[{upTo:50,rate:0.90},{upTo:150,rate:0.55},{upTo:400,rate:0.42},{upTo:Infinity,rate:0.32}]},
- hors_idf:{minimum:85,base:40,tiers:[{upTo:50,rate:0.90},{upTo:150,rate:0.55},{upTo:400,rate:0.42},{upTo:Infinity,rate:0.32}]}
+ idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.50},{upTo:500,rate:0.25},{upTo:Infinity,rate:0.15}]},
+ hors_idf:{minimum:35,base:0,tiers:[{upTo:250,rate:0.50},{upTo:500,rate:0.25},{upTo:Infinity,rate:0.15}]}
 });
 function proposedLabor(km,zone,policy=DEFAULT_POLICY){
  number(km,'Distance totale');

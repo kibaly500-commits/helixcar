@@ -4,7 +4,7 @@ const text=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
 const code=text.slice(text.indexOf('  async function calculateAll('),text.indexOf('  function budgetErrors('));
 const plan=(key,ret)=>({key,category:'convoyage',distance:ret?447.2:223.9,distance_aller:ret?223.9:undefined,kind:'direct',organisation:{},mission:{adresse_depart:'75012 Paris',adresse_arrivee:'59000 Lille',restitution:ret,adresse_restitution:'75012 Paris'}});
 const plans=[plan('return',true),plan('oneway',false)];
-const c={state:{plans},generation:1,totalDevis:1000,readEdits(){},routeNote(){},note(){},render(){},money:String,autoDrafts:new Map(),HCMissionBudget:B,HCRemunerationEstimation:E};
+const c={state:{plans},generation:1,totalDevis:1000,budgetErrors(){return [];},readEdits(){},routeNote(){},note(){},render(){},money:String,autoDrafts:new Map(),HCMissionBudget:B,HCRemunerationEstimation:E};
 vm.createContext(c);vm.runInContext(code,c);
 (async()=>{
  await c.calculateAll();
@@ -12,7 +12,7 @@ vm.createContext(c);vm.runInContext(code,c);
  assert.equal(plans[0].carburant_peages,73.92);
  assert.ok(Math.abs(plans[0].calcul_interne.work-plans[1].calcul_interne.work)<=5.01);
  assert.ok(Math.abs(plans[0].remuneration-plans[1].remuneration-24.63)<=5.011);
- assert.equal(Math.round(plans.reduce((s,p)=>s+p.remuneration,0)*100),46500);
+ assert.equal(Math.round(plans.reduce((s,p)=>s+p.remuneration,0)*100),34500);
  const unknown=plan('legacy',true);delete unknown.distance_aller;B.useOutboundDistance(unknown);assert.equal(unknown.distance,null);
  const published=plan('published',true);published.saved={mission_id:'locked'};B.useOutboundDistance(published);assert.equal(published.distance,447.2);
  plans[0].distance=100;await c.calculateAll();assert.equal(plans[0].distance_aller,100);assert.equal(plans[0].carburant_peages,33);
