@@ -1,0 +1,743 @@
+From fe7d652f9431b4aa11ce24c68d50ed77576292ba Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 10 Sep 2026 12:07:37 +0000
+Subject: [PATCH 1/2] =?UTF-8?q?F01=20(1/8)=20:=20=C2=AB=20Trouver=20un=20p?=
+ =?UTF-8?q?rofessionnel=20=C2=BB=20a=20son=20=C3=A9tape=203=20d=C3=A9di?=
+ =?UTF-8?q?=C3=A9e?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Les quatre rubriques Votre besoin, Lieu d'intervention, Période et
+horaires, Mission quittent la liste des services (étape 2) pour une
+étape 3 dédiée, déplacées octet pour octet (aucun libellé, champ,
+validation, payload ni brouillon modifié — C04 respecté). Le seul
+choix du service active Continuer ; l'étape 3 porte un stylo dans
+l'étapeur (jamais une voiture) ; l'étape 4 en sort au lieu d'être
+grisée à tort ; Continuer depuis l'étape 3 mène au récapitulatif.
+
+Suites adaptées au nouveau parcours, en le disant en commentaire :
+t_pro, t_etapes, t_brouillon, t_stabilisation (N11). Nouveau helper
+ouvrirEtapeProfessionnel dans tests/lib.js. Inventaire initial du lot
+dans tests/RECETTE-F01.md.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019pgrVMCXfVuhyMDc7dctBj
+---
+ index.html               | 342 +++++++++++++++++++++++----------------
+ tests/RECETTE-F01.md     |  68 ++++++++
+ tests/lib.js             |  12 +-
+ tests/t_brouillon.js     |   4 +
+ tests/t_etapes.js        |  11 +-
+ tests/t_pro.js           |  26 ++-
+ tests/t_stabilisation.js |  16 +-
+ 7 files changed, 324 insertions(+), 155 deletions(-)
+ create mode 100644 tests/RECETTE-F01.md
+
+diff --git a/index.html b/index.html
+index 4fcdb28..3233948 100644
+--- a/index.html
++++ b/index.html
+@@ -4786,6 +4786,13 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+   display: none !important;
+ }
+ 
++/* LOT F01 — Trouver un professionnel : l'étape 3 ne montre QUE les quatre
++   rubriques métier. Même principe que le nettoyage ci-dessus : le bloc
++   « Prise en charge » est masqué, jamais supprimé. */
++#modal-client[data-service-professionnel="1"] .form-step[data-step="3"] > *:not(#bloc-socle-professionnel) {
++  display: none !important;
++}
++
+ /* 2 — Bloc Conditions grisé pour un client non professionnel. */
+ #modal-client #nett-eligibilite-bloc[data-inactif="1"] .nett-elig-opt {
+   opacity: .55;
+@@ -6563,6 +6570,137 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+            Rubriques repliables reprenant STRICTEMENT les classes des
+            sous-accordéons véhicules (veh-sous-*), donc le même design,
+            les mêmes boutons Effacer / OK et aucune nouvelle icône. -->
++      <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
++        <div class="chrono-section">Période de stockage</div>
++        <div id="info-lieu-stockage" style="background:#fff;border:1px solid rgba(16,24,32,.07);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:.82rem;color:#555;line-height:1.6"></div>
++
++        <!-- Bug 4 (V50.47) — la zone des champs devient repliable : même
++             PRINCIPE que les sous-accordéons véhicules (display togglé
++             par une classe), sans reprendre leurs classes CSS littérales
++             pour ne pas hériter de leur habillage visuel sur un bloc déjà
++             validé graphiquement. -->
++        <div id="bloc-stockage-resume" style="display:none;background:#fff;border:1px solid rgba(16,24,32,.08);border-radius:10px;padding:14px 16px;margin-bottom:16px">
++          <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#9A9EA2;font-weight:700;margin-bottom:4px">Période de stockage estimée</div>
++          <div id="bloc-stockage-resume-dates" style="font-size:.92rem;color:var(--ink);font-weight:600;margin-bottom:12px"></div>
++          <div style="display:flex;justify-content:flex-end;gap:8px">
++            <button type="button" onclick="_hcEffacerPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid rgba(158,63,70,.35);background:#fff;color:var(--accent);cursor:pointer">Effacer</button>
++            <button type="button" onclick="_hcRouvrirPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer">Modifier</button>
++          </div>
++        </div>
++        <div id="bloc-stockage-champs">
++        <div class="modal-row">
++          <div class="modal-form-group">
++            <label>Date de début du stockage <button type="button" class="hc-help-btn" data-help="Date à laquelle le véhicule entre effectivement en stockage." aria-label="Aide sur le début du stockage">i</button> <span class="field-required">*</span></label>
++            <input type="date" id="stock-debut" readonly onchange="revaliderChaineDates()">
++          </div>
++          <div class="modal-form-group">
++            <label>Date de fin prévue <button type="button" class="hc-help-btn" data-help="Date prévue de sortie du véhicule du stockage." aria-label="Aide sur la fin du stockage">i</button> <span class="field-required">*</span></label>
++            <input type="date" id="stock-fin" readonly onchange="revaliderChaineDates()">
++          </div>
++        </div>
++        <!-- V50.3G — les heures d'entrée/sortie stockage ont été déplacées
++             directement sous les questions Acheminement/Sortie qui les
++             rendent pertinentes (cf. plus bas). Elles ne sont plus ici. -->
++        <div id="stock-duree" style="display:none;font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:12px"></div>
++        <div class="modal-form-group">
++          <label>Informations complémentaires <span class="field-optional-hint">(facultatif)</span></label>
++          <textarea id="stock-notes" placeholder="Précisez toute demande particulière liée au stockage…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:64px;resize:vertical;outline:none"></textarea>
++        </div>
++
++        <!-- V50.44 — bouton OK PUREMENT VISUEL (Objectif 5), même style
++             que les autres sous-sections (classe veh-sous-valider déjà
++             existante). AUCUNE logique câblée : voir le rapport. -->
++        <div class="veh-sous-ok" style="justify-content:flex-end;display:flex;margin-bottom:4px">
++          <button type="button" class="veh-sous-effacer" onclick="_hcEffacerPeriodeStockage()">Effacer</button>
++          <button type="button" class="veh-sous-valider" onclick="_hcOkPeriodeStockage()">OK</button>
++        </div>
++        </div>
++
++        <div class="modal-form-group">
++          </div>
++        <div class="chrono-section">Avant le stockage</div>
++        <div class="modal-form-group">
++          <label>Comment les véhicules arrivent-ils chez HelixCar ? <button type="button" class="hc-help-btn" data-help="Indiquez si vous déposez vous-même le ou les véhicules, ou si HelixCar vient les récupérer avant leur stockage." aria-label="Aide sur l’acheminement">i</button> <span class="field-required">*</span></label>
++          <div style="display:flex;flex-direction:column;gap:7px" id="stock-acheminement-group">
++            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="depot_client" onclick="onAcheminementStockage()"><span>Je les dépose moi-même</span></label>
++            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="helixcar" onclick="onAcheminementStockage()"><span>HelixCar vient les récupérer</span></label>
++          </div>
++        </div>
++        <!-- V50.3G — champ déplacé ici : n'apparaît que si le client dépose
++             lui-même (cf. _heureEntreeStockageApplicable(), inchangée). -->
++        <div class="modal-form-group" id="bloc-stock-heure-entree">
++          <label>Heure d'entrée prévue <span class="field-required">*</span></label>
++          <input id="stock-heure-entree" type="time" readonly onchange="_onChangementHeureEntreeStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
++        </div>
++
++        <div class="modal-form-group">
++          </div>
++        <div class="chrono-section">Après le stockage</div>
++        <div class="modal-form-group">
++          <label>Que souhaitez-vous après le stockage ? <button type="button" class="hc-help-btn" data-help="Choisissez si vous venez récupérer les véhicules après le stockage ou si HelixCar vous les livre." aria-label="Aide sur la récupération après stockage">i</button> <span class="field-required">*</span></label>
++          <div style="display:flex;flex-direction:column;gap:7px" id="stock-sortie-group">
++            <label class="radio-opt"><input type="radio" name="stock-sortie" value="recuperation_client" onclick="onSortieStockage()"><span>Je viens récupérer les véhicules</span></label>
++            <label class="radio-opt"><input type="radio" name="stock-sortie" value="helixcar" onclick="onSortieStockage()"><span>HelixCar me livre les véhicules</span></label>
++          </div>
++        </div>
++        <!-- V50.3G — champ déplacé ici, libellé mis à jour pour cohérence
++             avec « Je viens récupérer les véhicules ». Id, clé payload et
++             colonne Supabase INCHANGÉS (stock-heure-sortie /
++             stockage_heure_sortie) — seul le texte visible change. N'apparaît
++             que si le client récupère lui-même (cf.
++             _heureSortieStockageApplicable(), inchangée). -->
++        <div class="modal-form-group" id="bloc-stock-heure-sortie">
++          <label>Heure de récupération prévue <span class="field-required">*</span></label>
++          <input id="stock-heure-sortie" type="time" readonly onchange="_verifierHeureRecupStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
++        </div>
++      </div>
++
++      <!-- Bloc CONVOYAGE : masqué tant que le service ne comprend pas de convoyage -->
++      <!-- Compteur de véhicules : commun aux 3 services -->
++
++
++
++      <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
++        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
++        <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
++        <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
++      </div>
++
++      </div>
++
++      <!-- Questions mission (masquées si pas-maintenant) -->
++<div id="mission-details-group">
++
++      <div class="form-step" data-step="2">
++        <div id="trajet-type-group" style="display:none">
++        <div class="modal-form-group">
++          <label>Type de trajet</label>
++          <div style="display:flex;flex-direction:column;gap:7px">
++            <label class="radio-opt"><input type="radio" name="trajet-type" value="achat" onclick="toggleTrajetAutre()"><span>Achat de véhicule (garage / particulier)</span></label>
++            <label class="radio-opt"><input type="radio" name="trajet-type" value="vente" onclick="toggleTrajetAutre()"><span>Vente de véhicule</span></label>
++            <label class="radio-opt"><input type="radio" name="trajet-type" value="demenagement" onclick="toggleTrajetAutre()"><span>Déménagement / déplacement personnel</span></label>
++            <label class="radio-opt"><input type="radio" name="trajet-type" value="professionnel" onclick="toggleTrajetAutre()"><span>Transport professionnel (flotte / entreprise)</span></label>
++            <label class="radio-opt"><input type="radio" name="trajet-type" value="autre" onclick="toggleTrajetAutre()"><span>Autre</span></label>
++          </div>
++        </div>
++        <div class="modal-form-group" id="trajet-autre-group" style="display:none">
++          <label>Précisez la raison de votre convoyage <span class="field-required">*</span></label>
++          <input type="text" id="client-trajet-autre" placeholder="Ex : succession, rapatriement, transfert familial, véhicule immobilisé…">
++        </div>
++        </div>
++      </div>
++
++      <div class="form-step" data-step="3">
++
++        <!-- LOT F01 (F01-023..029) — TROUVER UN PROFESSIONNEL : ÉTAPE DÉDIÉE.
++             Les quatre rubriques « Votre besoin », « Lieu d'intervention »,
++             « Période et horaires » et « Mission » vivaient sous la liste des
++             services, à l'étape 2. Elles sont DÉPLACÉES telles quelles dans
++             cette étape 3 : aucun libellé, aucun champ, aucune validation,
++             aucun payload ni brouillon n'est modifié — seul l'emplacement.
++             Le bloc « Prise en charge » ci-dessous est masqué pour ce service
++             (attribut data-service-professionnel sur la modale), jamais
++             supprimé : il réapparaît tel quel pour Convoyage / Stockage. -->
+       <div id="bloc-socle-professionnel" style="display:none">
+ 
+         <!-- RUBRIQUE — Votre besoin -->
+@@ -6754,128 +6892,6 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+ 
+       </div>
+ 
+-      <div id="bloc-stockage" style="display:none;background:#FCFBFA;border-radius:12px;padding:22px 20px;margin-bottom:16px;border:1px solid rgba(16,24,32,.07)">
+-        <div class="chrono-section">Période de stockage</div>
+-        <div id="info-lieu-stockage" style="background:#fff;border:1px solid rgba(16,24,32,.07);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:.82rem;color:#555;line-height:1.6"></div>
+-
+-        <!-- Bug 4 (V50.47) — la zone des champs devient repliable : même
+-             PRINCIPE que les sous-accordéons véhicules (display togglé
+-             par une classe), sans reprendre leurs classes CSS littérales
+-             pour ne pas hériter de leur habillage visuel sur un bloc déjà
+-             validé graphiquement. -->
+-        <div id="bloc-stockage-resume" style="display:none;background:#fff;border:1px solid rgba(16,24,32,.08);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+-          <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#9A9EA2;font-weight:700;margin-bottom:4px">Période de stockage estimée</div>
+-          <div id="bloc-stockage-resume-dates" style="font-size:.92rem;color:var(--ink);font-weight:600;margin-bottom:12px"></div>
+-          <div style="display:flex;justify-content:flex-end;gap:8px">
+-            <button type="button" onclick="_hcEffacerPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid rgba(158,63,70,.35);background:#fff;color:var(--accent);cursor:pointer">Effacer</button>
+-            <button type="button" onclick="_hcRouvrirPeriodeStockage()" style="padding:8px 16px;font-size:.82rem;font-weight:600;border-radius:8px;border:1.5px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer">Modifier</button>
+-          </div>
+-        </div>
+-        <div id="bloc-stockage-champs">
+-        <div class="modal-row">
+-          <div class="modal-form-group">
+-            <label>Date de début du stockage <button type="button" class="hc-help-btn" data-help="Date à laquelle le véhicule entre effectivement en stockage." aria-label="Aide sur le début du stockage">i</button> <span class="field-required">*</span></label>
+-            <input type="date" id="stock-debut" readonly onchange="revaliderChaineDates()">
+-          </div>
+-          <div class="modal-form-group">
+-            <label>Date de fin prévue <button type="button" class="hc-help-btn" data-help="Date prévue de sortie du véhicule du stockage." aria-label="Aide sur la fin du stockage">i</button> <span class="field-required">*</span></label>
+-            <input type="date" id="stock-fin" readonly onchange="revaliderChaineDates()">
+-          </div>
+-        </div>
+-        <!-- V50.3G — les heures d'entrée/sortie stockage ont été déplacées
+-             directement sous les questions Acheminement/Sortie qui les
+-             rendent pertinentes (cf. plus bas). Elles ne sont plus ici. -->
+-        <div id="stock-duree" style="display:none;font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:12px"></div>
+-        <div class="modal-form-group">
+-          <label>Informations complémentaires <span class="field-optional-hint">(facultatif)</span></label>
+-          <textarea id="stock-notes" placeholder="Précisez toute demande particulière liée au stockage…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:64px;resize:vertical;outline:none"></textarea>
+-        </div>
+-
+-        <!-- V50.44 — bouton OK PUREMENT VISUEL (Objectif 5), même style
+-             que les autres sous-sections (classe veh-sous-valider déjà
+-             existante). AUCUNE logique câblée : voir le rapport. -->
+-        <div class="veh-sous-ok" style="justify-content:flex-end;display:flex;margin-bottom:4px">
+-          <button type="button" class="veh-sous-effacer" onclick="_hcEffacerPeriodeStockage()">Effacer</button>
+-          <button type="button" class="veh-sous-valider" onclick="_hcOkPeriodeStockage()">OK</button>
+-        </div>
+-        </div>
+-
+-        <div class="modal-form-group">
+-          </div>
+-        <div class="chrono-section">Avant le stockage</div>
+-        <div class="modal-form-group">
+-          <label>Comment les véhicules arrivent-ils chez HelixCar ? <button type="button" class="hc-help-btn" data-help="Indiquez si vous déposez vous-même le ou les véhicules, ou si HelixCar vient les récupérer avant leur stockage." aria-label="Aide sur l’acheminement">i</button> <span class="field-required">*</span></label>
+-          <div style="display:flex;flex-direction:column;gap:7px" id="stock-acheminement-group">
+-            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="depot_client" onclick="onAcheminementStockage()"><span>Je les dépose moi-même</span></label>
+-            <label class="radio-opt"><input type="radio" name="stock-acheminement" value="helixcar" onclick="onAcheminementStockage()"><span>HelixCar vient les récupérer</span></label>
+-          </div>
+-        </div>
+-        <!-- V50.3G — champ déplacé ici : n'apparaît que si le client dépose
+-             lui-même (cf. _heureEntreeStockageApplicable(), inchangée). -->
+-        <div class="modal-form-group" id="bloc-stock-heure-entree">
+-          <label>Heure d'entrée prévue <span class="field-required">*</span></label>
+-          <input id="stock-heure-entree" type="time" readonly onchange="_onChangementHeureEntreeStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+-        </div>
+-
+-        <div class="modal-form-group">
+-          </div>
+-        <div class="chrono-section">Après le stockage</div>
+-        <div class="modal-form-group">
+-          <label>Que souhaitez-vous après le stockage ? <button type="button" class="hc-help-btn" data-help="Choisissez si vous venez récupérer les véhicules après le stockage ou si HelixCar vous les livre." aria-label="Aide sur la récupération après stockage">i</button> <span class="field-required">*</span></label>
+-          <div style="display:flex;flex-direction:column;gap:7px" id="stock-sortie-group">
+-            <label class="radio-opt"><input type="radio" name="stock-sortie" value="recuperation_client" onclick="onSortieStockage()"><span>Je viens récupérer les véhicules</span></label>
+-            <label class="radio-opt"><input type="radio" name="stock-sortie" value="helixcar" onclick="onSortieStockage()"><span>HelixCar me livre les véhicules</span></label>
+-          </div>
+-        </div>
+-        <!-- V50.3G — champ déplacé ici, libellé mis à jour pour cohérence
+-             avec « Je viens récupérer les véhicules ». Id, clé payload et
+-             colonne Supabase INCHANGÉS (stock-heure-sortie /
+-             stockage_heure_sortie) — seul le texte visible change. N'apparaît
+-             que si le client récupère lui-même (cf.
+-             _heureSortieStockageApplicable(), inchangée). -->
+-        <div class="modal-form-group" id="bloc-stock-heure-sortie">
+-          <label>Heure de récupération prévue <span class="field-required">*</span></label>
+-          <input id="stock-heure-sortie" type="time" readonly onchange="_verifierHeureRecupStockage()" style="width:100%;max-width:260px;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box">
+-        </div>
+-      </div>
+-
+-      <!-- Bloc CONVOYAGE : masqué tant que le service ne comprend pas de convoyage -->
+-      <!-- Compteur de véhicules : commun aux 3 services -->
+-
+-
+-
+-      <div id="client-step2-choice" style="display:none;margin-top:8px;padding:16px;background:#f8f7f2;border-radius:3px">
+-        <div style="font-size:.82rem;color:#555;margin-bottom:12px">Vous pourrez effectuer une demande de service à tout moment depuis votre espace client.</div>
+-        <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px 20px;font-size:.88rem;margin-bottom:8px" onclick="clientCreateAccountOnly()">Créer mon compte</button>
+-        <button type="button" class="btn-secondary-subtle" onclick="clientContinueWithMission()">Faire une demande maintenant</button>
+-      </div>
+-
+-      </div>
+-
+-      <!-- Questions mission (masquées si pas-maintenant) -->
+-<div id="mission-details-group">
+-
+-      <div class="form-step" data-step="2">
+-        <div id="trajet-type-group" style="display:none">
+-        <div class="modal-form-group">
+-          <label>Type de trajet</label>
+-          <div style="display:flex;flex-direction:column;gap:7px">
+-            <label class="radio-opt"><input type="radio" name="trajet-type" value="achat" onclick="toggleTrajetAutre()"><span>Achat de véhicule (garage / particulier)</span></label>
+-            <label class="radio-opt"><input type="radio" name="trajet-type" value="vente" onclick="toggleTrajetAutre()"><span>Vente de véhicule</span></label>
+-            <label class="radio-opt"><input type="radio" name="trajet-type" value="demenagement" onclick="toggleTrajetAutre()"><span>Déménagement / déplacement personnel</span></label>
+-            <label class="radio-opt"><input type="radio" name="trajet-type" value="professionnel" onclick="toggleTrajetAutre()"><span>Transport professionnel (flotte / entreprise)</span></label>
+-            <label class="radio-opt"><input type="radio" name="trajet-type" value="autre" onclick="toggleTrajetAutre()"><span>Autre</span></label>
+-          </div>
+-        </div>
+-        <div class="modal-form-group" id="trajet-autre-group" style="display:none">
+-          <label>Précisez la raison de votre convoyage <span class="field-required">*</span></label>
+-          <input type="text" id="client-trajet-autre" placeholder="Ex : succession, rapatriement, transfert familial, véhicule immobilisé…">
+-        </div>
+-        </div>
+-      </div>
+-
+-      <div class="form-step" data-step="3">
+-
+         <!-- SECTION LIVRAISON -->
+         <div style="border-top:2px solid #f0f0f0;margin:18px 0 14px;padding-top:4px">
+           <div class="modal-section-title"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.7 7-12.1A7 7 0 0 0 5 8.9C5 14.3 12 21 12 21z"/><circle cx="12" cy="8.8" r="2.2"/></svg> Informations de livraison</div>
+@@ -9626,9 +9642,11 @@ function _nettLibelleCategorie(v) {
+ // ══════════════════════════════════════════════════════════════
+ // TROUVER UN PROFESSIONNEL AUTOMOBILE
+ // ══════════════════════════════════════════════════════════════
+-// Parcours porte par l'ETAPE 2 existante : aucune nouvelle etape
+-// globale, "Continuer" mene directement au recapitulatif habituel
+-// (cf. _estEtapeApplicable, qui rend l'etape 4 inapplicable ici).
++// LOT F01 — l'etape 2 ne porte que le choix du service ; les quatre
++// rubriques metier vivent dans l'ETAPE 3 (bloc #bloc-socle-professionnel,
++// deplace tel quel). "Continuer" depuis l'etape 3 mene directement au
++// recapitulatif habituel (cf. _estEtapeApplicable, qui rend l'etape 4
++// inapplicable ici).
+ // Toutes les donnees metier vivent dans professionnel_details, sur le
+ // meme modele que nettoyage_details : liste blanche stricte, aucun
+ // champ Convoyage/Stockage ne peut s'y glisser.
+@@ -10037,9 +10055,12 @@ function _proMajBoutonContinuer() {
+   // On empêche toujours de RESTER sur une étape plus lointaine que ce
+   // que l'étape 2 autorise : c'est un garde-fou de navigation, pas un
+   // grisage de bouton.
++  // LOT F01 — les rubriques vivent à l'étape 3 : c'est elle, et non
++  // plus l'étape 2, qui borne la progression tant qu'elles sont
++  // incomplètes.
+   if (!_proPeutContinuerEtape2()) {
+-    _etapeMax = Math.min(_etapeMax, 2);
+-    if (_formStepState.client > 2) _formStepState.client = 2;
++    _etapeMax = Math.min(_etapeMax, 3);
++    if (_formStepState.client > 3) _formStepState.client = 3;
+   }
+ }
+ 
+@@ -10210,6 +10231,10 @@ function onChoixService() {
+   // Stockage. Marqueur unique porte par la modale.
+   var _modalCli = document.getElementById('modal-client');
+   if (_modalCli) _modalCli.setAttribute('data-service-nettoyage', nett ? '1' : '0');
++  // LOT F01 — meme mecanisme pour Trouver un professionnel : l'etape 3
++  // ne montre que ses quatre rubriques, le bloc Prise en charge y est
++  // masque (CSS), jamais supprime.
++  if (_modalCli) _modalCli.setAttribute('data-service-professionnel', pro ? '1' : '0');
+   if (nett) { nettRendreRepartition(); nettOnEligibiliteChange(true); }
+ 
+   // Lot 2 (V72) — GARDE-FOU SOCLE : tant que les parcours Nettoyage et
+@@ -10588,11 +10613,12 @@ function _typeHoraire(i, prefixe) {
+ // sautée. On distingue APPLICABLE (sens métier) et ATTEINTE (parcourue).
+ function _estEtapeApplicable(n) {
+   if (n === 1 || n === 2 || n === 5) return true;
+-  // Trouver un professionnel : tout le parcours tient dans l'étape 2.
+-  // « Continuer » mène donc directement au récapitulatif habituel,
+-  // sans créer ni traverser aucune étape supplémentaire.
++  // Trouver un professionnel : l'étape 2 ne porte que le choix du
++  // service ; les quatre rubriques métier vivent dans l'étape 3
++  // (LOT F01). L'étape 4 (véhicules) ne lui est pas applicable :
++  // « Continuer » depuis l'étape 3 mène au récapitulatif habituel.
+   if (n === 4) return !_avecProfessionnel();
+-  if (n === 3) return !!_blocsGlobauxActifs().pc;   // prise en charge globale
++  if (n === 3) return _avecProfessionnel() || !!_blocsGlobauxActifs().pc;   // rubriques métier ou prise en charge globale
+   return false;
+ }
+ 
+@@ -13122,15 +13148,13 @@ function _validateClientStep(n) {
+       return ok;
+     }
+ 
+-    // Trouver un professionnel : validation dédiée puis sortie
+-    // immédiate, exactement comme le Nettoyage. Aucune règle
++    // Trouver un professionnel : à l'étape 2, seul le choix du service
++    // est exigé — sélectionner ce service active immédiatement
++    // « Continuer ». Les quatre rubriques métier sont validées à
++    // l'ÉTAPE 3 (LOT F01), avec exactement les mêmes règles qu'avant
++    // (_validateProfessionnelEtape2, inchangée). Aucune règle
+     // Convoyage/Stockage plus bas ne doit s'appliquer.
+     if (typeService === 'professionnel') {
+-      var rP2 = _validateProfessionnelEtape2();
+-      if (!rP2.ok) {
+-        ok = false;
+-        if (!firstInvalid) firstInvalid = document.getElementById(rP2.first);
+-      }
+       if (firstInvalid) {
+         try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+       }
+@@ -13232,6 +13256,21 @@ function _validateClientStep(n) {
+     }
+   }
+ 
++  // LOT F01 — Trouver un professionnel : l'étape 3 porte les quatre
++  // rubriques métier. Validation dédiée puis sortie immédiate : le bloc
++  // « Prise en charge » ci-dessous n'est jamais évalué pour ce service.
++  if (n === 3 && _avecProfessionnel()) {
++    var rP3 = _validateProfessionnelEtape2();
++    if (!rP3.ok) {
++      ok = false;
++      if (!firstInvalid) firstInvalid = document.getElementById(rP3.first);
++    }
++    if (firstInvalid) {
++      try { firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
++    }
++    return ok;
++  }
++
+   if (n === 3 && _blocsGlobauxActifs().pc) {
+     mark(_checkRequiredText('client-from-rue', null, true), 'client-from-rue');
+     mark(_checkCodePostal('client-from-cp', true), 'client-from-cp');
+@@ -13957,6 +13996,7 @@ function resetClientForm() {
+   _reinitialiserQuantitesNettoyage();
+   var _mc = document.getElementById('modal-client');
+   if (_mc) _mc.setAttribute('data-service-nettoyage', '0');
++  if (_mc) _mc.setAttribute('data-service-professionnel', '0');
+   if (typeof _clearGroupError === 'function') _clearGroupError('nett-repartition-group');
+   _demandeSoumise = false;   // nouvelle demande : l'avertissement redevient actif
+   _formulaireClientSale = false;
+@@ -15621,13 +15661,14 @@ async function _submitClientFormInterne() {
+     }
+   }
+ 
+-  // Meme garde-fou final pour Trouver un professionnel : tout le
+-  // parcours tenant dans l'etape 2, seules les etapes 1 et 2 sont
+-  // rejouees, avec les MEMES validateurs que la navigation.
++  // Meme garde-fou final pour Trouver un professionnel : les etapes 1,
++  // 2 et 3 (les quatre rubriques metier, LOT F01) sont rejouees, avec
++  // les MEMES validateurs que la navigation.
+   if (_avecProfessionnel()) {
+     var _etapeKOPro = null;
+     if (!_validateClientStep(1)) _etapeKOPro = 1;
+     if (!_etapeKOPro && !_validateClientStep(2)) _etapeKOPro = 2;
++    if (!_etapeKOPro && !_validateClientStep(3)) _etapeKOPro = 3;
+     if (_etapeKOPro) {
+       _formStepState.client = _etapeKOPro;
+       _etapeMax = Math.max(_etapeMax, _etapeKOPro);
+@@ -21004,6 +21045,8 @@ document.addEventListener('click', function (e) {
+     if(kind==='calendar') return '<svg '+common+'><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></svg>';
+     if(kind==='before') return '<svg '+common+'><path d="M4 12h14M13 7l5 5-5 5"/><circle cx="5" cy="12" r="2"/></svg>';
+     if(kind==='after') return '<svg '+common+'><path d="M20 12H6M11 7l-5 5 5 5"/><circle cx="19" cy="12" r="2"/></svg>';
++    // LOT F01 — stylo discret : l'étape métier du parcours « Trouver un professionnel ».
++    if(kind==='edit') return '<svg '+common+'><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
+     return '<svg '+common+'><circle cx="12" cy="12" r="8"/></svg>';
+   }
+   var stepMeta={
+@@ -21018,8 +21061,16 @@ document.addEventListener('click', function (e) {
+     var item3=ind.querySelector('[data-step-item="3"]'), lineBefore=item3?item3.previousElementSibling:null;
+     var applicable=!!_estEtapeApplicable(3);
+     if(item3){item3.classList.toggle('hc-step-hidden',!applicable);if(lineBefore&&lineBefore.classList.contains('step-indicator-line'))lineBefore.classList.toggle('hc-step-hidden',!applicable);}
++    // LOT F01 — l'étape 4 (véhicules) n'existe pas pour « Trouver un
++    // professionnel » : elle sort de l'étapeur comme l'étape 3 sort de
++    // celui du nettoyage — jamais une pastille grisée à tort, aucun trou.
++    var item4=ind.querySelector('[data-step-item="4"]'), lineBefore4=item4?item4.previousElementSibling:null;
++    var applicable4=!!_estEtapeApplicable(4);
++    if(item4){item4.classList.toggle('hc-step-hidden',!applicable4);if(lineBefore4&&lineBefore4.classList.contains('step-indicator-line'))lineBefore4.classList.toggle('hc-step-hidden',!applicable4);}
++    var proActif=(typeof _avecProfessionnel==='function')&&_avecProfessionnel();
+     ind.querySelectorAll('.step-indicator-item').forEach(function(item){
+       var actual=parseInt(item.getAttribute('data-step-item'),10), meta=stepMeta[actual], n=item.querySelector('.step-indicator-num');
++      if(actual===3&&proActif)meta={kind:'edit',label:'Votre mission'};
+       if(meta&&n){n.innerHTML=svg(meta.kind);item.setAttribute('aria-label',meta.label);item.setAttribute('title',meta.label);}
+     });
+   };
+@@ -21630,6 +21681,10 @@ console.log('HelixCar ' + window.HC_VERSION);
+     if(kind==='presentation')return '<svg '+c+'><path d="M4 5.5h16v10H9.5L6 19v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>';
+     // V77 - horloge : etape Organisation du parcours Nettoyage.
+     if(kind==='clock')return '<svg '+c+'><circle cx="12" cy="12" r="7.5"/><path d="M12 7.8V12l2.8 1.7"/></svg>';
++    // LOT F01 - stylo discret : etape des rubriques metier du parcours
++    // « Trouver un professionnel ». Jamais une voiture, jamais « Valider
++    // un vehicule ».
++    if(kind==='edit')return '<svg '+c+'><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
+     return '<svg '+c+'><path d="m5 12 4 4 10-10"/></svg>';
+   }
+   function lockStepper(){
+@@ -21639,7 +21694,10 @@ console.log('HelixCar ' + window.HC_VERSION);
+     // source d'etat : le service actif. Restauration immediate au
+     // changement de service puisque lockStepper est rejoue a chaque rendu.
+     var _nettActif = (typeof _avecNettoyage === 'function') && _avecNettoyage();
+-    var kinds={1:'person',2:'request',3:'route',4:(_nettActif?'clock':'vehicle'),5:'check'};
++    // LOT F01 - etape 3 : stylo pour Trouver un professionnel (ses quatre
++    // rubriques metier), itineraire pour la prise en charge des autres.
++    var _proActif = (typeof _avecProfessionnel === 'function') && _avecProfessionnel();
++    var kinds={1:'person',2:'request',3:(_proActif?'edit':'route'),4:(_nettActif?'clock':'vehicle'),5:'check'};
+     Object.keys(kinds).forEach(function(k){var n=ind.querySelector('[data-step-item="'+k+'"] .step-indicator-num');if(n)n.innerHTML=svg(kinds[k]);});
+     var visible=Array.prototype.filter.call(ind.querySelectorAll('.step-indicator-item'),function(x){return !x.classList.contains('hc-step-hidden')&&getComputedStyle(x).display!=='none';});
+     ind.classList.remove('hc-step-count-4','hc-step-count-5');ind.classList.add('hc-step-count-'+Math.max(4,Math.min(5,visible.length)));
+diff --git a/tests/RECETTE-F01.md b/tests/RECETTE-F01.md
+new file mode 100644
+index 0000000..cbe70b4
+--- /dev/null
++++ b/tests/RECETTE-F01.md
+@@ -0,0 +1,68 @@
++# Recette — LOT F01 : formulaires métier, validations et PDF
++
++Branche de travail : `worktree-agent-a9b9f1c965842e7bb`, créée depuis
++`claude/helixcar-expert-review-p0-p1-qcawh6` (pointe `fed90a7`), elle-même
++issue de `origin/main` (`3faf5e0`). Aucune connexion à Supabase, aucun
++e-mail, aucune donnée réelle : jeux d'essai préfixés
++`TEST-QA-CLAUDE-HELIXCAR`, adresses en `.invalid` / `.test`.
++
++Décisions définitives appliquées : C01 (Type de mission 156, Mission 166,
++espaces et accents compris, navigateur ET serveur), C04 (parcours Renfort
++strictement inchangé hors déplacement visuel des quatre blocs et icône
++stylo), G01-007 (aucune contrainte ni RLS affaiblie), G01-009 (aucune
++erreur SQL/PostgREST/stack/JSON brute affichée), G01-011 (préfixe des
++données de test).
++
++Statuts. « État avant » : DEJA_CONFORME / A_CORRIGER / NON_APPLICABLE /
++BLOQUE, constaté par lecture du code de la branche de base (fichier:ligne
++au moment de l'inventaire, avant toute modification). « Statut » :
++CORRIGÉ / DÉJÀ CONFORME / NON APPLICABLE / BLOQUÉ, avec la preuve
++(suite de tests et contrôle) qui l'établit.
++
++## 1. Inventaire lecture seule (avant modification)
++
++| ID | Source (fichier:ligne, branche de base) | État avant | Given / When / Then | Preuve | Statut |
++|----|------------------------------------------|------------|---------------------|--------|--------|
++| F01-001 | index.html:7008-7018 (`#nett-date`, `#nett-date-fin`), 19799 (`_hcCalPeriode` : couple `nett-date`/`nett-date-fin`), 19567 (`_hcFormaterYMD`) | DEJA_CONFORME — deux champs + calendrier de période partagé (lot F1/F2 antérieur) | Given le parcours Nettoyage à l'étape Organisation, When le client ouvre Date de début, Then un seul calendrier de période couvre début et fin | t_f01_formulaires T15 ; t_dates ; t_nettoyage | DÉJÀ CONFORME |
++| F01-002 | index.html:9463-9481 (validation fin ≥ début), 19567 (`_hcFormaterYMD`, jamais `toISOString`) | DEJA_CONFORME — une journée acceptée, fin < début refusée | Given début = fin, When Continuer, Then accepté ; Given fin < début, Then refus « La fin ne peut pas précéder le début. » ; 28-29 févr. 2028 et 31 déc. → 1er janv. acceptés en date civile | t_f01_formulaires T15-1..T15-5 | DÉJÀ CONFORME |
++| F01-003 | index.html:20054 (`data-hc-periode`), 20073-20110 (légende et bornes) | DEJA_CONFORME — la période est marquée dans la grille | Given une période choisie, When le calendrier est ouvert, Then chaque jour de la période porte une classe de marquage | t_f01_formulaires T15-6 | DÉJÀ CONFORME |
++| F01-004 | index.html:7003-7007 (commentaire de retrait), 8514-8516 (fonctions retirées), 15508 (`selectDispo`, résidu inerte, `#disponibilite-group` absent du HTML) ; dashboard.html:8418-8428 (`_nettHoraireTexte`, lecture seule des anciens dossiers) | DEJA_CONFORME côté formulaire/payload/récap/PDF ; résidu : `selectDispo` et `_clearGroupError('disponibilite-group')` sans HTML | Given le bloc Nettoyage, When on lit ses textes, Then ni « Quelle est votre disponibilité ? », ni Heure précise / Créneau horaire / Flexible ; payload sans `dispo_type` ni `heure_precise` | t_f01_formulaires T15-7..T15-9 ; t_stabilisation L2/L5/L9 | DÉJÀ CONFORME (résidus commentés) |
++| F01-005 | index.html:7027-7034 (champs `required`, aucune valeur), 9492-9512 (obligatoires) | DEJA_CONFORME | Given les horaires vides, When Continuer, Then « Ce champ est obligatoire. » sous chacun ; aucune valeur par défaut | t_f01_formulaires T15-10 | DÉJÀ CONFORME |
++| F01-006 | index.html:9422-9433 (`_nettChronologieOk`) ; dashboard.html:8418-8428 (anciens dossiers lus tels quels) | DEJA_CONFORME | Given une journée 17:00 → 09:00, Then refus ; Given deux jours 17:00 → 09:00, Then accepté ; Given un ancien dossier sans horaire, Then le Dashboard affiche « Non renseigné » sans erreur | t_f01_formulaires T15-11..T15-13 ; t_nettoyage_dashboard | DÉJÀ CONFORME |
++| F01-007 | index.html:9581+ (récap), dashboard.html:9520 (fiche), 10758 (PDF « Période et horaires »), migrations/103 (mission) | DEJA_CONFORME | Given une demande Nettoyage, Then récap, fiche admin et PDF portent début, fin et les deux horaires | t_f01_formulaires T15-14 ; t_devis ; t_mission_nettoyage | DÉJÀ CONFORME |
++| F01-008 / F01-009 | migrations/102, 103 (`creer_mission_nettoyage_si_prete`), 109 (`garde_paiement_devis`) ; lot Q02 | NON_APPLICABLE au lot F01 (cycle devis/paiement/mission : lot Q02) | — | — | NON APPLICABLE (hors périmètre F01, traité par Q02) |
++| F01-010 | index.html:6457 (option Nettoyage, description « Réservé aux entreprises ») ; 8230-8247 (`nettSyncStatutPro` : seules les cases d'éligibilité sont désactivées, l'option de service reste cochable) ; migrations/92 (`creer_demande_avec_vehicules` : aucune règle type_client × type_service) | A_CORRIGER — option cochable par un particulier ; aucune interdiction serveur | Given client-type = particulier, Then l'option est grisée, `disabled`, `aria-disabled`, « Réservé aux entreprises » lisible, non cochable au clavier ; Given un INSERT direct nettoyage + particulier, Then refus serveur `HC_RESERVE_ENTREPRISES` | t_f01_formulaires T15-15..T15-18 ; tests/rls/f01.sh F01-1..F01-5 | CORRIGÉ |
++| F01-011 | index.html:6457, 8230 | DEJA_CONFORME (professionnel : service actif) | Given client-type = pro, Then l'option est active et le parcours complet | t_f01_formulaires T15-19 ; t_nettoyage | DÉJÀ CONFORME |
++| F01-012 | index.html:7259-7276 (contrôle global retiré), 7286-7295 (Délai souhaité seul) | DEJA_CONFORME | Given l'étape véhicules, Then aucun contrôle « Standard / Sur plateau » global | t_f01_formulaires T16-1 | DÉJÀ CONFORME |
++| F01-013 | index.html:19395-19399 (radios `veh-i-mode` route / plateau par véhicule) | DEJA_CONFORME | Given 2 véhicules, When V1 route et V2 plateau, Then chaque fiche garde son mode | t_f01_formulaires T16-2 ; t_multivehicules | DÉJÀ CONFORME |
++| F01-014 | index.html:7290-7292 (`delai` standard / urgent, global) | DEJA_CONFORME | Given le délai « Prioritaire / urgent », Then il reste indépendant du mode de transport | t_f01_formulaires T16-3 | DÉJÀ CONFORME |
++| F01-015 | index.html:19396-19399 (`_hcSousVeh(i,'mode',…)` à l'intérieur de la carte) | DEJA_CONFORME | Given 3 véhicules, Then chaque bloc Mode de transport est descendant de `#veh-contenu-i` | t_f01_formulaires T16-4 | DÉJÀ CONFORME |
++| F01-016 | tests/t_multivehicules.js | DEJA_CONFORME | 1, 2, 3 et 5 véhicules : modes et délais indépendants, payload = saisie | t_f01_formulaires T16-5 ; t_multivehicules | DÉJÀ CONFORME |
++| F01-017 | index.html:10312-10327 (`_scenarioTrajet` : liv seulement si sortie HelixCar), 19394 (bloc Mode seulement si pc ou liv) | DEJA_CONFORME | Given Stockage, dépôt et récupération par le client, Then aucune rubrique Livraison, aucun champ de livraison exigé | t_f01_formulaires T16-6 | DÉJÀ CONFORME |
++| F01-018 | index.html:6624-6634 (rubrique véhicules supprimée, lot D4) | DEJA_CONFORME | Given Technicien (mécanique, carrosserie, diagnostic, autre, conseil), Then aucune rubrique « Informations sur les véhicules » | t_f01_formulaires T17-1 | DÉJÀ CONFORME |
++| F01-019 | index.html:6568-6754 (quatre rubriques) | DEJA_CONFORME | Then besoin, lieu, période et horaires, mission, nombre de professionnels restent | t_f01_formulaires T17-2 | DÉJÀ CONFORME |
++| F01-020 | index.html:10064-10066 (`nombre_vehicules: null`, `vehicules: []`) ; dashboard.html:9512, 10805 (affichage seulement si présents) | DEJA_CONFORME | Then payload sans véhicule artificiel ; fiche et PDF n'en inventent aucun | t_f01_formulaires T17-3 ; t_pro F4 | DÉJÀ CONFORME |
++| F01-021 | dashboard.html:10785-10795 (bandeau : période, durée, professionnels) | DEJA_CONFORME | — | t_devis_commun | DÉJÀ CONFORME |
++| F01-022 | index.html:6579, 6592-6600 (Renfort) | DEJA_CONFORME — protégé C04 | Given Renfort, Then options, libellés, validations et payload identiques à `origin/main` | t_f01_formulaires T17-4 (comparaison des chaînes Renfort entre origin/main et la branche) | DÉJÀ CONFORME |
++| F01-023 | index.html:6566 (bloc dans l'étape 2), 10589-10597 (`_estEtapeApplicable` : étape 3 jamais applicable pour ce service) | A_CORRIGER — accordéons sous le choix du service, étape 3 grisée | Given Trouver un professionnel choisi, Then les accordéons ne sont pas dans l'étape 2 | t_f01_formulaires T13-1 (reproduction origin/main) / T13-2 | CORRIGÉ |
++| F01-024 | index.html:13109-13120 (`_validateClientStep(2)` exigeait les quatre rubriques) | A_CORRIGER | Given le service choisi, When Continuer, Then l'étape 3 s'ouvre sans erreur | t_f01_formulaires T13-3 | CORRIGÉ |
++| F01-025 | index.html:6879 (étape 3 = « SECTION LIVRAISON ») | A_CORRIGER | Then les quatre blocs sont dans `.form-step[data-step="3"]`, HTML identique | t_f01_formulaires T13-4 (HTML du bloc identique à origin/main) | CORRIGÉ |
++| F01-026 | index.html:21636-21640 (`kinds` : étape 3 = `route`), 21009-21014 (`stepMeta` 3 = pickup) | A_CORRIGER | Then l'icône de l'étape 3 est un stylo, libellé « Votre mission », jamais « Valider un véhicule » | t_f01_formulaires T13-5 | CORRIGÉ |
++| F01-027 | index.html:13109-13120 | A_CORRIGER | Given les quatre blocs valides à l'étape 3, When Continuer, Then étape 5 (récapitulatif) | t_f01_formulaires T13-6 | CORRIGÉ |
++| F01-028 | index.html:10049-10085 (`_construireDetailsProfessionnel`), 10093-10140 (récap) | DEJA_CONFORME (inchangés) | Then payload et récap identiques avant/après | t_f01_formulaires T13-7 ; t_pro ; t_metiers | DÉJÀ CONFORME |
++| F01-029 | index.html:13744-13885 (brouillon), 20880-20890 / 21014-21025 (étapeur) | A_CORRIGER (étapeur : étape 4 grisée à tort pour ce service) | Retour arrière, reprise de brouillon, rechargement, 390 px : réponses conservées, aucune duplication, aucune étape grisée à tort | t_f01_formulaires T13-8..T13-11 ; t_brouillon | CORRIGÉ |
++| F01-030 | index.html:2794-2815 (`.hc-note`, lot E1), 16463-16491 ; résidus : 6669 et 6987 (encadrés orange « Complétez votre nom… »), 7343 (`#client-socle-msg` orange) | A_CORRIGER (trois encadrés colorés résiduels) | Then ces messages utilisent `.hc-note` (fond inchangé, filet vertical) ; aucune `alert()` dans le formulaire | t_f01_formulaires T13-12 | CORRIGÉ |
++| F01-031 | index.html:20684-20708 (lot E3 : `.veh-sous-effacer` / `.veh-sous-valider` stylés quel que soit le conteneur) | DEJA_CONFORME | Then les boutons Effacer / OK des fiches véhicules portent le style HelixCar | t_f01_formulaires T16-7 | DÉJÀ CONFORME |
++| F01-032 | dashboard.html:10359+ (rendu premium V50.6) | DEJA_CONFORME (à préserver) | Non-régression : t_devis, t_devis_commun | t_devis ; t_devis_commun | DÉJÀ CONFORME |
++| F01-033 | dashboard.html:10474-10485 (`TITRES_A_AERER`) | DEJA_CONFORME | Then « Mission sur site », « Informations complémentaires », « Prestation » reçoivent l'espace supplémentaire | t_f01_formulaires T18-1 | DÉJÀ CONFORME |
++| F01-034 | dashboard.html:10752-10763 (carte « Période et horaires » mesurée avant dessin) | DEJA_CONFORME | Then aucun chevauchement entre la carte et le titre suivant (positions y mesurées avec un double jsPDF) | t_f01_formulaires T18-2 | DÉJÀ CONFORME |
++| F01-035 | index.html:6737 (`#pro-description` sans `maxlength`), 9970 (`_proValiderRubrique('mission')` : présence seule) ; migrations : aucune contrainte de longueur | A_CORRIGER | Mission : 165 et 166 acceptés, 167 refusé (navigateur : maxlength + compteur + message discret ; serveur : refus direct) ; chaîne de référence = 166 | t_f01_formulaires T18-3..T18-8 ; tests/rls/f01.sh F01-6..F01-9 | CORRIGÉ |
++| F01-036 | idem (même champ, libellé « Type de mission » pour Renfort) | A_CORRIGER | Type de mission : 155 et 156 acceptés, 157 refusé ; chaîne de référence = 156 ; brouillon long tronqué à rien (conservé tel quel, refusé à la soumission) | t_f01_formulaires T18-9..T18-14 ; tests/rls/f01.sh F01-10..F01-12 | CORRIGÉ |
++| F01-037 | dashboard.html:8520 (`NETT_LIB_TYPE.preparation_complete` = « Préparation complète — intérieur et extérieur ») | A_CORRIGER | Then le devis imprime « Préparation complète » seul | t_f01_formulaires T18-15 ; t_devis ; t_mission_nettoyage | CORRIGÉ |
++| F01-038 | dashboard.html:9125-9128 (rappel « La mission sera créée automatiquement… ») | A_CORRIGER | Then le texte et tout équivalent sont absents de la fiche ; la logique serveur (102/103) est inchangée | t_f01_formulaires T18-16 | CORRIGÉ |
++| F01-039 | PDF de référence n° 1/2/3 : absents du dépôt | BLOQUE (comparaison visuelle impossible sans les fichiers) | — | Non-régression textuelle : t_devis, t_devis_commun | BLOQUÉ — PDF de référence non fournis ; non-régression textuelle verte |
++| F01-040 / 041 / 042 | tests/reference_ancien_index.js ; tests/t_nonreg.js | DEJA_CONFORME (référence de fluidité, aucune restauration) | — | t_nonreg ; t_stabilisation | DÉJÀ CONFORME |
++
++## 2. Journal d'implémentation
++
++Rempli au fil des sous-lots (commits, fichiers touchés, suites exécutées).
+diff --git a/tests/lib.js b/tests/lib.js
+index 2fc8aae..0715752 100644
+--- a/tests/lib.js
++++ b/tests/lib.js
+@@ -65,6 +65,16 @@ async function chooseService(page, value) {
+   await page.waitForTimeout(60);
+ }
+ 
++// LOT F01 (F01-023..029) — « Trouver un professionnel automobile » : les
++// quatre rubriques métier vivent dans une ÉTAPE 3 dédiée. Depuis
++// l'étape 2, le seul choix du service active « Continuer », qui ouvre
++// cette étape. À appeler juste après chooseService(page, 'professionnel').
++async function ouvrirEtapeProfessionnel(page) {
++  await page.click('#client-step-next-btn');
++  await page.waitForTimeout(120);
++  return page.evaluate(() => _formStepState.client);
++}
++
+ // Étape 2 nettoyage complète et valide
+ async function fillNettoyageStep2(page, total, repartition, prestation) {
+   await page.click('#nett-elig-emplacement');
+@@ -140,4 +150,4 @@ async function step(page) { return page.evaluate(() => _formStepState.client); }
+ module.exports = {
+   // Réexportés depuis env.js : une suite qui charge lib.js dispose des
+   // mêmes helpers de chemin, sans second require.
+-  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
++  RACINE, fichier, urlFichier, lancerNavigateur, jourCivil, dansNJours, launch, newPage, fillStep1, chooseService, ouvrirEtapeProfessionnel, fillNettoyageStep2, fillNettoyageStep4, fillContactSurPlace, btnState, step, check, results, FILE };
+diff --git a/tests/t_brouillon.js b/tests/t_brouillon.js
+index 60cc197..1d217bb 100644
+--- a/tests/t_brouillon.js
++++ b/tests/t_brouillon.js
+@@ -20,6 +20,8 @@ async function setVal(page, id, v) {
+   let page = await L.newPage(browser);
+   await L.fillStep1(page, 'pro');
+   await L.chooseService(page, 'professionnel');
++  // LOT F01 — les rubriques vivent à l'étape 3 dédiée : on l'ouvre d'abord.
++  await L.ouvrirEtapeProfessionnel(page);
+   await page.evaluate(() => proBasculerRubrique('besoin'));
+   await page.click('input[name="pro-categorie"][value="technicien"]');
+   await page.waitForTimeout(50);
+@@ -65,6 +67,8 @@ async function setVal(page, id, v) {
+   page = await L.newPage(browser);
+   await L.fillStep1(page, 'pro');
+   await L.chooseService(page, 'professionnel');
++  // LOT F01 — les rubriques vivent à l'étape 3 dédiée : on l'ouvre d'abord.
++  await L.ouvrirEtapeProfessionnel(page);
+   await page.evaluate(() => proBasculerRubrique('besoin'));
+   await page.click('input[name="pro-categorie"][value="technicien"]');
+   await page.waitForTimeout(60);
+diff --git a/tests/t_etapes.js b/tests/t_etapes.js
+index 7810a2e..1927244 100644
+--- a/tests/t_etapes.js
++++ b/tests/t_etapes.js
+@@ -19,6 +19,13 @@ async function etatBouton(page) {
+ 
+   // ── A. LE SCÉNARIO SIGNALÉ ──
+   await L.chooseService(page, 'professionnel');
++  // LOT F01 (F01-023..025) — ANCIEN COMPORTEMENT ADAPTÉ : les quatre
++  // rubriques métier vivaient sous le choix du service (étape 2). Elles
++  // vivent désormais dans l'étape 3 dédiée : on y entre par
++  // « Continuer », que le seul choix du service active.
++  await page.click('#client-step-next-btn');
++  await page.waitForTimeout(150);
++  L.check('A0 : le choix du service ouvre l\'étape 3 dédiée', (await L.step(page)) === 3);
+   await page.evaluate(() => proBasculerRubrique('besoin'));
+   await page.waitForTimeout(80);
+   await page.click('input[name="pro-categorie"][value="technicien"]');
+@@ -28,7 +35,9 @@ async function etatBouton(page) {
+   L.check('A1 : professionnel incomplet — le bouton reste ACTIF et cliquable',
+     proIncomplet.disabled === false && proIncomplet.visible === true, JSON.stringify(proIncomplet));
+ 
+-  // Retour à l'étape 1, puis bascule vers Nettoyage.
++  // Retour à l'étape 1 (deux retours depuis l'étape 3), puis bascule vers Nettoyage.
++  await page.evaluate(() => clientStepPrev());
++  await page.waitForTimeout(150);
+   await page.evaluate(() => clientStepPrev());
+   await page.waitForTimeout(150);
+   const etape1 = await etatBouton(page);
+diff --git a/tests/t_pro.js b/tests/t_pro.js
+index c1bada2..7bc556e 100644
+--- a/tests/t_pro.js
++++ b/tests/t_pro.js
+@@ -49,14 +49,29 @@ async function ouvrirRubrique(page, cle) {
+   // signale les manques. On vérifie donc la garantie utile — on ne
+   // franchit pas l'étape — et non plus l'état visuel du bouton.
+   L.check('A4 : le bouton Continuer reste actif et cliquable', etat.btnDisabled === false);
++  // LOT F01 (F01-024/025) — ANCIEN COMPORTEMENT ADAPTÉ : les quatre
++  // rubriques vivaient sous le choix du service, à l'étape 2, et
++  // « Continuer » y bloquait tant qu'elles étaient vides. Elles vivent
++  // désormais dans une étape 3 dédiée : depuis l'étape 2, le seul choix
++  // du service suffit à ouvrir l'étape 3 ; c'est LÀ que le clic bloque
++  // et signale les manques, avec les mêmes validateurs qu'avant.
++  const ouverture = await page.evaluate(() => {
++    const avant = _formStepState.client;
++    clientStepNext();
++    return { avant, apres: _formStepState.client,
++             erreurs: document.querySelectorAll('#modal-client .field-error-msg.visible').length };
++  });
++  L.check('A4b : depuis l\'étape 2, le seul choix du service ouvre l\'étape 3 sans erreur',
++    ouverture.avant === 2 && ouverture.apres === 3 && ouverture.erreurs === 0, JSON.stringify(ouverture));
++  await page.waitForTimeout(80);
+   const blocage = await page.evaluate(() => {
+     const avant = _formStepState.client;
+     clientStepNext();
+     return { avant, apres: _formStepState.client,
+              erreurs: document.querySelectorAll('#modal-client .field-error-msg.visible').length };
+   });
+-  L.check('A4b : mais cliquer ne franchit PAS l\'étape tant que rien n\'est saisi',
+-    blocage.apres === blocage.avant && blocage.erreurs > 0, JSON.stringify(blocage));
++  L.check('A4c : à l\'étape 3, cliquer ne franchit PAS l\'étape tant que rien n\'est saisi',
++    blocage.avant === 3 && blocage.apres === 3 && blocage.erreurs > 0, JSON.stringify(blocage));
+ 
+   // Aucun message intermédiaire interdit
+   const texte = await page.evaluate(() => (document.getElementById('bloc-socle-professionnel') || {}).textContent || '');
+@@ -158,7 +173,9 @@ async function ouvrirRubrique(page, cle) {
+   await page.click('#client-step-next-btn');
+   await page.waitForTimeout(250);
+   let st = await L.step(page);
+-  L.check('E1 : Continuer mène directement au récapitulatif (2 -> 5)', st === 5, 'étape=' + st);
++  // LOT F01 (F01-027) — les rubriques sont à l'étape 3 : « Continuer »
++  // mène de l'étape 3 au récapitulatif, sans traverser l'étape 4.
++  L.check('E1 : Continuer mène directement au récapitulatif (3 -> 5)', st === 5, 'étape=' + st);
+ 
+   let recap = await page.evaluate(() => (document.getElementById('recap-demande') || {}).textContent.replace(/\s+/g, ' '));
+   L.check('E2 : récap contient le besoin', /Technicien automobile/.test(recap), recap.slice(0, 300));
+@@ -187,7 +204,8 @@ async function ouvrirRubrique(page, cle) {
+   L.check('F7 : payload informations complémentaires nulles si vides', d.informations_complementaires === null);
+ 
+   // ── G. Changement de catégorie : remise à zéro RÉELLE ──
+-  await page.evaluate(() => { _formStepState.client = 2; _renderFormStep('client'); });
++  // LOT F01 — les rubriques sont à l'étape 3, on y revient.
++  await page.evaluate(() => { _formStepState.client = 3; _renderFormStep('client'); });
+   await page.waitForTimeout(80);
+   await ouvrirRubrique(page, 'besoin');
+   await page.click('input[name="pro-categorie"][value="renfort"]');
+diff --git a/tests/t_stabilisation.js b/tests/t_stabilisation.js
+index a2f225b..5f81417 100644
+--- a/tests/t_stabilisation.js
++++ b/tests/t_stabilisation.js
+@@ -1283,7 +1283,7 @@ window.jspdf = { jsPDF: function () {
+       const d = _construireDetailsProfessionnel();
+       return { okCat, okMet, categorie: d.categorie, mission: d.mission,
+                libelle: _proLibelleMetier(d), etape4: _estEtapeApplicable(4),
+-               apresEtape2: _prochaineEtape(2) };
++               apresEtape2: _prochaineEtape(2), apresEtape3: _prochaineEtape(3) };
+     });
+     check('N9 : parcours « Trouver un professionnel » — il vit et se remplit (t_pro, t_pro_ui)',
+       pro.okCat === true && pro.okMet === true && pro.categorie === 'renfort',
+@@ -1291,12 +1291,14 @@ window.jspdf = { jsPDF: function () {
+     check('N10 : le métier « Soutien administratif » est réellement sélectionnable (t_metiers)',
+       pro.mission === 'soutien_administratif' && pro.libelle === 'Soutien administratif',
+       JSON.stringify(pro));
+-    // Le parcours professionnel tient TOUT ENTIER dans l'étape 2 : la
+-    // 4 ne lui est pas applicable, et « Continuer » mène directement au
+-    // récapitulatif. C'est la nouveauté, pas un manque.
+-    check('N11 : le parcours professionnel va de l\'étape 2 au récapitulatif (t_etapes)',
+-      pro.etape4 === false && pro.apresEtape2 === 5,
+-      JSON.stringify([pro.etape4, pro.apresEtape2]));
++    // LOT F01 (F01-023..027) — ANCIEN COMPORTEMENT ADAPTÉ : le parcours
++    // tenait tout entier dans l'étape 2 et « Continuer » menait de 2 au
++    // récapitulatif. Les quatre rubriques vivent désormais dans l'étape
++    // 3 dédiée : 2 -> 3 (rubriques) -> 5 (récapitulatif). L'étape 4
++    // (véhicules) ne lui est toujours pas applicable.
++    check('N11 : le parcours professionnel va de l\'étape 2 à l\'étape 3 dédiée, puis au récapitulatif (t_etapes)',
++      pro.etape4 === false && pro.apresEtape2 === 3 && pro.apresEtape3 === 5,
++      JSON.stringify([pro.etape4, pro.apresEtape2, pro.apresEtape3]));
+     await pagePro.close();
+ 
+     // ── N12 à N13 : les huit métiers de candidature ──
+-- 
+2.43.0
+

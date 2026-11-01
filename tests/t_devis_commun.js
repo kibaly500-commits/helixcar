@@ -54,12 +54,17 @@ window.supabase = { createClient: function () { return {
                                order: function(){return this;}, limit: function(){return this;},
                                then: function(r){ return Promise.resolve({ data: [], error: null }).then(r); } }; },
   storage: { from: function () { return {}; } },
+  rpc: async function () { return { data: [], error: null }; },
 }; } };
 const _f = window.fetch;
 window.fetch = function (url) {
   if (String(url).indexOf('/rest/v1/') !== -1) {
     return Promise.resolve({ ok: true, status: 200, headers: { get: function(){ return 'items 0-0/0'; } },
-                             text: function(){ return Promise.resolve('[]'); } });
+                             text: function(){
+                               var u = new URL(String(url));
+                               var id = (u.searchParams.get('id') || '').slice(3);
+                               return Promise.resolve(JSON.stringify(u.pathname.endsWith('/clients') ? (window.__demandesServeur || []).filter(c => c.id === id) : []));
+                             } });
   }
   return _f.apply(window, arguments);
 };
@@ -115,6 +120,7 @@ const DEMANDES = {
 
   await page.evaluate(d => {
     _demandesDevisListe = Object.values(d);
+    window.__demandesServeur = Object.values(d);
     _devisParClient = {};
   }, DEMANDES);
 
