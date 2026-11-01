@@ -47,7 +47,7 @@ const L=require('./lib'),{urlFichier}=require('./env');
   L.check(width+' champs manquants toujours bloquants '+value,await page.locator('#completer-envoyer').isDisabled());
  }
  await page.evaluate(()=>{__lines[0].statut='a_corriger';__lines[0].commentaire='Vérifiez le VIN';_completerRendre(__lines);});
- L.check(width+' motif du refus visible',(await page.locator('.completion-correction').innerText()).includes('Vérifiez le VIN'));
+ L.check(width+' motif du refus visible',(await page.locator('.completion-correction:visible').innerText()).includes('Vérifiez le VIN'));
  await page.locator('#completer-champ-vehicule_1_vin').fill('VF555555555555555');
  await page.getByRole('button',{name:'Valider la correction',exact:true}).click();
  await page.waitForFunction(()=>!_completerEnvoiEnCours);

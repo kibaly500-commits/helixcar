@@ -9779,19 +9779,31 @@ function _completerSection(l) {
 }
 function _completerBrouillonCle() { return 'hc-completion-brouillon:' + _completerDemandeId; }
 var _completerToutesLignes = [];
-function _completerChampPret(l) {
+function _completerErreurChamp(l) {
   var el = document.getElementById(_completerChampId(l.cle));
-  if (!el || !el.value.trim() || !el.checkValidity()) return false;
+  if (!el || !el.value.trim()) return 'Renseignez ce champ.';
   if (/(_tel|telephone)$/.test(l.cle)) {
     var v=el.value.trim(), n=v.replace(/[^0-9]/g,'').length;
-    return n>=7 && n<=15 && /^\+?[0-9 ()./-]+$/.test(v);
+    if (!(n>=7 && n<=15 && /^\+?[0-9 ()./-]+$/.test(v))) return 'Saisissez un numéro de téléphone valide, par exemple 06 12 34 56 78.';
   }
-  return true;
+  if (!el.checkValidity()) return el.validationMessage || 'Vérifiez le format de ce champ.';
+  return '';
 }
+function _completerChampPret(l) { return !_completerErreurChamp(l); }
 function _completerEtatBouton() {
   var bouton = document.getElementById('completer-envoyer');
   var manquantes = _completerRubriques.filter(function(l){return !_completerChampPret(l);});
   if (bouton) bouton.disabled = _completerEnvoiEnCours || (_completerVerrouillee && !_completerRubriques.length) || manquantes.length>0;
+  _completerRubriques.forEach(function(l){
+    var el=document.getElementById(_completerChampId(l.cle));
+    if(!el)return;
+    var erreur=_completerErreurChamp(l), message=document.getElementById(el.id+'-erreur');
+    var invalide=!!erreur && !!el.value.trim();
+    if(message){message.textContent=invalide?erreur:'';message.hidden=!invalide;}
+    el.setAttribute('aria-invalid',String(invalide));
+    var label=document.getElementById(el.id+'-label');
+    if(label)label.title=_completerLibelleCourt(l);
+  });
   var groupes = _completerGrouper(_completerToutesLignes), incomplets=[], vehicules=0, complets=0;
   groupes.forEach(function(g){
     var restantes=g.lignes.filter(function(l){return _completerEstManquante(l) && !_completerChampPret(l);});
@@ -9813,7 +9825,7 @@ function _completerEtatBouton() {
     if(barre)barre.value=remplis;
   }
   var guide=document.getElementById('completer-guide');
-  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? (incomplets.length ? 'Pour valider la demande, complétez tous les blocs. Il reste : '+incomplets.join(', ')+'. Aucune information ne sera envoyée avant la validation complète.' : 'Terminez ou annulez les modifications en cours dans les informations déjà reçues avant de valider.') : 'Tous les blocs sont complets. Cliquez sur « Valider mes informations » pour transmettre l’ensemble à notre équipe.';
+  if(guide)guide.textContent=!_completerRubriques.length?'':manquantes.length ? (incomplets.length ? 'À compléter ou corriger : '+manquantes.map(function(l){return String(l.libelle || l.cle).replace(/ manquante$/, '');}).join(' ; ')+'. Vérifiez les indications sous les champs.' : 'Terminez ou annulez les modifications en cours dans les informations déjà reçues avant de valider.') : 'Tous les blocs sont complets. Cliquez sur « Valider mes informations » pour transmettre l’ensemble à notre équipe.';
 }
 function _completerConserverSaisies() {
   var brouillon = {};
@@ -9956,6 +9968,11 @@ function _completerRendre(lignes) {
       if(/(^|_)consignes$/.test(l.cle)){var help=document.createElement('p');help.className='completion-help';help.textContent='Ajoutez toute information ou consigne utile au bon déroulement de la prestation. Pour modifier le trajet ou la prestation, contactez HelixCar.';groupe.appendChild(help);}
       champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
       groupe.appendChild(champ);
+      var erreurChamp=document.createElement('p');
+      erreurChamp.id=champ.id+'-erreur';erreurChamp.className='completion-correction';erreurChamp.hidden=true;
+      erreurChamp.setAttribute('aria-live','polite');groupe.appendChild(erreurChamp);
+      champ.setAttribute('aria-describedby',[champ.getAttribute('aria-describedby'),erreurChamp.id].filter(Boolean).join(' '));
+      champ.addEventListener('change',_completerConserverSaisies);
       if(estMotorisation){
         champ.hidden=true;
         var choices=document.createElement('div'); choices.className='completion-choices';
