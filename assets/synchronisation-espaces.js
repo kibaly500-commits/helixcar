@@ -14,6 +14,7 @@
     'admin-infos': ['chargerCentreInformationsAdmin'], 'admin-recontact': ['loadRecontacts'],
     'admin-acquisition': ['loadAcquisition'], 'admin-parametres': ['loadParametresAdmin'],
     'client-dashboard': ['loadDemandesClient', 'loadFideliteCarte', 'loadMissionsResumeClient'],
+    'client-devis': ['hcChargerDevisClient'],
     'client-missions': ['loadMissionsClient'], 'client-infos': ['loadInfosClient'],
     'client-fidelite': ['loadFideliteClient'], 'client-notation': ['loadEvaluationsClient'],
     'client-profil': ['hcSyncProfilClient'],
@@ -54,7 +55,7 @@
   }
   function plan() {
     clearTimeout(timer);
-    if (visible()) timer = setTimeout(function () { request(0); }, role() === 'client' ? 30000 : 15000);
+    if (visible()) timer = setTimeout(function () { request(0); }, 10000);
   }
   window.hcSyncProfilClient = async function () {
     var cycle = context, rows = await chargerDemandesClient();
@@ -134,6 +135,7 @@
         if (typeof majBadgeDemandes === 'function') tasks.push(majBadgeDemandes(true));
         if (typeof majBadgeCandidatures === 'function') tasks.push(majBadgeCandidatures());
       }
+      if (['client','convoyeur'].includes(role()) && typeof window.hcCompteursParcours === 'function') tasks.push(window.hcCompteursParcours());
       if (role() === 'convoyeur' && typeof chargerBadgesIdentite === 'function') tasks.push(chargerBadgesIdentite());
       if (typeof verifierAccesPartenaireEnCours === 'function' && role() === 'convoyeur') tasks.push(verifierAccesPartenaireEnCours());
       await Promise.allSettled(tasks);
@@ -157,7 +159,8 @@
   }
   async function connect() {
     disconnect();
-    if (!visible() || !sbAuth.channel) return;
+    if (!visible()) return;
+    if (!sbAuth.channel) { plan(); request(0); return; }
     var expected = epoch;
     try {
       await sbAuth.realtime.setAuth(session.access_token);

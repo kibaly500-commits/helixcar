@@ -762,7 +762,7 @@ export async function actionReprendreEnvoi(sb:any,req:Request,corps:any,cors:Rec
 // ACTIONS 2-4 — lien secret envoyé OU identité Auth propriétaire.
 // Le lien ne donne accès qu'à sa version du devis, jamais au compte client.
 // ============================================================
-async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
+async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, req?: Request, lectureSeule = false) {
   const jwt = (req?.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   const tokenBrut = corps?.token;
   const parLien = tokenBrut != null;
@@ -803,9 +803,9 @@ async function devisDuClient(sb: any, corps: any, cors: Record<string, string>, 
   if(archive) devis={...devis, snapshot_devis:archive.snapshot_devis,pdf_path:archive.pdf_path,
     version_envoyee:archive.version,date_envoi:archive.envoyee_le,date_expiration_token:archive.date_expiration};
 
-  if (!devis.date_expiration_token || !Number.isFinite(Date.parse(devis.date_expiration_token)) ||
-      Date.parse(devis.date_expiration_token) <= Date.now()) return invalide();
-  if (devis.annule_le || devis.expire_le || ["annule", "expire"].includes(devis.statut)) {
+  if (!(lectureSeule && uid && !parLien) && (!devis.date_expiration_token || !Number.isFinite(Date.parse(devis.date_expiration_token)) ||
+      Date.parse(devis.date_expiration_token) <= Date.now())) return invalide();
+  if (!lectureSeule && (devis.annule_le || devis.expire_le || ["annule", "expire"].includes(devis.statut))) {
     return { refus: erreur("ACTION_IMPOSSIBLE", "Ce devis est annulé ou expiré.", 409, cors) };
   }
   return { devis, uid };
@@ -833,9 +833,11 @@ export async function actionAdminPdf(sb: any, req: Request, corps: any, cors: Re
 }
 
 export async function actionGet(sb: any, corps: any, cors: Record<string, string>, req?: Request) {
-  const autorisation = await devisDuClient(sb, corps, cors, req);
+  const autorisation = await devisDuClient(sb, corps, cors, req, true);
   if ("refus" in autorisation) return autorisation.refus;
   const { devis } = autorisation;
+  const echeance = await sb.rpc('etat_echeance_devis', {p_devis:devis.id});
+  if(echeance.error) return erreur('INTERNAL_ERROR','Impossible de vérifier la date de prestation.',503,cors);
   // Un lien préparé mais jamais envoyé n'existe pas pour le client.
   if (devis.statut === "genere" && !devis.version_envoyee) {
     return erreur("INVALID_OR_EXPIRED_LINK", "Lien invalide ou expiré.", 404, cors);
@@ -862,7 +864,8 @@ export async function actionGet(sb: any, corps: any, cors: Record<string, string
     devis: {
       reference: devis.reference, prix: prixEnvoye, statut: devis.statut,
       snapshot: devis.snapshot_devis, date_envoi: devis.date_envoi,
-      date_acceptation: devis.date_acceptation, date_refus: devis.date_refus,
+      date_acceptation: devis.date_acceptation, date_refus: devis.date_refus, motif_refus: devis.motif_refus || null,
+      prestation_depassee: echeance.data === true, lecture_seule: !!(devis.annule_le || devis.expire_le || ['annule','expire'].includes(devis.statut) || !Number.isFinite(Date.parse(devis.date_expiration_token)) || Date.parse(devis.date_expiration_token)<=Date.now()),
       pdf_disponible: !!pdfUrl, pdf_url: pdfUrl,
       version: version, version_envoyee: devis.version_envoyee, version_acceptee: devis.version_acceptee,
       version_obsolete: versionObsolete, paiement_statut: devis.paiement_statut || "aucun",
@@ -881,6 +884,9 @@ async function traiterReponseDevis(sb: any, corps: any, cibleStatut: "accepte" |
   const autorisation = await devisDuClient(sb, corps, cors, req);
   if ("refus" in autorisation) return autorisation.refus;
   const { devis: etat, uid } = autorisation;
+  const echeance = await sb.rpc('etat_echeance_devis', {p_devis:etat.id});
+  if(echeance.error) return erreur('INTERNAL_ERROR','Impossible de vérifier la date de prestation.',503,cors);
+  if(echeance.data === true) return erreur('PRESTATION_DEPASSEE','La date prévue est dépassée. Veuillez effectuer une nouvelle demande.',409,cors);
   const maintenant = new Date().toISOString();
   const version = etat.version ?? 1;
   if (etat.version_envoyee != null && etat.version_envoyee !== version) {

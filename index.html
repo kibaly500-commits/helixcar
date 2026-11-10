@@ -7536,7 +7536,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
         <div class="modal-form-group">
           <label>N° de châssis (VIN) <span class="field-optional-hint">(facultatif)</span></label>
           <div style="background:#f5f5f0;border-radius:2px;padding:8px 12px;font-size:.78rem;color:#666;margin-bottom:8px">Visible sur la carte grise, case E.</div>
-          <input type="text" id="client-vin" placeholder="VF1XXXXXXXX000000" style="text-transform:uppercase;letter-spacing:.04em" maxlength="17" autocomplete="off">
+          <input type="text" id="client-vin" placeholder="VF1ABCD1234567890" style="text-transform:uppercase;letter-spacing:.04em" maxlength="17" autocomplete="off">
         </div>
 <div class="modal-form-group"><label for="client-motorisation">Motorisation</label><select id="client-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
         </div><!-- /bloc-vehicule-unique -->
@@ -7657,7 +7657,7 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
             <div>
               <label style="display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:4px">N° de châssis (VIN) — véhicule restitution</label>
               <div style="background:#f5f5f0;border-radius:2px;padding:6px 10px;font-size:.75rem;color:#888;margin-bottom:6px">Visible sur la carte grise, case E.</div>
-              <input type="text" id="client-restit-vin" placeholder="VF1XXXXXXXX000000" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
+              <input type="text" id="client-restit-vin" placeholder="VF1ABCD1234567890" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:.04em" maxlength="17">
             </div>
 <div class="modal-form-group"><label for="client-restit-motorisation">Motorisation</label><select id="client-restit-motorisation"><option value="">À préciser</option><option value="Essence">Essence</option><option value="Diesel">Diesel</option><option value="Hybride">Hybride</option><option value="Hybride rechargeable">Hybride rechargeable</option><option value="Électrique">Électrique</option><option value="Autre">Autre</option></select></div>
 
@@ -9970,7 +9970,7 @@ function _completerRendre(lignes) {
       champ.addEventListener('input', _completerConserverSaisies);
       if(l.statut === 'a_corriger'){champ.setAttribute('aria-invalid','true'); if(l.commentaire)champ.setAttribute('aria-describedby',_completerChampId(l.cle)+'-motif');}
       if(/(^|_)consignes$/.test(l.cle)){var help=document.createElement('p');help.className='completion-help';help.textContent='Ajoutez toute information ou consigne utile au bon déroulement de la prestation. Pour modifier le trajet ou la prestation, contactez HelixCar.';groupe.appendChild(help);}
-      champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : 'À renseigner';
+      champ.placeholder = champ.type === 'tel' ? 'Ex. 06 12 34 56 78' : /immatriculation/.test(l.cle) ? 'Ex. AB-123-CD' : /(^|_)vin$/.test(l.cle) ? 'VF1ABCD1234567890' : 'À renseigner';
       groupe.appendChild(champ);
       var erreurChamp=document.createElement('p');
       erreurChamp.id=champ.id+'-erreur';erreurChamp.className='completion-correction';erreurChamp.hidden=true;
@@ -11659,7 +11659,7 @@ function _blocTrajetVehicule(i, prefixe, titre, v) {
   var b = 'veh-' + i + '-' + prefixe;
 
   return '<div class="veh-sep"></div><div class="veh-sstitre">' + titre + '</div>' +
-    (prefixe==='restit'?'<label class="hc-retour-question" for="veh-'+i+'-restit-destination">Où devons-nous ramener ce véhicule ?</label><select id="veh-'+i+'-restit-destination" data-hc-retour-destination="'+i+'" data-precedent="'+_attr(v.restit_destination||'adresse')+'" data-manuelle="'+_attr(JSON.stringify(v._restit_adresse_manuelle||[v.restit_adresse_rue||'',v.restit_code_postal||'',v.restit_ville||'']))+'" onchange="_hcRetourDestination('+i+',true)">'+[['adresse','À une autre adresse'],['depart','À l’adresse de prise en charge du premier véhicule'],['stockage','Chez HelixCar à Noisy-le-Grand, pour venir le récupérer ensuite']].map(function(o){return '<option value="'+o[0]+'"'+((v.restit_destination||'adresse')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select><p id="veh-'+i+'-restit-retour-resume" class="hc-retour-resume" hidden></p><div id="veh-'+i+'-restit-adresse-zone">':'')+
+    (prefixe==='restit'?'<label class="hc-retour-question" for="veh-'+i+'-restit-destination">Où devons-nous restituer ce véhicule ?</label><select id="veh-'+i+'-restit-destination" data-hc-retour-destination="'+i+'" data-precedent="'+_attr(v.restit_destination||'adresse')+'" data-manuelle="'+_attr(JSON.stringify(v._restit_adresse_manuelle||[v.restit_adresse_rue||'',v.restit_code_postal||'',v.restit_ville||'']))+'" onchange="_hcRetourDestination('+i+',true)">'+[['adresse','À une autre adresse'],['depart','À l’adresse de prise en charge du premier véhicule'],['stockage','Chez HelixCar à Noisy-le-Grand, pour venir le récupérer ensuite']].map(function(o){return '<option value="'+o[0]+'"'+((v.restit_destination||'adresse')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select><p id="veh-'+i+'-restit-retour-resume" class="hc-retour-resume" hidden></p><div id="veh-'+i+'-restit-adresse-zone">':'')+
     '<div class="modal-form-group"><label>Adresse' + R + '</label>' +
     '<input type="text" id="' + b + '-rue" value="' + val(0) + '"></div>' +
     '<div class="modal-row">' +
@@ -21066,7 +21066,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label class="hc-identite-type-requis">Type</label><select id="veh-'+i+'-type">'+_optionsTypeVehicule(v.type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle</label><input type="text" id="veh-'+i+'-marque" value="'+_attr(v.marque_modele)+'" placeholder="Ex : Peugeot 3008"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-immat" value="'+_attr(v.immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
+      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-vin" placeholder="VF1ABCD1234567890" value="'+_attr(v.vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>';
     identite+='<div class="modal-form-group"><label>Motorisation</label><select id="veh-'+i+'-motorisation">'+_optionsMotorisation(v.motorisation)+'</select></div>';
     html+=_hcSousVeh(i,'identite',1,'Identité du véhicule',identite,true);
 
@@ -21109,7 +21109,7 @@ function rendreFichesVehicules() {
       '<div class="modal-form-group"><label>Type <span class="field-required">*</span></label><select id="veh-'+i+'-restit-vtype">'+_optionsTypeVehicule(v.restit_type_vehicule)+'</select></div>'+
       '<div class="modal-form-group"><label>Marque / modèle <span class="field-required">*</span></label><input type="text" id="veh-'+i+'-restit-marque" value="'+_attr(v.restit_marque_modele)+'" placeholder="Ex : Renault Clio"></div>'+
       '<div class="modal-row"><div class="modal-form-group"><label>Immatriculation</label><input type="text" id="veh-'+i+'-restit-immat" value="'+_attr(v.restit_immatriculation)+'" placeholder="AB-123-CD" style="text-transform:uppercase"></div>'+
-      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
+      '<div class="modal-form-group"><label>VIN</label><input type="text" id="veh-'+i+'-restit-vin" placeholder="VF1ABCD1234567890" value="'+_attr(v.restit_vin)+'" maxlength="17" autocomplete="off" style="text-transform:uppercase"></div></div>'+
       '<div class="modal-form-group"><label>Motorisation</label><select id="veh-'+i+'-restit-motorisation">'+_optionsMotorisation(v.restit_motorisation)+'</select></div>'+
       _blocTrajetVehicule(i,'restit','Destination du véhicule récupéré',v)+
       '<div class="modal-form-group"><label>Consignes de restitution <span class="field-optional-hint">(facultatif)</span></label><textarea id="veh-'+i+'-restit-consignes" placeholder="Accès, remise des clés, personne à prévenir…" style="width:100%;padding:10px 12px;font-size:.86rem;min-height:56px;resize:vertical;outline:none">'+_attr(v.restit_contraintes)+'</textarea></div></div></div>';

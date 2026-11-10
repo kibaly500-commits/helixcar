@@ -22,3 +22,12 @@
 .hc-profil-partenaire .sb-metiers{justify-content:center}
 
 .hc-mode-sombre .sidebar .user-name,.hc-mode-sombre #sb-name{color:#f3f5f8!important}
+
+/* Devis : référence, état et action restent dans des colonnes stables. */
+.hc-devis-item{display:grid;grid-template-columns:minmax(150px,1fr) minmax(160px,1fr) auto;gap:12px 20px;padding:20px;border:1px solid #e5e4df;border-radius:12px;margin-top:12px;background:var(--white,#fff)}
+.hc-devis-item small{display:block;margin-top:6px;color:#697179;font-size:.78rem}
+.hc-devis-item .hc-nouveau{margin-left:10px}.hc-devis-statut{justify-self:start;font-size:.85rem;border-radius:20px;padding:6px 10px;background:#f1f3f2;color:#374a42}
+.hc-devis-note{grid-column:1/-1;margin:0;font-size:.85rem;line-height:1.5}
+.hc-partenaire-missions{border-top:1px solid #ddd;padding:14px 0}.hc-partenaire-missions summary{cursor:pointer;font-weight:600}.hc-partenaire-mission{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #eee}.hc-partenaire-mission p{margin:4px 0}
+.hc-demande-summary .detail-val{align-self:start;line-height:1.5}
+@media(max-width:650px){.hc-devis-item{grid-template-columns:1fr;padding:16px}.hc-devis-item .btn{justify-self:start}.hc-partenaire-mission{align-items:flex-start;flex-direction:column}}

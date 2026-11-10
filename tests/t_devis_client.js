@@ -13,7 +13,7 @@ try{
    await page.addInitScript(INIT+`Object.assign(window.__devis,{statut:'accepte',paiement_statut:'${paiement}',date_acceptation:'2026-09-20T20:39:00Z'});`);
    await page.goto(urlFichier('devis.html')+'?id='+ID);
    await page.waitForSelector('.statut-final');
-   assert.equal(await page.locator('.statut-final strong').textContent(),paiement==='paye'?'Devis payé':'Devis accepté');
+   assert.equal(await page.locator('.statut-final strong').textContent(),paiement==='paye'?'Commande confirmée':'Devis accepté');
    assert.equal(await page.locator('#bouton-accepter-devis').count(),0);
    const retour=page.getByRole('link',{name:'Accéder à mon espace client'});
    assert.ok(await retour.isVisible());assert.ok(await retour.evaluate(e=>{const r=e.getBoundingClientRect();return Math.abs(r.x+r.width/2-innerWidth/2)<2;}));assert.equal(await retour.getAttribute('href'),'dashboard.html');
@@ -82,7 +82,7 @@ try{
    await page.goto(urlFichier('devis.html')+'#token='+'t'.repeat(64));
    await page.locator('[data-scenario="'+scenario+'"]').click();
    const calls=await page.evaluate(()=>window.__sim);assert.equal(calls.length,1);assert.equal(calls[0].body.token,'t'.repeat(64));assert.equal(calls[0].body.scenario,scenario);assert.ok(!calls[0].authorization&&!calls[0].body.devis_id);
-   if(scenario==='success'){await page.waitForFunction(()=>document.querySelector('.statut-final strong')?.textContent==='Devis payé');}else{assert.equal(await page.locator('#paiement-recette-resultat').textContent(),'Simulation '+scenario);}
+   if(scenario==='success'){await page.waitForFunction(()=>document.querySelector('.statut-final strong')?.textContent==='Commande confirmée');}else{assert.equal(await page.locator('#paiement-recette-resultat').textContent(),'Simulation '+scenario);}
    await page.close();
  });
 }finally{await browser.close();}console.log(`\n=== ${pass} PASS / ${fail} FAIL ===`);process.exitCode=fail?1:0;})().catch(e=>{console.error(e);process.exitCode=1;});

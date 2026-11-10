@@ -116,6 +116,7 @@ function creerDouble(etat) {
       },
     },
     from: table,
+    async rpc(name) { if(name!=='etat_echeance_devis')throw Error('RPC inattendu : '+name);return {data:!!etat.prestation_depassee,error:etat.erreur_echeance?{message:'Indisponible'}:null}; },
     storage: {
       from(bucket) {
         return {
@@ -385,6 +386,16 @@ async function executerSuite() {
     check('7.2 GET après envoi -> le devis, son PDF signé, sa version', r.statut === 200 && r.json.devis.reference === 'DEV-2026-0062' && r.json.devis.pdf_disponible === true
       && /storage\/v1\/object\/sign\/devis\//.test(r.json.devis.pdf_url) && r.json.devis.version === 1 && r.json.devis.version_obsolete === false, JSON.stringify(r.json));
     const consulte1 = ligneDevis(etat).consulte_le;
+    etat.prestation_depassee=true;
+    const archive=await appeler(d,{action:'get',token});
+    check('Date dépassée : devis consultable en archive',archive.statut===200&&archive.json.devis.prestation_depassee===true);
+    for(const action of ['accept','refuse']){
+      const resultat=await appeler(d,{action,token});
+      check('Date dépassée : '+action+' bloqué',resultat.statut===409&&resultat.json.code==='PRESTATION_DEPASSEE');
+    }
+    etat.erreur_echeance=true;
+    check('Échéance indisponible : aucune décision autorisée',(await appeler(d,{action:'accept',token})).statut===503);
+    etat.erreur_echeance=false;etat.prestation_depassee=false;
     check('7.3 La première consultation est datée (état distinct d\'« envoyé »)', !!consulte1 && ligneDevis(etat).statut === 'envoye');
     await new Promise(res => setTimeout(res, 5));
     await appeler(d, { action: 'get', token });

@@ -19,7 +19,24 @@
   z.innerHTML='<details><summary>Supprimer mon compte</summary><p>Vous perdrez l’accès à votre espace. Les dossiers et documents historiques restent conservés par HelixCar. Une nouvelle inscription avec la même adresse e-mail sera possible, sans récupérer cet ancien espace.</p><form><label>Motif de votre départ<textarea required maxlength="1000" name="motif"></textarea></label><label>Écrivez SUPPRIMER pour confirmer<input required name="confirmation" autocomplete="off" pattern="SUPPRIMER"></label><button type="submit" class="btn btn-primary">Supprimer définitivement mon accès</button><p role="status"></p></form></details>';
   const form=z.querySelector('form');form.onsubmit=async(e)=>{e.preventDefault();if(!form.reportValidity())return;const btn=form.querySelector('button'),msg=form.querySelector('[role=status]');btn.disabled=true;try{const r=await sbAuth.functions.invoke('supprimer-compte',{body:{motif:form.elements.motif.value,confirmation:form.elements.confirmation.value}});if(r.error||!r.data?.ok)throw Error(r.data?.error||'Suppression non confirmée. Réessayez.');await sbAuth.auth.signOut();location.href='index.html';}catch(e){msg.textContent=e.message;btn.disabled=false;}};
  }
- async function devis(){const z=zone('client-devis');z.textContent='Chargement…';const rows=await chargerDevisClient();if(currentRole!=='client')return;z.innerHTML='<label for="hc-filtre-devis">Afficher</label><select id="hc-filtre-devis"><option value="attente">En attente de réponse</option><option value="accepte">Devis acceptés</option><option value="refuse">Devis refusés</option><option value="tous">Tous les devis</option></select><div data-devis></div>';const render=()=>{const f=z.querySelector('select').value;const selection=rows.filter(d=>f==='tous'||f==='attente'&&['envoye','consulte'].includes(d.statut)||d.statut===f);z.querySelector('[data-devis]').innerHTML=selection.map(d=>'<article class="hc-devis-item"><strong>'+esc(d.reference)+'</strong><span>'+esc(_etatDevisClient(d)?.texte||d.statut)+'</span><a class="btn btn-outline" href="devis.html?id='+encodeURIComponent(d.id)+'">Consulter le devis</a></article>').join('')||'<p>Aucun devis dans cette rubrique.</p>';};z.querySelector('select').onchange=render;render();afficherCompteurMenu('client-devis',rows.filter(d=>['envoye','consulte'].includes(d.statut)).length,'devis en attente de réponse');}
+ async function devis(){
+  const cycle=window.HCSync&&window.HCSync.capture(),z=zone('client-devis');
+  const ancien=z.querySelector('select')?.value||'tous';
+  if(!cycle)z.textContent='Chargement…';
+  const rows=await chargerDevisClient();
+  if(currentRole!=='client'||cycle&&!window.HCSync.safe(cycle))return;
+  z.innerHTML='<label for="hc-filtre-devis">Afficher</label><select id="hc-filtre-devis"><option value="tous">Tous les devis</option><option value="attente">En attente de réponse</option><option value="accepte">Devis acceptés</option><option value="refuse">Devis refusés</option><option value="archives">Date dépassée</option></select><div data-devis></div>';
+  z.querySelector('select').value=ancien;
+  const render=()=>{
+   const f=z.querySelector('select').value;
+   const selection=rows.filter(d=>f==='tous'||f==='archives'&&d.prestation_depassee||f==='attente'&&!d.prestation_depassee&&['envoye','consulte'].includes(d.statut)||d.statut===f);
+   z.querySelector('[data-devis]').innerHTML=selection.map(d=>'<article class="hc-devis-item"><div><strong>'+esc(d.reference)+'</strong>'+(!d.prestation_depassee&&d.statut==='envoye'&&!d.consulte_le?'<span class="hc-nouveau">Nouveau</span>':'')+'<small>'+esc(d.date_envoi?_dvDateHeure(d.date_envoi):'')+'</small></div><span class="hc-devis-statut">'+esc(d.prestation_depassee?'Date dépassée':_etatDevisClient(d)?.texte||d.statut)+'</span><a class="btn btn-outline" href="devis.html?id='+encodeURIComponent(d.id)+'">Consulter le devis</a>'+(d.motif_refus?'<p class="hc-devis-note"><strong>Motif du refus :</strong> '+esc(d.motif_refus)+'</p>':'')+(d.prestation_depassee?'<p class="hc-devis-note">La date prévue est dépassée. Merci d’effectuer une nouvelle demande.</p>':'')+'</article>').join('')||'<p>Aucun devis dans cette rubrique.</p>';
+  };
+  z.querySelector('select').onchange=render;render();
+  afficherCompteurMenu('client-devis',rows.filter(d=>!d.prestation_depassee&&['envoye','consulte'].includes(d.statut)).length,'devis en attente de réponse');
+ }
+ window.hcChargerDevisClient=devis;
+
  function contenuChallenge(d,admin){
   const dateFr=s=>new Date(s+'T12:00:00').toLocaleDateString('fr-FR');
   const lignes=admin?d.classement:d.classement.filter(c=>c.moi);
@@ -100,9 +117,9 @@
   const role=currentRole;
   if(role==='client'){
    const ds=await chargerDevisClient();if(currentRole!==role)return;
-   afficherCompteurMenu('client-devis',ds.filter(d=>['envoye','consulte'].includes(d.statut)).length,'devis à consulter');
+   afficherCompteurMenu('client-devis',ds.filter(d=>!d.prestation_depassee&&['envoye','consulte'].includes(d.statut)).length,'devis à consulter');
    const demandes=await chargerDemandesClient();let n=0;
-   for(const d of demandes){if(ds.find(v=>v.client_id===d.id)?.statut==='refuse')continue;const lignes=await chargerInformationsDemande(d.id);n+=lignes.filter(_estRestante).length;}
+   for(const d of demandes){if(d.prestation_depassee||ds.find(v=>v.client_id===d.id)?.statut==='refuse')continue;const lignes=await chargerInformationsDemande(d.id);n+=lignes.filter(_estRestante).length;}
    if(currentRole===role)afficherCompteurMenu('client-infos',n,'informations à compléter');
    const missions=await chargerMissionsClient();if(currentRole===role)afficherCompteurMenu('client-missions',missions.filter(m=>!['terminee','annulee','fini'].includes(m.statut)).length,'missions à suivre');
    const r=await sbAuth.from('fidelite_recompenses').select('id').in('statut',['a_preparer','prete']);if(!r.error&&currentRole===role)afficherCompteurMenu('client-fidelite',r.data.length,'récompenses débloquées');
@@ -111,6 +128,7 @@
    const f=await sbAuth.from('factures_convoyeur').select('id').in('statut',['en_attente','validee']);if(!f.error&&currentRole===role)afficherCompteurMenu('convoyeur-facturation',f.data.length,'factures en attente');
   }
  }
+ window.hcCompteursParcours=compteurs;
  async function ouvrir(id){portraitMenu();const n=++generation;try{if(id==='convoyeur-dashboard')await resumeChallenge(n);if(id==='convoyeur-profil')await portrait();if(id==='client-devis')await devis();if(['convoyeur-challenge','admin-challenge'].includes(id))await challenge(id);if(['client-parametres','convoyeur-parametres'].includes(id))await parametres(id);if(currentRole==='admin'){document.documentElement.classList.remove('hc-mode-sombre');return;}await session();if(n!==generation)return;theme();marquerNouveaux();compteurs().catch(()=>{});}catch{const z=el('page-'+id)?.querySelector('[data-parcours-contenu]');if(z&&n===generation)z.textContent='Chargement impossible. Réouvrez cette rubrique pour réessayer.';}}
  function marquerNouveaux(){if(!uid||currentRole!=='client')return;document.querySelectorAll('#client-demandes-liste [data-demande]').forEach(card=>{if(card.parentElement.firstElementChild!==card||card.dataset.etatDemande==='cloture')return;const key=card.dataset.demande+':'+card.dataset.etatDemande;if(prefs.nouveautes_lues[key]||card.querySelector('.hc-nouveau'))return;const badge=document.createElement('span');badge.className='hc-nouveau';badge.textContent='Nouveau';card.querySelector('.hc-demande-summary')?.append(badge);const details=card.querySelector('.hc-demande-details');details?.addEventListener('toggle',async()=>{if(!details.open)return;prefs.nouveautes_lues[key]=true;try{await sauver();badge.remove();}catch{delete prefs.nouveautes_lues[key];}},{once:true});});}
  new MutationObserver(()=>marquerNouveaux()).observe(el('client-demandes-liste'),{childList:true});

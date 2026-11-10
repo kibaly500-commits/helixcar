@@ -18,7 +18,7 @@ function past(r){
  const now=parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
  return (value.length===10?value+'T23:59':value)<now;
 }
-const isArchived=r=>(records.get(r.id)?.cles_reponse!=null)||!!records.get(r.id)?.cles_effectuees_le||C.archiveApres48h(minute(eventTime(r)));
+const isArchived=r=>(records.get(r.id)?.cles_reponse!=null)||!!records.get(r.id)?.cles_effectuees_le||past(r);
 function archiveKeys(r){
  const s=records.get(r.id)||{},answer=s.cles_reponse??(s.cles_effectuees_le?true:null);
  const incoming=['avant_stockage','retour_reception'].includes(r.plan.kind);
@@ -125,7 +125,7 @@ function render(){
  const archived=document.getElementById('hc-planning-state').value==='archives';
  const list=rows.filter(r=>isArchived(r)===archived&&(!day||eventTime(r).slice(0,10)===day)&&(!kind||r.plan.kind===kind||(kind==='avant_stockage'&&r.plan.kind==='retour_reception')||(kind==='apres_stockage'&&r.plan.kind==='retour_remise')));
  list.sort((a,b)=>(archived?-1:1)*String(eventTime(a)).localeCompare(String(eventTime(b))));
- if(!list.length){setContent(archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les rendez-vous clôturés ou passés depuis 48 h sont disponibles dans Archives.</div>');return;}
+ if(!list.length){setContent(archived?'<div class="card">Aucun rendez-vous archivé pour cette sélection.</div>':'<div class="card">Aucun rendez-vous à venir pour cette sélection. Les rendez-vous clôturés ou dont la date est dépassée sont disponibles dans Archives.</div>');return;}
  setContent(list.map(r=>{
   if(r.returnEvent)return returnCard(r);
   const p=r.plan,s=records.get(r.id),inbound=p.kind==='avant_stockage',time=schedule(p);

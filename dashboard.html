@@ -1062,7 +1062,7 @@ body.scroll-verrouille { overflow: hidden; }
 .hc-demande-card>.btn{width:auto;max-width:100%;min-height:40px;padding:9px 16px;justify-content:center;white-space:normal}
 .hc-demande-date{font-size:.78rem;color:#626973;font-weight:400}
 .hc-demande-meta{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;font-size:.8rem;border-top:1px solid #e1e4e8;padding-top:12px}
-.hc-demande-meta>span:nth-child(even){justify-self:end;text-align:right}
+.hc-demande-meta>span:nth-child(even){justify-self:start;text-align:left}
 .hc-info-neutre{background:#f1f2f4!important;color:#555e68!important}
 @media(max-width:1100px){.hc-demandes-grille{grid-template-columns:1fr}}
 .hc-demande-card{padding:20px;margin:0 0 20px;border:1px solid #d4d8dc;border-radius:10px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.035)}
@@ -1608,7 +1608,7 @@ body.scroll-verrouille { overflow: hidden; }
       <div class="page" id="page-admin-planning">
         <div id="hc-retards-planning" aria-live="polite"></div>
         <div class="card"><h2>Réceptions et remises de clés</h2><p>Point HelixCar · 12 rue de l’Université, 93160 Noisy-le-Grand</p><p>Uniquement les véhicules à réceptionner ou à remettre par vous au point HelixCar. Vous fixez les horaires après votre vérification du trafic. Repère : 45 minutes de battement. Confirmez la réception ou la remise des clés au moment où elle a lieu.</p></div>
-        <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Afficher<select id="hc-planning-state"><option value="actifs">À venir / À régulariser</option><option value="archives">Archives</option></select></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
+        <div class="hc-planning-toolbar"><label>Date<input type="date" id="hc-planning-day"></label><label>Afficher<select id="hc-planning-state"><option value="actifs">À venir</option><option value="archives">Archives</option></select></label><label>Rendez-vous<select id="hc-planning-kind"><option value="">Tous</option value="avant_stockage">À réceptionner</option><option value="apres_stockage">À remettre</option></select></label><button class="btn btn-outline" type="button" id="hc-planning-refresh">Actualiser le planning</button></div>
         <div id="hc-planning-list" aria-live="polite"></div>
       </div>
       <div class="page" id="page-admin-opportunites">
@@ -1875,8 +1875,8 @@ body.scroll-verrouille { overflow: hidden; }
              écrits en dur. Les missions réelles se lisent dans « Mes
              missions » (v_mes_missions) ; un résumé réel est rendu ici. -->
         <div class="card">
-          <div class="card-header"><div><div class="card-title">Mes missions</div></div>
-            <button class="btn btn-sm btn-primary" onclick="showPage('client-missions')">Voir mes missions →</button></div>
+          <div class="card-header"><div><div class="card-title">Mes prestations</div></div>
+            <button class="btn btn-sm btn-primary" onclick="showPage('client-missions')">Voir mes prestations →</button></div>
           <div id="client-missions-resume"><div class="fid-note">Chargement…</div></div>
         </div>
         <!-- LOT L01 — PROGRAMME DE FIDÉLITÉ : plus aucune valeur écrite en
@@ -1933,7 +1933,7 @@ body.scroll-verrouille { overflow: hidden; }
           <button class="btn btn-primary" onclick="ouvrirNouvelleDemande()">+ Nouvelle demande</button>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">Mes missions</div><div class="card-sub" id="client-missions-sub"></div></div>
+          <div class="card-header"><div class="card-title">Mes prestations</div><div class="card-sub" id="client-missions-sub"></div></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Référence</th><th>Prestation</th><th>Lieu</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
@@ -2319,12 +2319,12 @@ const NAVS = {
   ],
   client: [
     { id: 'client-dashboard', icon: '📊', label: 'Tableau de bord' },
-    { id: 'client-missions',  icon: '🚗', label: 'Mes missions', badgeDynamique:true },
+    { id: 'client-missions',  icon: '🚗', label: 'Mes prestations', badgeDynamique:true },
+    {id:'client-devis',icon:'📄',label:'Mes devis',badgeDynamique:true},
     { id: 'client-infos',     icon: '📝', label: 'Informations à compléter', badgeDynamique:true },
     { id: 'client-notation',  icon: '⭐', label: 'Évaluer', badgeDynamique: true },
     { id: 'client-fidelite',  icon: '🎁', label: 'Fidélité', badgeDynamique:true },
     { id: 'client-profil',    icon: '👤', label: 'Mon profil' },
-    {id:'client-devis',icon:'📄',label:'Mes devis',badgeDynamique:true},
     {id:'client-parametres',icon:'⚙️',label:'Paramètres'},
   ],
 };
@@ -2973,7 +2973,7 @@ async function rendreInfosDemandeAdmin(c) {
     + '<div class="detail-row"><span class="detail-label">Devis associé</span><span class="detail-val">'
     + escapeHtml(devis && devis.reference ? devis.reference : 'Aucun') + '</span></div>'
     + (devis && devis.motif_refus ? '<p><strong>Motif du refus du devis :</strong> '+escapeHtml(devis.motif_refus)+'</p>' : '')
-    + (restantes.some(l=>l.statut==='transmise') ? '<button class="btn btn-primary" '+actionHtml('validerToutesReponses',[c.id])+'>Valider toutes les réponses reçues</button>' : '')
+    + (restantes.some(l=>l.statut==='transmise') ? '<button class="btn btn-primary" '+actionHtml('validerToutesReponses',[c.id])+'>Valider toutes les réponses</button>' : '')
     + '<div style="font-weight:700;font-size:.75rem;margin:12px 0 4px;color:#444">Encore manquantes ou à traiter</div>'
     + (restantes.length ? restantes.map(ligneHtml).join('')
         : '<div style="font-size:.85rem;color:#666">Aucune : tout a été reçu et traité.</div>')
@@ -3102,7 +3102,7 @@ window.addEventListener('message', function (ev) {
 // client ne quitte plus le Dashboard pour la vitrine.
 async function ouvrirCompletionDemande(id) {
   if(currentRole==='client'){
-    try{const ds=await chargerDevisClient();if(ds.find(d=>String(d.client_id)===String(id))?.statut==='refuse'){alert('Ce devis est refusé. Les informations ne sont plus modifiables.');return;}}catch{alert('Impossible de vérifier le devis. Réessayez.');return;}
+    try{const demandes=await chargerDemandesClient();if(demandes.find(d=>String(d.id)===String(id))?.prestation_depassee){alert('La date prévue est dépassée. Merci d’effectuer une nouvelle demande.');return;}const ds=await chargerDevisClient();if(ds.find(d=>String(d.client_id)===String(id))?.statut==='refuse'){alert('Ce devis est refusé. Les informations ne sont plus modifiables.');return;}}catch{alert('Impossible de vérifier le devis. Réessayez.');return;}
   }
   const cadre = document.getElementById('client-demande-cadre');
   if (!cadre) { window.location.href = 'index.html?completer=' + encodeURIComponent(id); return; }
@@ -3180,11 +3180,11 @@ function _etatDevisClient(dv) {
   if (!dv) return null;
   if (dv.statut === 'refuse') return { texte: 'Devis refusé', cls: 'badge-refused' };
   if (dv.statut === 'accepte') {
-    if (dv.paiement_statut === 'paye') return { texte: 'Devis payé', cls: 'badge-done' };
+    if (dv.paiement_statut === 'paye') return { texte: 'Commande confirmée', cls: 'badge-done' };
     return { texte: 'Devis accepté — paiement en attente', cls: 'badge-progress' };
   }
   if (dv.statut === 'envoye') {
-    return { texte: dv.consulte_le ? 'Devis consulté' : 'Devis envoyé — à consulter', cls: 'badge-pending' };
+    return { texte: dv.consulte_le ? 'Devis consulté' : 'Devis reçu — à consulter', cls: 'badge-pending' };
   }
   return null;
 }
@@ -3198,7 +3198,8 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
   const etat = (texte, couleur, message, action, groupe) => ({texte, couleur, message, action:action || null, groupe:groupe || 'cloture'});
   if (['annule','annulee'].includes(d.statut)) return etat('Demande annulée','neutre','Cette demande est clôturée.');
   if (['termine','terminee'].includes(d.statut)) return etat('Prestation terminée','vert','Retrouvez vos documents dans le détail de la demande.');
-  if (!erreurDevis && dv && dv.statut === 'refuse') return etat('Devis refusé','neutre','Ce devis est clôturé.');
+  if (d.prestation_depassee) return etat('Date dépassée','neutre','La date prévue pour cette prestation est dépassée. Merci d’effectuer une nouvelle demande.'+(!erreurDevis && dv?.motif_refus ? ' Motif du refus : '+dv.motif_refus : ''));
+  if (!erreurDevis && dv && dv.statut === 'refuse') return etat('Devis refusé','neutre',dv.motif_refus ? 'Motif : '+dv.motif_refus : 'Ce devis est clôturé.');
   const paye = dv && dv.paiement_statut === 'paye';
   // Le paiement confirmé classe le dossier en préparation ; la complétude
   // reste signalée séparément et conserve les contrôles de lancement.
@@ -3211,7 +3212,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
         ? 'Votre paiement est reçu. Nous préparons votre prestation.'
         : lignes.some(l=>l.statut==='transmise')
           ? 'Votre paiement est reçu. Vos informations ont été transmises et sont en cours de vérification.'
-          : enCours ? 'Retrouvez le suivi dans « Mes missions ».' : 'Nous vous informerons dès que l’organisation sera confirmée.';
+          : enCours ? 'Retrouvez le suivi dans « Mes prestations ».' : 'Nous vous informerons dès que l’organisation sera confirmée.';
     return etat(enCours ? 'Prestation en cours' : 'Prestation en préparation','vert',message,
       restantes ? 'completer' : null,enCours ? 'en-cours' : 'preparation');
   }
@@ -3231,7 +3232,7 @@ function _presentationDemandeClient(d, dv, lignes, erreurInfos, erreurDevis) {
 function _badgesSuiviDemandeClient(dv, lignes, erreurInfos, erreurDevis) {
   const badges = [];
   if (erreurDevis) badges.push({type:'devis',texte:'Devis : suivi indisponible',couleur:'neutre'});
-  else if (dv && dv.paiement_statut === 'paye') badges.push({type:'devis',texte:'Paiement effectué',couleur:'vert'});
+  else if (dv && dv.paiement_statut === 'paye') badges.push({type:'devis',texte:'Commande confirmée',couleur:'vert'});
   else if (dv && dv.statut === 'accepte') badges.push({type:'devis',texte:'Paiement en attente',couleur:'violet'});
   else if (dv && dv.statut === 'envoye') badges.push({type:'devis',texte:'Devis à consulter',couleur:'violet'});
   else if (dv && dv.statut === 'refuse') badges.push({type:'devis',texte:'Devis refusé',couleur:'neutre'});
@@ -3283,10 +3284,10 @@ erreurInfos=true;}
 
   if(generation!==_demandesClientGeneration)return;
   const groupes=[
-    {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
     {cle:'devis',titre:'Vos devis',description:'Retrouvez le détail de nos propositions.'},
+    {cle:'preparation',titre:'Prestations en préparation',description:'Notre équipe organise les prochaines étapes de votre prestation.'},
     {cle:'demandes',etats:['devis-preparation','informations','verification'],titre:'Demandes en cours',description:'Retrouvez le suivi de vos demandes et les éventuelles informations à compléter.'},
-    {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes missions ».'},
+    {cle:'en-cours',titre:'Prestations en cours',description:'Retrouvez leur déroulement dans « Mes prestations ».'},
     {cle:'cloture',titre:'Demandes clôturées',description:'Retrouvez les détails et documents de ces demandes.'},
     {cle:'indisponible',titre:'Suivi momentanément indisponible',description:'Actualisez la page pour retrouver le suivi de ces demandes.'}
   ];
@@ -3740,7 +3741,7 @@ function _oppCarteHtml(o, options) {
       html += '<div style="margin-top:12px"><span class="badge badge-progress" data-ma-candidature="' + escapeHtml(o.ma_candidature_etat) + '">'
         + 'Votre candidature : ' + escapeHtml(_libEtatCandidaturePartenaire(o.ma_candidature_etat, window._currentConvoyeur)) + '</span>'
         + (o.ma_candidature_le ? ' <span style="font-size:.78rem;color:#888">envoyée le ' + escapeHtml(_dvDate(o.ma_candidature_le)) + '</span>' : '')
-        + '</div>';
+        + (o.ma_candidature_motif ? '<p>'+escapeHtml(o.ma_candidature_motif)+'</p>' : '') + '</div>';
     } else if (o.statut === 'a_pourvoir') {
       html += '<button class="btn btn-primary" style="margin-top:12px" id="opp-postuler-' + escapeHtml(o.id) + '" '
         + actionHtml('postulerOpportunite', [o.id]) + '>Postuler</button>';
@@ -3822,7 +3823,7 @@ async function ouvrirOpportuniteMission(missionId) {
 async function _oppChargerDetail(id) {
   const r = await Promise.all([
     sbAuth.from('v_opportunites_admin').select('*').eq('id', id).limit(1),
-    sbAuth.from('opportunite_candidatures').select('id, convoyeur_id, etat, created_at, decidee_le').eq('opportunite_id', id).order('created_at', { ascending: true }),
+    sbAuth.from('opportunite_candidatures').select('id, convoyeur_id, etat, created_at, decidee_le, motif_decision').eq('opportunite_id', id).order('created_at', { ascending: true }),
     sbFetchToutePage('convoyeurs?select=*')
   ]);
   if (r[0].error) throw new Error(r[0].error.message);
@@ -3895,7 +3896,7 @@ function _oppCandidaturesHtml(detail) {
         + ' <span class="badge badge-pending">' + escapeHtml(etatPersonnel) + '</span>'
         + ' <span style="font-size:.75rem;color:#888">' + escapeHtml((normaliserActivites(cv.activites) || []).map(_oppLibCategorie).join(', ')) + '</span>'
         + ' <button type="button" class="btn btn-sm btn-outline" style="margin-left:6px" ' + actionHtml('ouvrirProfilCandidature', [c.convoyeur_id]) + '>Profil</button>'
-        + boutons + '</div>';
+        + boutons + (c.motif_decision?'<p class="hc-devis-note">'+escapeHtml(c.motif_decision)+'</p>':'') + '</div>';
     });
     html += '</span></div>';
   });
@@ -4510,7 +4511,7 @@ async function loadInfosClient() {
   try {
     demandes = await chargerDemandesClient();
     const devisInfos=await chargerDevisClient();
-    demandes=demandes.filter(d=>devisInfos.find(v=>v.client_id===d.id)?.statut!=='refuse');
+    demandes=demandes.filter(d=>!d.prestation_depassee && devisInfos.find(v=>v.client_id===d.id)?.statut!=='refuse');
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
   } catch (e) {
@@ -4975,7 +4976,7 @@ function initApp(user) {
   // Show mobile bottom nav
   const mbn = document.getElementById('mobile-bottom-nav');
   if (mbn) mbn.style.display = 'flex';
-  document.getElementById('mbn-missions').innerHTML = '<span class="mbn-icon">🚗</span>' + (user.role === 'convoyeur' ? 'Mes missions' : 'Missions');
+  document.getElementById('mbn-missions').innerHTML = '<span class="mbn-icon">🚗</span>' + (user.role === 'convoyeur' ? 'Mes missions' : 'Mes prestations');
   document.getElementById('mbn-history').innerHTML = '<span class="mbn-icon">📁</span>' + (user.role === 'convoyeur' ? 'Opportunités' : 'Historique');
 
   document.getElementById('sb-avatar').textContent = user.initials;
@@ -5116,7 +5117,7 @@ const PAGE_TITLES = {
   'convoyeur-profil':     ['Mon profil', 'Vos informations'],
   'client-dashboard':    ['Tableau de bord', 'Bienvenue'],
   'client-nouvelle-demande': ['Nouvelle demande', 'Convoyage, stockage, nettoyage ou recherche d\'un professionnel'],
-  'client-missions':     ['Mes missions', 'Historique et suivi'],
+  'client-missions':     ['Mes prestations', 'Historique et suivi'],
   'client-infos':        ['Informations à compléter', 'Ce qu\'il nous manque pour organiser vos prestations'],
   'client-notation':     ['Évaluer mes missions', 'Vos missions terminées à évaluer, et vos évaluations envoyées'],
   'admin-recompenses': ['Récompenses', 'Préparation et envoi des box surprises'],
@@ -7449,7 +7450,7 @@ function openDossierSb(id) {
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🎥 Vidéo de présentation</span><span class="detail-val">${_celluleVideoCandidature(c)}</span></div>
     <div id="hc-portrait-admin"></div>
-    <div style="margin-top:12px"><strong>Missions effectuées</strong><div id="dossier-missions-liste">Chargement…</div></div>
+    <div style="margin-top:12px"><strong>Voir les missions</strong><div id="dossier-missions-liste">Chargement…</div></div>
   `;
   // Décisions par activité + état de blocage RÉELLEMENT enregistré.
   preparerFichePartenaire(c);
@@ -8079,24 +8080,19 @@ async function ouvrirProfilCandidature(id) {
     openDossierSb(id);
   } catch (e) { alert('Impossible de charger ce profil. Réessayez.'); }
 }
-function chargerMissionsEffectueesPartenaire(id) {
+async function chargerMissionsEffectueesPartenaire(id) {
   const cible = document.getElementById('dossier-missions-liste');
-  return sbFetchToutePage('missions?convoyeur_id=eq.' + encodeURIComponent(id) + '&statut=eq.terminee&order=date_prise_en_charge.desc&select=reference_courte,reference,ville_depart,ville_arrivee,date_prise_en_charge,statut')
-    .then(function(rows) {
-      const el = document.getElementById('dossier-missions-liste');
-      if (!el || el !== cible) return;
-      if (!rows || rows.length === 0) { el.textContent = 'Aucune mission effectuée pour le moment.'; return; }
-      el.innerHTML = rows.map(function(m) {
-        const dateStr = m.date_prise_en_charge ? new Date(m.date_prise_en_charge).toLocaleDateString('fr-FR') : '—';
-        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">'
-          + '<span>' + escapeHtml(referenceMission(m)) + ' · ' + escapeHtml(m.ville_depart || '') + ' → ' + escapeHtml(m.ville_arrivee || '') + ' · ' + dateStr + '</span>'
-          + '<span style="color:#888">' + escapeHtml(m.statut) + '</span></div>';
-      }).join('');
-    })
-    .catch(function() {
-      const el = document.getElementById('dossier-missions-liste');
-      if (el && el === cible) el.textContent = 'Erreur de chargement des missions.';
-    });
+  if(!cible)return;
+  try {
+    const {data:rows,error}=await sbAuth.rpc('missions_partenaire_admin',{p_partenaire:id});
+    if(error)throw error;
+    if(document.getElementById('dossier-missions-liste')!==cible)return;
+    const groupes=[['À venir',m=>!['annule','annulee'].includes(m.statut)&&_phaseMissionClient(m)==='En préparation'],['En cours',m=>_phaseMissionClient(m)==='En cours'],['Effectuées',m=>_phaseMissionClient(m)==='Terminée']];
+    cible.innerHTML=groupes.map(([titre,filtre])=>{
+      const selection=(rows||[]).filter(filtre);
+      return '<details class="hc-partenaire-missions" open><summary>'+titre+' ('+selection.length+')</summary>'+selection.map(m=>'<div class="hc-partenaire-mission"><div><strong>'+escapeHtml(referenceMission(m))+'</strong><p>'+escapeHtml([m.ville_depart,m.ville_arrivee].filter(Boolean).join(' → ')||m.ville_intervention||'Intervention sur place')+'</p><small>'+escapeHtml(_dvDateHeure(m.date_prise_en_charge||m.date_intervention))+'</small></div><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Voir les détails</button></div>').join('')+(!selection.length?'<p>Aucune mission dans cette rubrique.</p>':'')+'</details>';
+    }).join('');
+  } catch(e) { if(document.getElementById('dossier-missions-liste')===cible)cible.textContent='Impossible de charger les missions. Réouvrez le dossier pour réessayer.'; }
 }
 
 function voirConvoyeurSb(id) {
@@ -8131,7 +8127,7 @@ function voirConvoyeurSb(id) {
     <div class="detail-row"><span class="detail-label">Permis de conduire</span><span class="detail-val">${docLink(c.permis_url, 'le permis')}</span></div>
     <div class="detail-row"><span class="detail-label">Pièce d'identité</span><span class="detail-val">${docLink(c.id_url, "la pièce d'identité")}</span></div>
     <div class="detail-row"><span class="detail-label">🏦 RIB de paiement</span><span class="detail-val">${_lienRibAdmin(c)}</span></div>
-    <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Missions effectuées</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
+    <div style="margin-top:12px"><div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px">🚗 Voir les missions</div><div id="dossier-missions-liste" style="font-size:.83rem;color:#888">Chargement…</div></div>
   `;
   // CORRECTION : l'état de blocage était codé en dur à false, si bien que
   // le bouton ne reflétait jamais la réalité. Il est désormais lu sur la

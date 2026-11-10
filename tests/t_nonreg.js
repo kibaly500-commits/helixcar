@@ -391,6 +391,7 @@ const futur = dansNJours;
     'supabase/migrations/20261028134205_statistiques_partenaires_synchronisees.sql',
     'supabase/migrations/20261028135708_numeros_partenaires.sql'
   );
+  PERIMETRE_PR6.push('supabase/migrations/20261110135542_suivi_client_et_conflits_attribution.sql');
   const horsPerimetre = f => PERIMETRE.indexOf(f) === -1 && !PERIMETRE_PR6.includes(f)
     && !f.startsWith('migrations/') && !f.startsWith('tests/')
     && !f.startsWith('supabase/functions/') && !f.startsWith('supabase/templates/');
@@ -398,7 +399,7 @@ const futur = dansNJours;
     !fichiers.some(horsPerimetre), fichiers.filter(horsPerimetre).join(', '));
   L.check('E6c : le périmètre reste une liste, pas un préfixe fourre-tout',
     [...PERIMETRE, ...PERIMETRE_PR6].every(f => f.indexOf('*') === -1 && !f.endsWith('/'))
-      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 77,
+      && PERIMETRE.length <= 28 && PERIMETRE_PR6.length === 78,
     PERIMETRE.length + ' entrées historiques, ' + PERIMETRE_PR6.length + ' entrées PR6');
   // devis.html, les deux documents opérationnels et index.ts sont entrés dans le
   // périmètre (voir PERIMETRE) ; les autres pages annexes restent interdites.

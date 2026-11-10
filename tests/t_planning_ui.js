@@ -2,6 +2,7 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
 (async()=>{const browser=await lancerNavigateur();try{for(const width of [390,1280]){
  const page=await browser.newPage({viewport:{width,height:950}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'test',user:{id:'admin-test'}}}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},rpc:async()=>({data:null})})};});
+ await page.clock.setFixedTime(new Date('2026-11-07T12:00:00Z'));
  await page.goto(urlFichier('dashboard.html'));
  await page.evaluate(()=>{
   document.getElementById('login-screen').style.display='none';document.getElementById('app').classList.add('visible');_hcNavigationRole='admin';
@@ -38,8 +39,8 @@ const assert=require('node:assert/strict'),{lancerNavigateur,urlFichier}=require
  });
  await page.waitForSelector('[data-planning-id="p0"]');
  assert.equal(await page.locator('[data-planning-id]').count(),2);
- // Après 48 h : archive automatique, sans inventer de remise des clés.
- await page.evaluate(()=>{const old=JSON.parse(JSON.stringify(__rows[0]));old.id='past';old.mission_id='past-mission';old.plan.mission.date_livraison='2000-01-01T10:00';__rows.push(old)});
+ // Dès que le créneau est passé : archive automatique, sans inventer de remise des clés.
+ await page.evaluate(()=>{const old=JSON.parse(JSON.stringify(__rows[0]));old.id='past';old.mission_id='past-mission';old.plan.mission.date_livraison='2026-11-07T12:00';__rows.push(old)});
  await page.locator('#hc-planning-refresh').click();assert.equal(await page.locator('[data-planning-id="past"]').count(),0);
  await page.locator('#hc-planning-state').selectOption('archives');
  assert.match(await page.locator('[data-planning-id="past"]').innerText(),/Archivé · Clés non confirmées/);

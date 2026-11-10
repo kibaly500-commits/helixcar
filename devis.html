@@ -440,7 +440,7 @@
   }
 
   function badgeStatut(statut, devis) {
-    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Devis payé</span>';
+    if (statut === 'accepte' && devis && devis.paiement_statut === 'paye') return '<span class="badge accepte">Commande confirmée</span>';
     if (statut === 'accepte' && devis && devis.paiement_statut === 'en_attente') return '<span class="badge accepte">Accepté — paiement en attente</span>';
     if (statut === 'accepte') return '<span class="badge accepte">Accepté</span>';
     if (statut === 'refuse') return '<span class="badge refuse">Refusé</span>';
@@ -743,6 +743,7 @@
   }
 
   function blocActions(devis) {
+    if(devis.prestation_depassee || devis.lecture_seule) return '<div class="statut-final"><div><strong>'+(devis.prestation_depassee?'Date de prestation dépassée':'Devis archivé')+'</strong><p>Ce devis reste consultable. Pour poursuivre, veuillez effectuer une nouvelle demande.</p>'+(devis.motif_refus?'<p>Motif du refus : '+echapperHtml(devis.motif_refus)+'</p>':'')+'</div></div>';
     // LOT Q01 — une version modifiée après envoi ne peut plus être
     // acceptée ni refusée : le client le lit, sans bouton trompeur.
     if (devis.version_obsolete) {
@@ -759,7 +760,7 @@
         '<button class="bouton bouton-simulation" data-scenario="success">Paiement réussi</button><button class="bouton bouton-simulation" data-scenario="requires_action">3D Secure</button>'+
         '<button class="bouton bouton-simulation" data-scenario="refused">Paiement refusé</button><button class="bouton bouton-simulation" data-scenario="abandoned">Paiement abandonné</button></div>'+
         '<div id="paiement-recette-resultat" class="paiement-recette-resultat" role="status" aria-live="polite"></div></section>' : '';
-      return '<div class="statut-final accepte"><div><strong>' + (devis.paiement_statut === 'paye' ? 'Devis payé' : 'Devis accepté') + '</strong>' +
+      return '<div class="statut-final accepte"><div><strong>' + (devis.paiement_statut === 'paye' ? 'Commande confirmée' : 'Devis accepté') + '</strong>' +
         (devis.date_acceptation ? echapperHtml((devis.paiement_statut === 'paye' ? 'Accepté le ' : 'le ') + formaterDate(devis.date_acceptation)) : '') +
         echapperHtml(suite) +
         '</div></div>'+simulation+(stripeQa && devis.paiement_statut !== 'paye' ?
@@ -769,10 +770,9 @@
         '<div id="stripe-resultat" role="status" aria-live="polite">'+(retourStripe?'Confirmation du paiement en cours…':abandonStripe?'Vous avez quitté le paiement. Vous pouvez le reprendre.':'')+'</div></section>' : '');
     }
     if (devis.statut === 'refuse') {
-      // Le motif de refus n'est pas exposé par la réponse GET actuelle
-      // (voir rapport) — non affiché ici pour ne rien inventer.
       return '<div class="statut-final refuse"><div><strong>Devis refusé</strong>' +
         (devis.date_refus ? echapperHtml('le ' + formaterDate(devis.date_refus)) : '') +
+        (devis.motif_refus ? '<p>Motif : '+echapperHtml(devis.motif_refus)+'</p>' : '') +
         '</div></div>';
     }
     return (
