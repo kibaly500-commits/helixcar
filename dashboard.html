@@ -3706,7 +3706,13 @@ function _oppCompteur(o) {
 
 // La carte telle que le partenaire la voit. Même rendu pour l'aperçu de
 // l'administrateur (« Ne pas publier lors de l'ouverture de l'aperçu »).
+const _oppRefusCandidature = new Map();
 function _oppCarteHtml(o, options) {
+  const html = _oppCarteContenuHtml(o, options);
+  const refus = options && options.partenaire && !o.ma_candidature_etat && _oppRefusCandidature.get(o.id);
+  return refus ? '<div class="hc-note visible" role="status">' + escapeHtml(refus) + '</div>' + html : html;
+}
+function _oppCarteContenuHtml(o, options) {
   if (options && options.partenaire && o.ma_candidature_etat === 'preselectionne') o = {...o, ma_candidature_etat:'a_etudier'};
   if (o.preparation_annonce && window.hcPreparationCarteOpportunite) return window.hcPreparationCarteOpportunite(o, options || {});
   options = options || {};
@@ -4059,6 +4065,7 @@ async function postulerOpportunite(id) {
   const prefixe = document.getElementById('page-convoyeur-missions').classList.contains('active') ? 'missions-' : '';
   const msg = document.getElementById(prefixe + 'opp-msg-' + id);
   const bouton = document.getElementById(prefixe + 'opp-postuler-' + id);
+  _oppRefusCandidature.delete(id);
   if (bouton) { bouton.disabled = true; bouton.textContent = 'Envoi…'; }
   try {
     const res = await sbAuth.rpc('postuler_opportunite', { p_opportunite_id: id });
@@ -4078,7 +4085,9 @@ async function postulerOpportunite(id) {
     setTimeout(() => { loadOpportunitesPartenaire(); loadMissionsConvoyeur(); }, 700);
   } catch (e) {
     console.error('postuler_opportunite :', e && e.message);
-    _hcNoteEl(msg, /Créneau indisponible|Horaires de mission|Ajoutez votre photo de profil/.test(e.message)?e.message:'L\'envoi n\'a pas abouti. Vérifiez votre connexion et réessayez.', 'erreur');
+    const refus = /Créneau indisponible|Horaires de mission|Ajoutez votre photo de profil/.test(e.message) ? e.message : "L'envoi n'a pas abouti. Vérifiez votre connexion et réessayez.";
+    _oppRefusCandidature.set(id, refus);
+    _hcNoteEl(document.getElementById(prefixe + 'opp-msg-' + id), refus, 'erreur');
     if (bouton) { bouton.disabled = false; bouton.textContent = 'Postuler'; }
   }
 }
