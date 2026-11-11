@@ -8490,10 +8490,10 @@ function chargerAccueilAdmin() {
  if (_hcSyncCycle) return;
  _ecrireStat('stat-clients', '—'); }));
 
-  _hcSyncTasks.push(_compterLignes('missions?select=id&statut=in.(acceptee,en_cours,proposee,fini)')
-    .then(function (n) {
+  _hcSyncTasks.push(sbFetchToutePage('missions?select=*&statut=in.(acceptee,en_cours,proposee,fini)')
+    .then(function (rows) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
- _ecrireStat('stat-missions', n); })
+ _ecrireStat('stat-missions', (rows || []).filter(m=>!missionArchivee(m)).length); })
     .catch(function () {
  if (_hcSyncCycle) return;
  _ecrireStat('stat-missions', '—'); }));
@@ -8594,13 +8594,13 @@ function chargerMissionsAccueil() {
   var tbody = document.getElementById('missions-accueil');
   if (!tbody) return;
   _hcSyncTasks.push(Promise.all([
-    sbFetch('missions?select=id,reference_courte,reference,ville_depart,ville_arrivee,client_id,convoyeur_id,marque_modele,immatriculation,date_prise_en_charge,prix_ttc,statut&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc&limit=6'),
+    sbFetchToutePage('missions?select=*&statut=in.(proposee,acceptee,en_cours,fini)&order=date_prise_en_charge.asc'),
     sbFetchToutePage('convoyeurs?select=id,prenom,nom'),
     sbFetchToutePage('clients?select=id,prenom,nom')
   ]).then(function (res) {
   if (_hcSyncCycle && !window.HCSync.safe(_hcSyncCycle)) return;
 
-    var missions = res[0] || [];
+    var missions = (res[0] || []).filter(m=>!missionArchivee(m)).slice(0,6);
     var conv = {}, cli = {};
     (res[1] || []).forEach(function (c) { conv[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
     (res[2] || []).forEach(function (c) { cli[c.id] = ((c.prenom || '') + ' ' + (c.nom || '')).trim(); });
@@ -8718,8 +8718,8 @@ function missionArchivee(m, maintenant = new Date()) {
     }
   } else {
     if(!m.date_livraison)return false;
-    // Ne pas archiver pendant un trajet de restitution encore à effectuer.
-    if(m.restitution&&!m.date_restitution_arrivee)return false;
+    // Retenir la dernière échéance renseignée, restitution comprise.
+    // Les anciens dossiers ne renseignent pas toujours une arrivée distincte.
     fins=[m.date_livraison,...(m.restitution?[m.date_restitution_depart,m.date_restitution_arrivee]:[])];
   }
   const fin=fins.filter(Boolean).map(v=>String(v).replace(' ','T')).sort().pop();
