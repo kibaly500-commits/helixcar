@@ -15,6 +15,9 @@ async function ouvrirRubrique(page, cle) {
 
   await L.fillStep1(page, 'particulier');
   await L.chooseService(page, 'professionnel');
+  await L.ouvrirEtapeProfessionnel(page);
+  L.check('A0 : les blocs testés sont réellement visibles à l’étape dédiée',
+    await page.locator('#bloc-socle-professionnel').isVisible());
   await ouvrirRubrique(page, 'besoin');
 
   // ── A. MÉTIERS ──
@@ -28,19 +31,19 @@ async function ouvrirRubrique(page, cle) {
   }));
   const valeurs = metiers.missions.map(m => m.valeur);
   L.check('A1 : « Accueil en concession » remplace l\'ancien libellé',
-    metiers.libelles.accueil_preparation === 'Accueil en concession'
-    && metiers.missions.some(m => m.texte === 'Accueil en concession'), JSON.stringify(metiers.missions));
+    metiers.libelles.accueil_preparation === 'Chargé d’accueil en concession automobile'
+    && metiers.missions.some(m => m.texte === 'Chargé d’accueil en concession automobile'), JSON.stringify(metiers.missions));
   L.check('A2 : plus aucune mention de « Accueil et préparation des véhicules »',
     !JSON.stringify(metiers).includes('Accueil et préparation'));
   L.check('A3 : « Soutien administratif » est proposé',
     valeurs.includes('soutien_administratif')
-    && metiers.libelles.soutien_administratif === 'Soutien administratif', JSON.stringify(valeurs));
+    && metiers.libelles.soutien_administratif === 'Assistant administratif automobile', JSON.stringify(valeurs));
   L.check('A4 : Jockey, Une autre mission et Je souhaite être conseillé sont conservés',
     valeurs.includes('jockey') && valeurs.includes('autre') && valeurs.includes('conseil'), JSON.stringify(valeurs));
   L.check('A5 : l\'exemple de spécialité est « Technicien vitrage automobile »',
     metiers.exemple === 'Ex : Technicien vitrage automobile', metiers.exemple);
   L.check('A6 : la description du renfort cite les nouveaux métiers',
-    /accueil en concession/i.test(metiers.descRenfort) && /soutien administratif/i.test(metiers.descRenfort),
+    metiers.descRenfort.trim() === 'Accueil en concession et autres spécialités',
     metiers.descRenfort);
 
   // ── B. ALIGNEMENT DES CARTES MÉTIER ──
@@ -65,6 +68,8 @@ async function ouvrirRubrique(page, cle) {
       });
     });
     const [a, bb] = pos;
+    L.check('B-' + nom + ' : les mesures ne portent pas sur des blocs masqués',
+      a.hauteurDesc > 0 && bb.hauteurDesc > 0, JSON.stringify(pos));
     L.check('B-' + nom + ' : les boutons radio démarrent au même endroit',
       a.radioX === bb.radioX && a.radioY === bb.radioY, JSON.stringify(pos));
     console.log('   [diag B-' + nom + ']', JSON.stringify(pos));

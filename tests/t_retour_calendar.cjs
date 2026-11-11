@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const C=require('../assets/planning-calcul.js');
+const p={rows:[{label:'Livraison',value:'2026-11-18 · 14:30'}],mission:{date_livraison:'2026-11-18T14:30'},retour_helixcar:{transfert:true}};
+assert.equal(C.retourReceptionMin(p),'2026-11-18T14:31');
+p.retour_reception='2026-09-18T15:30';assert.ok(C.retourErrors(p,false).some(x=>x.includes('suivre la livraison')));
+p.retour_reception='2026-11-18T15:30';assert.deepEqual(C.retourErrors(p,false),[]);
+assert.equal(C.retourReceptionMin({...p,rows:[{label:'Livraison',value:'2026-11-18 · 14:30 - 16:00'}]}),'2026-11-18T16:01');
+assert.equal(C.retourReceptionMin({...p,rows:[{label:'Livraison',value:'2026-11-18 · 23:59'}]}),'2026-11-19T00:00');
+const text=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
+const start=text.indexOf('  function input('),end=text.indexOf('\n  function ',start+5);
+const ctx={HCPlanningCalcul:C,esc:String};vm.createContext(ctx);vm.runInContext(text.slice(start,end),ctx);
+let html=ctx.input(p,0,'retour_reception','Retour','datetime-local');assert.ok(html.includes('min="2026-11-18T14:31"'));
+p.retour_reception='2026-09-18T15:30';html=ctx.input(p,0,'retour_reception','Retour','datetime-local');assert.ok(html.includes('value=""'));assert.ok(html.includes('date précédente'));
+console.log('PASS calendrier retour : borne livraison, même jour autorisé après livraison, date antérieure refusée, créneau et min HTML.');

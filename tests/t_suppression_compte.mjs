@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';import {supprimerCompte} from '../supabase/functions/supprimer-compte/handler.mjs';
+const calls=[];let authError=false,prepareError=false,deleteError=false;
+const sb={auth:{getUser:async()=>authError?{error:true}:{data:{user:{id:'own-id'}}},admin:{deleteUser:async(...args)=>{calls.push(['delete',...args]);return {error:deleteError};}}},rpc:async(n,p)=>{calls.push([n,p]);return {error:prepareError};},from:()=>({update:()=>({eq:async()=>({})})})};
+const request=(body,origin='https://helixcar-i89b-git-codex-helix-b25bf8-kibaly500-commits-projects.vercel.app')=>new Request('https://test.invalid',{method:'POST',headers:{origin,authorization:'Bearer test','content-type':'application/json'},body:JSON.stringify(body)});
+let r=await supprimerCompte(request({confirmation:'SUPPRIMER',motif:'départ'},'https://evil.invalid'),sb);assert.equal(r.status,403);assert.equal(calls.length,0);
+authError=true;r=await supprimerCompte(request({confirmation:'SUPPRIMER',motif:'départ'}),sb);assert.equal(r.status,401);authError=false;
+r=await supprimerCompte(request({confirmation:'NON',motif:'départ'}),sb);assert.equal(r.status,400);
+prepareError=true;r=await supprimerCompte(request({confirmation:'SUPPRIMER',motif:'départ'}),sb);assert.equal(r.status,409);assert.equal(calls.some(c=>c[0]==='delete'),false);
+prepareError=false;deleteError=true;r=await supprimerCompte(request({confirmation:'SUPPRIMER',motif:'départ',user_id:'victim'}),sb);assert.equal(r.status,503);assert.equal(calls.at(-1)[1],'own-id');
+deleteError=false;r=await supprimerCompte(request({confirmation:'SUPPRIMER',motif:'départ',user_id:'victim'}),sb);assert.equal(r.status,200);assert.deepEqual(calls.at(-1),['delete','own-id',true]);
+console.log('PASS suppression : origine, session vérifiée, confirmation, propre UUID, échecs explicites et suppression Auth logique');
