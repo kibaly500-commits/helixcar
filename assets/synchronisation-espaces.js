@@ -5,11 +5,11 @@
   var context = null, epoch = 0, revision = 0, pending = false, currentPage = '';
   var dirty = new Set(), details = new Map(), lastRun = 0;
   var loaders = {
-    'admin-dashboard': ['chargerAccueilAdmin'], 'admin-clients': ['chargerClientsAdmin'],
+    'admin-dashboard': ['chargerAccueilAdmin', 'chargerMissionsUnifiees'], 'admin-clients': ['chargerClientsAdmin'],
     'admin-candidatures': ['loadCandidatures', 'loadConvoyeursActifs'],
     'admin-metiers': ['chargerValidationMetiers'],
     'admin-planning': ['chargerPlanningHelixCar'],
-    'admin-missions': ['loadMissions'], 'admin-autres-missions': ['loadMissions'], 'admin-opportunites': ['loadOpportunitesAdmin'],
+    'admin-operations': ['chargerMissionsUnifiees'], 'admin-missions': ['loadMissions'], 'admin-autres-missions': ['loadMissions'], 'admin-opportunites': ['loadOpportunitesAdmin'],
     'admin-recompenses': ['loadRecompensesAdmin'], 'admin-facturation': ['loadFacturationAdmin'], 'admin-devis': ['loadDemandesDevis'],
     'admin-infos': ['chargerCentreInformationsAdmin'], 'admin-recontact': ['loadRecontacts'],
     'admin-acquisition': ['loadAcquisition'], 'admin-parametres': ['loadParametresAdmin'],

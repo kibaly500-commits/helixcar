@@ -1335,7 +1335,7 @@ body.scroll-verrouille { overflow: hidden; }
         <div class="card">
           <div class="card-header">
             <div><div class="card-title">Missions en cours</div></div>
-            <button class="btn btn-sm btn-dark" onclick="showPage('admin-missions')">Toutes les missions</button>
+            <button class="btn btn-sm btn-dark" onclick="showPage('admin-operations')">Toutes les missions</button>
           </div>
           <div class="table-wrap">
             <table>
@@ -2291,10 +2291,8 @@ let currentRole = 'admin';
 const NAVS = {
   admin: [
     { id: 'admin-dashboard',    icon: '📊', label: 'Tableau de bord' },
-    { id: 'admin-devis',        icon: '📄', label: 'Demandes de devis', badgeDynamique: true },
-    { id: 'admin-missions',     icon: '🚗', label: 'Missions de convoyage', badgeDynamique: true },
-    { id: 'admin-autres-missions', icon: '🛠️', label: 'Autres missions', badgeDynamique: true },
-    { id: 'admin-opportunites', icon: '📣', label: 'Offres de mission', badgeDynamique: true },
+    { id: 'admin-devis',        icon: '📄', label: 'Demandes & devis', badgeDynamique: true },
+    { id: 'admin-operations', icon: '🚗', label: 'Missions', badgeDynamique: true },
     { id: 'admin-planning', icon: '🗓️', label: 'Planning HelixCar', badgeDynamique: true },
     { id: 'admin-infos', icon: '📝', label: 'Informations manquantes', badgeDynamique: true },
     { id: 'admin-candidatures', icon: '📋', label: 'Candidatures', badgeCandidatures: true },
@@ -5109,11 +5107,12 @@ const PAGE_TITLES = {
   'admin-dashboard':     ['Tableau de bord', 'Vue d\'ensemble de HelixCar'],
   'admin-metiers': ['Validation des métiers', 'Chaque badge est validé indépendamment'],
   'admin-candidatures':  ['Candidatures', 'Gérez les candidatures des professionnels'],
+  'admin-operations': ['Missions', 'Préparation, attribution et suivi des prestations'],
   'admin-missions':      ['Missions de convoyage', 'Transport de véhicules et suivi des états des lieux'],
   'admin-autres-missions': ['Autres missions', 'Nettoyage et interventions professionnelles'],
   'admin-clients':       ['Clients', 'Base clients HelixCar'],
   'admin-infos': ['Informations manquantes', 'Suivez les dossiers et vérifiez les informations transmises'],
-  'admin-devis':         ['Demandes de devis', 'Traitez les demandes de convoyage et envoyez vos devis'],
+  'admin-devis':         ['Demandes & devis', 'Devis, paiement et validation du dossier client'],
   'admin-acquisition':   ['Acquisition', 'D\'où viennent vos demandes de convoyage'],
   'admin-recontact':     ['Demandes de recontact', 'Formulaires soumis depuis le site'],
   'admin-facturation':   ['Facturation', 'Validation et paiement des professionnels'],
@@ -5253,7 +5252,8 @@ function showPage(id, options) {
   const t = PAGE_TITLES[id] || ['', ''];
   document.getElementById('topbar-title').textContent = t[0];
   document.getElementById('topbar-sub').textContent = t[1];
-  if (id === 'admin-dashboard') { chargerAccueilAdmin(); }
+  if (id === 'admin-dashboard') { chargerAccueilAdmin(); if(window.chargerMissionsUnifiees)chargerMissionsUnifiees(); }
+  if (id === 'admin-operations') { chargerMissionsUnifiees(); }
   if (id === 'admin-clients') { chargerClientsAdmin(); }
   if (id === 'admin-metiers') { chargerValidationMetiers(); }
   if (id === 'convoyeur-profil') { chargerMesBadges(); }
@@ -8812,7 +8812,7 @@ function ligneIntervention(m, admin, actions, client, partenaire) {
   const lieu = escapeHtml(m.ville_intervention || 'Lieu à préciser');
   const fiche = '<details><summary class="btn btn-sm btn-outline">Voir les détails</summary><div style="padding:12px 0;max-width:520px;white-space:normal;overflow-wrap:anywhere">'+informations+'</div></details>';
   const montant = admin ? m.prix_ttc : remunerationFacturable(m);
-  return '<tr><td>' + details + (admin ? '</td><td>' : '<br>') + lieu + '</td>'
+  return '<tr data-gestion-mission="'+escapeHtml(m.id)+'"><td>' + details + (admin ? '</td><td>' : '<br>') + lieu + '</td>'
     + (admin ? '<td>' + client + '</td><td>' + partenaire + '</td>' : '')
     + '<td>' + escapeHtml(periodeIntervention(m)) + '</td><td>' + escapeHtml(horairesIntervention(m)) + '</td>'
     + '<td><strong>' + (montant != null ? escapeHtml(String(montant)) + ' €' : '—') + '</strong></td>'
@@ -8924,7 +8924,7 @@ function loadMissions() {
         ? ([m.adresse_intervention, [m.code_postal_intervention, m.ville_intervention].filter(Boolean).join(' ')]
              .filter(Boolean).join(', ') || '—')
         : (escapeHtml(m.ville_depart || '—') + ' → ' + escapeHtml(m.ville_arrivee || '—'));
-      return '<tr>'
+      return '<tr data-gestion-mission="'+escapeHtml(m.id)+'">'
         + '<td style="font-family:monospace;font-size:.78rem">' + escapeHtml(referenceMission(m)) + '</td>'
         + '<td>' + badgeType + '</td>'
         + '<td><strong>' + (estSurPlace ? escapeHtml(lieu) : lieu) + '</strong>'
@@ -10854,6 +10854,7 @@ function loadDemandesDevis(silencieux) {
     _mettreAJourFiltreDemandesCompte();
     filtrerDemandesDevis((document.getElementById('recherche-devis')||{}).value);
     _chargerEtatsInformationsDemandes();
+    if(window.chargerMissionsUnifiees)chargerMissionsUnifiees();
 
     // CREATION AUTOMATIQUE des missions de nettoyage pretes. Silencieuse
     // et idempotente : le serveur refuse tout ce qui n'est pas pret, et
@@ -10939,6 +10940,8 @@ function _cleStatutDevis(d) {
   return d.statut||'nouveau';
 }
 function _rendreTableDemandesDevis(liste) {
+  const suivi=document.getElementById('hm-devis-suivi')?.value||'';
+  if(window.HCMissions&&suivi)liste=(liste||[]).filter(c=>suivi==='transmis'?HCMissions.link(c.id):!HCMissions.link(c.id));
   var choixInfos=(document.getElementById('filtre-informations-devis')||{}).value||'';
   liste=(liste||[]).filter(function(c){return _filtreInfosDemande(c,choixInfos);});
   var choixStatut=(document.getElementById('filtre-statut-devis')||{}).value||'';
@@ -10969,7 +10972,7 @@ function _rendreTableDemandesDevis(liste) {
       '<td>' + _escapeHtml(_dv(vehicule)) + '</td>' +
       '<td>' + _dvDate(_dateSouhaiteeListe(c)) + '</td>' +
       '<td>' + _statutDevisBadge(statut, d) + '</td>' +
-      '<td>' + _badgesInfosDemande(c.id) + '</td>' +
+      '<td>' + _badgesInfosDemande(c.id) + (window.HCMissions?HCMissions.badge(c.id):'') + '</td>' +
       '<td><button class="btn btn-sm btn-primary" ' + actionHtml('ouvrirFicheDemande', [c.id]) + '>Ouvrir</button></td>' +
       '</tr>';
   });
@@ -15562,6 +15565,8 @@ function declencherChampFichier(id) {
 <script src="assets/synchronisation-espaces.js"></script>
 <script src="assets/admin-demandes.js"></script>
 <script src="assets/parcours-comptes.js"></script>
+<link rel="stylesheet" href="assets/missions-admin.css">
+<script src="assets/missions-admin.js"></script>
 <link rel="stylesheet" href="assets/parcours-comptes.css">
 </body>
 </html>
