@@ -24,7 +24,7 @@ async function rendu(){
 function cible(){return {badge:null,querySelector(){return this.badge},append(b){this.badge=b;b.remove=()=>this.badge=null}};}
 function carte(id,etat='preparation',lu='false'){
  const summary=cible(),details={open:false,isConnected:true,dataset:{},addEventListener(type,fn){this.listener=fn}};
- return {dataset:{demande:id,etatDemande:etat,devisLu:lu},summary,details,querySelector:s=>s==='.hc-demande-summary'?summary:details};
+ return {isConnected:true,addEventListener(type,fn){this.click=fn},contains:()=>true,dataset:{demande:id,etatDemande:etat,devisLu:lu},summary,details,querySelector:s=>s==='.hc-demande-summary'?summary:details};
 }
 async function badges(){
  const a=carte('a'),b=carte('b'),consulte=carte('c','devis','true'),heading=cible(),vide=cible(),devis=cible();
@@ -34,7 +34,8 @@ async function badges(){
  vm.createContext(c);vm.runInContext(extraire(fs.readFileSync('assets/parcours-comptes.js','utf8'),'marquerNouveaux'),c);
  c.marquerNouveaux();assert.ok(heading.badge);assert.ok(a.summary.badge);assert.ok(b.summary.badge);assert.equal(vide.badge,null);assert.equal(devis.badge,null);
  await a.details.listener();assert.equal(saves,0);assert.ok(heading.badge);
- a.details.open=true;await a.details.listener();assert.equal(a.summary.badge,null);assert.ok(heading.badge);
+ await a.click({target:{closest:()=>({disabled:true})}});assert.equal(saves,0);
+ await a.click({target:{closest:()=>({disabled:false})}});assert.equal(a.summary.badge,null);assert.ok(heading.badge);
  panne=true;b.details.open=true;await b.details.listener();assert.ok(b.summary.badge);assert.ok(heading.badge);
  panne=false;await b.details.listener();assert.equal(heading.badge,null);
  c.marquerNouveaux();assert.equal(heading.badge,null);

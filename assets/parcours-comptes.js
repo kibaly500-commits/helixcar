@@ -152,14 +152,20 @@
     details.dataset.lectureLiee='true';
     const compte=uid;
     let enregistrement=false;
-    details.addEventListener('toggle',async()=>{
-     // Ouvrir la rubrique ne suffit pas : il faut consulter les détails du dossier.
-     if(!details.open||!details.isConnected||uid!==compte||prefs.nouveautes_lues[key]||enregistrement)return;
+    const lire=async()=>{
+     if(!card.isConnected||uid!==compte||prefs.nouveautes_lues[key]||enregistrement)return;
      enregistrement=true;prefs.nouveautes_lues[key]=true;
+     marquerNouveaux();
      try{await sauver();if(uid===compte)marquerNouveaux();}
      catch{if(uid===compte){delete prefs.nouveautes_lues[key];marquerNouveaux();}}
      finally{enregistrement=false;}
-    });
+    };
+    details.addEventListener('toggle',()=>{if(details.open)return lire();});
+    // Les actions de consultation comptent aussi, sans attendre la fin du formulaire.
+    card.addEventListener('click',e=>{
+     const action=e.target.closest('button,a[href]');
+     if(action&&card.contains(action)&&!action.disabled)return lire();
+    },true);
    });
    badgeDans(groupe.querySelector('.hc-demandes-accordeon>summary h3'),nouveau);
   });
