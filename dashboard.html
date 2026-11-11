@@ -8090,7 +8090,7 @@ async function chargerMissionsEffectueesPartenaire(id) {
     const groupes=[['À venir',m=>!['annule','annulee'].includes(m.statut)&&_phaseMissionClient(m)==='En préparation'],['En cours',m=>_phaseMissionClient(m)==='En cours'],['Effectuées',m=>_phaseMissionClient(m)==='Terminée']];
     cible.innerHTML=groupes.map(([titre,filtre])=>{
       const selection=(rows||[]).filter(filtre);
-      return '<details class="hc-partenaire-missions" open><summary>'+titre+' ('+selection.length+')</summary>'+selection.map(m=>'<div class="hc-partenaire-mission"><div><strong>'+escapeHtml(referenceMission(m))+'</strong><p>'+escapeHtml([m.ville_depart,m.ville_arrivee].filter(Boolean).join(' → ')||m.ville_intervention||'Intervention sur place')+'</p><small>'+escapeHtml(_dvDateHeure(m.date_prise_en_charge||m.date_intervention))+'</small></div><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Voir les détails</button></div>').join('')+(!selection.length?'<p>Aucune mission dans cette rubrique.</p>':'')+'</details>';
+      return '<details class="hc-partenaire-missions" open><summary>'+titre+' ('+selection.length+')</summary>'+selection.map(m=>'<div class="hc-partenaire-mission"><div><strong>'+escapeHtml(referenceMission(m))+'</strong><p>'+escapeHtml([m.ville_depart,m.ville_arrivee].filter(Boolean).join(' → ')||m.ville_intervention||'Intervention sur place')+'</p><small>'+escapeHtml(_dvHoraireMission(m.date_prise_en_charge||m.date_intervention))+'</small></div><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirDetailsPreparation',[m.id])+'>Voir les détails</button></div>').join('')+(!selection.length?'<p>Aucune mission dans cette rubrique.</p>':'')+'</details>';
     }).join('');
   } catch(e) { if(document.getElementById('dossier-missions-liste')===cible)cible.textContent='Impossible de charger les missions. Réouvrez le dossier pour réessayer.'; }
 }
@@ -8692,7 +8692,33 @@ async function reglerTarifBrouillon(id) {
 
 var filtresMissionsAdmin = {convoyage:{archives:false,recherche:''},autres:{archives:false,recherche:''}};
 function referenceMission(m) { return m.reference_courte || m.reference || ''; }
-function missionArchivee(m) { return ['terminee','annulee'].includes(m.statut); }
+function missionArchivee(m, maintenant = new Date()) {
+  if (['terminee','annule','annulee'].includes(m.statut)) return true;
+  let fins;
+  if (missionSurPlace(m)) {
+    const jour=m.date_fin_intervention||m.date_intervention;
+    if(!jour)return false;
+    const heures=String(m.heure_intervention||'').match(/\d{2}:\d{2}/g)||[];
+    const fin=String(m.heure_fin_intervention||heures[1]||'23:59:59');
+    let date=String(jour).slice(0,10);
+    const debut=String(m.heure_debut_intervention||heures[0]||'00:00');
+    fins=[date+'T'+fin];
+    if(fin.slice(0,5)<=debut.slice(0,5)) {
+      const lendemain=new Date(date+'T00:00:00Z');lendemain.setUTCDate(lendemain.getUTCDate()+1);
+      fins=[lendemain.toISOString().slice(0,10)+'T'+fin];
+    }
+  } else {
+    if(!m.date_livraison)return false;
+    // Ne pas archiver pendant un trajet de restitution encore à effectuer.
+    if(m.restitution&&!m.date_restitution_arrivee)return false;
+    fins=[m.date_livraison,...(m.restitution?[m.date_restitution_depart,m.date_restitution_arrivee]:[])];
+  }
+  const fin=fins.filter(Boolean).map(v=>String(v).replace(' ','T')).sort().pop();
+  if(!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(fin||''))return false;
+  const p=Object.fromEntries(new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(maintenant).map(p=>[p.type,p.value]));
+  const now=p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second;
+  return (fin.length===10?fin+'T23:59:59':fin.length===16?fin+':00':fin)<now;
+}
 function filtrerMissionsAdmin(rows) {
   return rows.filter(m=>{
     const f=filtresMissionsAdmin[missionSurPlace(m)?'autres':'convoyage'];
@@ -10163,6 +10189,14 @@ function _dvDateHeure(v) {
     if (isNaN(d.getTime())) return String(v);
     return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   } catch (e) { return String(v); }
+}
+
+// Les rendez-vous sont enregistrés en heure civile de Paris, contrairement
+// aux horodatages techniques created_at utilisés par _dvDateHeure.
+function _dvHoraireMission(v) {
+  if(!v)return '—';
+  const civil=/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?)?$/.exec(String(v));
+  return civil ? civil[3]+'/'+civil[2]+'/'+civil[1]+(civil[4]?' à '+civil[4]:'') : _dvDateHeure(v);
 }
 
 function _escapeHtml(s) {

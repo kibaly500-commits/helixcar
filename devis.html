@@ -390,6 +390,7 @@
   if (!/^[0-9a-f-]{36}$/i.test(devisId || '')) devisId = null;
 
   var numeroChargement = 0;
+  var chargementInitialTermine = false;
   var enCoursTraitement = false; // protection double-clic partagée accept/refuse
   var hoteProduction = window.location.hostname === 'helixcar.vercel.app';
 
@@ -871,6 +872,9 @@
   // après un accept/refuse réussi (objectif 4 : refresh cohérent).
   // ────────────────────────────────────────────────────────────
   function chargerEtAfficherDevis(silencieux) {
+    // Un rafraîchissement ne doit ni invalider le premier affichage ni
+    // masquer son erreur en laissant indéfiniment l'écran de chargement.
+    if(silencieux && !chargementInitialTermine)return Promise.resolve();
     if(silencieux && (document.hidden || enCoursTraitement || !voileModal.hidden))return Promise.resolve();
     var chargement = ++numeroChargement;
     if (!token && !devisId) {
@@ -913,7 +917,7 @@
         if (chargement !== numeroChargement) return;
         if(silencieux)return;
         afficherEtatSimple('📡', 'Problème de connexion.', 'Impossible de contacter HelixCar pour le moment. Vérifiez votre connexion internet et réessayez.');
-      });
+      }).finally(function () { if(!silencieux)chargementInitialTermine=true; });
   }
 
   function afficherConnexionRequise() {
