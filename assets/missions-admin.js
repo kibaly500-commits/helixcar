@@ -11,7 +11,8 @@
   if(o?.publiee_le&&o.statut==='a_pourvoir'||m.statut==='proposee')return 'attribuer';
   return 'preparer';
  }
- const api={etape};
+ function datesCiviles(m,fin){const copy={...m};for(const k of ['date_livraison','date_restitution_depart','date_restitution_arrivee','heure_intervention','heure_debut_intervention','heure_fin_intervention'])if(typeof copy[k]==='string')copy[k]=copy[k].replace(/(\d{2}:\d{2}:\d{2})\.\d+/g,'$1');if(!copy.date_livraison&&fin)copy.date_livraison=fin;return copy;}
+ const api={etape,datesCiviles};
  if(typeof module==='object'&&module.exports){module.exports=api;return;}
  const esc=v=>escapeHtml(String(v??'')),el=id=>document.getElementById(id);
  const steps=[['preparer','À préparer'],['attribuer','À attribuer'],['avenir','À venir'],['encours','En cours'],['historique','Historique']];
@@ -35,7 +36,7 @@
   el('hm-list').innerHTML=selected.length?'<div class="hm-grid">'+selected.map(x=>{
    const state=x.virtual?'Paiement confirmé · dossier validé':x.m.statut==='fini'?'Réalisation à valider':x.step==='attribuer'?(x.opp?.publiee_le?'Offre publiée · '+Number(x.opp.nb_a_etudier||0)+' candidature(s) à examiner':'Proposition en attente'):x.step==='preparer'?'Préparation à finaliser':LIB_STATUT_MISSION[x.m.statut]||x.m.statut;
    const action=x.virtual?(x.step==='historique'||x.stockage?'Dossier':'Préparer'):x.step==='attribuer'&&x.opp?'Candidatures':'Voir';
-   return '<article class="hm-card hm-'+x.step+'"><div class="hm-card-head"><strong>'+esc(x.ref)+'</strong><span class="hm-chip">'+esc(x.label)+'</span></div><h3>'+esc(x.title)+'</h3><dl><div><dt>Prévu</dt><dd>'+esc(x.when?_dvHoraireMission(x.when):'À préciser')+'</dd></div><div><dt>Client</dt><dd>'+esc(x.customer)+'</dd></div><div><dt>Partenaire</dt><dd>'+esc(x.partner||'À attribuer')+'</dd></div><div><dt>Rémunération</dt><dd>'+esc(money(x.amount))+'</dd></div></dl><p class="hm-state">'+esc(state)+'</p><div class="hm-card-actions"><button class="btn btn-primary" data-hm-open="'+esc(x.key)+'">'+action+'</button><button class="btn btn-outline" data-hm-dossier="'+esc(x.clientId)+'">Dossier</button></div></article>';
+   return '<article class="hm-card hm-'+x.step+'"><div class="hm-card-head"><strong>'+esc(x.ref)+'</strong><span class="hm-chip">'+esc(x.label)+'</span></div><h3>'+esc(x.title)+'</h3>'+(x.vehicle?'<p class="hm-vehicle">'+esc(x.vehicle)+'</p>':'')+'<dl><div><dt>Prévu</dt><dd>'+esc(x.when?_dvHoraireMission(x.when)+(x.end&&String(x.end).slice(0,10)!==String(x.when).slice(0,10)?' → '+_dvHoraireMission(x.end):''):'À préciser')+'</dd></div><div><dt>Client</dt><dd>'+esc(x.customer)+'</dd></div><div><dt>Partenaire</dt><dd>'+esc(x.partner||'À attribuer')+'</dd></div><div><dt>Rémunération</dt><dd>'+esc(money(x.amount))+'</dd></div></dl><p class="hm-state">'+esc(state)+'</p><div class="hm-card-actions"><button class="btn btn-primary" data-hm-open="'+esc(x.key)+'">'+action+'</button><button class="btn btn-outline" data-hm-dossier="'+esc(x.clientId)+'">Dossier</button></div></article>';
   }).join('')+'</div>':'<div class="hm-empty">Aucune mission dans cette rubrique'+(q||type||client?' avec ces filtres':'')+'.</div>';
  }
  async function read(){
@@ -52,7 +53,7 @@
    for(const o of opps)if(!om.has(o.mission_id))om.set(o.mission_id,o);
    const result=missions.map(m=>{
     const o=om.get(m.id),type=m.type_mission||'convoyage',c=cm.get(m.client_id),p=pm.get(m.convoyeur_id);
-    return {key:m.id,m,opp:o,step:etape(m,o,missionArchivee(m)),type,clientId:m.client_id,ref:referenceMission(m),label:type==='professionnel'?'Renfort professionnel':type==='nettoyage'?'Nettoyage':'Convoyage',title:missionSurPlace(m)?m.prestation||m.ville_intervention||'Intervention':[m.ville_depart,m.ville_arrivee].filter(Boolean).join(' → '),when:date(m),customer:name(c),partner:p?name(p):'',amount:m.remuneration_prevue,search:[referenceMission(m),c?.numero_client,name(c),name(p),m.marque_modele,m.immatriculation,m.ville_depart,m.ville_arrivee].join(' ').toLocaleLowerCase('fr')};
+    return {key:m.id,m,opp:o,step:etape(m,o,missionArchivee(datesCiviles(m))),type,clientId:m.client_id,ref:referenceMission(m),vehicle:[m.marque_modele,m.immatriculation].filter(Boolean).join(' · '),label:type==='professionnel'?'Renfort professionnel':type==='nettoyage'?'Nettoyage':'Convoyage',title:missionSurPlace(m)?m.prestation||m.ville_intervention||'Intervention':[m.ville_depart,m.ville_arrivee].filter(Boolean).join(' → '),when:date(m),end:m.date_fin_intervention||m.date_livraison,customer:name(c),partner:p?name(p):'',amount:m.remuneration_prevue,search:[referenceMission(m),c?.numero_client,name(c),name(p),m.marque_modele,m.immatriculation,m.ville_depart,m.ville_arrivee].join(' ').toLocaleLowerCase('fr')};
    });
    const latest=new Map();for(const d of quotes)if(!latest.has(d.client_id)||String(d.date_generation)>String(latest.get(d.client_id).date_generation))latest.set(d.client_id,d);
    const paid=customers.filter(c=>latest.get(c.id)?.statut==='accepte'&&latest.get(c.id)?.paiement_statut==='paye');
@@ -65,7 +66,7 @@
      const source=r.data,saved=source.brouillons||[],exceptions={};saved.forEach(s=>{if(s.plan?.organisation)exceptions[s.plan.vehicule_id||'principal']=s.plan.organisation;});
      const plans=HCPreparation.preservePublished(HCPreparation.build(source.client,source.vehicules,source.point_remise,exceptions),saved);
      // Les anciens dossiers déjà transformés sans plan conservent leurs missions.
-     const legacy=missions.some(m=>m.client_id===c.id)&&!saved.length;
+     const legacy=missions.some(m=>m.client_id===c.id&&!m.preparation_id);
      nextSources.set(c.id,{source,plans});
      if(legacy)return;
      if(!plans.length&&source.client.type_service==='stockage'){
@@ -74,9 +75,9 @@
      }
      for(const p of plans){
       if(saved.some(s=>s.cle===p.key&&s.mission_id))continue;
-      const existing=saved.find(s=>s.cle===p.key),m=p.mission||{},expired=missionArchivee(m);
+      const existing=saved.find(s=>s.cle===p.key),m=p.mission||{},expired=missionArchivee(datesCiviles(m,p.date_fin));
       const type=m.type_mission||'convoyage';
-      result.push({key:'plan:'+c.id+':'+p.key,virtual:true,m,step:expired?'historique':'preparer',clientId:c.id,type,ref:c.numero_client||source.reference,label:type==='professionnel'?'Renfort professionnel':type==='nettoyage'?'Nettoyage':'Convoyage',title:p.zone||p.title,when:p.date_debut,customer:name(c),partner:'',amount:existing?.plan?.remuneration,search:[c.numero_client,source.reference,name(c),p.title,p.zone,m.marque_modele,m.immatriculation].join(' ').toLocaleLowerCase('fr')});
+      result.push({key:'plan:'+c.id+':'+p.key,virtual:true,m,step:expired?'historique':'preparer',clientId:c.id,type,ref:(c.numero_client||source.reference)+(p.position?' · Véhicule '+p.position:''),vehicle:[m.marque_modele,m.immatriculation].filter(Boolean).join(' · '),label:type==='professionnel'?'Renfort professionnel':type==='nettoyage'?'Nettoyage':'Convoyage',title:p.zone||p.title,when:p.date_debut,end:p.date_fin,customer:name(c),partner:'',amount:existing?.plan?.remuneration,search:[c.numero_client,source.reference,name(c),p.title,p.zone,m.marque_modele,m.immatriculation].join(' ').toLocaleLowerCase('fr')});
      }
     }));
     if(!valid())return;
@@ -125,7 +126,7 @@
  });
  ['hm-type','hm-diffusion'].forEach(id=>el(id).addEventListener('change',render));el('hm-search').addEventListener('input',render);
  document.addEventListener('click',e=>{const b=e.target.closest('[data-hm-priority]');if(b){step=b.dataset.hmPriority;client=null;showPage('admin-operations');}});
- window.HCMissions={...api,link(id){return sources.has(String(id))||items.some(x=>x.clientId===String(id));},open(id){client=id||null;step='preparer';showPage('admin-operations');},badge(id){return this.link(id)?'<span class="hm-transfer">Transmis aux missions</span><button class="btn btn-sm btn-outline" '+actionHtml('voirMissionsDemande',[id])+'>Voir les missions</button>':'';}};
+ window.HCMissions={...api,link(id){return sources.has(String(id))||items.some(x=>x.clientId===String(id));},open(id){client=id||null;step='preparer';el('hm-search').value='';el('hm-type').value='';el('hm-diffusion').value='';showPage('admin-operations');},badge(id){return this.link(id)?'<span class="hm-transfer">Transmis aux missions</span><button class="btn btn-sm btn-outline" '+actionHtml('voirMissionsDemande',[id])+'>Voir les missions</button>':'';}};
  HC_ACTIONS.voirMissionsDemande=id=>window.HCMissions.open(id);
  window.addEventListener('hc-session-fermee',()=>{generation++;items=[];sources.clear();client=null;step='preparer';el('hm-list').replaceChildren();el('hm-detail').replaceChildren();el('hm-priorites')?.remove();});
  const suivi=document.createElement('select');suivi.id='hm-devis-suivi';suivi.setAttribute('aria-label','Suivi des dossiers');suivi.innerHTML='<option value="a_traiter">À traiter</option><option value="transmis">Transmis aux missions</option><option value="">Tous les dossiers</option>';el('recherche-devis').after(suivi);suivi.addEventListener('change',()=>filtrerDemandesDevis(el('recherche-devis').value));
