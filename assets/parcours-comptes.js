@@ -130,7 +130,40 @@
  }
  window.hcCompteursParcours=compteurs;
  async function ouvrir(id){portraitMenu();const n=++generation;try{if(id==='convoyeur-dashboard')await resumeChallenge(n);if(id==='convoyeur-profil')await portrait();if(id==='client-devis')await devis();if(['convoyeur-challenge','admin-challenge'].includes(id))await challenge(id);if(['client-parametres','convoyeur-parametres'].includes(id))await parametres(id);if(currentRole==='admin'){document.documentElement.classList.remove('hc-mode-sombre');return;}await session();if(n!==generation)return;theme();marquerNouveaux();compteurs().catch(()=>{});}catch{const z=el('page-'+id)?.querySelector('[data-parcours-contenu]');if(z&&n===generation)z.textContent='Chargement impossible. Réouvrez cette rubrique pour réessayer.';}}
- function marquerNouveaux(){if(!uid||currentRole!=='client')return;document.querySelectorAll('#client-demandes-liste [data-demande]').forEach(card=>{if(card.parentElement.firstElementChild!==card||card.dataset.etatDemande==='cloture')return;const key=card.dataset.demande+':'+card.dataset.etatDemande;if(prefs.nouveautes_lues[key]||card.querySelector('.hc-nouveau'))return;const badge=document.createElement('span');badge.className='hc-nouveau';badge.textContent='Nouveau';card.querySelector('.hc-demande-summary')?.append(badge);const details=card.querySelector('.hc-demande-details');details?.addEventListener('toggle',async()=>{if(!details.open)return;prefs.nouveautes_lues[key]=true;try{await sauver();badge.remove();}catch{delete prefs.nouveautes_lues[key];}},{once:true});});}
+ function marquerNouveaux(){
+  if(!uid||currentRole!=='client')return;
+  const badgeDans=(cible,nouveau)=>{
+   if(!cible)return;
+   const ancien=cible.querySelector('.hc-nouveau');
+   if(!nouveau){ancien?.remove();return;}
+   if(ancien)return;
+   const badge=document.createElement('span');badge.className='hc-nouveau';badge.textContent='Nouveau';cible.append(badge);
+  };
+  document.querySelectorAll('#client-demandes-liste [data-groupe-demandes]').forEach(groupe=>{
+   let nouveau=false;
+   groupe.querySelectorAll('[data-demande]').forEach(card=>{
+    if(card.dataset.etatDemande==='indisponible')return;
+    const key=card.dataset.demande+':'+card.dataset.etatDemande;
+    const nonLu=!prefs.nouveautes_lues[key]&&card.dataset.devisLu!=='true';
+    nouveau=nouveau||nonLu;
+    badgeDans(card.querySelector('.hc-demande-summary'),nonLu);
+    const details=card.querySelector('.hc-demande-details');
+    if(!details||details.dataset.lectureLiee)return;
+    details.dataset.lectureLiee='true';
+    const compte=uid;
+    let enregistrement=false;
+    details.addEventListener('toggle',async()=>{
+     // Ouvrir la rubrique ne suffit pas : il faut consulter les détails du dossier.
+     if(!details.open||!details.isConnected||uid!==compte||prefs.nouveautes_lues[key]||enregistrement)return;
+     enregistrement=true;prefs.nouveautes_lues[key]=true;
+     try{await sauver();if(uid===compte)marquerNouveaux();}
+     catch{if(uid===compte){delete prefs.nouveautes_lues[key];marquerNouveaux();}}
+     finally{enregistrement=false;}
+    });
+   });
+   badgeDans(groupe.querySelector('.hc-demandes-accordeon>summary h3'),nouveau);
+  });
+ }
  new MutationObserver(()=>marquerNouveaux()).observe(el('client-demandes-liste'),{childList:true});
  window.addEventListener('hc-session-fermee',()=>{uid=null;generation++;avatarGeneration++;el('hc-challenge-dashboard')?.remove();el('sb-avatar')?.replaceChildren();el('sb-avatar')?.closest('.sidebar-user')?.classList.remove('hc-profil-partenaire');prefs={theme:'systeme',nouveautes_lues:{}};document.documentElement.classList.remove('hc-mode-sombre');});
  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(uid)theme();});
