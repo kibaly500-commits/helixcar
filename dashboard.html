@@ -5045,7 +5045,7 @@ async function majCompteursMenuAdmin() {
     _compterLignes('retards_convoyage?select=id&traite_le=is.null').then(n => appliquer('admin-planning',n,'retards à prendre en compte')),
     _compterLignes('fidelite_recompenses?select=id&statut=in.(a_preparer,prete)').then(n => appliquer('admin-recompenses',n,'box à préparer ou envoyer')),
     _compterLignes('professionnel_badges?select=professionnel_id,convoyeurs!inner(statut)&decision=eq.en_attente&convoyeurs.statut=eq.actif').then(n => appliquer('admin-metiers',n,'badges en attente')),
-    sbFetchToutePage('missions?select=id,type_mission,statut').then(rows => {
+    sbFetchToutePage('missions?select=*').then(rows => {
       const actives = rows.filter(m => !missionArchivee(m));
       appliquer('admin-missions',actives.filter(m => !missionSurPlace(m)).length,'missions non archivées');
       appliquer('admin-autres-missions',actives.filter(missionSurPlace).length,'missions non archivées');
