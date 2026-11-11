@@ -29,6 +29,15 @@ const {PGlite}=require('@electric-sql/pglite'),fs=require('fs'),assert=require('
  await assert.rejects(()=>db.query('select etat_echeance_devis($1)',[id(12)]),/non accessible/);
  await assert.rejects(()=>db.query('select missions_partenaire_admin($1)',[id(9)]),/administrateur/);
  await db.exec('reset role');
+ // Reproduire le chemin réel de devis-secure, et pas seulement le rôle client.
+ await db.exec(`set role service_role;select set_config('request.jwt.claim.role','service_role',false)`);
+ await assert.rejects(()=>db.query('select etat_echeance_devis($1)',[id(11)]),/permission denied for schema private/);
+ await db.exec('reset role');
+ await db.exec(fs.readFileSync('supabase/migrations/20261111131903_acces_echeance_devis_serveur.sql','utf8'));
+ await db.exec('set role service_role');
+ assert.equal((await db.query('select etat_echeance_devis($1) e',[id(11)])).rows[0].e,true);
+ assert.equal((await db.query('select etat_echeance_devis($1) e',[id(12)])).rows[0].e,false);
+ await db.exec(`reset role;select set_config('request.jwt.claim.role','authenticated',false)`);
  await db.exec(`insert into vehicules values('${id(21)}','${id(1)}','2099-01-01',null)`);
  assert.equal((await db.query('select * from v_mes_devis')).rows[0].prestation_depassee,false);
  await db.exec(`update devis set statut='accepte' where id='${id(11)}'`);
