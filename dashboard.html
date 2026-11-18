@@ -8915,7 +8915,7 @@ function loadMissions() {
       // L'URL vient de la base : « javascript:… » y serait exécutable au
       // clic, et un guillemet suffisait à sortir de l'attribut.
       var urlLettre = urlSure(m.lettre_voiture_signee_url);
-      const lettreVdv = estSurPlace ? '—' : (urlLettre
+      const lettreVdv = estSurPlace ? '—' : (String(m.lettre_voiture_signee_url||'').startsWith('pieces-missions/') ? _lienLettreSignee(m) : urlLettre
         ? '<a href="' + escapeHtml(urlLettre) + '" target="_blank" rel="noopener noreferrer" class="badge badge-active" style="font-size:.72rem">✅ Reçue</a>'
         : '<span class="badge badge-pending" style="font-size:.72rem">⏳ Pas encore</span>');
       var badgeType = m.type_mission === 'professionnel' ? '<span class="badge badge-service">Professionnel automobile</span>' : estSurPlace

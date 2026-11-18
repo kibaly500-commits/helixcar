@@ -32,6 +32,7 @@ assert.equal(typePrestation({},{type_service:'nettoyage'}),'nettoyage');
 assert.equal(typePrestation({}), 'inconnu');
 assert.match(motifHistorique({statut:'en_cours',convoyeur_id:'a'}),/réalisation non validée/);
 assert.match(motifHistorique({statut:'brouillon'}),/Sans partenaire/);
-assert.match(motifHistorique({statut:'terminee'}),/Terminée et validée/);
+assert.match(motifHistorique({statut:'terminee'}),/contrôle final attendu/);
+assert.match(motifHistorique({statut:'terminee',validee_paiement:true}),/Terminée et validée/);
 assert.match(motifHistorique({statut:'fini'}),/validation en attente/);
 console.log('PASS dates Paris, début passé, dates manquantes, type réel et motifs sans validation fictive');

@@ -26,7 +26,11 @@ do $$ declare q record;fid uuid;letter text;begin
  insert into public.pieces_mission(client_id,mission_id,nom,chemin,auteur_role,categorie) values(q.cid,q.mid,'Lettre TEST rollback.pdf',letter,'Partenaire','lettre_signee');
  if (select statut from public.missions where id=q.mid)<>'fini' then raise exception 'Lettre sans transition';end if;
  perform set_config('request.jwt.claim.sub',q.auid::text,true);
+ update public.pieces_mission set etat='a_corriger',commentaire='Signature illisible TEST' where chemin=letter;
+ perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'reste à corriger');
+ update public.pieces_mission set etat='recu',commentaire=null where chemin=letter;
  perform public.controler_fin_mission(q.mid,'validee','Pièces et écarts contrôlés pour le test');
+ if (select etat from public.pieces_mission where chemin=letter)<>'valide' then raise exception 'Lettre non validée';end if;
  if not exists(select 1 from public.missions where id=q.mid and statut='terminee' and validee_paiement) then raise exception 'Validation non atomique';end if;
  perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'déjà validée');
  perform pg_temp.expect_failure(format('update public.missions set remuneration_prevue=1 where id=%L',q.mid),'verrouillées');

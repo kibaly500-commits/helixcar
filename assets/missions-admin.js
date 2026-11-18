@@ -31,7 +31,7 @@
  }
  function motifHistorique(m){
   const partner=m.convoyeur_id?'Avec partenaire':'Sans partenaire';
-  if(m.statut==='terminee')return 'Terminée et validée · '+partner;
+  if(m.statut==='terminee')return (m.validee_paiement?'Terminée et validée':'Terminée · contrôle final attendu')+' · '+partner;
   if(['annule','annulee'].includes(m.statut))return 'Annulée · '+partner;
   if(m.statut==='fini')return 'Réalisation déclarée · validation en attente · '+partner;
   return 'Date dépassée · '+partner+' · réalisation non validée';
