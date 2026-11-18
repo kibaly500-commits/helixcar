@@ -39,7 +39,8 @@
  const api={etape,datesCiviles,typePrestation,libelleType,debutDepasse,motifHistorique};
  if(typeof module==='object'&&module.exports){module.exports=api;return;}
  const esc=v=>escapeHtml(String(v??'')),el=id=>document.getElementById(id);
- const steps=[['preparer','À préparer'],['attribuer','À attribuer'],['avenir','À venir'],['encours','En cours'],['historique','Historique']];
+ const needsReview=m=>!!m.convoyeur_id&&!m.validee_paiement&&['edl_termine','fini','terminee'].includes(m.statut);
+ const steps=[['preparer','À préparer'],['attribuer','À attribuer'],['avenir','À venir'],['encours','En cours'],['valider','À valider'],['historique','Historique']];
  let items=[],sources=new Map(),generation=0,step='preparer',client=null,reading=null,readingPage=null;
  const page=document.createElement('div');page.id='page-admin-operations';page.className='page';
  page.innerHTML='<div class="hm-intro"><div><h2>Vos missions, étape par étape</h2><p>Préparez, publiez et suivez chaque prestation au même endroit.</p></div><button class="btn btn-outline" data-hm-create>Nouvelle demande</button></div><div class="hm-tabs" role="tablist" aria-label="Étapes des missions"></div><div class="hm-filters"><label>Prestation<select id="hm-type"><option value="">Toutes les prestations</option><option value="convoyage">Convoyage</option><option value="nettoyage">Nettoyage</option><option value="professionnel">Renfort professionnel</option><option value="stockage">Stockage</option></select></label><label>Rechercher<input type="search" id="hm-search" placeholder="Référence, client, partenaire…"></label><label id="hm-diffusion-label" hidden>Diffusion<select id="hm-diffusion"><option value="">Toutes</option><option value="publiee">Publiées</option><option value="directe">Propositions existantes</option></select></label><button class="btn btn-outline" id="hm-clear" hidden>Tout afficher</button></div><p id="hm-status" role="status"></p><div id="hm-list"></div>';
@@ -53,14 +54,14 @@
  function render(){
   const q=el('hm-search').value.trim().toLocaleLowerCase('fr'),type=el('hm-type').value;
   const base=items.filter(x=>(!client||x.clientId===client)&&(!type||x.type===type)&&(!q||x.search.includes(q)));
-  page.querySelector('.hm-tabs').innerHTML=steps.map(([k,t])=>'<button type="button" role="tab" aria-selected="'+(step===k)+'" data-hm-step="'+k+'" class="hm-tab hm-'+k+'">'+t+' <span>'+base.filter(x=>x.step===k).length+'</span></button>').join('');
+  page.querySelector('.hm-tabs').innerHTML=steps.map(([k,t])=>'<button type="button" role="tab" aria-selected="'+(step===k)+'" data-hm-step="'+k+'" class="hm-tab hm-'+k+'">'+t+' <span>'+base.filter(x=>k==='valider'?needsReview(x.m):x.step===k).length+'</span></button>').join('');
   el('hm-diffusion-label').hidden=step!=='attribuer';el('hm-clear').hidden=!client;
   const diffusion=el('hm-diffusion').value;
-  const selected=base.filter(x=>x.step===step&&(step!=='attribuer'||!diffusion||(diffusion==='publiee'?!!x.opp?.publiee_le:!x.opp?.publiee_le)));
+  const selected=base.filter(x=>(step==='valider'?needsReview(x.m):x.step===step)&&(step!=='attribuer'||!diffusion||(diffusion==='publiee'?!!x.opp?.publiee_le:!x.opp?.publiee_le)));
   el('hm-list').innerHTML=selected.length?'<div class="hm-grid">'+selected.map(x=>{
    const state=x.step==='historique'?motifHistorique(x.m):x.virtual?'Paiement confirmé · dossier validé':x.m.statut==='fini'?'Réalisation à valider':x.step==='attribuer'?(x.opp?.publiee_le?'Offre publiée · '+Number(x.opp.nb_a_etudier||0)+' candidature(s) à examiner':'Proposition en attente'):x.step==='preparer'?'Préparation à finaliser':LIB_STATUT_MISSION[x.m.statut]||x.m.statut;
    const action=x.virtual?(x.step==='historique'||x.stockage?'Dossier':'Préparer'):x.step==='attribuer'&&x.opp?'Candidatures':'Voir';
-   return '<article class="hm-card hm-'+x.step+'"><div class="hm-card-head"><strong>'+esc(x.ref)+'</strong><span class="hm-chip">'+esc(x.label)+'</span></div><h3>'+esc(x.title)+'</h3>'+(x.vehicle?'<p class="hm-vehicle">'+esc(x.vehicle)+'</p>':'')+'<dl><div><dt>Prévu</dt><dd>'+esc(x.when?_dvHoraireMission(x.when)+(x.end&&String(x.end).slice(0,10)!==String(x.when).slice(0,10)?' → '+_dvHoraireMission(x.end):''):'À préciser')+'</dd></div><div><dt>Client</dt><dd>'+esc(x.customer)+'</dd></div><div><dt>Partenaire</dt><dd>'+esc(x.partner||(x.step==='historique'?'Sans partenaire':'À attribuer'))+'</dd></div><div><dt>Rémunération</dt><dd>'+esc(money(x.amount))+'</dd></div></dl><p class="hm-state">'+esc(state)+'</p><div class="hm-card-actions"><button class="btn btn-primary" data-hm-open="'+esc(x.key)+'">'+action+'</button><button class="btn btn-outline" data-hm-dossier="'+esc(x.clientId)+'">Dossier</button></div></article>';
+   return '<article class="hm-card hm-'+x.step+'"><div class="hm-card-head"><strong>'+esc(x.ref)+'</strong><span class="hm-chip">'+esc(x.label)+'</span></div><h3>'+esc(x.title)+'</h3>'+(x.vehicle?'<p class="hm-vehicle">'+esc(x.vehicle)+'</p>':'')+'<dl><div><dt>Prévu</dt><dd>'+esc(x.when?_dvHoraireMission(x.when)+(x.end&&String(x.end).slice(0,10)!==String(x.when).slice(0,10)?' → '+_dvHoraireMission(x.end):''):'À préciser')+'</dd></div><div><dt>Client</dt><dd>'+esc(x.customer)+'</dd></div><div><dt>Partenaire</dt><dd>'+esc(x.partner||(x.step==='historique'?'Sans partenaire':'À attribuer'))+'</dd></div><div><dt>Rémunération</dt><dd>'+esc(money(x.amount))+'</dd></div></dl><p class="hm-state">'+esc(state)+'</p><div class="hm-card-actions"><button class="btn btn-primary" data-hm-open="'+esc(x.key)+'">'+action+'</button><button class="btn btn-outline" data-hm-dossier="'+esc(x.clientId)+'">Dossier</button>'+(!x.virtual?'<button class="btn btn-outline" data-suivi-mission="'+esc(x.m.id)+'">'+(needsReview(x.m)?'Contrôler':'Suivi')+'</button>':'')+'<button class="btn btn-outline" data-suivi-docs="'+(!x.virtual?esc(x.m.id):'')+'" data-suivi-client="'+esc(x.clientId)+'">Documents</button></div></article>';
   }).join('')+'</div>':'<div class="hm-empty">Aucune mission dans cette rubrique'+(q||type||client?' avec ces filtres':'')+'.</div>';
  }
  async function read(){
@@ -113,13 +114,13 @@
    if(client&&!items.some(x=>x.clientId===client&&x.step===step))step=items.find(x=>x.clientId===client)?.step||'preparer';
    render();afficherCompteurMenu('admin-operations',items.filter(x=>x.step!=='historique').length,'missions à suivre');
    if(typeof filtrerDemandesDevis==='function')filtrerDemandesDevis(el('recherche-devis')?.value||'');
-   priorities();
+   priorities();window.HCSuivi?.priorities();
   }catch(e){if(valid())el('hm-status').textContent='Chargement incomplet. Les dernières données restent affichées. Utilisez Actualiser.';}
  }
  window.chargerMissionsUnifiees=function(){const active=document.querySelector('.page.active')?.id;if(reading)return active===readingPage?reading:reading.then(()=>chargerMissionsUnifiees());readingPage=active;reading=read().finally(()=>reading=null);return reading;};
  function priorities(){
   let box=el('hm-priorites');if(!box){box=document.createElement('div');box.id='hm-priorites';box.className='card';el('page-admin-dashboard').prepend(box);}
-  box.innerHTML='<div class="card-header"><h3>À traiter · Missions</h3></div><div class="hm-priorites">'+[['preparer','À préparer'],['attribuer','À attribuer'],['historique','Réalisations à valider']].map(([k,t])=>{const count=items.filter(x=>k==='historique'?x.m.statut==='fini':x.step===k).length;return '<button class="btn btn-outline" data-hm-priority="'+k+'">'+t+' <strong>'+count+'</strong></button>';}).join('')+'</div>';
+  box.innerHTML='<div class="card-header"><h3>À traiter · Missions</h3></div><div class="hm-priorites">'+[['preparer','À préparer'],['attribuer','À attribuer'],['valider','Missions à valider']].map(([k,t])=>{const count=items.filter(x=>k==='valider'?needsReview(x.m):x.step===k).length;return '<button class="btn btn-outline" data-hm-priority="'+k+'">'+t+' <strong>'+count+'</strong></button>';}).join('')+'</div>';
  }
  async function dossier(id){
   await loadDemandesDevis(true);if(currentRole==='admin')ouvrirFicheDemande(id);

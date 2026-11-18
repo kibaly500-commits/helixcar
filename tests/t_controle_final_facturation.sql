@@ -1,0 +1,50 @@
+-- Fixtures exclusivement transactionnelles sur une mission TEST, rollback intégral.
+begin;
+select set_config('hc.validation_edl_test','1',true);
+create function pg_temp.expect_failure(q text,pattern text) returns void language plpgsql as $$
+begin
+ begin execute q;exception when others then if sqlerrm not ilike '%'||pattern||'%' then raise;end if;return;end;
+ raise exception 'EXPECTED FAILURE: %',q;
+end $$;
+create temp table qa_context as select m.id mid,m.client_id cid,m.convoyeur_id pid,m.vehicule_source_id vid,c.auth_user_id puid,cl.auth_user_id cuid,(select auth_user_id from public.admins limit 1) auid from public.missions m join public.convoyeurs c on c.id=m.convoyeur_id join public.clients cl on cl.id=m.client_id where m.reference_courte='HC-2026-0013';
+do $$ declare q record;fid uuid;letter text;begin
+ select * into strict q from qa_context;
+ if exists(select 1 from public.etats_des_lieux where mission_id=q.mid) then raise exception 'Fixture déjà utilisée';end if;
+ perform set_config('request.jwt.claim.sub',q.auid::text,true);
+ perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'Réalisation non terminée');
+ insert into public.etats_des_lieux(mission_id,vehicule_source_id,phase,km,signature_url) values(q.mid,q.vid,'depart',1000,'TEST_SIGNATURE'),(q.mid,q.vid,'arrivee',1400,'TEST_SIGNATURE');
+ perform pg_temp.expect_failure(format('update public.missions set statut=%L where id=%L','edl_termine',q.mid),'État des lieux signé manquant');
+ insert into public.etats_des_lieux(mission_id,vehicule_source_id,phase,km,signature_url) values(q.mid,q.vid,'restitution_depart',50000,'TEST_SIGNATURE'),(q.mid,q.vid,'restitution_arrivee',50200,'TEST_SIGNATURE');
+ update public.missions set statut='edl_termine' where id=q.mid;
+ perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'Lettre de voiture');
+ perform pg_temp.expect_failure(format('update public.missions set validee_paiement=true where id=%L',q.mid),'contrôle final');
+ perform public.controler_fin_mission(q.mid,'a_corriger','Merci de transmettre la lettre signée');
+ perform set_config('request.jwt.claim.sub',q.puid::text,true);
+ perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'Administration');
+ letter:=q.cid::text||'/'||q.puid::text||'/'||gen_random_uuid()::text||'.pdf';
+ insert into storage.objects(bucket_id,name) values('pieces-missions',letter);
+ insert into public.pieces_mission(client_id,mission_id,nom,chemin,auteur_role,categorie) values(q.cid,q.mid,'Lettre TEST rollback.pdf',letter,'Partenaire','lettre_signee');
+ if (select statut from public.missions where id=q.mid)<>'fini' then raise exception 'Lettre sans transition';end if;
+ perform set_config('request.jwt.claim.sub',q.auid::text,true);
+ perform public.controler_fin_mission(q.mid,'validee','Pièces et écarts contrôlés pour le test');
+ if not exists(select 1 from public.missions where id=q.mid and statut='terminee' and validee_paiement) then raise exception 'Validation non atomique';end if;
+ perform pg_temp.expect_failure(format('select public.controler_fin_mission(%L,%L)',q.mid,'validee'),'déjà validée');
+ perform pg_temp.expect_failure(format('update public.missions set remuneration_prevue=1 where id=%L',q.mid),'verrouillées');
+ perform set_config('request.jwt.claim.sub',q.puid::text,true);
+ insert into public.factures_convoyeur(convoyeur_id,mission_ids,montant_total) values(q.pid,jsonb_build_array(q.mid::text),0.01) returning id into fid;
+ if (select montant_total from public.factures_convoyeur where id=fid)<>(select round(remuneration_prevue,2) from public.missions where id=q.mid) then raise exception 'Prix client utilisé';end if;
+ perform pg_temp.expect_failure(format('insert into public.factures_convoyeur(convoyeur_id,mission_ids) values(%L,%L::jsonb)',q.pid,jsonb_build_array(q.mid::text)),'déjà facturée');
+ perform pg_temp.expect_failure(format('update public.factures_convoyeur set statut=%L where id=%L','validee',fid),'non autorisée');
+ perform set_config('request.jwt.claim.sub',q.auid::text,true);
+ perform pg_temp.expect_failure(format('update public.factures_convoyeur set statut=%L where id=%L','payee',fid),'non autorisée');
+ update public.factures_convoyeur set statut='a_corriger',correction_commentaire='Clarification TEST' where id=fid;
+ perform set_config('request.jwt.claim.sub',q.puid::text,true);
+ update public.factures_convoyeur set statut='en_attente' where id=fid;
+ perform set_config('request.jwt.claim.sub',q.auid::text,true);
+ update public.factures_convoyeur set statut='validee' where id=fid;
+ if (select date_paiement_prevue from public.factures_convoyeur where id=fid)<=now() then raise exception 'Échéance absente';end if;
+ update public.factures_convoyeur set statut='payee' where id=fid;
+ perform pg_temp.expect_failure(format('update public.factures_convoyeur set statut=%L where id=%L','en_attente',fid),'non autorisée');
+end $$;
+select 'PASS états des lieux, restitution, lettre privée, correction, contrôle unique, prix serveur, doublon, permissions de décision, correction facture, validation et paiement TEST' as result;
+rollback;

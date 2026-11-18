@@ -1565,7 +1565,7 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">🧾 Factures en attente de validation</div><div class="card-sub">Générées par les professionnels, à vérifier avant paiement</div></div>
+          <div class="card-header"><div class="card-title">Facturations à vérifier</div><div class="card-sub">Générées par les professionnels, à vérifier avant paiement</div></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Date émission</th><th>Action</th></tr></thead>
@@ -1575,7 +1575,7 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">💰 Factures validées — à payer</div></div>
+          <div class="card-header"><div class="card-title">Facturations à payer</div></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Validée le</th><th>Paiement prévu</th><th>Action</th></tr></thead>
@@ -1585,7 +1585,7 @@ body.scroll-verrouille { overflow: hidden; }
         </div>
 
         <div class="card">
-          <div class="card-header"><div class="card-title">Historique des factures payées</div></div>
+          <div class="card-header"><div class="card-title">Facturations payées</div></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>N° Facture</th><th>Professionnel</th><th>Missions incluses</th><th>Total</th><th>Payée le</th></tr></thead>
@@ -3396,6 +3396,7 @@ async function ouvrirRecapMissionClient(id) {
     }
     if(m.consignes)champs.push(['Consignes',m.consignes]);
     zone.innerHTML=champs.filter(c=>c[1]!==null&&c[1]!==undefined&&c[1]!=='').map(c=>'<div class="detail-row"><span class="detail-label">'+escapeHtml(c[0])+'</span><span class="detail-val" style="white-space:pre-line">'+escapeHtml(String(c[1]))+'</span></div>').join('');
+    zone.insertAdjacentHTML('beforeend','<button class="btn btn-outline" data-suivi-docs="'+escapeHtml(id)+'">Documents de la mission</button>');
   }catch(e){if(generation!==recapMissionClientGeneration)return;zone.textContent='Ce récapitulatif est momentanément indisponible. Fermez puis réessayez.';}
 }
 
@@ -8967,25 +8968,9 @@ function terminerMission(id) {
     .catch(function(e) { alert('❌ Erreur lors de la mise à jour (voir la console).'); });
 }
 
-function confirmerMissionTerminee(id) {
-  if (!confirm('Confirmer que cette mission est bien terminée ? Elle pourra ensuite être validée pour paiement.')) return;
-  sbFetch('missions?id=eq.' + id, {
-    method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ statut: 'terminee' })
-  }).then(async function() { await notifierMissionTest(id); loadMissions(); })
-    .catch(function(e) { alert('❌ Erreur lors de la confirmation (voir la console).'); });
-}
+function confirmerMissionTerminee(id) { return window.HCSuivi.control(id); }
 
-function validerMissionPourPaiement(id) {
-  if (!confirm('Valider cette mission pour paiement ? Le convoyeur pourra ensuite l\'inclure dans une facture.')) return;
-  sbFetch('missions?id=eq.' + id, {
-    method: 'PATCH',
-    headers: { 'Prefer': 'return=minimal' },
-    body: JSON.stringify({ validee_paiement: true, date_validation_paiement: new Date().toISOString() })
-  }).then(async function() { await notifierMissionTest(id); loadMissions(); })
-    .catch(function(e) { alert('❌ Erreur lors de la validation (voir la console).'); });
-}
+function validerMissionPourPaiement(id) { return window.HCSuivi.control(id); }
 
 function annulerMission(id) {
   if (!confirm('Annuler cette mission ?')) return;
@@ -9109,6 +9094,7 @@ function _boutonEdl(reference, etape, libelle) {
     + '<small style="display:block;margin:6px 0;overflow-wrap:anywhere">Code : ' + escapeHtml(reference + '/' + ({depart:'DEP',arrivee:'ARR',restitution_depart:'RDEP',restitution_arrivee:'RARR'}[etape] || '')) + '</small>';
 }
 function _lienLettreSignee(m) {
+  if(m?.lettre_voiture_signee_url?.startsWith('pieces-missions/'))return '<button class="btn btn-outline" data-private-letter="'+escapeHtml(m.lettre_voiture_signee_url.slice(16))+'">Lettre signée reçue</button>';
   var u = urlSure(m && m.lettre_voiture_signee_url);
   return u ? '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener noreferrer" '
     + 'class="btn btn-sm" style="background:rgba(31,122,77,.12);color:#1F7A4D;'
@@ -9131,14 +9117,7 @@ const CONV_MISSION_ACTIONS = {
       + _lienLettreVoiture(reference);
   },
   edl_termine: function(id, reference, m) {
-    var champ = 'upload-lettre-signee-' + String(id || '');
-    return _lienLettreVoiture(reference)
-      + '<button class="btn btn-sm" style="background:var(--y);color:var(--bk);border:none"'
-      + actionHtml('declencherChampFichier', [champ])
-      + '>📸 Envoyer la lettre signée</button>'
-      + '<input type="file" accept="image/*" capture="environment" id="' + escapeHtml(champ) + '" '
-      + 'style="display:none" data-hc-self="1"'
-      + actionHtml('envoyerLettreVoitureSignee', [id, reference]) + '>';
+    return _lienLettreVoiture(reference)+'<button class="btn btn-primary" data-suivi-docs="'+escapeHtml(id)+'">Envoyer la lettre signée</button>';
   },
   fini: function(id, reference, m) {
     return _lienLettreVoiture(reference) + _lienLettreSignee(m)
@@ -9543,7 +9522,7 @@ function chargerMissionsAttribuees(enCours) {
           + '<td><strong style="color:var(--green)">'
           + (remunerationFacturable(m) != null ? escapeHtml(String(remunerationFacturable(m))) + ' €' : 'À vérifier') + '</strong></td>'
           + '<td>' + badge + '</td>'
-          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + (m.type_mission==='convoyage' && STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? '<span data-retard-mission="'+escapeHtml(m.id)+'"></span>' : '') + '</td></tr>';
+          + '<td style="display:flex;gap:4px;flex-wrap:wrap">' + action + '<button class="btn btn-outline" data-suivi-docs="'+escapeHtml(m.id)+'">Documents</button>' + (m.type_mission==='convoyage' && STATUTS_MISSIONS_EN_COURS.includes(m.statut) ? '<span data-retard-mission="'+escapeHtml(m.id)+'"></span>' : '') + '</td></tr>';
       }).join('');
       if(window.HCRetards)return window.HCRetards.mount(tbody);
   }
@@ -9575,6 +9554,7 @@ function compterJoursOuvresEntre(dateDebut, dateFin) {
 }
 
 const FACTURE_STATUT_BADGE = {
+  a_corriger: '<span class="badge badge-pending">À corriger</span>',
   en_attente: '<span class="badge badge-pending">⏳ En attente</span>',
   validee:    '<span class="badge" style="background:rgba(181,68,75,.2);color:#8C3238">En attente de règlement</span>',
   payee:      '<span class="badge badge-active">✅ Payée</span>'
@@ -9681,7 +9661,7 @@ function loadFacturationConvoyeur() {
         const badge = FACTURE_STATUT_BADGE[f.statut] || f.statut;
         return '<tr><td><strong>' + escapeHtml(f.reference) + '</strong></td><td>' + missionsTxt + '</td>'
           + '<td style="color:var(--green);font-weight:700">' + f.montant_total + ' €</td>'
-          + '<td>' + dateTxt + '</td><td>' + badge + '</td></tr>';
+          + '<td>' + dateTxt + '</td><td>' + badge + (f.correction_commentaire?'<p>'+escapeHtml(f.correction_commentaire)+'</p>':'')+(f.statut==='a_corriger'?'<button class="btn btn-outline" data-facture-resubmit="'+f.id+'">Soumettre à nouveau</button>':'') + '</td></tr>';
       }).join('');
     }
   }).catch(function(e) {
@@ -9723,7 +9703,7 @@ function genererFactureConvoyeur() {
   total = Math.round(total * 100) / 100;
   if (!confirm('Générer une facture de ' + total.toLocaleString('fr-FR') + ' € pour ' + missionIds.length + ' mission(s) ?')) return;
 
-  const reference = 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
+  const reference = 'FAC-' + new Date().getFullYear() + '-' + crypto.randomUUID().slice(0,8);
   const btn = document.getElementById('fc-conv-generer-btn');
   btn.disabled = true; btn.textContent = 'Génération…';
 
@@ -9738,11 +9718,11 @@ function genererFactureConvoyeur() {
       statut: 'en_attente'
     })
   }).then(function() {
-    alert('✅ Facture ' + reference + ' générée pour ' + total.toLocaleString('fr-FR') + ' €.\nEnvoyée à HelixCar pour validation.');
+    alert('Facturation soumise à HelixCar. Retrouvez sa référence et son montant confirmé dans votre historique.');
     btn.textContent = '🧾 Générer la facture';
     loadFacturationConvoyeur();
   }).catch(function(e) {
-    alert('❌ Erreur lors de la génération de la facture (voir la console).');
+    alert(e.message || 'La facturation n’a pas pu être soumise. Actualisez puis réessayez.');
     console.error('Erreur genererFactureConvoyeur:', e);
     btn.disabled = false; btn.textContent = '🧾 Générer la facture';
   });
@@ -9774,17 +9754,17 @@ function loadFacturationAdmin() {
     (results[2] || []).forEach(function(m) { missionsRef[m.id] = referenceMission(m); });
 
     function missionsTxt(f) {
-      return (f.mission_ids || []).map(function(id) { return missionsRef[id] || id; }).join(' · ');
+      return (f.mission_ids || []).map(function(id) { return '<button class="btn btn-sm btn-outline" data-suivi-mission="'+escapeHtml(id)+'">'+escapeHtml(missionsRef[id] || id)+'</button>'; }).join(' ');
     }
 
-    const enAttente = factures.filter(function(f) { return f.statut === 'en_attente'; });
+    const enAttente = factures.filter(function(f) { return ['en_attente','a_corriger'].includes(f.statut); });
     const validees = factures.filter(function(f) { return f.statut === 'validee'; });
     const payees = factures.filter(function(f) { return f.statut === 'payee'; });
 
     document.getElementById('fc-admin-stat-attente').textContent = enAttente.length;
     document.getElementById('fc-admin-stat-a-payer').textContent = validees.length;
     const moisActuel = new Date().getMonth();
-    const payeesCeMois = payees.filter(function(f) { return f.date_paiement && new Date(f.date_paiement).getMonth() === moisActuel; });
+    const payeesCeMois = payees.filter(function(f) { return f.date_paiement && new Date(f.date_paiement).getMonth() === moisActuel && new Date(f.date_paiement).getFullYear() === new Date().getFullYear(); });
     const totalPayeCeMois = payeesCeMois.reduce(function(s, f) { return s + (f.montant_total || 0); }, 0);
     document.getElementById('fc-admin-stat-paye').textContent = totalPayeCeMois.toLocaleString('fr-FR') + ' €';
     document.getElementById('fc-admin-stat-paye-sub').textContent = payeesCeMois.length + ' facture(s) payée(s)';
@@ -9793,12 +9773,12 @@ function loadFacturationAdmin() {
       ? '<tr><td colspan="6" style="text-align:center;color:#888;padding:14px">Aucune facture en attente</td></tr>'
       : enAttente.map(function(f) {
           const dateTxt = f.date_generation ? new Date(f.date_generation).toLocaleDateString('fr-FR') : '—';
-          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+          return '<tr id="facture-'+f.id+'"><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
             + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
             + '<td>' + missionsTxt(f) + '</td>'
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
             + '<td>' + dateTxt + '</td>'
-            + '<td><button class="btn btn-sm" style="background:var(--green);color:#fff;border:none" ' + actionHtml('accepterFactureConvoyeur', [f.id]) + '>✅ Accepter</button></td></tr>';
+            + '<td>'+(f.statut==='a_corriger'?'<span class="badge badge-pending">Correction demandée</span><p>'+escapeHtml(f.correction_commentaire||'')+'</p>':'<button class="btn btn-sm btn-primary" '+actionHtml('accepterFactureConvoyeur',[f.id])+'>Valider</button> <button class="btn btn-sm btn-outline" data-facture-correction="'+f.id+'">À corriger</button>')+'</td></tr>';
         }).join('');
 
     aPayerEl.innerHTML = validees.length === 0
@@ -9806,7 +9786,7 @@ function loadFacturationAdmin() {
       : validees.map(function(f) {
           const dateValTxt = f.date_validation ? new Date(f.date_validation).toLocaleDateString('fr-FR') : '—';
           const datePaieTxt = f.date_paiement_prevue ? new Date(f.date_paiement_prevue).toLocaleDateString('fr-FR') : '—';
-          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+          return '<tr id="facture-'+f.id+'"><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
             + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
             + '<td>' + missionsTxt(f) + '</td>'
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
@@ -9819,7 +9799,7 @@ function loadFacturationAdmin() {
       ? '<tr><td colspan="5" style="text-align:center;color:#888;padding:14px">Aucune facture payée pour le moment</td></tr>'
       : payees.map(function(f) {
           const datePaieTxt = f.date_paiement ? new Date(f.date_paiement).toLocaleDateString('fr-FR') : '—';
-          return '<tr><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
+          return '<tr id="facture-'+f.id+'"><td><strong style="font-family:monospace">' + escapeHtml(f.reference) + '</strong></td>'
             + '<td>' + escapeHtml(convoyeurs[f.convoyeur_id] || '—') + '</td>'
             + '<td>' + missionsTxt(f) + '</td>'
             + '<td style="font-weight:700;color:var(--green)">' + f.montant_total + ' €</td>'
@@ -15568,6 +15548,7 @@ function declencherChampFichier(id) {
 <link rel="stylesheet" href="assets/missions-admin.css">
 <script src="assets/alertes-kilometriques.js"></script>
 <script src="assets/missions-admin.js"></script>
+<script src="assets/suivi-final.js"></script>
 <link rel="stylesheet" href="assets/parcours-comptes.css">
 </body>
 </html>

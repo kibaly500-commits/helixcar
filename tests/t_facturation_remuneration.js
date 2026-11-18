@@ -14,7 +14,7 @@ for (const block of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
 const button = {}, total = {}, alerts = [], posts = [], elements = {};
 let missions = [], invoices = []; 
 let checks = [];
-const ctx = {window:{_currentConvoyeur:{id:'partner-test'}}, document:{querySelectorAll:()=>checks,getElementById:id=>id==='fc-conv-total'?total:id==='fc-conv-generer-btn'?button:(elements[id] ||= {style:{}})}, sbFetchToutePage:async path=>path.startsWith('missions?')?missions:invoices,missionSurPlace:m=>['professionnel','nettoyage'].includes(m.type_mission),escapeHtml:s=>String(s),referenceMission:m=>m.id,_dvDate:s=>s,FACTURE_STATUT_BADGE:{},compterJoursOuvresEntre:()=>10,alert:m=>alerts.push(m),confirm:()=>true,console,loadFacturationConvoyeur:()=>{},sbFetch:async(path,opts)=>posts.push(JSON.parse(opts.body))};
+const ctx = {crypto:require('node:crypto').webcrypto,window:{_currentConvoyeur:{id:'partner-test'}}, document:{querySelectorAll:()=>checks,getElementById:id=>id==='fc-conv-total'?total:id==='fc-conv-generer-btn'?button:(elements[id] ||= {style:{}})}, sbFetchToutePage:async path=>path.startsWith('missions?')?missions:invoices,missionSurPlace:m=>['professionnel','nettoyage'].includes(m.type_mission),escapeHtml:s=>String(s),referenceMission:m=>m.id,_dvDate:s=>s,FACTURE_STATUT_BADGE:{},compterJoursOuvresEntre:()=>10,alert:m=>alerts.push(m),confirm:()=>true,console,loadFacturationConvoyeur:()=>{},sbFetch:async(path,opts)=>posts.push(JSON.parse(opts.body))};
 vm.createContext(ctx); vm.runInContext(source, ctx);
 for(const [m,expected] of [
  [{prix_ttc:null,remuneration_prevue:'300'},300],
