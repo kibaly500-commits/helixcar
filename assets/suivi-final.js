@@ -15,6 +15,20 @@
   const query=context.mission_id?'mission_id=eq.'+context.mission_id:'client_id=eq.'+context.client_id+'&mission_id=is.null';
   return sbFetchToutePage('pieces_mission?'+query+'&order=created_at.desc');
  }
+ let countVersion=0;
+ async function refreshCounts(){
+  if(currentRole!=='client')return;
+  const ticket=++countVersion;
+  try{
+   const rows=await sbFetchToutePage('pieces_mission?select=client_id,mission_id');
+   if(ticket!==countVersion||currentRole!=='client')return;
+   document.querySelectorAll('[data-client-doc-count]').forEach(b=>{
+    const n=rows.filter(p=>b.dataset.suiviDocs?p.mission_id===b.dataset.suiviDocs:p.client_id===b.dataset.suiviClient).length;
+    b.textContent=n?'Documents ('+n+')':'Ajouter un document';
+    b.title=n?'Consulter les documents ou en ajouter un':'Envoyer un document à HelixCar';
+   });
+  }catch(e){/* Garder un accès utilisable si le compteur est indisponible. */}
+ }
  async function openDocuments(mid,cid){
   const d=create(currentRole==='client'?'Documents de ma demande / prestation':'Documents de la mission');const body=d.querySelector('.hc-suivi-content');
   try{
@@ -35,7 +49,7 @@
        const uid=(await sbAuth.auth.getUser()).data.user?.id;if(!uid)throw Error('Session expirée');
        path=c.client_id+'/'+uid+'/'+crypto.randomUUID()+'.'+({'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[f.type]);
        const upload=await sbAuth.storage.from('pieces-missions').upload(path,f,{upsert:false,contentType:f.type});if(upload.error)throw upload.error;stored=true;
-       const r=await sbAuth.from('pieces_mission').insert({client_id:c.client_id,mission_id:c.mission_id,nom:f.name.slice(0,180),chemin:path,auteur_role:currentRole,categorie:form.elements.category?.value||'document',partage_partenaire:!!form.elements.partner?.checked,partage_client:!!form.elements.client?.checked,obligatoire:!!form.elements.required?.checked});if(r.error)throw r.error;stored=false;select.disabled=false;await paint(c);
+       const r=await sbAuth.from('pieces_mission').insert({client_id:c.client_id,mission_id:c.mission_id,nom:f.name.slice(0,180),chemin:path,auteur_role:currentRole,categorie:form.elements.category?.value||'document',partage_partenaire:!!form.elements.partner?.checked,partage_client:!!form.elements.client?.checked,obligatoire:!!form.elements.required?.checked});if(r.error)throw r.error;stored=false;select.disabled=false;await paint(c);refreshCounts();
       }catch(err){if(stored)await sbAuth.storage.from('pieces-missions').remove([path]);status.textContent=err.message||'Envoi impossible';submit.disabled=false;select.disabled=false;}
      };
      zone.querySelector('.hc-doc-list').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const id=b.dataset.pieceOpen||b.dataset.pieceShare||b.dataset.pieceClient||b.dataset.pieceId||b.dataset.pieceLink,p=docs.find(x=>x.id===id);if(!p)return;b.disabled=true;
@@ -87,9 +101,9 @@
    zone.onclick=e=>{const b=e.target.closest('[data-finance-view]');if(b){showPage('admin-facturation');document.getElementById(b.dataset.financeView)?.scrollIntoView({block:'center'});}};
   }catch(e){console.warn('Compteurs de facturation indisponibles');}
  }
- window.HCSuivi={control,documents:openDocuments,priorities};
+ window.HCSuivi={control,documents:openDocuments,priorities,refreshCounts};
  HC_ACTIONS.controlerMission=control;
- window.addEventListener('hc-session-fermee',()=>{version++;active?.close();document.getElementById('hc-finance-priorities')?.remove();});
+ window.addEventListener('hc-session-fermee',()=>{version++;countVersion++;active?.close();document.getElementById('hc-finance-priorities')?.remove();});
  // Accès permanent pour les documents reçus avant la création d’une mission.
  for(const id of ['page-convoyeur-missions']){const page=document.getElementById(id);if(page){const bar=document.createElement('div');bar.className='hc-doc-entry';bar.innerHTML=button('Mes documents','data-suivi-docs=""');page.prepend(bar);}}
 })();
