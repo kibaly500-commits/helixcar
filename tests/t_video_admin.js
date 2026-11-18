@@ -20,6 +20,14 @@ const NETTOYAGE_SEUL = {
   id: 'cand-3', prenom: 'TEST-QA', nom: 'Petit', email: 'qa3@example.invalid',
   telephone: '+33600000002', activites: ['nettoyage'], statut: 'en_attente', video_chemin: null
 };
+// LOT V01 — envoi autorisé mais jamais finalisé (migration 105) : ni
+// reçue, ni absente. L'administrateur doit le lire tel quel.
+const ENVOI_EN_COURS = {
+  id: 'cand-4', prenom: 'TEST-QA', nom: 'Roux', email: 'qa4@example.invalid',
+  telephone: '+33600000003', activites: ['convoyage'], statut: 'video_attendue', video_chemin: null,
+  video_envoi_chemin: 'candidatures/8f14e45f-ea8d-4c2b-9f21-000000000004/aaaaaaaa-0000-4000-8000-000000000004.mp4',
+  video_envoi_mime: 'video/mp4', video_envoi_taille_octets: 225024410, video_envoi_commence_le: '2026-09-09T10:00:00Z'
+};
 
 // `const sbAuth = window.supabase ? window.supabase.createClient(...) : null`
 // est évalué au chargement, et supabase-js vient d'un CDN injoignable ici.
@@ -69,13 +77,15 @@ async function definirResultatSignature(page, litteral) {
   await page.addInitScript(INIT_SUPABASE);
   await page.goto(urlFichier('dashboard.html'), { waitUntil: 'load' });
 
-  await page.evaluate(([a, b, c]) => {
+  await page.evaluate(([a, b, c, d]) => {
     window._candidaturesData = {};
-    [a, b, c].forEach(x => { window._candidaturesData[x.id] = x; });
-  }, [AVEC_VIDEO, SANS_VIDEO_REQUISE, NETTOYAGE_SEUL]);
+    [a, b, c, d].forEach(x => { window._candidaturesData[x.id] = x; });
+  }, [AVEC_VIDEO, SANS_VIDEO_REQUISE, NETTOYAGE_SEUL, ENVOI_EN_COURS]);
 
   // ── A. Fiche unique et états ──
   await page.evaluate(() => openDossierSb('cand-1'));
+  const dossierCandidat = await page.evaluate(() => document.getElementById('dossier-content').textContent);
+  check('A0 : le RIB n\'est pas demandé dans le dossier de candidature', !/RIB/i.test(dossierCandidat), dossierCandidat);
   await page.waitForTimeout(120);
   let fiche = await page.evaluate(() => ({
     html: document.getElementById('dossier-content').innerHTML,
@@ -98,8 +108,20 @@ async function definirResultatSignature(page, litteral) {
   await page.evaluate(() => openDossierSb('cand-3'));
   await page.waitForTimeout(80);
   fiche = await page.evaluate(() => document.getElementById('dossier-content').textContent);
-  check('A7 : nettoyage seul -> « Non requise », jamais « Manquante »',
-    /Non requise/i.test(fiche) && !/Manquante/i.test(fiche), fiche.slice(-160));
+  check('A7 : nettoyage seul sans vidéo -> « Manquante »',
+    /Manquante/i.test(fiche) && !/Non requise/i.test(fiche), fiche.slice(-160));
+
+  await page.evaluate(() => openDossierSb('cand-4'));
+  await page.waitForTimeout(80);
+  let ficheEnCours = await page.evaluate(() => ({
+    html: document.getElementById('dossier-content').innerHTML,
+    texte: document.getElementById('dossier-content').textContent
+  }));
+  check('A8 : LOT V01 — envoi autorisé non finalisé -> « Envoi en cours, non finalisé », ni « Manquante » ni « Voir la vidéo »',
+    /Envoi en cours, non finalisé/.test(ficheEnCours.texte) && !/Manquante/i.test(ficheEnCours.texte)
+    && !/Voir la vidéo/.test(ficheEnCours.html), ficheEnCours.texte.slice(-200));
+  check('A9 : ... et aucun chemin de stockage exposé pour un envoi en cours',
+    !/candidatures\/|storage\/v1/.test(ficheEnCours.html));
 
   // ── B. Lecture réussie par URL signée ──
   await definirResultatSignature(page, { data: { signedUrl: 'https://exemple.invalid/signed?token=abc&expires=300' }, error: null });

@@ -1,0 +1,303 @@
+diff --git a/dashboard.html b/dashboard.html
+index a7eef35..daf7e5f 100644
+--- a/dashboard.html
++++ b/dashboard.html
+@@ -8518,7 +8518,9 @@ var NETT_LIB_CAT = {
+ var NETT_LIB_TYPE = {
+   interieur: 'Nettoyage intérieur', exterieur: 'Nettoyage extérieur',
+   interieur_exterieur: 'Nettoyage intérieur et extérieur',
+-  preparation_complete: 'Préparation complète — intérieur et extérieur', conseil: 'Client à conseiller'
++  // LOT F01 (F01-037) — sur le devis (fiche, PDF, objet de l'e-mail),
++  // uniquement la formule courte : plus jamais « — intérieur et extérieur ».
++  preparation_complete: 'Préparation complète', conseil: 'Client à conseiller'
+ };
+ // V75 — intervention exclusivement sur le site du client. Les anciens
+ // libellés (Chez HelixCar / À définir) restent connus ici afin que les
+diff --git a/index.html b/index.html
+index 3233948..da5bca0 100644
+--- a/index.html
++++ b/index.html
+@@ -4859,6 +4859,30 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+   max-width: 100%;
+   overflow-wrap: anywhere;
+ }
++
++/* LOT F01 (F01-010) — service réservé aux entreprises. L'option reste
++   VISIBLE et LISIBLE (« Réservé aux entreprises »), mais un particulier
++   ne peut ni la cocher (souris, clavier, tactile : le bouton radio est
++   réellement désactivé) ni la contourner. Le professionnel la voit
++   active, sans aucun changement. */
++#modal-client label.radio-opt.hc-opt-reservee {
++  opacity: .55;
++  cursor: not-allowed;
++}
++#modal-client label.radio-opt.hc-opt-reservee input[type="radio"] { cursor: not-allowed; }
++#modal-client label.radio-opt.hc-opt-reservee .hc-opt-desc { color: var(--accent); font-weight: 600; }
++
++/* LOT F01 (F01-035/036) — compteur discret sous un texte plafonné
++   (Mission : 166 caractères, Type de mission : 156). Il devient rouge
++   quand un texte restauré d'un brouillon dépasse la limite. */
++#modal-client .hc-compteur {
++  font-size: .74rem;
++  color: #7A7F84;
++  text-align: right;
++  margin-top: 4px;
++  line-height: 1.4;
++}
++#modal-client .hc-compteur.hc-compteur--depasse { color: #DC2626; font-weight: 600; }
+ </style>
+ 
+ <style id="hc-connexion-premium-v1">
+@@ -6461,7 +6485,11 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+           <label class="radio-opt"><input type="radio" name="type-service" value="stockage" onclick="onChoixService()"><span>Stockage automobile <button type="button" class="hc-help-btn" data-help="Le stockage peut être associé à une prise en charge et/ou une livraison de votre véhicule par HelixCar." aria-label="Aide sur le stockage automobile">i</button></span></label>
+           <label class="radio-opt"><input type="radio" name="type-service" value="convoyage" onclick="onChoixService()"><span>Convoyage automobile</span></label>
+           <label class="radio-opt"><input type="radio" name="type-service" value="professionnel" onclick="onChoixService()"><span>Trouver un professionnel automobile</span></label>
+-          <label class="radio-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService()"><span>Nettoyage automobile professionnel<span class="hc-opt-desc">Réservé aux entreprises</span></span></label>
++          <!-- LOT F01 (F01-010/011) — option réservée aux entreprises : pour un
++               particulier, le bouton radio est réellement désactivé
++               (nettSyncOptionService) et l'option grisée ; le serveur
++               applique la même interdiction (migration 111). -->
++          <label class="radio-opt" id="type-service-nettoyage-opt"><input type="radio" name="type-service" value="nettoyage" onclick="onChoixService()"><span>Nettoyage automobile professionnel<span class="hc-opt-desc" id="type-service-nettoyage-desc">Réservé aux entreprises</span></span></label>
+           <label class="radio-opt"><input type="radio" name="type-service" value="compte" onclick="onChoixService()"><span>Je souhaite simplement créer mon compte pour l'instant</span></label>
+         </div>
+       </div>
+@@ -6872,7 +6900,14 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+ 
+             <div class="modal-form-group">
+               <label id="pro-description-label">Décrivez la mission brièvement <span class="field-required">*</span></label>
+-              <textarea id="pro-description" rows="3" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
++              <!-- LOT F01 (F01-035/036, décision C01) — plafond de saisie :
++                   166 caractères pour « Mission », 156 pour « Type de
++                   mission » (Renfort), espaces et accents compris. Le
++                   maxlength suit la catégorie (_proMajPlafondDescription),
++                   le compteur reste discret, et le serveur applique la
++                   même limite (migration 111). -->
++              <textarea id="pro-description" rows="3" maxlength="166" oninput="proOnDescriptionInput()" onpaste="proOnDescriptionColle(event)" aria-describedby="pro-description-compteur" placeholder="Ex : recherche de panne et diagnostic électronique" style="width:100%;padding:11px 14px;font-size:.88rem;outline:none;box-sizing:border-box;resize:vertical;font-family:inherit"></textarea>
++              <div class="hc-compteur" id="pro-description-compteur" aria-live="polite">0 / 166 caractères</div>
+             </div>
+ 
+             <div class="modal-form-group">
+@@ -7000,7 +7035,9 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+ 
+           <div id="nett-contact-sp-moi" style="display:none">
+             <div id="nett-contact-sp-moi-valeur" style="display:none;font-size:.84rem;color:#444;background:#F7F6F3;border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+-            <div id="nett-contact-sp-moi-manque" style="display:none;font-size:.82rem;color:#8a5a2e;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
++            <!-- LOT F01 (F01-030) — composant HelixCar discret (.hc-note) à la
++                 place de l'encadré orange : fond inchangé, filet vertical. -->
++            <div id="nett-contact-sp-moi-manque" class="hc-note hc-note--info" role="status" style="display:none;margin-bottom:16px">Complétez votre nom et votre téléphone à l'étape 1 pour vous désigner comme contact sur place.</div>
+           </div>
+ 
+           <div id="nett-contact-sp-autre" style="display:none">
+@@ -7356,7 +7393,10 @@ body.hc-modal-open > *:not(.modal-overlay)::after {
+ 
+       </div>
+ 
+-      <div id="client-socle-msg" style="display:none;width:100%;background:#FEF6F0;border:1px solid rgba(224,122,63,.35);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.8rem;color:#8a5a2e;line-height:1.5">
++      <!-- LOT F01 (F01-030) — même composant discret que le reste du
++           formulaire ; ce message n'est plus jamais affiché (parcours
++           tous construits), il garde son identifiant pour la reprise. -->
++      <div id="client-socle-msg" class="hc-note hc-note--info" role="status" style="display:none;width:100%;margin-bottom:10px">
+         Ce parcours est en cours de préparation chez HelixCar et n'est pas encore disponible à la soumission. Vous pouvez déjà le sélectionner ; nous vous préviendrons dès qu'il sera activé.
+       </div>
+       <div class="form-step-nav" id="client-step-nav">
+@@ -7975,6 +8015,10 @@ function _renderFormStep(type) {
+   if (type === 'client' && typeof _clientLibererBoutonContinuer === 'function') {
+     _clientLibererBoutonContinuer();
+     if (typeof _clientPurgerBranchesInactives === 'function') _clientPurgerBranchesInactives();
++    // LOT F01 (F01-010) — l'option de service réservée aux entreprises
++    // est resynchronisée à chaque rendu : réinitialisation, reprise de
++    // brouillon et espace client intégré passent tous par ici.
++    if (typeof nettSyncOptionService === 'function') nettSyncOptionService();
+   }
+ 
+   container.querySelectorAll('.form-step').forEach(function(el) {
+@@ -8241,6 +8285,40 @@ function _nettConditions() {
+     eau_electricite: !!(document.getElementById('nett-elig-eau-elec') || {}).checked
+   };
+ }
++// LOT F01 (F01-010/011) — L'OPTION DE SERVICE ELLE-MEME EST RESERVEE.
++// Un particulier voit « Nettoyage automobile professionnel » grisé,
++// avec « Réservé aux entreprises », et ne peut pas le cocher : le bouton
++// radio est reellement desactive (souris, clavier, tactile). Si le
++// statut redevient « Particulier » alors que ce service etait choisi,
++// le choix est retire et la progression revient a l'etape du service :
++// aucune demande de nettoyage ne peut plus partir d'un particulier —
++// et le serveur applique la meme regle (migration 111).
++// Appelee a chaque changement de type de client, a chaque rendu
++// d'etape (reinitialisation, brouillon, espace client integre) : une
++// seule source de verite, #client-type.
++function nettSyncOptionService() {
++  var opt = document.querySelector('#modal-client input[name="type-service"][value="nettoyage"]');
++  if (!opt) return;
++  var pro = _nettEstProfessionnel();
++  opt.disabled = !pro;
++  opt.setAttribute('aria-disabled', pro ? 'false' : 'true');
++  var lab = opt.closest('label');
++  if (lab) {
++    lab.classList.toggle('hc-opt-reservee', !pro);
++    lab.setAttribute('aria-disabled', pro ? 'false' : 'true');
++    if (!pro) lab.setAttribute('title', 'Réservé aux entreprises'); else lab.removeAttribute('title');
++  }
++  if (!pro && opt.checked) {
++    opt.checked = false;
++    lab && lab.classList.remove('selected');
++    // Plus aucun service choisi : les etapes au-dela du choix du service
++    // ne sont plus atteintes, et l'etape courante y revient.
++    _etapeMax = Math.min(_etapeMax, 2);
++    if (_formStepState.client > 2) _formStepState.client = 2;
++    if (typeof onChoixService === 'function') onChoixService();
++  }
++}
++
+ // Resynchronise l'affichage du statut pro. Appele quand #client-type
+ // change (etape 1) et a chaque recalcul d'eligibilite.
+ function nettSyncStatutPro() {
+@@ -9712,6 +9790,70 @@ function _proHeureFin() { return ((document.getElementById('pro-horaire-cfin') |
+ function _proDescription() { return ((document.getElementById('pro-description') || {}).value || '').trim(); }
+ function _proInfos() { return ((document.getElementById('pro-infos') || {}).value || '').trim(); }
+ 
++// ── LOT F01 (F01-035/036, décision C01) — PLAFONDS DE SAISIE ─────────
++// « Mission » (Technicien) : 166 caractères ; « Type de mission »
++// (Renfort) : 156 caractères. Espaces, virgules et accents comptent
++// pour un caractère chacun : c'est la longueur JavaScript du texte, la
++// même que char_length() côté serveur (migration 111). Les deux
++// chaînes de référence font EXACTEMENT 166 et 156 caractères.
++var PRO_PLAFOND_DESCRIPTION = { mission: 166, type_mission: 156 };
++function _proPlafondDescription() {
++  return (_proCategorie() === 'renfort') ? PRO_PLAFOND_DESCRIPTION.type_mission
++                                          : PRO_PLAFOND_DESCRIPTION.mission;
++}
++// Longueur RÉELLE du texte saisi (sans le trim : les espaces comptent).
++function _proLongueurDescription() {
++  return ((document.getElementById('pro-description') || {}).value || '').length;
++}
++function _proDescriptionTropLongue() {
++  return _proLongueurDescription() > _proPlafondDescription();
++}
++function _proMessagePlafond() {
++  var max = _proPlafondDescription(), n = _proLongueurDescription();
++  return 'Limite de ' + max + ' caractères, espaces et accents compris (' + n + ' saisis) : raccourcissez le texte.';
++}
++// Le maxlength et le compteur suivent la catégorie choisie. Un texte
++// restauré d'un brouillon n'est JAMAIS tronqué : le compteur passe en
++// rouge et la validation refuse la soumission tant qu'il dépasse.
++function _proMajPlafondDescription() {
++  var el = document.getElementById('pro-description');
++  if (!el) return;
++  var max = _proPlafondDescription();
++  el.setAttribute('maxlength', String(max));
++  var cpt = document.getElementById('pro-description-compteur');
++  if (cpt) {
++    var n = _proLongueurDescription();
++    cpt.textContent = n + ' / ' + max + ' caractères';
++    cpt.classList.toggle('hc-compteur--depasse', n > max);
++  }
++}
++function proOnDescriptionInput() {
++  _proMajPlafondDescription();
++  if (!_proDescriptionTropLongue()) _clearFieldError('pro-description');
++  else _showFieldError('pro-description', _proMessagePlafond());
++  _proMajBoutonContinuer();
++}
++// Collage : le navigateur applique le maxlength (le texte collé est
++// ramené à la limite). Ce n'est jamais silencieux — le client en est
++// informé par le même message discret, sous le champ.
++function proOnDescriptionColle(e) {
++  var el = document.getElementById('pro-description');
++  if (!el) return;
++  var colle = '';
++  try { colle = (e && e.clipboardData) ? (e.clipboardData.getData('text') || '') : ''; } catch (err) { colle = ''; }
++  var max = _proPlafondDescription();
++  var selection = Math.max(0, (el.selectionEnd || 0) - (el.selectionStart || 0));
++  var attendu = (el.value || '').length - selection + colle.length;
++  setTimeout(function () {
++    _proMajPlafondDescription();
++    if (attendu > max) {
++      _showFieldError('pro-description',
++        'Texte collé raccourci à ' + max + ' caractères, espaces et accents compris (' + attendu + ' collés) : vérifiez votre saisie.');
++    }
++    _proMajBoutonContinuer();
++  }, 0);
++}
++
+ // Duree REELLEMENT deduite des deux dates : jamais demandee au client,
+ // jamais inventee. Retourne 0 tant que la periode est incomplete.
+ function _proDureeJours() {
+@@ -9877,6 +10019,9 @@ function proOnCategorieChange() {
+                                           : 'Décrivez la mission brièvement') +
+       ' <span class="field-required">*</span>';
+   }
++  // LOT F01 (F01-035/036) — le plafond suit le libellé : 156 pour
++  // « Type de mission », 166 pour « Mission ».
++  if (typeof _proMajPlafondDescription === 'function') _proMajPlafondDescription();
+ 
+   proOnMetierChange();
+   _proMajNumerosRubriques();
+@@ -9987,6 +10132,13 @@ function _proValiderRubrique(cle, fail) {
+ 
+   if (cle === 'mission') {
+     if (!_checkRequiredText('pro-description', null, true)) ko('pro-description');
++    // LOT F01 (F01-035/036) — un texte au-dela du plafond (par exemple
++    // restaure d'un brouillon) est refuse a la soumission, jamais
++    // tronque en silence : meme regle que le serveur (migration 111).
++    else if (_proDescriptionTropLongue()) {
++      _showFieldError('pro-description', _proMessagePlafond());
++      ko('pro-description');
++    }
+     return ok;   // informations complementaires : reellement facultatives
+   }
+   return true;
+@@ -10039,7 +10191,7 @@ function _proRubriqueComplete(cle) {
+     if (_proMemeJour() && _proHeureFin() <= _proHeureDebut()) return false;
+     return true;
+   }
+-  if (cle === 'mission') return !!_proDescription();
++  if (cle === 'mission') return !!_proDescription() && !_proDescriptionTropLongue();
+   return true;
+ }
+ 
+@@ -15291,6 +15443,10 @@ function toggleClientType() {
+     if (sir) sir.value = '';
+   }
+ 
++  // LOT F01 (F01-010) — l'option « Nettoyage automobile professionnel »
++  // suit immédiatement le statut : réservée aux entreprises.
++  if (typeof nettSyncOptionService === 'function') nettSyncOptionService();
++
+ }
+ 
+ 
+@@ -16209,6 +16365,23 @@ async function _submitClientFormInterne() {
+         // l'usage du développeur. Le client, lui, lit une phrase qu'il
+         // peut comprendre et suivre.
+         console.error('Echec de creation de la demande :', r && r.error);
++        // LOT F01 — refus MÉTIER du serveur (migration 111) : la phrase
++        // dit ce qui bloque et comment corriger. Jamais le message SQL.
++        var _erreurSrv = String((r && r.error) || '');
++        if (_erreurSrv.indexOf('HC_RESERVE_ENTREPRISES') !== -1) {
++          _hcAfficherBandeauErreur(
++            'Le nettoyage automobile professionnel est réservé aux entreprises. '
++            + 'Indiquez « Professionnel / Entreprise » à l\'étape 1, ou choisissez un autre service. '
++            + 'Rien n\'a été enregistré et vos informations sont conservées.');
++          return;
++        }
++        if (_erreurSrv.indexOf('HC_PLAFOND_TYPE_MISSION') !== -1 || _erreurSrv.indexOf('HC_PLAFOND_MISSION') !== -1) {
++          var _maxSrv = (_erreurSrv.indexOf('HC_PLAFOND_TYPE_MISSION') !== -1) ? 156 : 166;
++          _hcAfficherBandeauErreur(
++            'Le texte de la mission dépasse la limite de ' + _maxSrv + ' caractères, espaces et accents compris. '
++            + 'Raccourcissez-le puis renvoyez votre demande. Rien n\'a été enregistré et vos informations sont conservées.');
++          return;
++        }
+         _hcAfficherBandeauErreur(
+           'Votre demande n\'a pas pu être enregistrée. '
+           + 'Rien n\'a été validé et vos informations sont conservées : '
+@@ -16556,6 +16729,9 @@ function openModal(type) {
+   // « Devenir client » (jamais pour le convoyeur, hors périmètre),
+   // après le reset d'étape ci-dessus (DOM propre avant restauration).
+   if (type === 'client') _restaurerBrouillonClientSiPresent();
++  // LOT F01 (F01-010) — dès l'ouverture, l'option « Nettoyage automobile
++  // professionnel » reflète le type de client (particulier par défaut).
++  if (type === 'client' && typeof nettSyncOptionService === 'function') nettSyncOptionService();
+ 
+ }
+ 

@@ -1,0 +1,11 @@
+const L=require('./lib'),{urlFichier}=require('./env');
+(async()=>{const b=await L.launch();try{for(const width of [390,1280]){const p=await b.newPage({viewport:{width,height:1000}});await p.route('https://**/*',r=>r.abort());await p.addInitScript(()=>{window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})}})};});await p.goto(urlFichier('index.html'));await p.evaluate(()=>{openModal('convoyeur');enhanceDocZone('conv-doc-photo');});
+L.check(width+' photo sous permis',await p.evaluate(()=>document.getElementById('conv-zone-permis').nextElementSibling.id==='conv-zone-photo'));
+L.check(width+' photo obligatoire',await p.evaluate(()=>_docsPartenaireManquants().some(d=>d.input==='conv-doc-photo')));
+await p.locator('#conv-doc-photo').setInputFiles({name:'test.pdf',mimeType:'application/pdf',buffer:Buffer.from('pdf')});
+L.check(width+' PDF refusé',await p.evaluate(()=>!_fichierPresent('conv-doc-photo')));
+await p.locator('#conv-doc-photo').setInputFiles({name:'photo.jpg',mimeType:'image/jpeg',buffer:Buffer.from('test-jpg')});
+L.check(width+' JPG accepté',await p.evaluate(()=>!_docsPartenaireManquants().some(d=>d.input==='conv-doc-photo')));
+const r=await p.evaluate(async()=>{_convJetonEnvoi='test-token';window._convAppelerFonctionVideo=async(action,body)=>({action,body});return _convEnvoyerPhotoInscription();});
+L.check(width+' photo liée au jeton du dossier',r.action==='photo'&&r.body.jeton==='test-token'&&r.body.mime==='image/jpeg'&&!!r.body.base64);
+await p.close();}}finally{await b.close();}process.exitCode=L.results()?1:0;})().catch(e=>{console.error(e);process.exitCode=1});

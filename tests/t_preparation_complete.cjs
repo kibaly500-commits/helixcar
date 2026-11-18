@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('dashboard.html','utf8'),HCPreparation=require('../assets/preparation-missions'),HCPlanningCalcul=require('../assets/planning-calcul');
+const c={id:'client',type_service:'stockage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar',stockage_date_debut:'2026-11-08',stockage_date_fin:'2026-11-16',_vehicules:[{id:'v',date_prise_en_charge:'2026-11-08',date_livraison:'2026-11-16'}]};
+const ctx={window:{HCPreparation},HCPreparation,HCPlanningCalcul,_preparationsParDemande:{}};vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function preparationDemandeComplete('),html.indexOf('\nfunction ',html.indexOf('function preparationDemandeComplete(')+10)),ctx);
+const plans=HCPreparation.build(c,c._vehicules,HCPlanningCalcul.POINT);assert.equal(plans.length,2);assert.equal(ctx.preparationDemandeComplete(c),false);
+ctx._preparationsParDemande.client=plans.map((p,i)=>({cle:p.key,plan:p,mission_id:i?'m1':null}));assert.equal(ctx.preparationDemandeComplete(c),false);
+ctx._preparationsParDemande.client[0].mission_id='m0';assert.equal(ctx.preparationDemandeComplete(c),true);
+const p=plans[0];p.distance=235;p.distance_restitution=22;p.mission.restitution=true;p.rows.push({label:'Garde avant réception',value:'ancien texte'});
+const pub=HCPreparation.publicData(p);assert.equal(pub.rows.find(r=>r.label==='Distance restitution').value,'22 km');assert.ok(!pub.rows.some(r=>r.label==='Garde avant réception'));
+console.log('PASS préparation : partielle visible, complète masquée, distance restitution séparée, texte de nuit retiré.');

@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const P=require('../assets/preparation-missions.js'),B=require('../assets/mission-budget.js'),C=require('../assets/planning-calcul.js');
+const code=fs.readFileSync('assets/preparation-missions-ui.js','utf8');
+const client={id:'client-test',type_service:'convoyage',stockage_acheminement:'helixcar',stockage_sortie:'helixcar'};
+const vehicle={id:'v',position:1,type_vehicule:'berline',marque_modele:'Test',ville_depart:'Paris',ville_arrivee:'Lille',date_prise_en_charge:'2026-11-17',date_livraison:'2026-11-22',heure_prise_en_charge:'14:30',heure_livraison:'14:30'};
+const source={client,vehicules:[vehicle],devis_id:'d',empreinte:'fingerprint',brouillons:[]};
+const reorder=v=>Array.isArray(v)?v.map(reorder):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().reverse().map(k=>[k,reorder(v[k])])):v;
+const memory=new Map();let lastPayload;
+const ctx={state:null,editVersion:0,window:{_currentAdmin:{id:'admin-a'}},localStorage:{setItem:(k,v)=>memory.set(k,v),getItem:k=>memory.get(k),removeItem:k=>memory.delete(k)},HCPreparation:P,HCMissionBudget:B,HCPlanningCalcul:C,note(){},readEdits(){},budgetErrors:()=>[],rpc:async(name,args)=>{lastPayload=args;return reorder({...source,brouillons:args.p_plans.map(p=>({id:'saved',cle:p.key,empreinte:'fingerprint',plan:p,annonce:p.public}))});}};
+vm.createContext(ctx);vm.runInContext(code.slice(code.indexOf('  function stable('),code.indexOf('  window.ouvrirPreparationDemande=')),ctx);
+vm.runInContext(code.slice(code.indexOf('  async function save('),code.indexOf("  modal.addEventListener('input'")),ctx);
+(async()=>{
+ ctx.adopt(source);let p=ctx.state.plans[0];p.remuneration=500;p.distance=224;p.distance_aller=224;p.distance_basis='outbound_v1';
+ const org=JSON.stringify(p.organisation);assert.notEqual(org,JSON.stringify(reorder(p.organisation)));
+ await ctx.save();assert.equal(ctx.state.plans[0].remuneration,500);assert.equal(ctx.state.plans[0].distance,224);
+ assert.equal(P.publicData(ctx.state.plans[0]).remuneration,500);
+ assert.equal(lastPayload.p_plans[0].public.remuneration,500);
+ const reopened=structuredClone(ctx.state.source);ctx.adopt(reopened);assert.equal(ctx.state.plans[0].remuneration,500);
+ ctx.state.plans[0].remuneration=475;ctx.backup();ctx.adopt(reopened);ctx.restoreDraft();assert.equal(ctx.state.plans[0].remuneration,475);
+ ctx.window._currentAdmin.id='admin-b';ctx.adopt(reopened);ctx.restoreDraft();assert.equal(ctx.state.plans[0].remuneration,500);
+ ctx.window._currentAdmin.id='admin-a';ctx.adopt({...reopened,empreinte:'changed'});ctx.restoreDraft();assert.notEqual(ctx.state.plans[0].remuneration,475);
+ console.log('PASS persistance : ordre JSONB, sauvegarde/relecture, prix et kilomètres aperçu, secours local, isolation administrateur et source modifiée.');
+})();

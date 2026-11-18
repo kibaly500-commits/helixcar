@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('edl.html','utf8');const source=html.slice(html.indexOf('let edlSubmissionId='),html.indexOf("document.addEventListener('input',planifierSauvegardeEdl)"));
+(async()=>{const fields=[{id:'v-km',value:'10000'},{id:'v-obs',value:'TEST brouillon'}],nodes=new Map(),saved=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{id,classList:{add(){}},style:{},setAttribute(){},after(){}});return nodes.get(id);};fields.forEach(f=>nodes.set(f.id,f));
+const ctx=vm.createContext({crypto,console,setTimeout,clearTimeout,structuredClone,currentMission:{id:'mission-preparee',preparation_id:'preparation',devis_source_id:null},PHASE:'depart',user:'compte-a',photos:{avant:'photo-test',avg:'photo-avant-gauche'},dmgPhotos:{},dmgTypes:{},dmgPins:{},etat:'bon',sigHas:false,sc:{toDataURL:()=>''},document:{getElementById:node,querySelectorAll:()=>fields,querySelector:()=>null,createElement:()=>node('edl-brouillon-status')},updCtr(){},sbAuth:{auth:{getSession:async()=>({data:{session:{user:{id:ctx.user}}}})}}});
+vm.runInContext(source,ctx);
+ctx.operationBrouillonEdl=async(mode,action)=>{const key=await ctx.cleBrouillonEdl();const store={put:(value,k)=>{saved.set(k,structuredClone(value));return{result:k}},get:k=>({result:structuredClone(saved.get(k))}),delete:k=>{saved.delete(k);return{}}};return action(store,key).result;};
+await ctx.sauvegarderBrouillonEdl();assert.equal(saved.size,1);fields.forEach(f=>f.value='');ctx.photos={};await ctx.restaurerBrouillonEdl();assert.equal(fields[0].value,'10000');assert.equal(fields[1].value,'TEST brouillon');assert.equal(ctx.photos.avg,'photo-avant-gauche');console.log('PASS mission préparée sans devis_source : champs et photos restaurés');
+ctx.user='compte-b';fields.forEach(f=>f.value='');ctx.photos={};await ctx.restaurerBrouillonEdl();assert.equal(fields[0].value,'');assert.equal(Object.keys(ctx.photos).length,0);console.log('PASS brouillon isolé par compte');
+ctx.user='compte-a';ctx.PHASE='arrivee';await ctx.restaurerBrouillonEdl();assert.equal(fields[0].value,'');console.log('PASS brouillon isolé par étape');
+ctx.PHASE='depart';await ctx.supprimerBrouillonEdl();assert.equal(saved.size,0);console.log('PASS brouillon supprimé seulement après succès');
+assert.ok(!html.includes('#FFD94A'));console.log('PASS survol du bouton sans ancien jaune');
+})().catch(e=>{console.error(e);process.exitCode=1;});

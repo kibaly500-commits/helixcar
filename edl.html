@@ -2,23 +2,24 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HelixCar — État des lieux</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/documents-mission.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
   (function(){ try { emailjs.init({ publicKey: "8LNUJ1IVKWDZKv6VH" }); } catch(e){ console.error("EmailJS init error", e); } })();
 </script>
 <style>
-:root{--y:#F5C518;--bk:#0D0D0D;--nv:#0A1628;--bl:#2556A8;--wh:#FAFAF7;--gr:#8A8A8A;--gl:#F0EFE9;--gn:#22C55E;--rd:#EF4444;--or:#F97316;--t:.25s ease}
+:root{--y:#B32637;--bk:#0D0D0D;--nv:#182126;--bl:#B32637;--wh:#FFFFFF;--gr:#8A8A8A;--gl:#F4F5F6;--gn:#22C55E;--rd:#EF4444;--or:#F97316;--t:.25s ease}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{font-family:'DM Sans',sans-serif;background:var(--gl);color:var(--bk);min-height:100vh}
 .hdr{background:var(--nv);color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:60}
 .logo{display:flex;align-items:center;gap:8px;font-family:'Syne',sans-serif;font-weight:800;font-size:.98rem}
 .lb{width:25px;height:25px;background:var(--y);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:800;color:var(--bk)}
 .pb{padding:4px 11px;border-radius:100px;font-size:.7rem;font-weight:700}
-.pd{background:rgba(245,197,24,.2);color:var(--y)}.pa{background:rgba(34,197,94,.2);color:var(--gn)}
+.pd{background:rgba(179,38,55,.2);color:var(--y)}.pa{background:rgba(34,197,94,.2);color:var(--gn)}
 .pw{background:var(--nv);padding:0 18px 9px}
 .ps{display:flex;gap:3px}.psi{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.1);transition:background .4s}
 .psi.done{background:var(--gn)}.psi.active{background:var(--y)}
@@ -37,7 +38,7 @@ html,body{font-family:'DM Sans',sans-serif;background:var(--gl);color:var(--bk);
 .eb .ei{font-size:1.1rem;display:block;margin-bottom:2px}
 .eb.sm{border-color:var(--rd);background:rgba(239,68,68,.06);color:var(--rd)}
 .eb.sa{border-color:var(--or);background:rgba(249,115,22,.06);color:var(--or)}
-.eb.sb{border-color:var(--bl);background:rgba(37,86,168,.06);color:var(--bl)}
+.eb.sb{border-color:var(--bl);background:rgba(179,38,55,.06);color:var(--bl)}
 .eb.se{border-color:var(--gn);background:rgba(34,197,94,.06);color:var(--gn)}
 .stl{font-family:'Syne',sans-serif;font-weight:800;font-size:.82rem;color:var(--nv);margin:8px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--gl);display:flex;align-items:center;gap:6px}
 .pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:5px}
@@ -67,7 +68,7 @@ html,body{font-family:'DM Sans',sans-serif;background:var(--gl);color:var(--bk);
 .dcs{display:flex;flex-direction:column;gap:0;border-radius:10px;overflow:hidden}
 .dci{padding:10px 13px;background:rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);color:#fff;font-size:.83rem;cursor:pointer;transition:background var(--t);display:flex;align-items:center;gap:8px}
 .dci:last-child{border-bottom:none}
-.dci:hover{background:rgba(245,197,24,.18);color:var(--y)}
+.dci:hover{background:rgba(179,38,55,.18);color:var(--y)}
 .dci input{flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:.8rem;font-family:'DM Sans',sans-serif}
 .dci input::placeholder{color:rgba(255,255,255,.3)}
 .doi-acts{display:flex;gap:7px}
@@ -80,10 +81,10 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 .sigact{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--gl);border-top:1px solid #e0e0e0}
 .siglbl{font-size:.7rem;color:var(--gr)}.sigclr{font-size:.7rem;color:var(--rd);cursor:pointer;font-weight:600;background:none;border:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 20px;border-radius:9px;cursor:pointer;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:.84rem;transition:all var(--t);width:100%}
-.btn-y{background:var(--y);color:var(--bk)}.btn-y:hover{background:#FFD94A}
+.btn-y{background:var(--y);color:var(--bk)}.btn-y:hover{background:#8D1E2C;color:#fff}
 .btn-dk{background:var(--bk);color:#fff}.btn-ol{border:1.5px solid #ddd;background:transparent;color:var(--bk)}
 .alert{padding:9px 12px;border-radius:7px;font-size:.78rem;margin-bottom:11px;display:flex;align-items:flex-start;gap:6px;line-height:1.5}
-.ai{background:rgba(37,86,168,.08);color:var(--bl);border:1px solid rgba(37,86,168,.2)}
+.ai{background:rgba(179,38,55,.08);color:var(--bl);border:1px solid rgba(179,38,55,.2)}
 [id^="step-"]{display:none}
 .sticky{position:fixed;bottom:0;left:0;right:0;background:var(--wh);padding:11px 14px;border-top:1px solid #e0e0e0;z-index:50}
 .sticky-inner{max-width:620px;margin:0 auto;display:flex;gap:7px}
@@ -97,7 +98,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 .rrow:last-child{border-bottom:none}
 .rrow span:first-child{color:var(--gr)}.rrow span:last-child{font-weight:600}
 /* highlight overlay on slot */
-.slot-highlight{position:absolute;border-radius:50%;background:rgba(245,197,24,.45);border:2.5px solid var(--y);pointer-events:none;animation:pulse-hl 1.5s infinite}
+.slot-highlight{position:absolute;border-radius:50%;background:rgba(179,38,55,.45);border:2.5px solid var(--y);pointer-events:none;animation:pulse-hl 1.5s infinite}
 @keyframes pulse-hl{0%,100%{opacity:1}50%{opacity:.4}}
   @media (max-width: 480px) {
     .pgrid { grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -107,6 +108,8 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     .eo { gap: 5px; }
     .eb { padding: 7px 4px; font-size: .68rem; }
   }
+
+.btn-y,.lb{color:#fff}.pd{color:#ffb8c1}.pl{color:#c5cbd0}.fg input,.fg select,.fg textarea{min-height:44px}.photo-guide{font-size:.75rem;line-height:1.5;color:#49545c;margin:8px 0 14px}.angle-guide{padding:5px 8px 9px;font-size:.65rem;line-height:1.4;text-align:center;color:#49545c}.pslot.done .angle-guide{display:none}
 </style>
 </head>
 <body>
@@ -124,17 +127,17 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 <div id="screen-code" style="max-width:480px;margin:40px auto;text-align:center;padding:0 16px">
   <div class="card" style="padding:32px">
     <div style="font-size:2.5rem;margin-bottom:12px">🔑</div>
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;margin-bottom:8px">Code de mission requis</div>
-    <p style="font-size:.85rem;color:var(--gr);margin-bottom:24px;line-height:1.6">Entrez le code de mission fourni dans votre email de confirmation pour accéder à l'état des lieux.</p>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;margin-bottom:8px">Code de l’état des lieux</div>
+    <p style="font-size:.85rem;color:var(--gr);margin-bottom:24px;line-height:1.6">Ouvrez cette étape depuis « Mes missions » ou saisissez son code. Connectez-vous avec le compte partenaire affecté à la mission.</p>
     <div class="fg" style="margin-bottom:16px">
-      <label>Code de mission</label>
-      <input type="text" id="mission-code-input" placeholder="Ex : HC-2024-0529" style="text-transform:uppercase;font-weight:700;letter-spacing:.1em;font-size:1rem;text-align:center" oninput="this.value=this.value.toUpperCase()">
+      <label for="mission-code-input">Code de l’état des lieux</label>
+      <input type="text" id="mission-code-input" placeholder="HC-2026-0019/DEP" style="text-transform:uppercase;font-weight:700;letter-spacing:.1em;font-size:1rem;text-align:center" >
     </div>
     <div id="code-error" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px;font-size:.8rem;color:var(--rd);margin-bottom:12px">
       ⚠️ Code invalide. Vérifiez votre email de confirmation HelixCar.
     </div>
     <button class="btn btn-y" onclick="validateMissionCode()">Accéder à l'état des lieux →</button>
-    <p style="font-size:.75rem;color:var(--gr);margin-top:16px">Ce code vous a été envoyé par email lors de la confirmation de votre mission.</p>
+    <p style="font-size:.75rem;color:var(--gr);margin-top:16px">Chaque étape possède son code : DEP, ARR, RDEP ou RARR.</p>
   </div>
 </div>
 
@@ -149,7 +152,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     <div class="fr">
       <div class="fg"><label>Immatriculation</label><input id="v-immat" value="" style="text-transform:uppercase;font-weight:700"></div>
     <div class="fg"><label>N° VIN (châssis)</label>
-      <div style="background:rgba(37,86,168,.06);border:1px solid rgba(37,86,168,.2);border-radius:8px;padding:9px 12px;font-size:.78rem;color:var(--bl);margin-bottom:8px;line-height:1.5">
+      <div style="background:rgba(179,38,55,.06);border:1px solid rgba(179,38,55,.2);border-radius:8px;padding:9px 12px;font-size:.78rem;color:var(--bl);margin-bottom:8px;line-height:1.5">
         📸 Vous n'avez pas besoin de saisir le VIN. Prenez simplement une photo du numéro de châssis à l'étape suivante.
       </div>
     </div>
@@ -188,22 +191,12 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     <div class="pctr"><span>Extérieur</span><span><strong id="ext-c">0</strong>/8</span></div>
 
     <div class="stl">🔑 Numéro de châssis (VIN) — obligatoire</div>
-    <div class="alert" style="background:rgba(37,86,168,.06);border:1px solid rgba(37,86,168,.2);border-radius:8px;padding:9px 12px;font-size:.78rem;color:var(--bl);margin-bottom:10px">
+    <div class="alert" style="background:rgba(179,38,55,.06);border:1px solid rgba(179,38,55,.2);border-radius:8px;padding:9px 12px;font-size:.78rem;color:var(--bl);margin-bottom:10px">
       Photographiez le numéro VIN du véhicule. Son emplacement peut varier selon le modèle : il est généralement visible en bas du pare-brise côté conducteur ou sur une plaque située dans le compartiment moteur.
     </div>
     <div class="pgrid" style="grid-template-columns:1fr;margin-bottom:12px">
       <div class="pslot" id="sl-vin" onclick="triggerPhotoNoDmg('vin')" style="min-height:110px">
-        <svg class="slot-ill" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-          <rect x="10" y="12" width="280" height="76" rx="8" fill="#F8F8F8" stroke="#CCCCCC" stroke-width="1.5"/>
-          <rect x="20" y="24" width="165" height="48" rx="4" fill="#E8E8E8" stroke="#AAAAAA" stroke-width="1"/>
-          <text x="102" y="51" text-anchor="middle" font-size="10" fill="#1A1A1A" font-family="monospace" font-weight="900" letter-spacing="2">VF1AB12CD34E56789</text>
-          <text x="102" y="64" text-anchor="middle" font-size="6.5" fill="#666" font-family="Arial">NUMÉRO DE CHÂSSIS / VIN</text>
-          <circle cx="248" cy="48" r="26" fill="#1A1A1A" stroke="#0A0A0A" stroke-width="1.5"/>
-          <circle cx="248" cy="48" r="19" fill="#555"/>
-          <circle cx="248" cy="48" r="7" fill="#888"/>
-          <circle cx="248" cy="43" r="2.5" fill="#AAA"/>
-          <text x="155" y="95" text-anchor="middle" font-size="8.5" fill="#333" font-family="Arial" font-weight="700">📸 PHOTOGRAPHIER LE NUMÉRO DE CHÂSSIS</text>
-        </svg>
+        <img class="slot-ill" src="assets/edl-exemples/vin.svg" alt="Numéro de châssis lisible"><span class="angle-guide">Faites un gros plan net des 17 caractères du VIN. Évitez les reflets ; le numéro entier doit être lisible.</span>
         <span class="slot-req" style="margin-bottom:6px">Obligatoire</span>
         <img class="slot-prev" id="pv-vin"><div class="slot-ck">✓</div><div class="slot-dmg">⚠</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhotoNoDmg('vin')">↺</button>
@@ -214,18 +207,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 
       <!-- FACE AVANT : vraie berline vue de face -->
       <div class="pslot" id="sl-avant" onclick="triggerPhoto('avant')">
-<svg class="slot-ill" viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <ellipse cx="150" cy="196" rx="130" ry="10" fill="#eee"/>
-  <path d="M55 175 C55 120 78 68 150 60 C222 68 245 120 245 175 L245 190 C245 197 238 201 230 201 L70 201 C62 201 55 197 55 190 Z" fill="#111"/>
-  <path d="M96 100 C108 78 126 66 150 64 C174 66 192 78 204 100 L204 122 L96 122 Z" fill="#fff" stroke="#111" stroke-width="2"/>
-  <line x1="150" y1="64" x2="150" y2="122" stroke="#111" stroke-width="2"/>
-  <ellipse cx="80" cy="150" rx="22" ry="15" fill="#fff" stroke="#111" stroke-width="1.5"/>
-  <ellipse cx="220" cy="150" rx="22" ry="15" fill="#fff" stroke="#111" stroke-width="1.5"/>
-  <rect x="115" y="150" width="70" height="20" rx="4" fill="#333"/>
-  <ellipse cx="88" cy="201" rx="28" ry="11" fill="#111"/>
-  <ellipse cx="212" cy="201" rx="28" ry="11" fill="#111"/>
-  <text x="150" y="216" text-anchor="middle" font-size="12" fill="#333" font-family="Arial" font-weight="700" letter-spacing="1">FACE AVANT</text>
-</svg>
+<img class="slot-ill" src="assets/edl-exemples/avant.svg" alt="Vue de face — avant"><span class="angle-guide">Placez-vous face au véhicule. Cadrez toute la largeur, les feux et le pare-chocs, sans couper les coins.</span>
         <span class="slot-lbl">Face avant</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-avant"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('avant')">↺</button>
@@ -233,17 +215,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 
       <!-- FACE ARRIÈRE -->
       <div class="pslot" id="sl-arriere" onclick="triggerPhoto('arriere')">
-<svg class="slot-ill" viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <ellipse cx="150" cy="196" rx="130" ry="10" fill="#eee"/>
-  <path d="M55 175 C55 120 78 68 150 60 C222 68 245 120 245 175 L245 190 C245 197 238 201 230 201 L70 201 C62 201 55 197 55 190 Z" fill="#111"/>
-  <path d="M98 100 C110 78 128 66 150 64 C172 66 190 78 202 100 L202 122 L98 122 Z" fill="#fff" stroke="#111" stroke-width="2"/>
-  <ellipse cx="80" cy="150" rx="18" ry="12" fill="#C0392B" stroke="#111" stroke-width="1.5"/>
-  <ellipse cx="220" cy="150" rx="18" ry="12" fill="#C0392B" stroke="#111" stroke-width="1.5"/>
-  <rect x="115" y="160" width="70" height="14" rx="3" fill="#333"/>
-  <ellipse cx="88" cy="201" rx="28" ry="11" fill="#111"/>
-  <ellipse cx="212" cy="201" rx="28" ry="11" fill="#111"/>
-  <text x="150" y="216" text-anchor="middle" font-size="12" fill="#333" font-family="Arial" font-weight="700" letter-spacing="1">FACE ARRIÈRE</text>
-</svg>
+<img class="slot-ill" src="assets/edl-exemples/arriere.svg" alt="Vue de face — arrière"><span class="angle-guide">Placez-vous face au véhicule. Cadrez toute la largeur, les feux et le pare-chocs, sans couper les coins.</span>
         <span class="slot-lbl">Face arrière</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-arriere"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('arriere')">↺</button>
@@ -255,19 +227,7 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 
       <!-- CÔTÉ GAUCHE : vraie berline de profil -->
       <div class="pslot" id="sl-gauche" onclick="triggerPhoto('gauche')">
-        <svg class="slot-ill" viewBox="0 0 440 200" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <ellipse cx="220" cy="188" rx="185" ry="8" fill="#eee"/>
-  <path d="M45 130 C45 95 68 82 95 80 L155 52 C170 44 270 44 288 54 L345 80 C375 82 395 95 395 130 L395 150 C395 158 387 162 377 162 L63 162 C53 162 45 158 45 150 Z" fill="#111"/>
-  <path d="M170 80 L182 55 C190 47 250 47 260 56 L275 80 Z" fill="#fff" stroke="#111" stroke-width="2"/>
-  <line x1="222" y1="80" x2="222" y2="55" stroke="#111" stroke-width="2"/>
-  <circle cx="130" cy="163" r="34" fill="#111"/>
-  <circle cx="130" cy="163" r="15" fill="#999"/>
-  <circle cx="320" cy="163" r="34" fill="#111"/>
-  <circle cx="320" cy="163" r="15" fill="#999"/>
-  <text x="22" y="16" font-size="11" fill="#666" font-family="Arial" font-weight="700">◀ AVANT</text>
-  <text x="418" y="16" text-anchor="end" font-size="11" fill="#666" font-family="Arial" font-weight="700">ARRIÈRE ▶</text>
-  <text x="220" y="196" text-anchor="middle" font-size="12" fill="#333" font-family="Arial" font-weight="700" letter-spacing="1">CÔTÉ GAUCHE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/gauche.svg" alt="Profil gauche"><span class="angle-guide">Photographiez le côté gauche en entier, de profil : les deux roues, les portes et les deux extrémités doivent être visibles.</span>
         <span class="slot-lbl">Côté gauche</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-gauche"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('gauche')">↺</button>
@@ -275,156 +235,76 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
 
       <!-- CÔTÉ DROIT : miroir du gauche -->
       <div class="pslot" id="sl-droit" onclick="triggerPhoto('droit')">
-        <svg class="slot-ill" viewBox="0 0 440 200" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <ellipse cx="220" cy="188" rx="185" ry="8" fill="#eee"/>
-  <path d="M45 130 C45 95 68 82 95 80 L155 52 C170 44 270 44 288 54 L345 80 C375 82 395 95 395 130 L395 150 C395 158 387 162 377 162 L63 162 C53 162 45 158 45 150 Z" fill="#111"/>
-  <path d="M170 80 L182 55 C190 47 250 47 260 56 L275 80 Z" fill="#fff" stroke="#111" stroke-width="2"/>
-  <line x1="222" y1="80" x2="222" y2="55" stroke="#111" stroke-width="2"/>
-  <circle cx="130" cy="163" r="34" fill="#111"/>
-  <circle cx="130" cy="163" r="15" fill="#999"/>
-  <circle cx="320" cy="163" r="34" fill="#111"/>
-  <circle cx="320" cy="163" r="15" fill="#999"/>
-  <text x="22" y="16" font-size="11" fill="#666" font-family="Arial" font-weight="700">◀ ARRIÈRE</text>
-  <text x="418" y="16" text-anchor="end" font-size="11" fill="#666" font-family="Arial" font-weight="700">AVANT ▶</text>
-  <text x="220" y="196" text-anchor="middle" font-size="12" fill="#333" font-family="Arial" font-weight="700" letter-spacing="1">CÔTÉ DROIT</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/droit.svg" alt="Profil droit"><span class="angle-guide">Photographiez le côté droit en entier, de profil : les deux roues, les portes et les deux extrémités doivent être visibles.</span>
         <span class="slot-lbl">Côté droit</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-droit"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('droit')">↺</button>
       </div>
     </div>
 
-    <div class="stl">Angles diagonaux — vue de dessus</div>
+    <div class="stl">Photos en trois quarts — les quatre angles</div><a href="guide-photos-edl.html" target="_blank" rel="noopener" style="color:var(--bl);font-size:.8rem">Voir le guide des angles photo ↗</a><p class="photo-guide">Gauche et droite s’entendent assis au volant, en regardant vers l’avant. Placez-vous à environ 45° du coin indiqué, à quelques pas du véhicule : photographiez les deux faces et les roues, avec la voiture entière dans le cadre. Le schéma indique votre position, pas une photo à prendre du dessus.</p>
     <div class="pgrid">
       <!-- VUE DE DESSUS : berline transparente avec toit, 4 roues, 2 portières -->
       <div class="pslot" id="sl-avg" onclick="triggerPhoto('avg')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- ombre légère -->
-  <ellipse cx="100" cy="272" rx="80" ry="10" fill="#E8E8E8"/>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit - surface plus sombre -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres teintées vue dessus -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B central -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant (jaune) vue dessus -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière (rouge) vue dessus -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- lignes portières vue dessus -->
-  <line x1="56" y1="94" x2="56" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="94" x2="144" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="56" y1="134" x2="56" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="134" x2="144" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <text x="100" y="10" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▲ AVANT</text>
-  <text x="100" y="286" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▼ ARRIÈRE</text>
-<circle cx="38" cy="50" r="20" fill="rgba(245,197,24,0.35)" stroke="#F5C518" stroke-width="2.5"/><text x="38" y="55" text-anchor="middle" font-size="12" fill="#92400E" font-weight="900">★</text>
-</svg>
+        <svg class="slot-ill" viewBox="0 0 200 300" role="img" aria-label="Position du photographe : avant gauche" xmlns="http://www.w3.org/2000/svg">
+ <text x="100" y="18" text-anchor="middle" font-size="12" fill="#182126">AVANT</text>
+ <rect x="64" y="52" width="72" height="190" rx="28" fill="#edf0f2" stroke="#182126" stroke-width="2"/>
+ <path d="M72 91 Q100 76 128 91 L124 113 H76Z M76 184 H124 L128 204 Q100 218 72 204Z" fill="#71818c"/>
+ <rect x="77" y="122" width="46" height="53" rx="9" fill="#fff" stroke="#a8b1b8"/>
+ <path d="M60 90v29m80-29v29M60 192v29m80-29v29" stroke="#182126" stroke-width="6"/>
+ <text x="100" y="281" text-anchor="middle" font-size="12" fill="#182126">ARRIÈRE</text>
+ <path d="M32 42 L100 150" stroke="#B32637" stroke-width="2" stroke-dasharray="5 4"/>
+ <circle cx="32" cy="42" r="22" fill="#B32637"/>
+ <rect x="20" y="34" width="24" height="17" rx="3" fill="white"/><circle cx="32" cy="42" r="5" fill="#B32637"/>
+ </svg><span class="angle-guide">Placez-vous au coin avant gauche. Cadrez l’avant et le côté gauche.</span>
         <span class="slot-lbl">Angle avant-gauche</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-avg"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('avg')">↺</button>
       </div>
       <div class="pslot" id="sl-avd" onclick="triggerPhoto('avd')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- ombre légère -->
-  <ellipse cx="100" cy="272" rx="80" ry="10" fill="#E8E8E8"/>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit - surface plus sombre -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres teintées vue dessus -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B central -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant (jaune) vue dessus -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière (rouge) vue dessus -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- lignes portières vue dessus -->
-  <line x1="56" y1="94" x2="56" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="94" x2="144" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="56" y1="134" x2="56" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="134" x2="144" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <text x="100" y="10" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▲ AVANT</text>
-  <text x="100" y="286" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▼ ARRIÈRE</text>
-<circle cx="162" cy="50" r="20" fill="rgba(245,197,24,0.35)" stroke="#F5C518" stroke-width="2.5"/><text x="162" y="55" text-anchor="middle" font-size="12" fill="#92400E" font-weight="900">★</text>
-</svg>
+        <svg class="slot-ill" viewBox="0 0 200 300" role="img" aria-label="Position du photographe : avant droit" xmlns="http://www.w3.org/2000/svg">
+ <text x="100" y="18" text-anchor="middle" font-size="12" fill="#182126">AVANT</text>
+ <rect x="64" y="52" width="72" height="190" rx="28" fill="#edf0f2" stroke="#182126" stroke-width="2"/>
+ <path d="M72 91 Q100 76 128 91 L124 113 H76Z M76 184 H124 L128 204 Q100 218 72 204Z" fill="#71818c"/>
+ <rect x="77" y="122" width="46" height="53" rx="9" fill="#fff" stroke="#a8b1b8"/>
+ <path d="M60 90v29m80-29v29M60 192v29m80-29v29" stroke="#182126" stroke-width="6"/>
+ <text x="100" y="281" text-anchor="middle" font-size="12" fill="#182126">ARRIÈRE</text>
+ <path d="M168 42 L100 150" stroke="#B32637" stroke-width="2" stroke-dasharray="5 4"/>
+ <circle cx="168" cy="42" r="22" fill="#B32637"/>
+ <rect x="156" y="34" width="24" height="17" rx="3" fill="white"/><circle cx="168" cy="42" r="5" fill="#B32637"/>
+ </svg><span class="angle-guide">Placez-vous au coin avant droit. Cadrez l’avant et le côté droit.</span>
         <span class="slot-lbl">Angle avant-droit</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-avd"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('avd')">↺</button>
       </div>
       <div class="pslot" id="sl-arg" onclick="triggerPhoto('arg')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- ombre légère -->
-  <ellipse cx="100" cy="272" rx="80" ry="10" fill="#E8E8E8"/>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit - surface plus sombre -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres teintées vue dessus -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B central -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant (jaune) vue dessus -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière (rouge) vue dessus -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- lignes portières vue dessus -->
-  <line x1="56" y1="94" x2="56" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="94" x2="144" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="56" y1="134" x2="56" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="134" x2="144" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <text x="100" y="10" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▲ AVANT</text>
-  <text x="100" y="286" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▼ ARRIÈRE</text>
-<circle cx="38" cy="244" r="20" fill="rgba(245,197,24,0.35)" stroke="#F5C518" stroke-width="2.5"/><text x="38" y="249" text-anchor="middle" font-size="12" fill="#92400E" font-weight="900">★</text>
-</svg>
+        <svg class="slot-ill" viewBox="0 0 200 300" role="img" aria-label="Position du photographe : arrière gauche" xmlns="http://www.w3.org/2000/svg">
+ <text x="100" y="18" text-anchor="middle" font-size="12" fill="#182126">AVANT</text>
+ <rect x="64" y="52" width="72" height="190" rx="28" fill="#edf0f2" stroke="#182126" stroke-width="2"/>
+ <path d="M72 91 Q100 76 128 91 L124 113 H76Z M76 184 H124 L128 204 Q100 218 72 204Z" fill="#71818c"/>
+ <rect x="77" y="122" width="46" height="53" rx="9" fill="#fff" stroke="#a8b1b8"/>
+ <path d="M60 90v29m80-29v29M60 192v29m80-29v29" stroke="#182126" stroke-width="6"/>
+ <text x="100" y="281" text-anchor="middle" font-size="12" fill="#182126">ARRIÈRE</text>
+ <path d="M32 258 L100 150" stroke="#B32637" stroke-width="2" stroke-dasharray="5 4"/>
+ <circle cx="32" cy="258" r="22" fill="#B32637"/>
+ <rect x="20" y="250" width="24" height="17" rx="3" fill="white"/><circle cx="32" cy="258" r="5" fill="#B32637"/>
+ </svg><span class="angle-guide">Placez-vous au coin arrière gauche. Cadrez l’arrière et le côté gauche.</span>
         <span class="slot-lbl">Angle arrière-gauche</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-arg"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('arg')">↺</button>
       </div>
       <div class="pslot" id="sl-ard" onclick="triggerPhoto('ard')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- ombre légère -->
-  <ellipse cx="100" cy="272" rx="80" ry="10" fill="#E8E8E8"/>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit - surface plus sombre -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres teintées vue dessus -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B central -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant (jaune) vue dessus -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière (rouge) vue dessus -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- lignes portières vue dessus -->
-  <line x1="56" y1="94" x2="56" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="94" x2="144" y2="130" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="56" y1="134" x2="56" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <line x1="144" y1="134" x2="144" y2="158" stroke="#C0C0C0" stroke-width="1.2"/>
-  <text x="100" y="10" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▲ AVANT</text>
-  <text x="100" y="286" text-anchor="middle" font-size="8" fill="#666" font-family="Arial" font-weight="600">▼ ARRIÈRE</text>
-<circle cx="162" cy="244" r="20" fill="rgba(245,197,24,0.35)" stroke="#F5C518" stroke-width="2.5"/><text x="162" y="249" text-anchor="middle" font-size="12" fill="#92400E" font-weight="900">★</text>
-</svg>
+        <svg class="slot-ill" viewBox="0 0 200 300" role="img" aria-label="Position du photographe : arrière droit" xmlns="http://www.w3.org/2000/svg">
+ <text x="100" y="18" text-anchor="middle" font-size="12" fill="#182126">AVANT</text>
+ <rect x="64" y="52" width="72" height="190" rx="28" fill="#edf0f2" stroke="#182126" stroke-width="2"/>
+ <path d="M72 91 Q100 76 128 91 L124 113 H76Z M76 184 H124 L128 204 Q100 218 72 204Z" fill="#71818c"/>
+ <rect x="77" y="122" width="46" height="53" rx="9" fill="#fff" stroke="#a8b1b8"/>
+ <path d="M60 90v29m80-29v29M60 192v29m80-29v29" stroke="#182126" stroke-width="6"/>
+ <text x="100" y="281" text-anchor="middle" font-size="12" fill="#182126">ARRIÈRE</text>
+ <path d="M168 258 L100 150" stroke="#B32637" stroke-width="2" stroke-dasharray="5 4"/>
+ <circle cx="168" cy="258" r="22" fill="#B32637"/>
+ <rect x="156" y="250" width="24" height="17" rx="3" fill="white"/><circle cx="168" cy="258" r="5" fill="#B32637"/>
+ </svg><span class="angle-guide">Placez-vous au coin arrière droit. Cadrez l’arrière et le côté droit.</span>
         <span class="slot-lbl">Angle arrière-droit</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-ard"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('ard')">↺</button>
@@ -441,141 +321,25 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     <div class="pctr"><span>Roues</span><span><strong id="pneu-c">0</strong>/4</span></div>
     <div class="pgrid">
       <div class="pslot" id="sl-pag" onclick="triggerPhoto('pag')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- label avant/arrière -->
-  <text x="100" y="12" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▲ AVANT</text>
-  <text x="100" y="295" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▼ ARRIÈRE</text>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant jaunes -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière rouges -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- ROUES normales (3) - rectangles gris -->
-  <rect x="154" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="22" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="172" width="14" height="40" rx="3" fill="#666"/><rect x="154" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="172" width="14" height="40" rx="3" fill="#666"/>
-  <!-- ROUE CONCERNÉE - mise en valeur jaune -->
-  <rect x="18" y="40" width="28" height="56" rx="7" fill="rgba(245,197,24,0.3)" stroke="#F5C518" stroke-width="2.5"/>
-  <rect x="22" y="44" width="20" height="48" rx="5" fill="#1A1A1A" stroke="#0A0A0A" stroke-width="1.5"/>
-  <rect x="25" y="48" width="14" height="40" rx="3" fill="#555"/>
-  <!-- flèche -->
-  <text x="44" y="58" text-anchor="middle" font-size="16" fill="#F5C518" font-weight="900">▼</text>
-  <text x="100" y="285" text-anchor="middle" font-size="10" fill="#1a1a1a" font-family="Arial" font-weight="700">ROUE AVANT GAUCHE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/pag.svg" alt="Gros plan roue avant gauche"><span class="angle-guide">Roue avant gauche : placez-vous face à la jante. Cadrez la jante et le pneu entiers ; ajoutez une photo rapprochée de chaque dégât.</span>
         <span class="slot-lbl">Roue avant-gauche</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-pag"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('pag')">↺</button>
       </div>
       <div class="pslot" id="sl-pad" onclick="triggerPhoto('pad')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- label avant/arrière -->
-  <text x="100" y="12" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▲ AVANT</text>
-  <text x="100" y="295" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▼ ARRIÈRE</text>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant jaunes -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière rouges -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- ROUES normales (3) - rectangles gris -->
-  <rect x="22" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="22" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="172" width="14" height="40" rx="3" fill="#666"/><rect x="154" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="172" width="14" height="40" rx="3" fill="#666"/>
-  <!-- ROUE CONCERNÉE - mise en valeur jaune -->
-  <rect x="150" y="40" width="28" height="56" rx="7" fill="rgba(245,197,24,0.3)" stroke="#F5C518" stroke-width="2.5"/>
-  <rect x="154" y="44" width="20" height="48" rx="5" fill="#1A1A1A" stroke="#0A0A0A" stroke-width="1.5"/>
-  <rect x="157" y="48" width="14" height="40" rx="3" fill="#555"/>
-  <!-- flèche -->
-  <text x="156" y="58" text-anchor="middle" font-size="16" fill="#F5C518" font-weight="900">▼</text>
-  <text x="100" y="285" text-anchor="middle" font-size="10" fill="#1a1a1a" font-family="Arial" font-weight="700">ROUE AVANT DROITE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/pad.svg" alt="Gros plan roue avant droite"><span class="angle-guide">Roue avant droite : placez-vous face à la jante. Cadrez la jante et le pneu entiers ; ajoutez une photo rapprochée de chaque dégât.</span>
         <span class="slot-lbl">Roue avant-droite</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-pad"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('pad')">↺</button>
       </div>
       <div class="pslot" id="sl-prg" onclick="triggerPhoto('prg')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- label avant/arrière -->
-  <text x="100" y="12" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▲ AVANT</text>
-  <text x="100" y="295" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▼ ARRIÈRE</text>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant jaunes -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière rouges -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- ROUES normales (3) - rectangles gris -->
-  <rect x="22" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="154" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="154" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="172" width="14" height="40" rx="3" fill="#666"/>
-  <!-- ROUE CONCERNÉE - mise en valeur jaune -->
-  <rect x="18" y="164" width="28" height="56" rx="7" fill="rgba(245,197,24,0.3)" stroke="#F5C518" stroke-width="2.5"/>
-  <rect x="22" y="168" width="20" height="48" rx="5" fill="#1A1A1A" stroke="#0A0A0A" stroke-width="1.5"/>
-  <rect x="25" y="172" width="14" height="40" rx="3" fill="#555"/>
-  <!-- flèche -->
-  <text x="44" y="182" text-anchor="middle" font-size="16" fill="#F5C518" font-weight="900">▼</text>
-  <text x="100" y="285" text-anchor="middle" font-size="10" fill="#1a1a1a" font-family="Arial" font-weight="700">ROUE ARRIÈRE GAUCHE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/prg.svg" alt="Gros plan roue arrière gauche"><span class="angle-guide">Roue arrière gauche : placez-vous face à la jante. Cadrez la jante et le pneu entiers ; ajoutez une photo rapprochée de chaque dégât.</span>
         <span class="slot-lbl">Roue arrière-gauche</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-prg"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('prg')">↺</button>
       </div>
       <div class="pslot" id="sl-prd" onclick="triggerPhoto('prd')">
-        <svg class="slot-ill" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- label avant/arrière -->
-  <text x="100" y="12" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▲ AVANT</text>
-  <text x="100" y="295" text-anchor="middle" font-size="9" fill="#555" font-family="Arial" font-weight="700">▼ ARRIÈRE</text>
-  <!-- carrosserie blanche vue dessus -->
-  <path d="M48 38 C52 14 68 4 100 4 C132 4 148 14 152 38 L162 130 C162 178 158 220 150 242 C143 258 124 270 100 270 C76 270 57 258 50 242 C42 220 38 178 38 130 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.8"/>
-  <!-- toit -->
-  <path d="M60 68 C64 52 78 46 100 46 C122 46 136 52 140 68 L148 158 C148 180 132 192 100 192 C68 192 52 180 52 158 Z" fill="#E0E0E0" stroke="#C0C0C0" stroke-width="1.2"/>
-  <!-- vitres -->
-  <path d="M62 70 C66 54 78 46 100 44 C122 46 134 54 138 70 L142 92 L58 92 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <path d="M58 160 L142 160 L146 180 C136 193 120 200 100 200 C80 200 64 193 54 180 Z" fill="#2A2A2A" stroke="#1A1A1A" stroke-width="1"/>
-  <!-- montant B -->
-  <path d="M56 120 L144 120 L144 132 L56 132 Z" fill="#CCCCCC" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- rétroviseurs -->
-  <path d="M38 90 L24 97 L24 114 L38 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <path d="M162 90 L176 97 L176 114 L162 114 Z" fill="#DDDDDD" stroke="#BBBBBB" stroke-width="1"/>
-  <!-- phares avant jaunes -->
-  <path d="M56 36 C62 18 76 8 100 8 C124 8 138 18 144 36 L138 46 C128 28 116 20 100 20 C84 20 72 28 62 46 Z" fill="#FFFFC0" stroke="#D4D400" stroke-width="1"/>
-  <!-- feux arrière rouges -->
-  <path d="M56 242 C62 258 76 266 100 266 C124 266 138 258 144 242 L138 232 C128 248 116 254 100 254 C84 254 72 248 62 232 Z" fill="#FF4444" stroke="#CC0000" stroke-width="1"/>
-  <!-- ROUES normales (3) - rectangles gris -->
-  <rect x="22" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="154" y="44" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="157" y="48" width="14" height="40" rx="3" fill="#666"/><rect x="22" y="168" width="20" height="48" rx="5" fill="#333" stroke="#222" stroke-width="1.5"/><rect x="25" y="172" width="14" height="40" rx="3" fill="#666"/>
-  <!-- ROUE CONCERNÉE - mise en valeur jaune -->
-  <rect x="150" y="164" width="28" height="56" rx="7" fill="rgba(245,197,24,0.3)" stroke="#F5C518" stroke-width="2.5"/>
-  <rect x="154" y="168" width="20" height="48" rx="5" fill="#1A1A1A" stroke="#0A0A0A" stroke-width="1.5"/>
-  <rect x="157" y="172" width="14" height="40" rx="3" fill="#555"/>
-  <!-- flèche -->
-  <text x="156" y="182" text-anchor="middle" font-size="16" fill="#F5C518" font-weight="900">▼</text>
-  <text x="100" y="285" text-anchor="middle" font-size="10" fill="#1a1a1a" font-family="Arial" font-weight="700">ROUE ARRIÈRE DROITE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/prd.svg" alt="Gros plan roue arrière droite"><span class="angle-guide">Roue arrière droite : placez-vous face à la jante. Cadrez la jante et le pneu entiers ; ajoutez une photo rapprochée de chaque dégât.</span>
         <span class="slot-lbl">Roue arrière-droite</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-prd"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('prd')">↺</button>
@@ -589,42 +353,12 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
   <div class="card">
     <div class="ct">👔 Tenue du convoyeur</div>
     <div class="cs">À photographier en premier, avant toute chose.</div>
-    <div class="alert" style="background:rgba(245,197,24,.1);color:#92400E;border:1px solid rgba(245,197,24,.4);padding:9px 12px;border-radius:7px;font-size:.78rem;margin-bottom:12px">
+    <div class="alert" style="background:rgba(179,38,55,.1);color:#B32637;border:1px solid rgba(179,38,55,.4);padding:9px 12px;border-radius:7px;font-size:.78rem;margin-bottom:12px">
       ⚠️ Photo obligatoire de face, tenue complète visible. Pantalon noir · Haut noir · Chaussures de ville noires.
     </div>
     <div class="pgrid" style="grid-template-columns:1fr">
       <div class="pslot" id="sl-tenue" onclick="triggerPhoto('tenue')" style="min-height:200px">
-        <svg class="slot-ill" viewBox="0 0 200 170" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- silhouette convoyeur debout - tenue noire -->
-  <ellipse cx="100" cy="158" rx="50" ry="8" fill="#E8E8E8"/>
-  <!-- tête -->
-  <circle cx="100" cy="22" r="16" fill="#E8D5C0" stroke="#D0B89A" stroke-width="1.5"/>
-  <!-- veste / haut noir -->
-  <path d="M74 44 C74 36 82 30 90 28 L110 28 C118 30 126 36 126 44 L130 90 L70 90 Z" fill="#1A1A2E" stroke="#0D0D1A" stroke-width="1.5"/>
-  <!-- col blanc / chemise -->
-  <path d="M90 28 L100 46 L110 28" fill="none" stroke="#FFFFFF" stroke-width="2"/>
-  <!-- badge HelixCar jaune -->
-  <rect x="95" y="40" width="10" height="18" rx="2" fill="#F5C518"/>
-  <text x="100" y="52" text-anchor="middle" font-size="5" fill="#000" font-weight="900">HC</text>
-  <!-- bras gauche -->
-  <path d="M74 44 L58 80 C56 86 60 90 64 88 L72 86 L78 56 Z" fill="#1A1A2E" stroke="#0D0D1A" stroke-width="1"/>
-  <!-- bras droit -->
-  <path d="M126 44 L142 80 C144 86 140 90 136 88 L128 86 L122 56 Z" fill="#1A1A2E" stroke="#0D0D1A" stroke-width="1"/>
-  <!-- mains -->
-  <ellipse cx="60" cy="90" rx="6" ry="5" fill="#E8D5C0" stroke="#D0B89A" stroke-width="1"/>
-  <ellipse cx="140" cy="90" rx="6" ry="5" fill="#E8D5C0" stroke="#D0B89A" stroke-width="1"/>
-  <!-- pantalon noir -->
-  <path d="M70 90 L74 132 L94 132 L100 110 L106 132 L126 132 L130 90 Z" fill="#0D0D1A" stroke="#000" stroke-width="1.5"/>
-  <!-- chaussures de ville noires -->
-  <path d="M74 132 L70 144 C68 149 72 152 82 152 L94 152 L94 132 Z" fill="#0D0D1A" stroke="#000" stroke-width="1"/>
-  <path d="M106 132 L106 152 L118 152 C128 152 132 149 130 144 L126 132 Z" fill="#0D0D1A" stroke="#000" stroke-width="1"/>
-  <!-- flèches -->
-  <text x="28" y="42" font-size="8" fill="#F5C518" font-weight="900">←</text>
-  <text x="6" y="46" font-size="7" fill="#555" font-family="Arial">Tenue</text>
-  <text x="28" y="148" font-size="8" fill="#F5C518" font-weight="900">←</text>
-  <text x="2" y="152" font-size="7" fill="#555" font-family="Arial">Chaussures</text>
-  <text x="100" y="167" text-anchor="middle" font-size="8" fill="#333" font-family="Arial" font-weight="700">TENUE OBLIGATOIRE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/tenue.svg" alt="Tenue noire, de la tête aux pieds"><span class="angle-guide">Photo de face, de la tête aux chaussures. Portez la tenue noire demandée ; faites-vous photographier ou utilisez le retardateur.</span>
         <span class="slot-lbl">Photo tenue complète — de face, corps entier</span><span class="slot-req">Obligatoire avant toute mission</span>
         <img class="slot-prev" id="pv-tenue"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Non conforme</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('tenue')">↺</button>
@@ -637,167 +371,33 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
     <div class="pctr"><span>Photos</span><span><strong id="int-c">0</strong>/5</span></div>
     <div class="pgrid">
       <div class="pslot" id="sl-parebrise" onclick="triggerPhoto('parebrise')">
-        <svg class="slot-ill" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- vue extérieure face avant - pare-brise mis en avant -->
-  <!-- carrosserie -->
-  <path d="M38 90 C38 68 50 55 72 48 L228 48 C250 55 262 68 262 90 L262 165 C262 172 256 176 248 176 L52 176 C44 176 38 172 38 165 Z" fill="#F0F0F0" stroke="#C8C8C8" stroke-width="1.5"/>
-  <!-- capot -->
-  <path d="M72 48 C85 32 110 22 150 20 C190 22 215 32 228 48 Z" fill="#E8E8E8" stroke="#BEBEBE" stroke-width="1"/>
-  <!-- PARE-BRISE SURLIGNÉ EN JAUNE -->
-  <path d="M92 90 C98 62 114 44 132 38 L168 38 C186 44 202 62 208 90 Z" fill="#FFFDE7" stroke="#F5C518" stroke-width="3"/>
-  <!-- reflet pare-brise -->
-  <path d="M98 88 C104 66 116 50 132 44 L145 44 C130 50 118 66 112 88 Z" fill="#FFF9C4" opacity="0.6"/>
-  <!-- cadre pare-brise épais -->
-  <path d="M92 90 C98 62 114 44 132 38 L168 38 C186 44 202 62 208 90" fill="none" stroke="#1A1A1A" stroke-width="3"/>
-  <!-- phares -->
-  <path d="M40 94 C40 82 50 75 66 73 L90 73 C98 73 100 78 98 86 C96 96 86 104 68 104 C50 104 40 104 40 94 Z" fill="#F8F8E8" stroke="#D4D400" stroke-width="1.2"/>
-  <circle cx="68" cy="89" r="9" fill="#F0F0C0" stroke="#C8C800" stroke-width="1"/>
-  <path d="M260 94 C260 82 250 75 234 73 L210 73 C202 73 200 78 202 86 C204 96 214 104 232 104 C250 104 260 104 260 94 Z" fill="#F8F8E8" stroke="#D4D400" stroke-width="1.2"/>
-  <circle cx="232" cy="89" r="9" fill="#F0F0C0" stroke="#C8C800" stroke-width="1"/>
-  <!-- calandre -->
-  <path d="M108 120 C108 114 113 110 120 110 L180 110 C187 110 192 114 192 120 L192 138 C192 144 187 148 180 148 L120 148 C113 148 108 144 108 138 Z" fill="#1A1A1A" stroke="#333" stroke-width="1"/>
-  <!-- pare-chocs -->
-  <path d="M44 155 C42 148 48 142 58 142 L242 142 C252 142 258 148 256 155 L256 174 L44 174 Z" fill="#E8E8E8" stroke="#BEBEBE" stroke-width="1.2"/>
-  <!-- roues -->
-  <ellipse cx="90" cy="185" rx="32" ry="14" fill="#1A1A1A" stroke="#111" stroke-width="1"/>
-  <ellipse cx="90" cy="185" rx="22" ry="9" fill="#888" stroke="#666" stroke-width="1"/>
-  <ellipse cx="210" cy="185" rx="32" ry="14" fill="#1A1A1A" stroke="#111" stroke-width="1"/>
-  <ellipse cx="210" cy="185" rx="22" ry="9" fill="#888" stroke="#666" stroke-width="1"/>
-  <!-- flèche pointant le pare-brise -->
-  <text x="150" y="14" text-anchor="middle" font-size="10" fill="#F5C518" font-weight="900">▼ PARE-BRISE</text>
-  <line x1="150" y1="18" x2="150" y2="34" stroke="#F5C518" stroke-width="2" stroke-dasharray="3,2"/>
-  <text x="150" y="198" text-anchor="middle" font-size="9" fill="#333" font-family="Arial" font-weight="700">PARE-BRISE — VUE EXTÉRIEURE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/parebrise.svg" alt="Pare-brise entier depuis l’extérieur"><span class="angle-guide">Depuis l’extérieur, photographiez tout le pare-brise, ses quatre coins et les essuie-glaces. Évitez les reflets.</span>
         <span class="slot-lbl">Pare-brise (extérieur)</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-parebrise"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('parebrise')">↺</button>
       </div>
       <div class="pslot" id="sl-hab-av" onclick="triggerPhoto('hab-av')">
-        <svg class="slot-ill" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg" style="background:#fff">
-  <!-- sol -->
-  <rect x="0" y="130" width="200" height="20" fill="#E8E8E8"/>
-  <!-- siège conducteur gauche -->
-  <!-- dossier -->
-  <path d="M18 28 C18 18 26 14 36 14 L72 14 C82 14 88 18 88 28 L88 88 C88 94 84 96 78 96 L28 96 C22 96 18 94 18 88 Z" fill="#DDDDDD" stroke="#AAAAAA" stroke-width="1.5"/>
-  <!-- appuie-tête -->
-  <path d="M30 10 C30 4 36 2 44 2 L62 2 C70 2 74 4 74 10 L74 18 L30 18 Z" fill="#CCCCCC" stroke="#AAAAAA" stroke-width="1.2"/>
-  <!-- assise -->
-  <path d="M14 92 C14 86 20 82 28 82 L78 82 C86 82 90 86 90 92 L90 118 C90 124 86 128 78 128 L28 128 C20 128 14 124 14 118 Z" fill="#D5D5D5" stroke="#AAAAAA" stroke-width="1.5"/>
-  <!-- ligne séparation dossier/assise -->
-  <line x1="18" y1="96" x2="88" y2="96" stroke="#BBBBBB" stroke-width="1.2"/>
-  <!-- couture milieu dossier -->
-  <line x1="53" y1="14" x2="53" y2="96" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="3,3"/>
-  <!-- siège passager droit -->
-  <path d="M112 28 C112 18 120 14 130 14 L166 14 C176 14 182 18 182 28 L182 88 C182 94 178 96 172 96 L122 96 C116 96 112 94 112 88 Z" fill="#DDDDDD" stroke="#AAAAAA" stroke-width="1.5"/>
-  <path d="M124 10 C124 4 130 2 138 2 L158 2 C166 2 168 4 168 10 L168 18 L124 18 Z" fill="#CCCCCC" stroke="#AAAAAA" stroke-width="1.2"/>
-  <path d="M108 92 C108 86 114 82 122 82 L172 82 C180 82 184 86 184 92 L184 118 C184 124 180 128 172 128 L122 128 C114 128 108 124 108 118 Z" fill="#D5D5D5" stroke="#AAAAAA" stroke-width="1.5"/>
-  <line x1="112" y1="96" x2="182" y2="96" stroke="#BBBBBB" stroke-width="1.2"/>
-  <line x1="147" y1="14" x2="147" y2="96" stroke="#C0C0C0" stroke-width="0.8" stroke-dasharray="3,3"/>
-  <!-- console centrale -->
-  <rect x="90" y="90" width="20" height="36" rx="4" fill="#CCCCCC" stroke="#AAAAAA" stroke-width="1"/>
-  <rect x="93" y="95" width="14" height="10" rx="2" fill="#BBBBBB"/>
-  <circle cx="100" cy="115" r="4" fill="#AAAAAA"/>
-  <text x="100" y="146" text-anchor="middle" font-size="8" fill="#333" font-family="Arial" font-weight="700">HABITACLE AVANT</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/hab-av.svg" alt="Habitacle avant depuis une porte ouverte"><span class="angle-guide">Ouvrez une porte avant. Reculez pour cadrer les deux sièges, le tableau de bord et les espaces aux pieds.</span>
         <span class="slot-lbl">Habitacle avant</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-hab-av"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('hab-av')">↺</button>
       </div>
       <div class="pslot" id="sl-hab-ar" onclick="triggerPhoto('hab-ar')">
-        <svg class="slot-ill" viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- lunette arrière courbe -->
-  <path d="M18 22 C18 10 40 4 100 4 C160 4 182 10 182 22 L182 34 L18 34 Z" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <!-- banquette 3 places vue frontale -->
-  <rect x="10" y="34" width="180" height="68" rx="5" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <!-- dossiers séparés -->
-  <rect x="14" y="38" width="52" height="36" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <rect x="74" y="38" width="52" height="36" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <rect x="134" y="38" width="52" height="36" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <!-- assises -->
-  <rect x="14" y="78" width="52" height="20" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <rect x="74" y="78" width="52" height="20" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <rect x="134" y="78" width="52" height="20" rx="3" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <!-- appuie-têtes -->
-  <rect x="22" y="18" width="36" height="14" rx="4" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <rect x="82" y="18" width="36" height="14" rx="4" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <rect x="142" y="18" width="36" height="14" rx="4" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <!-- ceintures symboliques -->
-  <line x1="40" y1="38" x2="40" y2="98" stroke="#4A5568" stroke-width="1" stroke-dasharray="3,2"/>
-  <line x1="100" y1="38" x2="100" y2="98" stroke="#4A5568" stroke-width="1" stroke-dasharray="3,2"/>
-  <line x1="160" y1="38" x2="160" y2="98" stroke="#4A5568" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="100" y="122" text-anchor="middle" font-size="8" fill="#2D3748" font-family="Arial" font-weight="700">HABITACLE ARRIÈRE</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/hab-ar.svg" alt="Banquette arrière depuis une porte ouverte"><span class="angle-guide">Depuis une porte arrière ouverte, cadrez toute la banquette, les dossiers et le plancher. Les trois places doivent être visibles.</span>
         <span class="slot-lbl">Habitacle arrière</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-hab-ar"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('hab-ar')">↺</button>
       </div>
       <!-- Tableau de bord kilométrage -->
       <div class="pslot" id="sl-tableau" onclick="triggerPhoto('tableau')">
-        <svg class="slot-ill" viewBox="0 0 220 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- fond tableau de bord -->
-  <rect x="5" y="8" width="210" height="90" rx="8" stroke="#2D3748" stroke-width="2" fill="none"/>
-  <!-- compteur vitesse -->
-  <circle cx="68" cy="52" r="38" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <circle cx="68" cy="52" r="30" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <circle cx="68" cy="52" r="6" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <line x1="68" y1="52" x2="56" y2="26" stroke="#2D3748" stroke-width="2" stroke-linecap="round"/>
-  <text x="68" y="68" text-anchor="middle" font-size="6" fill="#4A5568" font-family="Arial">km/h</text>
-  <!-- graduations -->
-  <text x="68" y="20" text-anchor="middle" font-size="6" fill="#4A5568">260</text>
-  <text x="96" y="30" text-anchor="middle" font-size="6" fill="#4A5568">200</text>
-  <text x="40" y="30" text-anchor="middle" font-size="6" fill="#4A5568">60</text>
-  <!-- KILOMÉTRAGE central encadré -->
-  <rect x="84" y="36" width="54" height="22" rx="3" stroke="#2D3748" stroke-width="2" fill="none"/>
-  <rect x="87" y="39" width="48" height="16" rx="2" stroke="#4A5568" stroke-width="1" fill="none"/>
-  <text x="111" y="52" text-anchor="middle" font-size="11" fill="#2D3748" font-family="monospace" font-weight="900">48 250</text>
-  <text x="111" y="68" text-anchor="middle" font-size="7" fill="#4A5568" font-family="Arial" font-weight="700">km total</text>
-  <!-- compte-tours -->
-  <circle cx="155" cy="52" r="38" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <circle cx="155" cy="52" r="30" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <circle cx="155" cy="52" r="6" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <line x1="155" y1="52" x2="148" y2="24" stroke="#2D3748" stroke-width="2" stroke-linecap="round"/>
-  <text x="155" y="68" text-anchor="middle" font-size="5" fill="#4A5568" font-family="Arial">x1000tr/min</text>
-  <!-- voyants bas -->
-  <circle cx="88" cy="88" r="4" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <circle cx="102" cy="88" r="4" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <circle cx="116" cy="88" r="4" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <circle cx="130" cy="88" r="4" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <text x="110" y="114" text-anchor="middle" font-size="8" fill="#2D3748" font-family="Arial" font-weight="700">TABLEAU DE BORD ALLUMÉ</text>
-  <text x="110" y="126" text-anchor="middle" font-size="7" fill="#4A5568" font-family="Arial">— KILOMÉTRAGE BIEN VISIBLE —</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/tableau.svg" alt="Compteur allumé et kilométrage net"><span class="angle-guide">Mettez le contact, véhicule à l’arrêt. Cadrez le compteur sans reflet : le kilométrage total doit être parfaitement lisible.</span>
         <span class="slot-lbl">Tableau de bord allumé — kilométrage visible</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-tableau"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('tableau')">↺</button>
       </div>
       <!-- Coffre -->
       <div class="pslot" id="sl-coffre" onclick="triggerPhoto('coffre')">
-        <svg class="slot-ill" viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- hayon ouvert vu de l'intérieur (en haut) -->
-  <rect x="10" y="5" width="180" height="12" rx="3" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <path d="M10 5 L0 0 L200 0 L190 5" stroke="#4A5568" stroke-width="1" fill="none"/>
-  <!-- poignée hayon -->
-  <rect x="80" y="8" width="40" height="6" rx="3" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <!-- séparation siège / coffre -->
-  <rect x="10" y="18" width="180" height="8" rx="2" stroke="#2D3748" stroke-width="1.5" fill="none"/>
-  <!-- fond coffre -->
-  <rect x="10" y="26" width="180" height="90" rx="4" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <!-- tapis avec grille -->
-  <rect x="14" y="30" width="172" height="82" rx="3" stroke="#4A5568" stroke-width="1" fill="none"/>
-  <line x1="14" y1="55" x2="186" y2="55" stroke="#4A5568" stroke-width="0.8"/>
-  <line x1="14" y1="80" x2="186" y2="80" stroke="#4A5568" stroke-width="0.8"/>
-  <line x1="70" y1="30" x2="70" y2="112" stroke="#4A5568" stroke-width="0.8"/>
-  <line x1="130" y1="30" x2="130" y2="112" stroke="#4A5568" stroke-width="0.8"/>
-  <!-- roue de secours (vue dessus) -->
-  <circle cx="100" cy="90" r="20" stroke="#2D3748" stroke-width="1.8" fill="none"/>
-  <circle cx="100" cy="90" r="14" stroke="#4A5568" stroke-width="1.2" fill="none"/>
-  <circle cx="100" cy="90" r="5" stroke="#2D3748" stroke-width="1.2" fill="none"/>
-  <line x1="100" y1="76" x2="100" y2="104" stroke="#4A5568" stroke-width="1"/>
-  <line x1="86" y1="90" x2="114" y2="90" stroke="#4A5568" stroke-width="1"/>
-  <!-- parois latérales -->
-  <rect x="10" y="26" width="10" height="90" rx="2" stroke="#4A5568" stroke-width="1" fill="none"/>
-  <rect x="180" y="26" width="10" height="90" rx="2" stroke="#4A5568" stroke-width="1" fill="none"/>
-  <text x="100" y="126" text-anchor="middle" font-size="8" fill="#2D3748" font-family="Arial" font-weight="700">COFFRE OUVERT</text>
-</svg>
+        <img class="slot-ill" src="assets/edl-exemples/coffre.svg" alt="Coffre ouvert vu depuis l’arrière"><span class="angle-guide">Ouvrez le coffre et placez-vous derrière le véhicule. Cadrez tout le volume, le plancher et le seuil de chargement.</span>
         <span class="slot-lbl">Coffre ouvert</span><span class="slot-req">Obligatoire</span>
         <img class="slot-prev" id="pv-coffre"><div class="slot-ck">✓</div><div class="slot-dmg">⚠ Dégât</div>
         <button class="slot-rt" onclick="event.stopPropagation();triggerPhoto('coffre')">↺</button>
@@ -831,21 +431,21 @@ canvas.sc{display:block;width:100%;height:130px;cursor:crosshair;touch-action:no
   <h2 id="suc-title">État des lieux validé !</h2>
   <p id="suc-msg">L'état des lieux au départ a été enregistré et signé. Vous pouvez démarrer la mission.</p>
   <div style="margin-top:16px;background:var(--gl);border-radius:9px;padding:13px;text-align:left;font-size:.78rem;color:#555;line-height:1.7">
-    📧 Rapport envoyé automatiquement à HelixCar et au client.<br>
-    📱 <span id="sms-note">SMS de confirmation envoyé au client.</span>
+    Rapport enregistré dans le dossier HelixCar.<br>
+    📱 <span id="sms-note">Les notifications sont suivies séparément.</span>
   </div>
   <div style="margin-top:12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:9px;padding:13px;text-align:left;font-size:.78rem;color:#C2410C;line-height:1.9">
     📄 <strong>Lettre de voiture — action requise</strong><br>
     1. Faites signer la lettre de voiture au départ et à l'arrivée par le client<br>
     2. Une fois la mission terminée, envoyez une photo du document directement depuis ton espace convoyeur (bouton "📸 Envoyer la lettre signée" dans Historique)
   </div>
-  <button class="btn btn-y" style="margin-top:10px" id="btn-lettre-voiture" onclick="window.open('lettre-voiture.html?mission=' + missionCode, '_blank')">📄 Ouvrir la lettre de voiture</button>
+  <button class="btn btn-y" style="margin-top:10px" id="btn-lettre-voiture" onclick="window.open('lettre-voiture.html?mission=' + encodeURIComponent(missionCode) + '&trajet=' + (IS_RESTIT ? 'restitution' : 'aller'), '_blank', 'noopener')">📄 Ouvrir la lettre de voiture</button>
   <button class="btn btn-dk" style="margin-top:16px" onclick="window.location.href='dashboard.html'">← Retour au tableau de bord</button>
 </div>
 </div>
 
 <!-- STICKY -->
-<div class="sticky" id="sticky">
+<div class="sticky" id="sticky" style="display:none">
   <div class="sticky-inner">
     <button class="btn btn-ol" id="back-btn" onclick="prevStep()" style="width:auto;padding:11px 16px;flex-shrink:0">← Retour</button>
     <button class="btn btn-y" id="next-btn" onclick="nextStep()">Continuer →</button>
@@ -897,11 +497,13 @@ const SUPABASE_URL = 'https://zsetmqnmmupqbkgqbjbo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzZXRtcW5tbXVwcWJrZ3FiamJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI4OTgsImV4cCI6MjA5NjkzODg5OH0.wpxgmRXpoa6BI9P9Ybu6OXwmK9x6mPU3dxpiwf11gFc';
 const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function sbFetch(path, options) {
+async function sbFetch(path, options) {
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Reconnectez-vous à votre espace partenaire.');
   options = options || {};
   const headers = Object.assign({
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + session.access_token,
     'Content-Type': 'application/json'
   }, options.headers || {});
   return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, options, { headers }))
@@ -915,20 +517,33 @@ function sbFetch(path, options) {
 }
 
 async function uploadEdlFile(dataUrl, path) {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const resp = await fetch(SUPABASE_URL + '/storage/v1/object/edl/' + path, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': blob.type || 'image/png'
-    },
-    body: blob
-  });
-  if (!resp.ok) { throw new Error('Upload échoué : ' + (await resp.text())); }
-  return SUPABASE_URL + '/storage/v1/object/public/edl/' + path;
+  const session=(await sbAuth.auth.getSession()).data.session;
+  if(!session)throw new Error('Session expirée. Vos saisies restent sur cet appareil.');
+  const blob=await (await fetch(dataUrl)).blob();
+  const prive=!!currentMission;
+  if(prive){
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    path=path.replace(/\.(jpg|png)$/,'-'+hash+'.$1');
+    const {error}=await sbAuth.storage.from('edl-test').upload(path,blob,{contentType:blob.type,upsert:false});
+    if(error){
+      const existing=await sbAuth.storage.from('edl-test').createSignedUrl(path,60);
+      if(existing.error)throw new Error('Photo non enregistrée. Réessayez avec une connexion stable.');
+    }
+    return 'edl-test/'+path;
+  }
+  const resp=await fetch(SUPABASE_URL+'/storage/v1/object/edl/'+path,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':blob.type||'image/png'},body:blob});
+  if(!resp.ok)throw new Error('Upload échoué');
+  return SUPABASE_URL+'/storage/v1/object/public/edl/'+path;
 }
+async function urlPhotoEdl(value){
+ if(typeof value!=='string')return '';
+ if(value.startsWith('edl-test/')){
+   const {data,error}=await sbAuth.storage.from('edl-test').createSignedUrl(value.slice(9),300);
+   if(error)throw error;return data.signedUrl;
+ }
+ try{const u=new URL(value);return u.origin===SUPABASE_URL?u.href:'';}catch{return '';}
+}
+function edlHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 // Affiche, à côté de chaque case photo, la photo de la phase précédente pour comparaison
 // (arrivée → compare avec départ ; restitution_arrivee → compare avec restitution_depart)
@@ -940,7 +555,8 @@ async function chargerPhotosPrecedentesPourComparaison() {
     const rec = (rows || [])[0];
     if (!rec) return;
     // Rappel du kilométrage précédent, pour info — le convoyeur saisit le nouveau kilométrage à côté
-    if (rec.km) {
+    if (rec.km != null) {
+      kilometrageDepart = Number(rec.km);
       const kmBox = document.getElementById('km-precedent');
       const kmVal = document.getElementById('km-precedent-val');
       if (kmBox && kmVal) {
@@ -950,16 +566,14 @@ async function chargerPhotosPrecedentesPourComparaison() {
     }
     if (!rec.photos) return;
     const photosPrec = rec.photos;
-    Object.keys(photosPrec).forEach(function(key) {
-      if (key.indexOf('_degat') !== -1) return; // on ne compare que les photos principales, pas les gros plans de dégâts
-      const slotEl = document.getElementById('sl-' + key);
-      if (!slotEl) return;
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin-bottom:6px;text-align:center';
-      wrap.innerHTML = '<div style="font-size:.6rem;color:#888;font-weight:800;letter-spacing:.05em;margin-bottom:3px">📷 RÉFÉRENCE (' + (phasePrecedente === 'restitution_depart' ? 'RESTITUTION DÉPART' : 'DÉPART') + ')</div>' +
-        '<img src="' + photosPrec[key] + '" style="width:100%;border-radius:6px;border:1.5px solid #ddd;display:block">';
-      slotEl.insertBefore(wrap, slotEl.firstChild);
-    });
+    for(const key of Object.keys(photosPrec)) {
+      if(key.includes('_degat'))continue;
+      const slotEl=document.getElementById('sl-'+key);if(!slotEl)continue;
+      const wrap=document.createElement('div');wrap.style.cssText='margin-bottom:6px;text-align:center';
+      const label=document.createElement('div');label.textContent='Photo de référence — '+phasePrecedente;label.style.fontSize='.7rem';
+      const img=document.createElement('img');img.src=await urlPhotoEdl(photosPrec[key]);img.alt='Photo de la phase précédente';img.style.cssText='width:100%;border-radius:6px';
+      wrap.append(label,img);slotEl.insertBefore(wrap,slotEl.firstChild);
+    }
   } catch (e) { console.error('Erreur chargement photos de référence:', e); }
 }
 
@@ -969,7 +583,7 @@ const convoyeurSessionReady = (async function() {
   try {
     const { data: { session } } = await sbAuth.auth.getSession();
     if (session && session.user && session.user.email) {
-      const rows = await sbFetch('convoyeurs?email=eq.' + encodeURIComponent(session.user.email) + '&order=created_at.desc&limit=1');
+      const rows = await sbFetch('convoyeurs?auth_user_id=eq.' + encodeURIComponent(session.user.id) + '&order=created_at.desc&limit=1');
       window._currentConvoyeur = (rows || [])[0] || null;
     }
   } catch (e) { console.error('Session convoyeur EDL : erreur', e); }
@@ -981,10 +595,10 @@ function envoyerEmailClientEdl(mission, phase) {
     const client = (rows || [])[0];
     if (!client || !client.email) return;
     const TITRES = {
-      depart: '🚗 Votre véhicule est pris en charge — ' + mission.reference,
-      arrivee: '🏁 Votre véhicule est arrivé — ' + mission.reference,
-      restitution_depart: '🔄 Restitution en cours — ' + mission.reference,
-      restitution_arrivee: '✅ Restitution terminée — ' + mission.reference
+      depart: '🚗 Votre véhicule est pris en charge — ' + (mission.reference_courte || mission.reference),
+      arrivee: '🏁 Votre véhicule est arrivé — ' + (mission.reference_courte || mission.reference),
+      restitution_depart: '🔄 Restitution en cours — ' + (mission.reference_courte || mission.reference),
+      restitution_arrivee: '✅ Restitution terminée — ' + (mission.reference_courte || mission.reference)
     };
     const CORPS = {
       depart: 'Votre véhicule vient d\'être pris en charge par notre convoyeur à ' + mission.ville_depart + '.\n\nL\'état des lieux de départ a bien été réalisé.',
@@ -997,7 +611,7 @@ function envoyerEmailClientEdl(mission, phase) {
     const titre = TITRES[phase] || TITRES.depart;
     const msg = 'Bonjour ' + (client.prenom || '') + ',\n\n' +
       (CORPS[phase] || CORPS.depart) +
-      '\n\nRéférence mission : ' + mission.reference +
+      '\n\nRéférence mission : ' + (mission.reference_courte || mission.reference) +
       (estFinDeMission
         ? '\n\nMerci de votre confiance — n\'hésitez pas à nous contacter pour toute question. À bientôt pour une prochaine mission, nous serons ravis de vous accompagner à nouveau !\n\nCordialement,\nL\'équipe HelixCar'
         : '\n\nVous pouvez compter sur notre équipe pour vous accompagner et vous tenir informé tout au long de la mission.\n\nCordialement,\nL\'équipe HelixCar');
@@ -1012,16 +626,22 @@ function envoyerEmailClientEdl(mission, phase) {
 // ── MISSION CODE ──────────────────────────────────────────
 let missionCode = '';
 let currentMission = null;
+let kilometrageDepart = null;
 
 async function validateMissionCode() {
-  const input = document.getElementById('mission-code-input').value.trim().toUpperCase();
+  const input = document.getElementById('mission-code-input').value.trim();
   const errorEl = document.getElementById('code-error');
   const btn = document.querySelector('#screen-code button');
   errorEl.style.display = 'none';
   if (btn) { btn.disabled = true; btn.textContent = 'Vérification…'; }
   try {
-    const rows = await sbFetch('missions?reference=eq.' + encodeURIComponent(input));
-    const mission = (rows || [])[0];
+    const saisie = HCDocumentsMission.lireCode(input, new URLSearchParams(location.search).get('phase'));
+    if(saisie.phase!==PHASE){
+      location.href='edl.html?code='+encodeURIComponent(input)+'&phase='+encodeURIComponent(saisie.phase);
+      return;
+    }
+    await convoyeurSessionReady;
+    const mission = await HCDocumentsMission.chercher(sbFetch, input, PHASE);
     if (!mission) {
       errorEl.textContent = "Aucune mission trouvée avec ce code.";
       errorEl.style.display = 'block';
@@ -1029,7 +649,7 @@ async function validateMissionCode() {
       return;
     }
     const conv = window._currentConvoyeur;
-    if (conv && mission.convoyeur_id && mission.convoyeur_id !== conv.id) {
+    if (!conv || !mission.convoyeur_id || mission.convoyeur_id !== conv.id) {
       errorEl.textContent = "Cette mission ne t'est pas assignée.";
       errorEl.style.display = 'block';
       return;
@@ -1057,6 +677,7 @@ async function validateMissionCode() {
     currentMission = mission;
     missionCode = mission.reference;
     // Préremplissage des infos véhicule à partir de la vraie mission (véhicule de restitution si la phase concerne la restitution)
+    document.getElementById('mission-code-input').value = HCDocumentsMission.code(mission.reference_courte || mission.reference, PHASE);
     const marqueSource = IS_RESTIT ? (mission.restit_marque_modele || mission.marque_modele) : mission.marque_modele;
     const immatSource = IS_RESTIT ? (mission.restit_immatriculation || mission.immatriculation) : mission.immatriculation;
     const parts = (marqueSource || '').split(' ');
@@ -1073,14 +694,16 @@ async function validateMissionCode() {
 
     document.getElementById('screen-code').style.display = 'none';
     document.getElementById('step-1').style.display = 'block';
+    document.getElementById('sticky').style.display = 'block';
     document.querySelector('.hdr .logo').insertAdjacentHTML('afterend',
-      `<span style="font-size:.72rem;background:rgba(245,197,24,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${missionCode}</span>`
+      `<span style="font-size:.72rem;background:rgba(179,38,55,.2);color:var(--y);padding:3px 10px;border-radius:100px;font-weight:700;margin-left:8px">${edlHtml(HCDocumentsMission.code(currentMission.reference_courte || missionCode, PHASE))}</span>`
     );
-    if (PHASE === 'arrivee' || PHASE === 'restitution_arrivee') chargerPhotosPrecedentesPourComparaison();
+    if (PHASE === 'arrivee' || PHASE === 'restitution_arrivee') await chargerPhotosPrecedentesPourComparaison();
+    await restaurerBrouillonEdl();
     updProg();
   } catch (e) {
     console.error(e);
-    errorEl.textContent = "Erreur de connexion — vérifie ta connexion et réessaie.";
+    errorEl.textContent = e.message || 'Connexion impossible. Réessayez.';
     errorEl.style.display = 'block';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Valider →'; }
@@ -1090,7 +713,7 @@ async function validateMissionCode() {
 // Si l'URL contient déjà ?mission=REF, on saute l'écran de saisie du code
 (function() {
   const params = new URLSearchParams(location.search);
-  const refFromUrl = params.get('mission');
+  const refFromUrl = params.get('code') || params.get('mission');
   if (refFromUrl) {
     document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('mission-code-input').value = refFromUrl;
@@ -1107,7 +730,9 @@ document.getElementById('mission-code-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') validateMissionCode();
 });
 
-const PHASE=new URLSearchParams(location.search).get('phase')||'depart';
+const edlParams=new URLSearchParams(location.search);
+let PHASE=edlParams.get('phase')||'depart';
+try{PHASE=HCDocumentsMission.lireCode(edlParams.get('code')||edlParams.get('mission')||document.getElementById('mission-code-input').placeholder,edlParams.get('phase')).phase;}catch{/* La validation affiche l’erreur sans ouvrir le formulaire. */}
 const IS_ARR=PHASE==='arrivee'||PHASE==='restitution_arrivee';
 const IS_RESTIT=PHASE==='restitution_depart'||PHASE==='restitution_arrivee';
 const STEPS=[{id:1,l:'Infos'},{id:2,l:'Extérieur'},{id:3,l:'Roues'},{id:4,l:'Intérieur'},{id:5,l:'Signature'}];
@@ -1130,11 +755,11 @@ let sd=false;
 function gp(e){const r=sc.getBoundingClientRect(),w=sc.width/r.width,h=sc.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*w,y:(e.touches[0].clientY-r.top)*h};return{x:(e.clientX-r.left)*w,y:(e.clientY-r.top)*h};}
 sc.addEventListener('mousedown',e=>{sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)});
 sc.addEventListener('mousemove',e=>{if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();sigHas=true});
-sc.addEventListener('mouseup',()=>sd=false);
+sc.addEventListener('mouseup',()=>{sd=false;planifierSauvegardeEdl();});
 sc.addEventListener('touchstart',e=>{e.preventDefault();sd=true;sx.beginPath();const p=gp(e);sx.moveTo(p.x,p.y)},{passive:false});
 sc.addEventListener('touchmove',e=>{e.preventDefault();if(!sd)return;const p=gp(e);sx.lineTo(p.x,p.y);sx.stroke();sigHas=true},{passive:false});
-sc.addEventListener('touchend',()=>sd=false);
-function clearSig(){sx.clearRect(0,0,sc.width,sc.height);sigHas=false;}
+sc.addEventListener('touchend',()=>{sd=false;planifierSauvegardeEdl();});
+function clearSig(){sx.clearRect(0,0,sc.width,sc.height);sigHas=false;planifierSauvegardeEdl();}
 function nextStep(){
   if(!validate(cur))return;
   if(cur===STEPS.length){submit();return;}
@@ -1157,7 +782,7 @@ function updProg(){
   document.getElementById('pl').textContent=`Étape ${cur} / ${STEPS.length}`;
 }
 function validate(s){
-  if(s===1){if(!document.getElementById('v-km').value){alert('⚠️ Kilométrage obligatoire.');return false;}if(!etat){alert('⚠️ État général obligatoire.');return false;}return true;}
+  if(s===1){if(!/^\d+$/.test(document.getElementById('v-km').value)){alert('⚠️ Kilométrage obligatoire.');return false;}if((PHASE==='arrivee'||PHASE==='restitution_arrivee') && kilometrageDepart != null && Number(document.getElementById('v-km').value)<kilometrageDepart){alert('Le kilométrage d’arrivée ne peut pas être inférieur à celui du départ ('+kilometrageDepart.toLocaleString('fr-FR')+' km).');return false;}if(!etat){alert('⚠️ État général obligatoire.');return false;}return true;}
   if(s===2){if(!photos['vin']){alert('⚠️ La photo du numéro de châssis (VIN) est obligatoire.');return false;}const m=['avant','arriere','gauche','droit','avg','avd','arg','ard'].filter(x=>!photos[x]);if(m.length){alert(`⚠️ ${m.length} photo(s) extérieure(s) manquante(s).`);return false;}return true;}
   if(s===3){const m=['pag','pad','prg','prd'].filter(x=>!photos[x]);if(m.length){alert(`⚠️ ${m.length} photo(s) de roue(s) manquante(s).`);return false;}return true;}
   if(s===4){
@@ -1170,7 +795,7 @@ function validate(s){
   if(s===5){if(!sigHas){alert('⚠️ Signature obligatoire.');return false;}return true;}
   return true;
 }
-function setEtat(v,b){etat=v;document.querySelectorAll('.eb').forEach(x=>x.className='eb');const m={mauvais:'sm',acceptable:'sa',bon:'sb',excellent:'se'};b.classList.add(m[v]);}
+function setEtat(v,b){etat=v;document.querySelectorAll('.eb').forEach(x=>x.className='eb');const m={mauvais:'sm',acceptable:'sa',bon:'sb',excellent:'se'};b.classList.add(m[v]);planifierSauvegardeEdl();}
 function triggerPhoto(slot){curSlot=slot;document.getElementById('file-input').value='';document.getElementById('file-input').click();}
 function triggerPhotoNoDmg(slot){curSlot=slot;document.getElementById('file-input-nodmg').value='';document.getElementById('file-input-nodmg').click();}
 function handlePhotoNoDmg(e){
@@ -1195,6 +820,7 @@ function handlePhoto(e){
   };r.readAsDataURL(f);
 }
 function updCtr(){
+  planifierSauvegardeEdl();
   const ec=document.getElementById('ext-c'),pc=document.getElementById('pneu-c'),ic=document.getElementById('int-c');
   if(ec)ec.textContent=['avant','arriere','gauche','droit','avg','avd','arg','ard'].filter(x=>photos[x]).length;
   if(pc)pc.textContent=['pag','pad','prg','prd'].filter(x=>photos[x]).length;
@@ -1230,7 +856,7 @@ function handleDmgPhoto(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    dmgPhotos[curSlot].push(ev.target.result);dmgStep=2;
+    dmgPhotos[curSlot].push(ev.target.result);planifierSauvegardeEdl();dmgStep=2;
     document.getElementById('doi-photo').style.display='none';
     document.getElementById('doi-type').style.display='block';
     // Pas de bouton skip non plus ici - doit choisir le type
@@ -1239,7 +865,7 @@ function handleDmgPhoto(e){
 }
 function pickDmg(t){
   if(!t.trim())return;
-  dmgTypes[curSlot].push(t);
+  dmgTypes[curSlot].push(t);planifierSauvegardeEdl();
   const sl=document.getElementById('sl-'+curSlot);if(sl)sl.classList.add('hasdmg');
   document.getElementById('doi-type').style.display='none';
   document.getElementById('doi-done-actions').style.display='flex';
@@ -1249,32 +875,34 @@ function ajouterAutreDegat(){
   document.getElementById('doi-done-actions').style.display='none';
   dmgStep=0;
 }
-function closeDoi(){document.getElementById('doi').classList.remove('open');document.getElementById('doi-done-actions').style.display='none';}
+function closeDoi(){planifierSauvegardeEdl();document.getElementById('doi').classList.remove('open');document.getElementById('doi-done-actions').style.display='none';}
 const EL={mauvais:'🔴 Mauvais état',acceptable:'🟠 État correct',bon:'🔵 Bon état',excellent:'🟢 Excellent état'};
 function buildRecap(){
   const pd=Object.keys(dmgTypes).flatMap(s => (dmgTypes[s]||[]).map((t,i) => s+' #'+(i+1)+': '+t));
   const all=[...pd].filter(Boolean);
   const dh=all.length
-    ?`<div style="padding:8px;background:rgba(239,68,68,.05);border-radius:7px;border:1px solid rgba(239,68,68,.2);margin-top:4px"><span style="font-size:.73rem;color:var(--rd);font-weight:600">⚠️ Dommages : </span><span style="font-size:.78rem">${all.join(' · ')}</span></div>`
+    ?`<div style="padding:8px;background:rgba(239,68,68,.05);border-radius:7px;border:1px solid rgba(239,68,68,.2);margin-top:4px"><span style="font-size:.73rem;color:var(--rd);font-weight:600">⚠️ Dommages : </span><span style="font-size:.78rem">${edlHtml(all.join(' · '))}</span></div>`
     :`<div style="padding:7px 9px;background:rgba(34,197,94,.06);border-radius:7px;border:1px solid rgba(34,197,94,.2);font-size:.78rem;color:var(--gn)">✅ Aucun dommage constaté</div>`;
   document.getElementById('recap-content').innerHTML=`<div style="display:flex;flex-direction:column">
-    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${missionCode}</span></div>
-    <div class="rrow"><span>Véhicule</span><span>${document.getElementById('v-marque').value} ${document.getElementById('v-modele').value}</span></div>
-    <div class="rrow"><span>Immatriculation</span><span>${document.getElementById('v-immat').value}</span></div>
+    <div class="rrow"><span>Code mission</span><span style="font-weight:700;font-family:monospace">${edlHtml(HCDocumentsMission.code(currentMission.reference_courte || missionCode, PHASE))}</span></div>
+    <div class="rrow"><span>Véhicule</span><span>${edlHtml(document.getElementById('v-marque').value)} ${edlHtml(document.getElementById('v-modele').value)}</span></div>
+    <div class="rrow"><span>Immatriculation</span><span>${edlHtml(document.getElementById('v-immat').value)}</span></div>
     <div class="rrow"><span>N° VIN (châssis)</span><span style="font-size:.78rem">${photos['vin']?'📸 Photo prise ✓':'—'}</span></div>
-    <div class="rrow"><span>Conducteur</span><span>${document.getElementById('v-conv').value}</span></div>
-    <div class="rrow"><span>Lieu</span><span>${document.getElementById('v-lieu').value||'—'}</span></div>
+    <div class="rrow"><span>Conducteur</span><span>${edlHtml(document.getElementById('v-conv').value)}</span></div>
+    <div class="rrow"><span>Lieu</span><span>${edlHtml(document.getElementById('v-lieu').value||'—')}</span></div>
     <div class="rrow"><span>Kilométrage</span><span>${document.getElementById('v-km').value} km</span></div>
     <div class="rrow"><span>État général</span><span>${EL[etat]||'—'}</span></div>
-    <div class="rrow"><span>Photos</span><span style="color:var(--gn)">16/16 ✅</span></div>
+    <div class="rrow"><span>Photos</span><span style="color:var(--gn)">${Object.keys(photos).length} photos ✅</span></div>
     <div class="rrow"><span>Phase</span><span>${PHASE_LABELS[PHASE]||'🚦 Départ'}</span></div>
     <div style="margin-top:5px">${dh}</div>
-    <div style="margin-top:8px;padding:8px 10px;background:rgba(37,86,168,.06);border-radius:7px;border:1px solid rgba(37,86,168,.2);font-size:.78rem;color:var(--bl)">⛽ <strong>Rappel carburant :</strong> Restituer le véhicule avec le même niveau qu'à la prise en charge.</div>
-    ${document.getElementById('v-obs').value?`<div style="margin-top:5px;padding:7px;background:rgba(249,115,22,.06);border-radius:7px;border:1px solid rgba(249,115,22,.2)"><span style="font-size:.72rem;color:var(--or);font-weight:600">📝 Observations : </span><span style="font-size:.78rem">${document.getElementById('v-obs').value}</span></div>`:''}
+    <div style="margin-top:8px;padding:8px 10px;background:rgba(179,38,55,.06);border-radius:7px;border:1px solid rgba(179,38,55,.2);font-size:.78rem;color:var(--bl)">⛽ <strong>Rappel carburant :</strong> Restituer le véhicule avec le même niveau qu'à la prise en charge.</div>
+    ${document.getElementById('v-obs').value?`<div style="margin-top:5px;padding:7px;background:rgba(249,115,22,.06);border-radius:7px;border:1px solid rgba(249,115,22,.2)"><span style="font-size:.72rem;color:var(--or);font-weight:600">📝 Observations : </span><span style="font-size:.78rem">${edlHtml(document.getElementById('v-obs').value)}</span></div>`:''}
   </div>`;
 }
 async function submit(){
-  if(!validate(5))return;
+  if(document.getElementById('next-btn').disabled)return;
+  if(!currentMission)return;
+  for(let step=1;step<=5;step++)if(!validate(step))return;
   const btn = document.getElementById('next-btn');
   const originalText = btn.textContent;
   btn.disabled = true; btn.textContent = 'Enregistrement…';
@@ -1284,7 +912,7 @@ async function submit(){
     const dommagesTxt = [...pd].filter(Boolean).join(' · ') || null;
 
     // Upload des photos (véhicule + dégâts éventuels) vers Supabase Storage
-    const folder = missionCode + '-' + PHASE + '-' + Date.now();
+    const folder = currentMission.id+'/'+PHASE+'/'+edlSubmissionId;
     const photoUrls = {};
     for (const slot in photos) {
       photoUrls[slot] = await uploadEdlFile(photos[slot], folder + '/' + slot + '.jpg');
@@ -1299,46 +927,22 @@ async function submit(){
     const signatureDataUrl = sc.toDataURL('image/png');
     const signatureUrl = await uploadEdlFile(signatureDataUrl, folder + '/signature.png');
 
-    await sbFetch('etats_des_lieux', {
-      method: 'POST',
-      headers: { 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        mission_id: currentMission ? currentMission.id : null,
-        phase: PHASE,
-        km: parseInt(document.getElementById('v-km').value) || null,
-        carburant: document.getElementById('v-carb').value,
-        etat_general: etat,
-        observations: document.getElementById('v-obs').value || null,
-        dommages: dommagesTxt,
-        signature_url: signatureUrl,
-        photos: Object.assign({}, photoUrls, dmgPhotoUrls),
-        latitude: window._edlLat || null,
-        longitude: window._edlLng || null
-      })
-    });
-
-    if (currentMission) {
-      const maintenant = new Date().toISOString();
-      let patch;
-      if (PHASE === 'depart') {
-        patch = { statut: 'en_cours', date_prise_en_charge: maintenant };
-      } else if (PHASE === 'arrivee') {
-        patch = currentMission.restitution
-          ? { statut: 'restitution_requise', date_livraison: maintenant }
-          : { statut: 'edl_termine', date_livraison: maintenant };
-      } else if (PHASE === 'restitution_depart') {
-        patch = { statut: 'restitution_en_cours', date_restitution_depart: maintenant };
-      } else { // restitution_arrivee
-        patch = { statut: 'edl_termine', date_restitution_arrivee: maintenant };
+    {
+      const payload={km:Number(document.getElementById('v-km').value),carburant:document.getElementById('v-carb').value,etat_general:etat,
+        observations:document.getElementById('v-obs').value||null,dommages:dommagesTxt,signature_url:signatureUrl,photos:Object.assign({},photoUrls,dmgPhotoUrls)};
+      const {data,error}=await sbAuth.rpc('enregistrer_edl_test',{p_mission_id:currentMission.id,p_phase:PHASE,p_submission_id:edlSubmissionId,p_payload:payload});
+      if(error||!data?.ok){
+        const labels={KILOMETRAGE_INCOHERENT:'Le kilométrage est inférieur à celui du départ.',PHOTOS_MANQUANTES:'Des photos obligatoires sont manquantes.',FICHIER_NON_ENREGISTRE:'Une photo ou la signature doit être envoyée à nouveau.',PHASE_DEJA_VALIDEE:'Cette phase a déjà été validée.',ORDRE_INVALIDE:'La mission a changé de phase. Rechargez votre espace.'};
+        throw new Error(labels[data?.code]||'État des lieux non enregistré. Vos saisies sont conservées.');
       }
-      await sbFetch('missions?id=eq.' + currentMission.id, {
-        method: 'PATCH',
-        headers: { 'Prefer': 'return=minimal' },
-        body: JSON.stringify(patch)
-      });
-      envoyerEmailClientEdl(currentMission, PHASE);
+      await supprimerBrouillonEdl();
+      if(currentMission.devis_source_id)try{
+        const session=(await sbAuth.auth.getSession()).data.session;
+        const r=await fetch(SUPABASE_URL+'/functions/v1/mission-accepter-test',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({action:'notifications',mission_id:currentMission.id})});
+        const result=await r.json();
+        messageBrouillonEdl(result.ok?'Rapport enregistré. Notifications envoyées.':'Rapport enregistré. Notifications en attente.');
+      }catch{messageBrouillonEdl('Rapport enregistré. Notifications en attente.');}
     }
-
     document.getElementById('step-5').style.display='none';
     document.getElementById('sticky').style.display='none';
     document.getElementById('success-screen').style.display='block';
@@ -1348,26 +952,87 @@ async function submit(){
         : "État des lieux d'arrivée validé !";
       document.getElementById('suc-msg').textContent = currentMission && currentMission.restitution
         ? "Le véhicule est arrivé. Une restitution est à effectuer — l'état des lieux de restitution (départ) sera disponible depuis ton espace convoyeur."
-        : "La mission est terminée. Rapport enregistré et signé.";
-      document.getElementById('sms-note').textContent='📱 SMS envoyé au client pour confirmer l\'arrivée.';
+        : "Livraison constatée. Rapport signé, en attente de contrôle HelixCar.";
+      document.getElementById('sms-note').textContent='Rapport disponible dans le dossier de la mission.';
     } else if (PHASE === 'restitution_depart') {
       document.getElementById('suc-title').textContent = "État des lieux de restitution (départ) validé !";
       document.getElementById('suc-msg').textContent = "Vous pouvez démarrer le trajet de restitution.";
     } else if (PHASE === 'restitution_arrivee') {
       document.getElementById('suc-title').textContent = "État des lieux de restitution (arrivée) validé !";
-      document.getElementById('suc-msg').textContent = "La restitution est terminée. Mission clôturée.";
-      document.getElementById('sms-note').textContent='📱 SMS envoyé au client pour confirmer la restitution.';
+      document.getElementById('suc-msg').textContent = "Restitution constatée. La mission attend le contrôle HelixCar.";
+      document.getElementById('sms-note').textContent='Rapport disponible dans le dossier de la mission.';
     }
     STEPS.forEach(s=>document.getElementById('psi-'+s.id).className='psi done');
     const sucCode = document.getElementById('suc-code');
-    if (sucCode) sucCode.textContent = missionCode;
+    if (sucCode) sucCode.textContent = HCDocumentsMission.code(currentMission.reference_courte || missionCode, PHASE);
     window.scrollTo({top:0,behavior:'smooth'});
   } catch (e) {
     console.error(e);
-    alert('❌ Erreur lors de l\'enregistrement de l\'état des lieux (voir la console). Réessaie.');
+    await sauvegarderBrouillonEdl();
+    alert(e.message||'Échec de l’enregistrement. Vos saisies sont conservées sur cet appareil.');
     btn.disabled = false; btn.textContent = originalText;
   }
 }
+// Brouillon local séparé par compte, véhicule/mission et phase. Aucun succès simulé.
+let edlSubmissionId=crypto.randomUUID(),edlSaveTimer=null,edlRestoring=false,edlFinished=false;
+function messageBrouillonEdl(message){
+ let el=document.getElementById('edl-brouillon-status');
+ if(!el){el=document.createElement('p');el.id='edl-brouillon-status';el.setAttribute('role','status');el.style.cssText='padding:8px 16px;font-size:.8rem;color:#555';document.querySelector('.hdr').after(el);}
+ el.textContent=message;
+}
+async function baseBrouillonEdl(){
+ return new Promise((resolve,reject)=>{const r=indexedDB.open('helixcar-edl-brouillons',1);r.onupgradeneeded=()=>r.result.createObjectStore('brouillons');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+}
+async function cleBrouillonEdl(){
+ if(!currentMission?.id)return null;
+ const session=(await sbAuth.auth.getSession()).data.session;
+ return session?session.user.id+'/'+currentMission.id+'/'+PHASE:null;
+}
+async function operationBrouillonEdl(mode,action){
+ const key=await cleBrouillonEdl();if(!key)return null;
+ const db=await baseBrouillonEdl();
+ try{return await new Promise((resolve,reject)=>{
+  const tx=db.transaction('brouillons',mode),store=tx.objectStore('brouillons');const req=action(store,key);
+  tx.oncomplete=()=>resolve(req.result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ });}finally{db.close();}
+}
+function planifierSauvegardeEdl(){
+ if(edlRestoring||edlFinished||!currentMission?.id)return;
+ clearTimeout(edlSaveTimer);edlSaveTimer=setTimeout(sauvegarderBrouillonEdl,400);
+}
+async function sauvegarderBrouillonEdl(){
+ if(edlRestoring||edlFinished||!currentMission?.id)return;
+ try{
+  const fields={};document.querySelectorAll('input[id^="v-"],textarea[id^="v-"],select[id^="v-"]').forEach(el=>fields[el.id]=el.value);
+  await operationBrouillonEdl('readwrite',(store,key)=>store.put({fields,photos,dmgPhotos,dmgTypes,dmgPins,etat,sigHas,signature:sigHas?sc.toDataURL('image/png'):null,submissionId:edlSubmissionId,savedAt:new Date().toISOString()},key));
+  messageBrouillonEdl('Brouillon sauvegardé sur cet appareil. Vous pouvez reprendre après une coupure.');
+ }catch{messageBrouillonEdl('La sauvegarde locale a échoué. Gardez cette page ouverte et libérez de l’espace sur cet appareil.');}
+}
+async function restaurerBrouillonEdl(){
+ if(!currentMission?.id)return;
+ edlRestoring=true;
+ try{
+  const saved=await operationBrouillonEdl('readonly',(store,key)=>store.get(key));
+  if(!saved){messageBrouillonEdl('Vos saisies et photos seront sauvegardées sur cet appareil.');return;}
+  for(const [id,value] of Object.entries(saved.fields||{})){const el=document.getElementById(id);if(el&&id.startsWith('v-'))el.value=value;}
+  photos=saved.photos||{};dmgPhotos=saved.dmgPhotos||{};dmgTypes=saved.dmgTypes||{};dmgPins=saved.dmgPins||{};
+  etat=saved.etat;sigHas=!!saved.sigHas;edlSubmissionId=saved.submissionId||edlSubmissionId;
+  for(const [slot,src] of Object.entries(photos)){const el=document.getElementById('sl-'+slot),img=document.getElementById('pv-'+slot);if(el)el.classList.add('done');if(img)img.src=src;}
+  if(['mauvais','acceptable','bon','excellent'].includes(etat)){const b=document.querySelector('.eb[onclick*="'+etat+'"]');if(b)setEtat(etat,b);}
+  if(sigHas&&saved.signature){await new Promise(resolve=>{const img=new Image();img.onload=()=>{sx.drawImage(img,0,0,sc.width,sc.height);resolve();};img.onerror=()=>{sigHas=false;resolve();};img.src=saved.signature;});}
+  updCtr();messageBrouillonEdl('Brouillon restauré : vérifiez les informations et poursuivez.');
+ }catch{messageBrouillonEdl('Impossible de restaurer le brouillon local.');}
+ finally{edlRestoring=false;}
+}
+async function supprimerBrouillonEdl(){
+ edlFinished=true;clearTimeout(edlSaveTimer);
+ try{await operationBrouillonEdl('readwrite',(store,key)=>store.delete(key));}catch{messageBrouillonEdl('Rapport enregistré. Le brouillon local n’a pas pu être supprimé.');}
+}
+document.addEventListener('input',planifierSauvegardeEdl);document.addEventListener('change',planifierSauvegardeEdl);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')sauvegarderBrouillonEdl();});
+window.addEventListener('offline',()=>messageBrouillonEdl('Connexion coupée. Continuez la saisie ; l’envoi nécessitera le retour du réseau.'));
+window.addEventListener('online',()=>messageBrouillonEdl('Connexion rétablie. Vous pouvez valider et envoyer votre état des lieux.'));
+
 </script>
 </body>
 </html>

@@ -1,0 +1,11 @@
+const {PGlite}=require('@electric-sql/pglite'),fs=require('fs'),assert=require('assert');
+(async()=>{const db=new PGlite();let n=0;const check=(name,b)=>{assert.ok(b,name);console.log('PASS '+name);n++};await db.exec(`create role anon;create role authenticated;create schema private;create table public.missions(id serial primary key,reference text unique,created_at timestamptz default now(),statut text);insert into missions(reference,created_at) values('HC-2026-0001','2026-01-01'),('M-longreference','2026-01-02');`);
+const file=fs.readdirSync('supabase/migrations').find(f=>f.endsWith('_references_courtes_missions.sql'));await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
+let rows=(await db.query('select * from missions order by id')).rows;
+check('Référence courte existante conservée',rows[0].reference_courte==='HC-2026-0001');check('Ancienne référence documentaire préservée',rows[1].reference==='M-longreference');check('Conversion sans collision',rows[1].reference_courte==='HC-2026-0002');
+await db.exec("insert into missions(reference,reference_courte) values('M-new','imposee');");rows=(await db.query('select * from missions order by id')).rows;
+check('Attribution serveur du numéro',/^HC-\d{4}-\d{4}$/.test(rows[2].reference_courte));check('Numéros uniques',new Set(rows.map(m=>m.reference_courte)).size===3);
+let refused=false;try{await db.exec("update missions set reference_courte='HC-2026-9999' where id=1")}catch(e){refused=true}check('Référence permanente',refused);
+await db.exec("update missions set statut='terminee' where id=1");check('Clôture préserve la référence',(await db.query('select reference_courte from missions where id=1')).rows[0].reference_courte==='HC-2026-0001');
+check('Compteur non exposé',!(await db.query("select has_table_privilege('authenticated','private.compteurs_references_missions','UPDATE') as p")).rows[0].p);
+console.log(n+' PASS / 0 FAIL');await db.close();})().catch(e=>{console.error(e);process.exit(1)});
