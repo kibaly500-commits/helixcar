@@ -65,6 +65,7 @@
  }
  async function read(){
   if(currentRole!=='admin')return;
+  window.HCKm?.load();
   const ticket=++generation,cycle=window.HCSync?.capture();
   el('hm-status').textContent='Actualisation du suivi…';
   const valid=()=>ticket===generation&&currentRole==='admin'&&(!cycle||window.HCSync.safe(cycle));
@@ -133,7 +134,7 @@
    const row=document.querySelector('[data-gestion-mission="'+CSS.escape(x.m.id)+'"]');
    if(!row)throw Error('Mission indisponible');
    const heads=Array.from(row.closest('table').querySelectorAll('thead th')).map(h=>h.textContent);
-   el('hm-detail').innerHTML='<p class="hm-state">'+esc(x.label)+(x.step==='historique'?' · '+esc(motifHistorique(x.m)):'')+'</p><dl class="hm-detail-grid">'+Array.from(row.cells).map((cell,i)=>'<div><dt>'+esc(heads[i])+'</dt><dd>'+cell.innerHTML+'</dd></div>').join('')+'</dl>';
+   el('hm-detail').innerHTML=(window.HCKm?.detail(x.m.id)||'')+'<p class="hm-state">'+esc(x.label)+(x.step==='historique'?' · '+esc(motifHistorique(x.m)):'')+'</p><dl class="hm-detail-grid">'+Array.from(row.cells).map((cell,i)=>'<div><dt>'+esc(heads[i])+'</dt><dd>'+cell.innerHTML+'</dd></div>').join('')+'</dl>';
    el('hm-detail').querySelectorAll('button').forEach(b=>{const labels={'✅ Confirmer la mission':'Valider','✅ Valider la prestation':'Valider','✅ Valider pour paiement':'Valider le paiement','✅ Terminer':'Terminer','✗ Annuler':'Annuler','📣 Opportunité':'Offre','Contrôler le dossier':'Dossier','Voir les détails':'Détails','Confirmer la réalisation':'Valider'};const t=b.textContent.trim();if(labels[t])b.textContent=labels[t];});
   }catch(e){el('hm-detail').textContent='Impossible de charger la mission. Fermez puis réessayez.';}
   finally{filtresMissionsAdmin[type]=old;}
@@ -151,7 +152,7 @@
  });
  ['hm-type','hm-diffusion'].forEach(id=>el(id).addEventListener('change',render));el('hm-search').addEventListener('input',render);
  document.addEventListener('click',e=>{const b=e.target.closest('[data-hm-priority]');if(b){step=b.dataset.hmPriority;client=null;showPage('admin-operations');}});
- window.HCMissions={...api,link(id){return sources.has(String(id))||items.some(x=>x.clientId===String(id));},open(id){client=id||null;step='preparer';el('hm-search').value='';el('hm-type').value='';el('hm-diffusion').value='';showPage('admin-operations');},badge(id){return this.link(id)?'<span class="hm-transfer">Transmis aux missions</span><button class="btn btn-sm btn-outline" '+actionHtml('voirMissionsDemande',[id])+'>Voir les missions</button>':'';}};
+ window.HCMissions={...api,async openMission(id){await chargerMissionsUnifiees();if(currentRole!=='admin')return;const x=items.find(x=>x.m.id===id);if(x)await manage(x);},link(id){return sources.has(String(id))||items.some(x=>x.clientId===String(id));},open(id){client=id||null;step='preparer';el('hm-search').value='';el('hm-type').value='';el('hm-diffusion').value='';showPage('admin-operations');},badge(id){return this.link(id)?'<span class="hm-transfer">Transmis aux missions</span><button class="btn btn-sm btn-outline" '+actionHtml('voirMissionsDemande',[id])+'>Voir les missions</button>':'';}};
  HC_ACTIONS.voirMissionsDemande=id=>window.HCMissions.open(id);
  window.addEventListener('hc-session-fermee',()=>{generation++;items=[];sources.clear();client=null;step='preparer';el('hm-list').replaceChildren();el('hm-detail').replaceChildren();el('hm-priorites')?.remove();});
  const suivi=document.createElement('select');suivi.id='hm-devis-suivi';suivi.setAttribute('aria-label','Suivi des dossiers');suivi.innerHTML='<option value="a_traiter">À traiter</option><option value="transmis">Transmis aux missions</option><option value="">Tous les dossiers</option>';el('recherche-devis').after(suivi);suivi.addEventListener('change',()=>filtrerDemandesDevis(el('recherche-devis').value));
