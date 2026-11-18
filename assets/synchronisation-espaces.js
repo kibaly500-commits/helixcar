@@ -209,7 +209,7 @@
       (!url.includes('/rpc/') || /\/(evaluer|enregistrer|valider|corriger|soumettre|accepter|refuser|publier|postuler|annuler|supprimer|confirmer|modifier|finaliser|decider|repondre|mettre)/.test(url));
     var startRevision = revision, startPage = page();
     return originalFetch.apply(this, arguments).then(function (response) {
-      if (isWrite && response.ok) (response.status === 204 ? Promise.resolve(null) : response.clone().json()).then(function (body) {
+      if (isWrite && response.ok) (response.status === 204 ? Promise.resolve(null) : response.clone().text().then(function (text) { return text.trim() ? JSON.parse(text) : null; })).then(function (body) {
         if (body === 0 || body === false || (Array.isArray(body) && !body.length) || (body && (body.ok === false || body.error))) return;
         if (startRevision === revision && startPage === page()) dirty.delete(startPage);
         request(300);
