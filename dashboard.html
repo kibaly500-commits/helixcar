@@ -3324,6 +3324,7 @@ erreurInfos=true;}
       const badges=_badgesSuiviDemandeClient(dv,lignes,erreurInfos,devisIndisponibles).map(function(b){return '<span class="hc-info-etat hc-info-'+b.couleur+'" data-suivi="'+b.type+'">'+escapeHtml(b.texte)+'</span>';}).join('');
       return '<article class="hc-demande-card" data-demande="'+escapeHtml(d.id)+'" data-etat-demande="'+escapeHtml(p.groupe)+'" data-paiement="'+paiement+'" data-devis-lu="'+(p.groupe==='devis' && !!dv?.consulte_le)+'"><div class="hc-demande-summary"><span class="detail-label">'+escapeHtml(d.numero_client||'—')+'</span>'+(d.created_at?'<time class="hc-demande-date" datetime="'+escapeHtml(d.created_at)+'">'+escapeHtml(_dvDateHeure(d.created_at))+'</time>':'')+'<span class="detail-val">'+escapeHtml(_libelleServiceClient(d.type_service))+'</span></div>'
         +'<div class="hc-completion-note" data-completion-note>'+badges+'</div><p class="hc-demande-message">'+escapeHtml(['en-cours','cloture'].includes(p.groupe)?p.texte+'. '+p.message:p.message)+'</p>'+montant+bouton+complement+pointRemise
+        +'<div class="hc-demande-doc-actions"><button type="button" class="btn btn-sm btn-outline" data-suivi-docs="" data-suivi-client="'+escapeHtml(d.id)+'">Ajouter un document</button></div>'
         +'<details class="hc-demande-details"><summary>Voir les détails et documents</summary><div class="hc-demande-meta"><span>Paiement</span><span>'+escapeHtml(devisIndisponibles?'À vérifier':paiement==='paye'?'Effectué':dv && dv.statut==='accepte'?'À effectuer':'Aucun paiement effectué')+'</span></div>'
         +(etatDevis && paiement!=='paye'?'<p class="hc-demande-message" data-etat-devis>'+escapeHtml(etatDevis.texte)+'</p>':'')
         +'<div class="hc-demande-documents"><button class="btn btn-sm btn-outline hc-demande-apercu-btn" '+actionHtml('ouvrirApercuDemandeClient',[d.id])+'>Récapitulatif de la demande</button>'
@@ -3433,7 +3434,7 @@ async function loadMissionsClient() {
       + '<td>' + escapeHtml(_missionLieuClient(m)) + '</td>'
       + '<td>' + escapeHtml(_missionDateClient(m)) + '</td>'
       + '<td><span class="badge badge-progress">' + escapeHtml(_phaseMissionClient(m)) + '</span></td>'
-      + '<td><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirRecapMissionClient',[m.id])+'>Voir le récapitulatif</button> '+evaluation+'</td></tr>';
+      + '<td><button class="btn btn-sm btn-outline" '+actionHtml('ouvrirRecapMissionClient',[m.id])+'>Voir le récapitulatif</button> <button type="button" class="btn btn-sm btn-outline" data-suivi-docs="'+escapeHtml(m.id)+'">Ajouter un document</button> '+evaluation+'</td></tr>';
   }).join('');
 }
 
